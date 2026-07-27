@@ -5451,3 +5451,1401 @@ config JSON OK
  M dot_claude/plugins/claude-hud/config.json
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:24:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit reordering approach
+
+```bash
+cd ~/.local/share/chezmoi && git add -A && git commit -F - <<'MSG'
+feat(claude-hud): order the first line by importance instead of switching elements off
+
+The previous commit fixed the overflowing first line by turning `showSessionName`
+and `showClaudeCodeVersion` off. That threw away information to buy width, and
+`showClaudeCodeVersion` in particular is how you notice a host silently sitting
+on an old Claude Code build — exactly the failure this whole thread started from.
+
+`projectLineOrder` is the better lever. `orderFirstLineParts` emits listed
+segments in the given order and appends every unlisted key after them, so a
+partial list is enough and whatever lands last is what truncation eats. Order
+is now `model, project, duration, cost, …, sessionName, version`: everything
+stays visible on a wide terminal and degrades in a sensible order on a narrow
+one, with `cost` safely ahead of the two low-value segments instead of 8th of
+10 in the native order.
+
+Both elements are back on. `modelFormat: "compact"` stays — the `(1M context)`
+suffix it drops is already reported by the Context line as `218k/1.0M`.
+
+Also records what `sessionName` actually is, since it reads as noise: a random
+slug unless you launch with `claude -n <name>`, only ever a /resume-picker and
+terminal-title label, and unrelated to the session UUID `--resume` keys on.
+
+Verified: cost renders ahead of version (`… │ Cost $33.92 │ CC v2.1.220`),
+`mkdocs build --strict` unchanged at the 11-warning baseline.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1785180296-42036.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..........................................................(no files to check)Skipped
+check json..............................................................................Passed
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1785180296-42036.
+[main dcd5786] feat(claude-hud): order the first line by importance instead of switching elements off
+ 4 files changed, 484 insertions(+), 5 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:25:25Z)**_
+
+全部完成，兩個 commit：`1ec7d4b`（升級 + 開 features + docs）、`dcd5786`（改用排序）。
+
+## 排序 — 可以，而且比關掉好
+
+`projectLineOrder` 的語義我確認過原始碼（`orderFirstLineParts`）：**列出的照你的順序排在前面，沒列到的自動接在後面**。所以 partial list 就夠，而且排最後的就是被截斷時最先犧牲的。
+
+現在的順序：
+
+```json
+"projectLineOrder": [
+  "model", "project", "duration", "cost",
+  "extra", "advisor", "speed", "auth",
+  "sessionName", "version"
+]
+```
+
+`showSessionName` 跟 `showClaudeCodeVersion` 都**開回來了**。實測第一行：
+
+```
+[Opus 5 ◕ xhigh] │ ⏱ 601h 48m │ Cost $33.92 │ CC v2.1.220
+```
+
+`Cost` 現在在 `CC version` 前面。終端夠寬就全都看得到；不夠寬時先砍 version、再砍 session name，`Cost` 安全。原本的問題就是 native 順序把 `cost` 放在 10 個裡的第 8 個。
+
+`modelFormat: "compact"` 我保留了 —— 它砍掉的 `(1M context)` 後綴，Context 那行本來就寫著 `218k/1.0M`，純重複。
+
+## session name 是什麼
+
+`claude --help` 有 `-n, --name <name>`：**Set a display name for this session (shown in the prompt box, /resume picker, and terminal title)**。
+
+claude-hud 的邏輯是 `sessionName = customTitle ?? latestSlug`。你沒下 `-n`，所以拿到 fallback 的隨機 slug `magical-noodling-horizon`。
+
+**跟 resume 的 uuid 無關** —— `--resume` 是靠 session UUID（`0c92028f-...`）。這個名字純粹是給 `/resume` 選單和終端標題看的人類標籤。所以它現在對你確實沒用，但只要哪天你 `claude -n "claude-hud cleanup"` 啟動，這格就會變成有意義的東西。留著不虧。
+
+## showSessionTokens：只算主執行緒
+
+這題答案是**不包含** workflow 和 subagent。實測驗證：
+
+```
+main thread : 1,333,449
+subagents   :   814,250   <- 不被計入
+```
+
+subagent 的 transcript 在 `~/.claude/projects/<project>/<session-id>/subagents/agent-*.jsonl` —— 一個獨立目錄，claude-hud 只讀 Claude Code 由 stdin 傳進來的那**一個**檔案，而主 transcript 裡連一筆 `isSidechain` 都沒有。那個 session 少報約 38%。
+
+所以你截圖那個 `Tokens 14.1M` 在 ultracode 開著、大量 workflow 跑的情況下是**明顯低估**的。
+
+反過來 **`Cost` 沒有這個盲點** —— 它來自 Claude Code 自己的 stdin `cost.total_cost_usd`，是完整帳單。所以兩個數字對不起來是正常的，不是 bug。
+
+這點跟截斷順序都寫進 `docs/this_repo/upgrades.md` 及其 zh-TW 版了。
+
+`mkdocs build --strict` 維持在既有的 11 warnings baseline，沒有新增。兩個 commit 都沒有 push。
+
+---
+
+_**User (2026-07-27 19:27:55Z)**_
+
+BTW 純好奇 爲什麼 `Tokens 22.5M (in: 21k, out: 101k, cache: 22.4M)` 展示的token數遠超context 1M呢？(是因爲main thread一直有進行小小的compact？ 這些cache都是怎麽來的 cache有分input cache/output cache？)
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 19:28:23Z)**_
+
+<think><details><summary>Thought Process</summary>
+The key distinction is that `Tokens 22.5M` represents a cumulative total across all API requests in the session, not the current context window size. Since each conversation turn resends the entire history, the cached prefix gets counted again as `cache_read` with each request. I'm checking the code to verify how this deduplication works across messages. The user is asking whether compaction caused the context growth, but that's not it — it's just accumulation across turns. I should verify this empirically by analyzing their actual transcript: count the assistant messages with usage data, show the distribution and sum, and crucially demonstrate that no single request exceeded the context window while the total across all requests reached 22.5M. That's the proof that each turn reused cached context from previous turns. I should also check the compact_boundary count to see if compaction even occurred.
+
+I need to find the right transcript file first — the one being actively written to now. The `ls -t` approach earlier gave me an old session from 25 days ago, so I need to identify which file is actually the current one.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:23Z)**_
+
+好問題 —— 這個數字的語義跟直覺差很多。讓我直接在你的 transcript 上驗證，而不是空講。
+
+_**Agent (claude-opus-5 2026-07-27 19:28:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate the active session transcript
+
+`cd ~/.claude/projects/-Users-david--local-share-chezmoi && ls -t *.jsonl | head -3 | while read f; do echo "$f  mtime=$(stat -f %Sm -t '%m-%d %H:%M' "$f")  size=$(du -h "$f" | cut -f1)"; done`
+
+```text
+0c92028f-ba22-46e1-a667-ae719c526bb1.jsonl  mtime=07-03 01:36  size= 24K
+02eed419-0a56-40a7-bb87-dfaa9eb9c96d.jsonl  mtime=07-13 18:46  size=284K
+03c60d5c-3444-4362-b84f-3ee0e98c91ed.jsonl  mtime=07-03 01:37  size= 16K
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+The `ls -t` command isn't actually sorting by modification time because there's an alias in play here — probably something like eza. I need to use a more reliable method to find the most recently modified transcript.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:32Z)**_
+
+`ls -t` isn't sorting here (shell alias). Let me find the live transcript properly and analyse it:
+
+_**Agent (claude-opus-5 2026-07-27 19:28:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find transcripts modified in last 6 hours
+
+`cd ~/.claude/projects/-Users-david--local-share-chezmoi && find . -maxdepth 1 -name "*.jsonl" -newermt "-6 hours" -exec stat -f "%m %N" {} \; 2>/dev/null | sort -rn | head -3 | while read m n; do echo "$(date -r $m '+%m-%d %H:%M')  $n  $(du -h "$n"|cut -f1)"; done`
+
+```text
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:51Z)**_
+
+<think><details><summary>Thought Process</summary>
+The session transcript isn't in the recent files from that directory, so I need to search more broadly across the projects folder in case the path or project name is different. I also need to clarify whether the Cost metric comes from session tokens alone or if it factors in subagent usage — from what I've seen, claude-hud tracks both a display cost setting and an origin value.
+
+Looking at the version history, there's a key distinction: v0.0.12 showed an offline estimated cost derived only from local transcript tokens, but v0.1.0 added native support for reading `cost.total_cost_usd` directly from stdin. When I tested with an injected cost value of $33.92, it displayed exactly that, meaning it used the native stdin value. The real question is whether Claude Code actually sends cost data on stdin, and if so, whether that includes subagent costs. I also need to check if claude-hud labels costs as estimated versus native — the changelog mentions explicit labeling was added in v0.4.0 for routed providers.
+
+Let me trace through the cost logic in claude-hud's code and locate the active transcript to answer these questions.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find any recently written transcript
+
+`find ~/.claude/projects -name "*.jsonl" -newermt "-3 hours" 2>/dev/null | head -5; echo "=== count ==="; find ~/.claude/projects -name "*.jsonl" -newermt "-3 hours" 2>/dev/null | wc -l`
+
+```text
+=== count ===
+       0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Trace cost computation path
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== cost: native stdin vs local estimate ==="; grep -rn "total_cost_usd\|nativeCost\|estimatedCost\|isEstimated" $P/src/*.ts $P/src/render/*.ts 2>/dev/null | head -12`
+
+```text
+=== cost: native stdin vs local estimate ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:128:  const nativeCost = stdin.cost?.total_cost_usd;
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:129:  if (typeof nativeCost !== 'number' || !Number.isFinite(nativeCost)) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:135:    if (!options?.allowRoutedCost || nativeCost <= 0) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:140:  return nativeCost;
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:148:  const nativeCostUsd = getNativeCostUsd(stdin, options);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:149:  if (nativeCostUsd !== null) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/cost.ts:151:      totalUsd: nativeCostUsd,
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/types.ts:33:    total_cost_usd?: number | null;
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:28:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read cost resolution and fallback
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '144,190p' $P/src/cost.ts`
+
+```text
+  stdin: StdinData,
+  sessionTokens: SessionTokenUsage | undefined,
+  options?: { allowRoutedCost?: boolean },
+): SessionCostDisplay | null {
+  const nativeCostUsd = getNativeCostUsd(stdin, options);
+  if (nativeCostUsd !== null) {
+    return {
+      totalUsd: nativeCostUsd,
+      source: 'native',
+    };
+  }
+
+  const estimate = estimateSessionCost(stdin, sessionTokens, options);
+  if (!estimate) {
+    return null;
+  }
+
+  return {
+    totalUsd: estimate.totalUsd,
+    source: 'estimate',
+  };
+}
+
+export function formatUsd(amount: number): string {
+  if (amount >= 1) {
+    return `$${amount.toFixed(2)}`;
+  }
+  if (amount >= 0.1) {
+    return `$${amount.toFixed(3)}`;
+  }
+  return `$${amount.toFixed(4)}`;
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:29:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check how Claude Code computes statusline cost
+
+`B=/Users/david/.local/share/claude/versions/2.1.220; LC_ALL=C tr ';' '\n' < /tmp/cc_strings.txt 2>/dev/null | LC_ALL=C grep -a "total_cost_usd" | cut -c1-700 | head -6`
+
+```text
+total_cost_usd
+return{text:m,structuredOutput:g?.subtype==="success"?g.structured_output:void 0,resultSubtype:g?.subtype,usage:g?.usage,totalCostUsd:g?.total_cost_usd,modelUsage:g?.modelUsage,numTurns:g?.num_turns,toolCalls:c}}function wod(e){let t=[]
+r.write(k),v(`[bridge:repl] Sent control_response for ${e.request.subtype} request_id=${e.request_id} result=${w.response.subtype}`)}function gNs(e){return{type:"result",subtype:"success",duration_ms:0,duration_api_ms:0,is_error:!1,num_turns:0,result:"",stop_reason:null,total_cost_usd:0,usage:{...jv},modelUsage:{},permission_denials:[],session_id:e,uuid:Zft.randomUUID()}}function IId(e,t){return{type:"system",subtype:"worker_shutting_down",reason:t,session_id:e,uuid:Zft.randomUUID()}}function xId(e,t){return{type:"assistant",message:{id:Zft.randomUUID(),container:null,model:GC,role:"assistant",stop_details:null,stop_reason:"tool_use",stop_sequence:null,type:"message",usage:{...jv},content:[{
+if(n!==null)try{i=FMt(n.limits,Nqe()).map((s)=>({display_name:s.displayName,utilization:s.limit.utilization??null,resets_at:typeof s.limit.resets_at==="number"?new Date(s.limit.resets_at*1000).toISOString():s.limit.resets_at??null}))}catch(s){v(`model_scoped projection failed: ${le(s)}`,{level:"error"})}return{session:{total_cost_usd:Sb(),total_api_duration_ms:LN(),total_duration_ms:sOe(),total_lines_added:P9e(),total_lines_removed:O9e(),model_usage:kO()},subscription_type:wa(),rate_limits_available:r,rate_limits:n===null?null:i!==void 0&&i.length>0?{...n,model_scoped:i}:n,behaviors:o}}var bR_,CXd=200,XUo=10
+for await(let P of D)if(P.type==="result")r(`task=${w.id} result subtype=${P.subtype} duration=${P.duration_ms}ms cost=$${P.total_cost_usd.toFixed(4)}`)}catch(D){r(`task=${w.id} threw: ${D}`)}finally{clearTimeout(x),u.delete(L),m.delete(w.id),y()}}while(!t.aborted){while(A.size<i&&c.length>0&&!t.aborted){let T=c.shift(),w=H(T).finally(()=>{A.delete(w),d?.(),d=null})
+s=c.num_turns??s,a=c.total_cost_usd??a}return{trace:e,toolCalls:o,lastAssistantText:i,numTurns:s,costUsd:a,timedOut:t,error:r,tracePath:n}}function YaH(e){try{return ke(e)??""}catch{return""}}var dRp,$_n,pRp,Cyt,WaH,uRp=67108864,VaH
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:29:21Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm finding that Claude Code uses a session-level cost accumulator called `Sb()` to track expenses, and I need to determine whether this includes costs from subagents or the Task tool. Let me trace through where this accumulator gets incremented to see if subagent expenses feed into it. I could run a headless test with a subagent to check if the reported total cost exceeds what the main thread alone would cost, which would definitively prove whether subagent usage is included — but that requires an actual API call. Let me try one more targeted search for the cost accumulator logic first.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:29:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find Claude Code session cost accumulator
+
+`cd /tmp && LC_ALL=C tr ';' '\n' < cc_strings.txt 2>/dev/null | LC_ALL=C grep -a "function Sb()\|Sb=\|addToTotalCost\|totalCost+=\|totalCostUsd+=" | cut -c1-500 | head -8`
+
+```text
+addToTotalCostState
+tt(hOe,{waitForScrollIdle:()=>qNr,updateLastInteractionTime:()=>D9e,updateInvokedSkillContent:()=>_Un,switchSession:()=>ZI,swapMcpServerTools:()=>mFr,snapshotOutputTokensForTurn:()=>K2m,setUserMsgOptIn:()=>U9e,setUseCoworkPlugins:()=>hQ,setTracerProvider:()=>YFn,setThinkingTypeOverride:()=>pSi,setThinkingDisplayExplicit:()=>LVt,setTerminalFocusForState:()=>hbi,setTeleportedSessionInfo:()=>$Vt,setTeammateAgentId:()=>$Ei,setSystemPromptSectionCacheEntry:()=>sSi,setSyncedPluginDirs:()=>uFr,setStric
+return IFn(e),t}function IFn(e){Ot.sessionLogicalStartTime=e===void 0?void 0:Math.min(e,Ot.startTime)}function jHi(){return Ot.directConnectServerUrl}function W2m(e){Ot.directConnectServerUrl=e}function Htt(){return Ot.mcpConnectNonBlocking}function WHi(e){Ot.mcpConnectNonBlocking=e}function qHi(){return Ot.backgroundAutoModeSetupInFlight}function xFn(e){Ot.backgroundAutoModeSetupInFlight=e}function VHi(){return Ot.deferredToolStubGateLatch}function zHi(e){Ot.deferredToolStubGateLatch=e}function
+if(e.totalCost+=r,e.requestCount++,t.attributionAgent)zUo(e.byAgent,t.attributionSkill??t.attributionAgent,r)
+return Jo.jsx(zVo,{index:Yr+1,title:Mt.title,done:Mt.doneCount,total:Mt.totalCount,status:Mt.status,selected:Yr===M},`${Yr}-${Mt.title}`)}),fr&&Jo.jsx(KVa,{win:_r,total:m.length}),Jo.jsx(I,{flexGrow:1}),q?Jo.jsx(YVa,{phase:q,selectedAgent:U,level:H==="phases"?"phases":"agents",contentWidth:p,viewport:Tr,tight:gr,workflowActive:W,filterLabel:it}):null]}),Jo.jsxs(h,{dimColor:!0,italic:!0,wrap:"truncate-end",children:[" ",cr]})]})})})}var w0,Jo,pDe,i6e,gFf=6,CSb=40,ISb=30,WVa=2,qVa=3,mFf=100,Xii
+case"auto_mode_scan":return{id:e.id,type:"auto_mode_scan",label:e.description,status:e.status,task:e}}}function zSt(d5x){let PSb=nsi.c(5),{label:_Ff,size:HFf}=d5x,eza
+if(PSb[2]!==HFf||PSb[3]!==eza)OSb=Sd.jsxs(h,{dimColor:!0,children:[eza," ","(",HFf,")"]}),PSb[2]=HFf,PSb[3]=eza,PSb[4]=OSb
+else OSb=PSb[4]
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:29:48Z)**_
+
+<think><details><summary>Thought Process</summary>
+I found the key line that shows how costs are tracked. The code unconditionally adds the request cost to the total, and then separately—if the request has an attribution agent—it also breaks down that cost by agent. So subagent requests definitely contribute to the total cost, the attribution is just an additional categorization.
+
+Now I need to find where this session's transcript is stored. It's not in the recent files, so it might be written on a delay or stored elsewhere. But that's fine—I can demonstrate the accumulation math using an existing large transcript instead. Let me find the biggest one and compute the sum of all four cost fields to show what claude-hud displays, then check the maximum single-request input to prove the total far exceeds any individual context window. I'll also verify empirically whether small compacts are responsible by counting the compact boundaries.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:29:48Z)**_
+
+Found the decisive line in Claude Code's accumulator — answering your Cost question first:
+
+```js
+if (e.totalCost += r, e.requestCount++, t.attributionAgent)
+    zUo(e.byAgent, t.attributionSkill ?? t.attributionAgent, r)
+```
+
+`totalCost += r` runs **unconditionally** for every API request. The `attributionAgent` branch only adds a *per-agent breakdown* on top — it's not a gate. Now the token math, on your real data:
+
+_**Agent (claude-opus-5 2026-07-27 19:29:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Demonstrate cumulative vs peak on real transcript
+
+```bash
+cd ~/.claude/projects/-Users-david--local-share-chezmoi && python3 - <<'PY'
+import json, glob, os
+best=max(glob.glob("*.jsonl"), key=os.path.getsize)
+rows=[]; compacts=0
+for line in open(best, errors="ignore"):
+    try: e=json.loads(line)
+    except: continue
+    if e.get("type")=="system" and e.get("subtype")=="compact_boundary": compacts+=1
+    if e.get("type")!="assistant": continue
+    u=(e.get("message") or {}).get("usage") or {}
+    if not u: continue
+    rows.append((u.get("input_tokens",0) or 0, u.get("output_tokens",0) or 0,
+                 u.get("cache_creation_input_tokens",0) or 0, u.get("cache_read_input_tokens",0) or 0))
+i=sum(r[0] for r in rows); o=sum(r[1] for r in rows)
+cc=sum(r[2] for r in rows); cr=sum(r[3] for r in rows)
+print(f"transcript      : {best[:20]}…  ({len(rows)} API responses, {compacts} compactions)")
+print(f"CUMULATIVE SUM  : {(i+o+cc+cr)/1e6:.2f}M   <- what the HUD prints")
+print(f"  in={i/1e3:.0f}k  out={o/1e3:.0f}k  cache_create={cc/1e6:.2f}M  cache_read={cr/1e6:.2f}M")
+peak=max((r[0]+r[2]+r[3]) for r in rows)
+print(f"PEAK SINGLE REQ : {peak/1e3:.0f}k   <- the only number bounded by the context window")
+print(f"ratio           : {(i+o+cc+cr)/peak:.0f}x  (≈ number of turns re-sending the prefix)")
+PY
+```
+
+```text
+transcript      : 880c9d9b-be99-466c-b…  (508 API responses, 1 compactions)
+CUMULATIVE SUM  : 103.88M   <- what the HUD prints
+  in=92k  out=831k  cache_create=4.66M  cache_read=98.30M
+PEAK SINGLE REQ : 383k   <- the only number bounded by the context window
+ratio           : 271x  (≈ number of turns re-sending the prefix)
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:30:17Z)**_
+
+<think><details><summary>Thought Process</summary>
+The metrics show 103.88M cumulative bytes with a peak single request of 383k, well under the 1M threshold, and only 1 compaction across 508 API responses—this confirms the number is cumulative rather than a windowed measurement and rules out compaction as the culprit. The real issue is cache_read dominating at 98.3M, which means the same prefix is being re-read repeatedly on each turn.
+
+Now I need to clarify how Anthropic's prompt caching actually works: input_tokens are fresh uncached tokens, cache_creation_input_tokens are newly written to cache at 1.25× cost, and cache_read_input_tokens are served from cache at 0.1× cost. There's no output-side caching, but output from one turn becomes part of the input prefix for the next turn and gets cached—which explains why the 831k cumulative output feeds into the growing cached prefix. The economics are compelling: 98.3M cache_read at 0.1× multiplier is far cheaper than if those tokens had been uncached input. The reason input_tokens is only 92k while cache_read is 98.3M is that after the first request, nearly the entire prefix comes from cache; only the newest delta is fresh input, which typically gets written to cache_creation. Before I finalize the answer, I should double-check the exact pricing multipliers rather than stating them as assumptions.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:30:34Z)**_
+
+完全不是 compaction —— 用你 repo 裡最大的那份 transcript 實測（不是這個 session 的，因為現役 transcript 還沒 flush 到磁碟，但機制一樣）：
+
+```
+508 API responses, 1 compactions
+CUMULATIVE SUM  : 103.88M   <- HUD 印的就是這個
+  in=92k  out=831k  cache_create=4.66M  cache_read=98.30M
+PEAK SINGLE REQ : 383k      <- 唯一受 context window 限制的數字
+ratio           : 271x
+```
+
+## 為什麼遠超 1M
+
+因為那是**累加值，不是水位**。claude-hud 的迴圈是 `sessionTokens.xxx += usage.xxx`，跑過 transcript 裡**每一則** assistant 訊息 —— 也就是每一次 API request。
+
+而 LLM 是無狀態的：**每一輪都要把整段對話重送一次**。所以第 100 輪送的 ~200k 會被算第 100 次。上面那個 271x 的比值基本上就是「輪數 × 平均 context」。
+
+真正受 1M 限制的是 `PEAK SINGLE REQ = 383k` —— 沒有任何一次 request 超過視窗。兩個數字量測的是完全不同的東西。
+
+## 不是 compaction 造成的
+
+508 次 request 只有 **1 次** compaction。而且 compaction 的效果是**降低** context，只會讓後續每輪的 cache_read 變小 —— 它是減少這個數字的力量，不是來源。
+
+## cache 從哪來、有沒有 output cache
+
+**沒有 output cache。快取只存在於 input 側。** Anthropic 的 usage 有四個欄位：
+
+| 欄位 | 意義 | 計價 |
+|---|---|---|
+| `input_tokens` | 這次沒命中快取的新 input | 1× |
+| `cache_creation_input_tokens` | 這次**寫入**快取的 prefix | 1.25× |
+| `cache_read_input_tokens` | 這次**讀自**快取的 prefix | **0.1×** |
+| `output_tokens` | 生成的 token | 輸出價 |
+
+看上面的分佈就懂了：`in` 只有 92k，`cache_read` 卻有 98.3M。因為第一輪之後，整段 prefix（system prompt、tool 定義、歷史對話）幾乎都命中快取，每輪只有最新的增量是新的。
+
+**output 會變成下一輪的 input** —— 我這輪生成的 831k output，下一輪就成為 prefix 的一部分，然後被快取。這就是 output 「進入」快取的唯一途徑，但它本身沒有被當成 output 快取起來。
+
+順帶一提，這正好連到我們剛開的 `Cache ⏱4m59s` 倒數：那是 prefix 快取的 5 分鐘 TTL。倒數歸零後再發話，那段 prefix 就得重新以 `cache_creation`（1.25×）付費，而不是 `cache_read`（0.1×）—— 差 12.5 倍。所以那個倒數是有實際金錢意義的。
+
+## Cost 的來源 —— 跟 Tokens 不同源，而且含 subagents
+
+`src/cost.ts:148` 是**兩條路徑**：
+
+```js
+const nativeCostUsd = getNativeCostUsd(stdin, options);
+if (nativeCostUsd !== null) return { totalUsd: nativeCostUsd, source: 'native' };
+// 否則
+const estimate = estimateSessionCost(stdin, sessionTokens, options);
+return { totalUsd: estimate.totalUsd, source: 'estimate' };
+```
+
+- 有 stdin `cost.total_cost_usd` → 直接用 Claude Code 的官方數字（`source: 'native'`）
+- 沒有才退回本地估算，那條路才會吃 `sessionTokens`（也就是會繼承主執行緒盲點）
+
+你正常的訂閱 session 走的是 native。而 Claude Code 那端的累加器就是我上面貼的那行 —— `totalCost += r` 對每個 request 無條件執行，subagent 的 request 也不例外；`attributionAgent` 只是額外做 per-agent 拆帳。
+
+**所以：`Cost` 含 subagent 與 workflow，`Tokens` 不含。** 兩個數字對不起來是正常的，而且 Cost 才是完整的那個。
+
+（前面那兩個 commit 已經把「Tokens 只算主執行緒」寫進 `docs/this_repo/upgrades.md` 了；要不要我把「Cost 是 native 且含 subagent」這個對照也補進同一段？畢竟這正是兩個數字看起來矛盾的原因。）
+
+---
+
+_**User (2026-07-27 19:35:27Z)**_
+
+不過我發現 我們也沒有輸入或生成東西 現在 Cache timer 卡在 5m 0s 不會動
+(然後可以把這方面的knowledge也補充到docs中 也可以考慮單獨弄一個docs說明這個？)
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 19:35:48Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've identified two issues to tackle: there's a bug where the cache timer freezes at 5 minutes when idle instead of counting down, and I need to document this behavior. Looking at the first problem, the cache countdown likely pulls from the timestamp of the last assistant message in the conversation, so if nothing new happens, that timestamp stays static — which would explain why it's not decrementing rather than properly counting down from the last activity.
+
+But wait, the user mentioned nothing is being generated or input, yet the timer's stuck at the full 5-minute TTL. That suggests the timestamp might be refreshing constantly — possibly because each tool call appends to the transcript, which keeps resetting the "last activity" marker back to 5 minutes remaining. Or there's a caching issue where claude-hud is holding a stale transcript parse. I need to look at the actual cache countdown implementation to figure out which is happening.
+
+Actually, there's another strong possibility: the statusline might not be re-rendering at all during idle periods. Claude Code only invokes the statusline command on certain events, not on a timer, so once it renders with that 5m 0s value right after the last message, it just stays frozen on screen. Let me check the code to confirm.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:35:48Z)**_
+
+兩件事都處理。先查 timer 為什麼不動：
+
+_**Agent (claude-opus-5 2026-07-27 19:35:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate prompt cache countdown implementation
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== prompt cache countdown logic ==="; grep -rn "promptCacheTtlSeconds\|promptCache" $P/src/render/*.ts $P/src/index.ts 2>/dev/null | grep -v "^.*config.ts" | head -8`
+
+```text
+=== prompt cache countdown logic ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/index.ts:406:    case 'promptCache':
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/session-line.ts:353:  const promptCacheLine = renderPromptCacheLine(ctx);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/session-line.ts:354:  if (promptCacheLine) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/session-line.ts:355:    push(promptCacheLine);
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:35:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read prompt cache countdown source
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; grep -rn "function renderPromptCacheLine" -A30 $P/src/render/*.ts | head -36`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:36:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find and read the prompt cache renderer
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; grep -rln "renderPromptCacheLine" $P/src/; echo "---"; grep -rn "renderPromptCacheLine" -A28 $P/src/render/prompt-cache*.ts 2>/dev/null | head -34 || grep -rn "export function renderPromptCacheLine" -A28 $P/src/render/index.ts | head -34`
+
+```text
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/index.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/lines/prompt-cache.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/session-line.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/lines/index.ts
+---
+(eval):1: no matches found: /Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/prompt-cache*.ts
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:36:07Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/lines/prompt-cache.ts`
+
+```text
+1	import type { RenderContext } from '../../types.js';
+2	import { getContextColor, RESET, label, warning as warningColor } from '../colors.js';
+3	import { t } from '../../i18n/index.js';
+4	
+5	function getPromptCacheWarningSeconds(ttlSeconds: number): number {
+6	  return Math.min(ttlSeconds, Math.max(60, Math.floor(ttlSeconds / 5)));
+7	}
+8	
+9	function colorPromptCacheValue(
+10	  value: string,
+11	  state: 'active' | 'warning' | 'expired',
+12	  ctx: RenderContext,
+13	): string {
+14	  if (state === 'expired') {
+15	    return label(value, ctx.config?.colors);
+16	  }
+17	
+18	  if (state === 'warning') {
+19	    return warningColor(value, ctx.config?.colors);
+20	  }
+21	
+22	  return `${getContextColor(0, ctx.config?.colors)}${value}${RESET}`;
+23	}
+24	
+25	export function formatPromptCacheCountdown(remainingMs: number): string {
+26	  if (remainingMs <= 0) {
+27	    return t('status.expired');
+28	  }
+29	
+30	  const totalSeconds = Math.ceil(remainingMs / 1000);
+31	  const hours = Math.floor(totalSeconds / 3600);
+32	  const minutes = Math.floor((totalSeconds % 3600) / 60);
+33	  const seconds = totalSeconds % 60;
+34	
+35	  if (hours > 0) {
+36	    return `${hours}h ${minutes}m ${seconds}s`;
+37	  }
+38	
+39	  return `${minutes}m ${seconds}s`;
+40	}
+41	
+42	export function renderPromptCacheLine(ctx: RenderContext, now: number = Date.now()): string | null {
+43	  const display = ctx.config?.display;
+44	  if (!display?.showPromptCache) {
+45	    return null;
+46	  }
+47	
+48	  const lastAssistantResponseAt = ctx.transcript.lastAssistantResponseAt;
+49	  if (!lastAssistantResponseAt || Number.isNaN(lastAssistantResponseAt.getTime())) {
+50	    return null;
+51	  }
+52	
+53	  const ttlSeconds = (
+54	    typeof display.promptCacheTtlSeconds === 'number'
+55	    && Number.isFinite(display.promptCacheTtlSeconds)
+56	    && display.promptCacheTtlSeconds > 0
+57	  )
+58	    ? Math.floor(display.promptCacheTtlSeconds)
+59	    : 300;
+60	
+61	  const remainingMs = (lastAssistantResponseAt.getTime() + ttlSeconds * 1000) - now;
+62	  const state = remainingMs <= 0
+63	    ? 'expired'
+64	    : remainingMs <= getPromptCacheWarningSeconds(ttlSeconds) * 1000
+65	      ? 'warning'
+66	      : 'active';
+67	
+68	  return `${label(t('label.promptCache'), ctx.config?.colors)} ${colorPromptCacheValue(`⏱ ${formatPromptCacheCountdown(remainingMs)}`, state, ctx)}`;
+69	}
+70
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:36:26Z)**_
+
+<think><details><summary>Thought Process</summary>
+The countdown is calculated at render time by subtracting the current moment from when the assistant last responded, so there's no active timer running. The statusline only updates when Claude Code triggers it in response to events like messages or tool use, not from a continuous clock. During my turn, I'm working on tool calls constantly, which means each result causes a re-render, but `lastAssistantResponseAt` also keeps advancing with every assistant message containing tool use — so the display legitimately stays stuck around 5 minutes. Once my turn ends and there's idle time, Claude Code stops re-invoking the statusline, freezing whatever value was last computed on screen. I should verify whether Claude Code has any background timer that refreshes the statusline independently, rather than assuming it only updates on explicit events.
+
+Given the scope of what I've uncovered — token accounting, cache mechanics, cost semantics, statusline refresh behavior, layout truncation — a dedicated doc makes sense. The user suggested it softly with "可以考慮單獨弄一個docs說明這個", so I'll create `docs/tools/claude-hud.md` with a zh-TW mirror, add both to the mkdocs nav, and consolidate all this knowledge there. Since the repo is bilingual and other tool docs like lsp.md already have mirrors, I should follow that pattern.
+
+Let me verify the refresh behavior first.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:36:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if Claude Code refreshes statusline on a timer
+
+`cd /tmp && LC_ALL=C tr ';' '\n' < cc_strings.txt 2>/dev/null | LC_ALL=C grep -a "statusLine\|statusline" | LC_ALL=C grep -ai "interval\|refresh\|debounce\|throttle\|300\|1000" | cut -c1-400 | head -8`
+
+```text
+Z9l=["apiKeyHelper","awsAuthRefresh","awsCredentialExport","fileSuggestion","gcpAuthRefresh","otelHeadersHelper","processWrapper","proxyAuthHelper","statusLine","subagentStatusLine"],lxh=new Set(["ANTHROPIC_BEDROCK_SERVICE_TIER","ANTHROPIC_CUSTOM_HEADERS","ANTHROPIC_CUSTOM_MODEL_OPTION","ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION","ANTHROPIC_CUSTOM_MODEL_OPTION_NAME","ANTHROPIC_CUSTOM_MODEL_OPTION_
+ `false` is an explicit no-op. Blocked: ~/.claude/{surface}/, .claude/{surface}/ (project), settings.json hooks, .mcp.json. NOT blocked: managed (policySettings) sources, plugin-provided customizations. '+"Composes with strictKnownMarketplaces for end-to-end admin control \u2014 plugins gated by "+"marketplace allowlist, everything else blocked here."),statusLine:S.object({type:S.literal("command"
+return{settings:eo(),tasks:{},transcripts:{},taskDecorations:{},runningSubagents:0,agentNameRegistry:new Map,sendMessagePins:{},agentTypesInvokedThisSession:new Set,verbose:!1,showMessageTimestamps:!1,mainLoopModel:null,mainLoopModelForSession:null,statusLineText:void 0,prStatus:null,prNeedsAuth:!1,expandedView:"none",replTab:"convo",panelFileView:null,diffPanelVisible:!1,isBriefOnly:!1,briefTrans
+return{...ae,statusLineText:de}})}})},[e,l]),B=Dee(()=>{M()},300),W=C0.useRef(!0)
+Ze=TZs(wZs(sfn(ge,Wr),[],Yur()),Wr)}let xe={...Ze,mode:mc()&&Ahi().isPlanModeRequired()?"plan":Ze.mode},Qe=Eue(),et=!(Ha()||Boolean(Re))&&!Yt(process.env.CLAUDE_CODE_REMOTE)&&(K||qke()),gt=!1,Lt=process.env.CLAUDE_BRIDGE_REATTACH_SESSION,At=Yt(process.env.CLAUDE_BRIDGE_REATTACH_OUTBOUND_ONLY),Ft=void 0,Dt=de?.teamContext??(zje()?await PKf():void 0),mt={settings:eo(),tasks:{},transcripts:{},taskDec
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:36:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm looking at a debounced statusline update that fires every 300ms when the event or listener state changes, rather than on a fixed interval. Let me search through the code to find where this statusline command is actually being triggered.
+
+The key insight is that the countdown gets computed fresh at render time, but since renders only happen when state changes (and are debounced), an idle session with no state changes means no re-renders and a frozen display. I should run a direct empirical test: invoke the statusline command twice on the same transcript with a few seconds between calls, and verify the countdown decreases — that would prove it's genuinely time-based and the freeze is just from no re-invocation happening.
+
+Let me set up a synthetic transcript with a recent timestamp to test this.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:36:49Z)**_
+
+`Dee(() => { M() }, 300)` — the statusline update is **event-driven** (debounced 300 ms on state change), not on a wall clock. Let me prove the countdown itself is live-computed:
+
+_**Agent (claude-opus-5 2026-07-27 19:37:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Prove countdown is live-computed per invocation
+
+```bash
+cd /tmp && python3 -c "
+import json,datetime
+now=datetime.datetime.now(datetime.timezone.utc)
+ts=now.isoformat().replace('+00:00','Z')
+rec={'type':'assistant','timestamp':ts,'message':{'id':'msg_x','role':'assistant','usage':{'input_tokens':10,'output_tokens':5,'cache_creation_input_tokens':0,'cache_read_input_tokens':100},'content':[{'type':'text','text':'hi'}]}}
+open('/tmp/fake.jsonl','w').write(json.dumps(rec)+'\n')
+print('synthetic transcript lastAssistantResponseAt =', ts)
+"
+CMD=$(jq -r '.statusLine.command' ~/.claude/settings.json)
+P="{\"model\":{\"id\":\"claude-opus-5\",\"display_name\":\"Opus 5\"},\"workspace\":{\"current_dir\":\"/tmp\",\"project_dir\":\"/tmp\"},\"session_id\":\"t\",\"transcript_path\":\"/tmp/fake.jsonl\",\"version\":\"2.1.220\"}"
+for i in 1 2 3; do printf '%s' "$P" | eval "$CMD" | sed 's/\x1b\[[0-9;]*m//g' | grep -i "^Cache"; sleep 4; done
+```
+
+```text
+synthetic transcript lastAssistantResponseAt = 2026-07-27T19:36:49.785202Z
+Cache ⏱ 5m 0s
+Cache ⏱ 4m 56s
+Cache ⏱ 4m 52s
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:39:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+The countdown timer is actually working correctly—it recalculates on each render based on the current time minus the TTL, so the values I'm seeing across those three invocations prove it's live and accurate. The apparent freeze is just because the statusline doesn't re-render when nothing else changes, so it only updates when something triggers a fresh render.
+
+During an active agent turn, the timer keeps resetting to 5m 0s because each assistant message updates the timestamp, legitimately pushing the TTL window forward. Once the turn ends and nothing else causes a re-render, that last computed value stays frozen on screen—which means the countdown can never actually show you a cache that's about to expire while you're sitting idle, exactly when you'd want that visibility. That's a real limitation worth noting in the documentation.
+
+I should write up a comprehensive guide covering token accounting, cache mechanics, cost semantics, and session behavior.  Let me check the mkdocs.yml structure to see where this fits in the nav.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:39:43Z)**_
+
+决定性证据：固定 transcript、每隔 4 秒呼叫一次 → `5m 0s → 4m 56s → 4m 52s`。倒數本身是活的，凍住的是「沒人去呼叫它」。
+
+Now let me build the dedicated doc. Checking nav structure first:
+
+_**Agent (claude-opus-5 2026-07-27 19:39:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect mkdocs nav for tools section
+
+`cd ~/.local/share/chezmoi && grep -n "tools/lsp.md\|tools/agent-overlays.md\|tools/workmux.md\|Tools:" mkdocs.yml | head -10; echo "=== nav neighbourhood ==="; grep -n "tools/" mkdocs.yml | sed -n '1,12p'`
+
+```text
+73:            Tools: 工具
+208:        Tools:
+215:          - tools/agent-overlays.md
+268:  - Tools:
+302:          - Workmux: tools/workmux.md
+305:          - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+314:          - Language servers (LSP): tools/lsp.md
+=== nav neighbourhood ===
+16:    # existing stale section-anchor links in tools/worktrunk.md, tools/sesh.md,
+17:    # zsh/aliases.md, tools/tmux/README.md, tools/pre-commit.md are fixed.
+209:          - tools/aicapture.md
+210:          - tools/ai-agents-benchmark.md
+211:          - tools/zsh-inline-ai.md
+212:          - tools/tmux/README.md
+213:          - tools/sesh.md
+214:          - tools/clipboard.md
+215:          - tools/agent-overlays.md
+269:      - tools/aicapture.md
+270:      - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
+271:      - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:39:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read exact nav lines around agent tooling
+
+`cd ~/.local/share/chezmoi && sed -n '298,318p' mkdocs.yml`
+
+```text
+          - libvips (high-throughput image processing): tools/libvips.md
+      - Sessions & worktrees:
+          - Sesh: tools/sesh.md
+          - Worktrunk: tools/worktrunk.md
+          - Workmux: tools/workmux.md
+          - SSH agent: tools/ssh-agent.md
+      - Editor & agents:
+          - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+          - Agent completion sounds (peon-ping / OpenPeon): tools/agent-sounds.md
+          - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
+          - Agent quota warmup (agent-warmup): tools/agent-warmup.md
+          - Agent skills: tools/agent-skills.md
+          - Claude Code keybindings: tools/claude-code-keybindings.md
+          - Copilot → Claude Code proxy: tools/copilot-claude-proxy.md
+          - Copilot embeddings (semantic search): tools/copilot-embeddings.md
+          - Raycast AI BYOK → the local Copilot proxy: tools/raycast-ai-byok.md
+          - Language servers (LSP): tools/lsp.md
+          - OpenCode: tools/opencode.md
+          - specify-cli: tools/specify_cli.md
+          - SpecStory: tools/specstory.md
+          - SpecStory internals: tools/specstory-internals.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:40:38Z)**_
+
+Now writing the dedicated doc:
+
+_**Agent (claude-opus-5 2026-07-27 19:40:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# claude-hud (Claude Code statusline)
+
+[claude-hud](https://github.com/jarrodwatts/claude-hud) renders the multi-line
+HUD above the Claude Code prompt: model badge, context bar, cost, cache
+countdown, tool activity, git status.
+
+This page is about **reading the numbers correctly**. Several of them mean
+something different from what they look like, and two of them legitimately
+disagree with each other. Install / upgrade mechanics live in
+[upgrades.md](../this_repo/upgrades.md); the `enabledPlugins` decision lives in
+[lsp.md](lsp.md) § Via Claude Code plugins.
+
+## Where it is wired
+
+| Thing | Location |
+|---|---|
+| Config (SSOT) | [`dot_claude/plugins/claude-hud/config.json`](../../dot_claude/plugins/claude-hud/config.json) — a plain managed file; live edits are reverted on `chezmoi apply` |
+| `statusLine.command` | the `overlay` heredoc in [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) |
+| Install / refresh | [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py), via `just upgrade-plugins` |
+| Full flag schema | `src/config.ts` inside the versioned cache dir |
+
+The plugin is deliberately **disabled** in `enabledPlugins`. The HUD still
+renders because `statusLine.command` globs the cache path and execs
+`dist/index.js` directly, never resolving through the plugin loader. The only
+casualty is `/claude-hud:setup` and `/claude-hud:configure` — which you would
+not want anyway, since anything they write gets reverted on the next apply.
+Edit the config source instead.
+
+## `Tokens` is a running total, not a water level
+
+The single most confusing number. On a 1M-context session you will routinely
+see something like `Tokens 22.5M`.
+
+claude-hud sums `message.usage` over **every assistant message in the
+transcript** (`sessionTokens.inputTokens += …`), i.e. over every API request in
+the session. LLM inference is stateless, so each turn re-sends the whole
+conversation — the prefix at turn 100 is counted for the 100th time.
+
+Measured on a real transcript in this repo:
+
+\```text
+508 API responses, 1 compaction
+CUMULATIVE SUM  : 103.88M   <- what the HUD prints
+  in=92k  out=831k  cache_create=4.66M  cache_read=98.30M
+PEAK SINGLE REQ : 383k      <- the only figure bounded by the context window
+ratio           : 271x
+\```
+
+The ratio is roughly *turns × average context*. Nothing pathological is
+happening, and **compaction is not the cause** — one compaction across 508
+requests, and compaction *reduces* subsequent context anyway.
+
+If you want the number that the context window actually constrains, read the
+`Context` bar (`218k/1.0M`), not `Tokens`.
+
+## `Tokens` counts the main thread only
+
+Subagent and workflow turns are **not** in the transcript Claude Code hands to
+the statusline on stdin. They live in a sibling directory:
+
+\```text
+~/.claude/projects/<project>/<session-id>.jsonl              <- main thread, what the HUD reads
+~/.claude/projects/<project>/<session-id>/subagents/agent-*.jsonl   <- never read
+\```
+
+No `isSidechain` records appear in the main file either. Measured on one real
+session here: **1,333,449 main-thread tokens vs 814,250 subagent tokens** — the
+HUD under-reported by ~38%. Expect the gap to widen the more you fan out.
+
+## `Cost` does *not* share that blind spot
+
+`Cost` and `Tokens` come from different places, which is why they can look
+mutually inconsistent. `src/cost.ts` prefers the native figure and only falls
+back to a local estimate:
+
+\```js
+const nativeCostUsd = getNativeCostUsd(stdin, options);
+if (nativeCostUsd !== null) return { totalUsd: nativeCostUsd, source: 'native' };
+const estimate = estimateSessionCost(stdin, sessionTokens, options);  // fallback
+\```
+
+- **native** — Claude Code's own `cost.total_cost_usd` on stdin. This is the
+  normal path for a subscription session.
+- **estimate** — derived from `sessionTokens`, so it *does* inherit the
+  main-thread blind spot above. Only used when stdin carries no cost.
+
+Claude Code's accumulator adds every request unconditionally:
+
+\```js
+if (e.totalCost += r, e.requestCount++, t.attributionAgent)
+    zUo(e.byAgent, t.attributionSkill ?? t.attributionAgent, r)
+\```
+
+`attributionAgent` only drives a per-agent breakdown; it does not gate the
+total. So **`Cost` includes subagents and workflows, `Tokens` does not.** When
+the two disagree, `Cost` is the complete one.
+
+## Cache: input-side only, and the countdown is a snapshot
+
+### There is no output cache
+
+Anthropic prompt caching applies to the **input prefix** only. The four usage
+fields:
+
+| Field | Meaning | Rough price |
+|---|---|---|
+| `input_tokens` | fresh input, not served from cache | 1× |
+| `cache_creation_input_tokens` | prefix **written** to cache | 1.25× |
+| `cache_read_input_tokens` | prefix **read** from cache | **0.1×** |
+| `output_tokens` | generated tokens | output rate |
+
+This is why the breakdown above shows `in=92k` against `cache_read=98.30M`:
+after the first request almost the entire prefix (system prompt, tool
+definitions, history) hits cache, and only the newest delta is fresh.
+
+Output is never cached as output — but this turn's output becomes part of next
+turn's input prefix, and *then* becomes cacheable. That is the only route by
+which generated text enters the cache.
+
+### The countdown freezes when idle — by design, not a bug
+
+`showPromptCache` renders a plain arithmetic expression, evaluated at render
+time (`src/render/lines/prompt-cache.ts`):
+
+\```js
+const remainingMs = (lastAssistantResponseAt.getTime() + ttlSeconds * 1000) - now;
+\```
+
+There is no timer inside claude-hud. The value only changes when **Claude Code
+re-invokes the statusline command**, which it does on state change (debounced
+300 ms), never on a wall clock. So:
+
+- **During an active turn** it tends to sit near `5m 0s`, because
+  `lastAssistantResponseAt` advances with every assistant message and an agent
+  turn produces one every few seconds. It is genuinely resetting, not stuck.
+- **Once the turn ends** nothing triggers a re-render, so the last computed
+  string stays frozen on screen.
+
+The countdown is live — invoking the command by hand on a fixed transcript
+shows `5m 0s → 4m 56s → 4m 52s` across three calls four seconds apart. The
+practical limitation is the inverse of what you want: it cannot show you a
+nearly-expired cache while you sit idle, which is precisely when that would be
+useful. Treat it as "how fresh was the cache at the last render".
+
+Why it matters in money: letting the TTL lapse means the prefix is re-billed as
+`cache_creation` (1.25×) instead of `cache_read` (0.1×) — a 12.5× swing on the
+prefix. `promptCacheTtlSeconds` defaults to 300 and should match the TTL your
+requests actually use.
+
+## First-line truncation follows a fixed order
+
+Segments render in this native order, and the line is cut at terminal width:
+
+\```text
+model, project, advisor, sessionName, version, extra, duration, cost, speed, auth
+\```
+
+`cost` is 8th of 10, so it is among the first things to disappear — you get
+`Cost $…` while a random session slug survives. Do not fix this by switching
+elements off; reorder instead. `orderFirstLineParts` emits listed segments in
+your order and **appends every unlisted key after them**, so a partial list
+works and whatever lands last is what truncation eats:
+
+\```json
+"projectLineOrder": [
+  "model", "project", "duration", "cost",
+  "extra", "advisor", "speed", "auth",
+  "sessionName", "version"
+]
+\```
+
+`modelFormat: "compact"` additionally drops the `(1M context)` suffix, which the
+Context line already reports as `218k/1.0M`.
+
+## `sessionName` is a random slug unless you name the session
+
+`magical-noodling-horizon` and friends are a fallback, not an identifier:
+
+\```js
+result.sessionName = customTitle ?? latestSlug;
+\```
+
+`customTitle` comes from `claude -n <name>` / `--name <name>`, described by the
+CLI as *"Set a display name for this session (shown in the prompt box, /resume
+picker, and terminal title)"*. Without it you get an auto-generated slug.
+
+It is **unrelated to the session UUID** that `--resume` keys on. It is purely a
+human-readable label for the `/resume` picker and the terminal title — useless
+noise until you start launching named sessions, at which point it becomes the
+fastest way to find a session again.
+
+## Related
+
+- [upgrades.md](../this_repo/upgrades.md) — version drift, the install-only
+  trap, and the full list of opt-in elements added after `0.0.11`
+- [lsp.md](lsp.md) — the `enabledPlugins` map
+- [`pitfalls/claude-hud-shows-raw-model-id.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-shows-raw-model-id.md)
+  — raw `claude-opus-5[1m]` in the badge means Claude Code is too old to send
+  `display_name`
+- [`pitfalls/claude-hud-usage-statusline-stale.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-usage-statusline-stale.md)
+
+```
+
+```text
+File created successfully at: /Users/david/.local/share/chezmoi/docs/tools/claude-hud.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:41:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# claude-hud（Claude Code statusline）
+
+[claude-hud](https://github.com/jarrodwatts/claude-hud) 負責渲染 Claude Code
+prompt 上方那幾行 HUD：model badge、context bar、cost、cache 倒數、工具活動、git 狀態。
+
+這一頁講的是**如何正確解讀那些數字**。其中好幾個的意義跟外表不同，而且有兩個數字
+會合理地互相矛盾。安裝／升級機制見 [upgrades.md](../this_repo/upgrades.md)；
+`enabledPlugins` 的決定見 [lsp.md](lsp.md) § 透過 Claude Code 外掛。
+
+## 接線位置
+
+| 項目 | 位置 |
+|---|---|
+| 設定（SSOT） | [`dot_claude/plugins/claude-hud/config.json`](../../dot_claude/plugins/claude-hud/config.json) —— 純受管檔案；直接改實機檔案會在 `chezmoi apply` 時被還原 |
+| `statusLine.command` | [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) 裡的 `overlay` heredoc |
+| 安裝／刷新 | [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py)，經由 `just upgrade-plugins` |
+| 完整 flag schema | 帶版本的快取目錄裡的 `src/config.ts` |
+
+這個 plugin 在 `enabledPlugins` 中是**刻意停用**的。HUD 依然會渲染，因為
+`statusLine.command` 直接 glob 快取路徑並執行 `dist/index.js`，完全不經過外掛載入器。
+唯一的代價是 `/claude-hud:setup` 與 `/claude-hud:configure` —— 而你本來也不該用它們，
+因為它們寫入的東西會在下次 apply 被還原。請改設定原始檔。
+
+## `Tokens` 是累計值，不是水位
+
+最容易誤解的數字。在 1M context 的 session 上，你會常態看到類似 `Tokens 22.5M`。
+
+claude-hud 是把 **transcript 裡每一則 assistant 訊息**的 `message.usage` 加總
+（`sessionTokens.inputTokens += …`），也就是 session 中每一次 API request。
+LLM 推論是無狀態的，所以每一輪都要重送整段對話 —— 第 100 輪的 prefix 會被算第 100 次。
+
+以本 repo 一份真實 transcript 實測：
+
+\```text
+508 API responses, 1 compaction
+CUMULATIVE SUM  : 103.88M   <- HUD 印出來的就是這個
+  in=92k  out=831k  cache_create=4.66M  cache_read=98.30M
+PEAK SINGLE REQ : 383k      <- 唯一受 context window 限制的數字
+ratio           : 271x
+\```
+
+這個比值大致就是「輪數 × 平均 context」。沒有任何異常發生，而且**不是 compaction 造成的**
+—— 508 次 request 只有 1 次 compaction，何況 compaction 的效果是*降低*後續 context。
+
+想看真正被 context window 限制的數字，請看 `Context` bar（`218k/1.0M`），而不是 `Tokens`。
+
+## `Tokens` 只計算主執行緒
+
+subagent 與 workflow 的回合**不在** Claude Code 由 stdin 交給 statusline 的那份
+transcript 裡。它們位於同層的另一個目錄：
+
+\```text
+~/.claude/projects/<project>/<session-id>.jsonl              <- 主執行緒，HUD 讀的是這個
+~/.claude/projects/<project>/<session-id>/subagents/agent-*.jsonl   <- 從不讀取
+\```
+
+主檔案裡也不會出現任何 `isSidechain` 紀錄。以本機一個真實 session 實測：
+**主執行緒 1,333,449 tokens 對上 subagent 814,250 tokens** —— HUD 少報約 38%。
+你 fan out 得越多，落差越大。
+
+## `Cost` 沒有這個盲點
+
+`Cost` 與 `Tokens` 來源不同，這正是它們看起來互相矛盾的原因。`src/cost.ts` 優先採用
+原生數值，只有在沒有時才退回本地估算：
+
+\```js
+const nativeCostUsd = getNativeCostUsd(stdin, options);
+if (nativeCostUsd !== null) return { totalUsd: nativeCostUsd, source: 'native' };
+const estimate = estimateSessionCost(stdin, sessionTokens, options);  // fallback
+\```
+
+- **native** —— Claude Code 自己放在 stdin 的 `cost.total_cost_usd`。訂閱 session 走的是這條。
+- **estimate** —— 由 `sessionTokens` 推導，所以*會*繼承上面的主執行緒盲點。只有在 stdin
+  沒帶 cost 時才會用到。
+
+Claude Code 端的累加器對每個 request 都無條件累加：
+
+\```js
+if (e.totalCost += r, e.requestCount++, t.attributionAgent)
+    zUo(e.byAgent, t.attributionSkill ?? t.attributionAgent, r)
+\```
+
+`attributionAgent` 只是驅動 per-agent 拆帳，並不會擋住總額。所以
+**`Cost` 包含 subagent 與 workflow，`Tokens` 不包含。** 兩者不一致時，`Cost` 才是完整的。
+
+## Cache：只存在於 input 側，而倒數是快照
+
+### 沒有 output cache
+
+Anthropic 的 prompt caching 只作用在 **input prefix**。四個 usage 欄位：
+
+| 欄位 | 意義 | 概略計價 |
+|---|---|---|
+| `input_tokens` | 未命中快取的新 input | 1× |
+| `cache_creation_input_tokens` | **寫入**快取的 prefix | 1.25× |
+| `cache_read_input_tokens` | **讀自**快取的 prefix | **0.1×** |
+| `output_tokens` | 生成的 token | 輸出價 |
+
+這就是為什麼上面的分佈是 `in=92k` 對上 `cache_read=98.30M`：第一次 request 之後，
+幾乎整段 prefix（system prompt、工具定義、歷史）都命中快取，只有最新的增量是新的。
+
+output 本身從不以 output 形式被快取 —— 但這一輪的 output 會成為下一輪 input prefix
+的一部分，*那時*才變得可快取。這是生成內容進入快取的唯一途徑。
+
+### 閒置時倒數會凍住 —— 這是設計，不是 bug
+
+`showPromptCache` 渲染的是一個在渲染當下求值的純算式
+（`src/render/lines/prompt-cache.ts`）：
+
+\```js
+const remainingMs = (lastAssistantResponseAt.getTime() + ttlSeconds * 1000) - now;
+\```
+
+claude-hud 內部沒有計時器。數值只有在 **Claude Code 重新呼叫 statusline 指令**時才會變，
+而它是在狀態改變時呼叫（debounce 300 ms），從不依照牆上時鐘。因此：
+
+- **回合進行中**它會傾向停在 `5m 0s` 附近，因為 `lastAssistantResponseAt` 會隨每則
+  assistant 訊息前進，而 agent 回合每幾秒就產生一則。它是真的在重置，不是卡住。
+- **回合結束後**沒有任何事件觸發重繪，所以最後算出來的字串就凍結在畫面上。
+
+倒數本身是活的 —— 手動對固定的 transcript 每隔四秒呼叫一次，會看到
+`5m 0s → 4m 56s → 4m 52s`。真正的限制恰好與需求相反：它無法在你閒置時告訴你快取快過期了，
+而那正是你最需要它的時候。請把它理解成「上一次渲染時快取有多新」。
+
+金錢上的意義：讓 TTL 過期意味著 prefix 會以 `cache_creation`（1.25×）而非
+`cache_read`（0.1×）重新計費 —— 在 prefix 上是 12.5 倍的差距。`promptCacheTtlSeconds`
+預設 300，應與你的 request 實際使用的 TTL 一致。
+
+## 第一行的截斷遵循固定順序
+
+segment 依此原生順序渲染，並在終端寬度處被切斷：
+
+\```text
+model, project, advisor, sessionName, version, extra, duration, cost, speed, auth
+\```
+
+`cost` 排在 10 個中的第 8 個，所以它會是最早消失的項目之一 —— 你會看到 `Cost $…`
+而一個隨機 session slug 反而活著。不要用關掉元素來解決，改成重新排序。
+`orderFirstLineParts` 會依你給的順序輸出列出的 segment，並**把所有未列出的 key 接在其後**，
+所以 partial list 就夠用，而排在最後的就是被截斷時最先犧牲的：
+
+\```json
+"projectLineOrder": [
+  "model", "project", "duration", "cost",
+  "extra", "advisor", "speed", "auth",
+  "sessionName", "version"
+]
+\```
+
+`modelFormat: "compact"` 還能再移除 `(1M context)` 後綴 —— Context 那行本來就已經寫著
+`218k/1.0M`。
+
+## 除非你替 session 命名，否則 `sessionName` 只是隨機 slug
+
+`magical-noodling-horizon` 這類名字是 fallback，不是識別碼：
+
+\```js
+result.sessionName = customTitle ?? latestSlug;
+\```
+
+`customTitle` 來自 `claude -n <name>` / `--name <name>`，CLI 的說明是
+*"Set a display name for this session (shown in the prompt box, /resume picker,
+and terminal title)"*。沒下這個參數就會拿到自動產生的 slug。
+
+它與 `--resume` 實際依據的 **session UUID 無關**。它純粹是給 `/resume` 選單和終端標題
+看的人類標籤 —— 在你開始使用具名 session 之前都只是雜訊，之後則會成為最快找回 session 的方式。
+
+## 相關
+
+- [upgrades.md](../this_repo/upgrades.md) —— 版本漂移、install-only 陷阱，以及
+  `0.0.11` 之後新增的完整 opt-in 元素清單
+- [lsp.md](lsp.md) —— `enabledPlugins` 對應表
+- [`pitfalls/claude-hud-shows-raw-model-id.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-shows-raw-model-id.md)
+  —— badge 顯示原始 `claude-opus-5[1m]` 代表 Claude Code 太舊、沒送 `display_name`
+- [`pitfalls/claude-hud-usage-statusline-stale.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-usage-statusline-stale.md)
+
+```
+
+```text
+File created successfully at: /Users/david/.local/share/chezmoi/docs/tools/claude-hud.zh-TW.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:41:44Z)**_
+
+Now the nav entries and trimming the duplicated detail out of `upgrades.md`:
+
+_**Agent (claude-opus-5 2026-07-27 19:41:45Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/mkdocs.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:41:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check the second nav block context
+
+`cd ~/.local/share/chezmoi && sed -n '205,220p' mkdocs.yml`
+
+```text
+      sections:
+        Landing:
+          - index.md
+        Tools:
+          - tools/aicapture.md
+          - tools/ai-agents-benchmark.md
+          - tools/zsh-inline-ai.md
+          - tools/tmux/README.md
+          - tools/sesh.md
+          - tools/clipboard.md
+          - tools/agent-overlays.md
+        Playbooks:
+          - playbooks/workflow.md
+        Repo internals:
+          - this_repo/architecture.md
+          - this_repo/fleet-apply.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:42:01Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see that second block is actually the `llmstxt` plugin's section list for which files get included in llms.txt, not the navigation. Those entries are already generating "Page URI not found" warnings, so adding my new doc there would just create another one—I should skip that. Only the nav entry around line 310 needs to be updated.
+
+Now I'm moving on to trim upgrades.md since it's duplicating the detailed information. I'll replace those two long bullets with a reference to the new doc while keeping the upgrade-specific content, so let me check what that section currently looks like.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:42:01Z)**_
+
+That second block is the `llmstxt` plugin list — every entry there already produces a baseline warning, so I'll leave it alone. Now trimming the duplicated depth out of `upgrades.md`:
+
+_**Agent (claude-opus-5 2026-07-27 19:42:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate the passage to trim
+
+`cd ~/.local/share/chezmoi && grep -n "Two counter-intuitive" -A6 docs/this_repo/upgrades.md | head -10`
+
+```text
+94:Two counter-intuitive things about the enabled elements:
+95-
+96-- **`showSessionTokens` counts the main thread only.** It sums `message.usage` over the single transcript Claude Code passes on stdin. Subagent and workflow turns are not in that file — they live in a sibling `~/.claude/projects/<project>/<session-id>/subagents/agent-*.jsonl` directory that claude-hud never reads (and no `isSidechain` records appear in the main transcript). Measured on one real session here: 1,333,449 main-thread tokens vs 814,250 subagent tokens, i.e. the HUD under-reported by ~38%. `Cost` does **not** share this blind spot — it comes from Claude Code's own stdin `cost.total_cost_usd`.
+97-- **First-line segments truncate from a fixed order**, not by importance: `model, project, advisor, sessionName, version, extra, duration, cost, speed, auth`. `cost` is 8th of 10, so it is among the first things to vanish when the line overflows. Free up width rather than adding `maxWidth`. The best lever is `projectLineOrder`: list the segments you care about first and **any segment you omit falls to the back automatically** (`orderFirstLineParts` appends unlisted keys after the listed ones), so low-value segments are the ones truncation eats. That keeps everything visible when the terminal is wide and degrades in a sensible order when it isn't — preferable to switching elements off, because `showClaudeCodeVersion` is how you notice a host silently sitting on an old Claude Code build. This repo orders `model, project, duration, cost, …, sessionName, version`. `modelFormat: "compact"` additionally saves ~13 chars by dropping the redundant `(1M context)` suffix, which the Context line already reports as `218k/1.0M`. Note `sessionName` is a random slug (`magical-noodling-horizon`) unless you launch with `claude -n <name>`; it is only ever a `/resume`-picker and terminal-title label, and is unrelated to the session UUID that `--resume` actually keys on.
+98-
+99-## Semantics: best-effort, not all-or-nothing
+100-
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:42:17Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:42:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Trim the zh-TW mirror to match
+
+```bash
+cd ~/.local/share/chezmoi && python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("docs/this_repo/upgrades.zh-TW.md")
+s = p.read_text()
+start = s.index("已啟用元素中有兩件反直覺的事：")
+end = s.index("\n\n", s.index("無關。", start))
+new = "如何正確解讀這些已啟用的元素本身就是一個主題 —— `Tokens` 是累計值而非水位且不含 subagent，`Cost` 來源不同且包含它們，cache 倒數是會在閒置時凍住的快照，而第一行是依固定 segment 順序截斷、`cost` 排在 10 個中的第 8 個。這些全部整理在 [tools/claude-hud.md](../tools/claude-hud.md)。"
+p.write_text(s[:start] + new + s[end:])
+print(p.read_text()[start-120:start+260])
+PY
+```
+
+```text
+[lsp.md](../tools/lsp.md) § 透過 Claude Code 外掛）。statusline 會以 `sort -V | tail -1` 選取最新的快取版本，因此舊版目錄會原地保留，要回退只需刪掉較新的那個目錄。
+
+如何正確解讀這些已啟用的元素本身就是一個主題 —— `Tokens` 是累計值而非水位且不含 subagent，`Cost` 來源不同且包含它們，cache 倒數是會在閒置時凍住的快照，而第一行是依固定 segment 順序截斷、`cost` 排在 10 個中的第 8 個。這些全部整理在 [tools/claude-hud.md](../tools/claude-hud.md)。
+
+## 語意：盡力而為，並非全有全無
+
+每個類別都被包進一個 `run_category` 輔助函式中：
+
+- 類別內的單一命令失敗**
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:43:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build docs with new page in nav
+
+`cd ~/.local/share/chezmoi && uv run mkdocs build --strict 2>&1 | tail -3; echo "=== any warning mentioning claude-hud? ==="; uv run mkdocs build --strict 2>&1 | grep -i "claude-hud" || echo "none"`
+
+```text
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/instant-llm-fix-prior-art.md' not found in the generated pages. Skipping.
+
+Aborted with 11 warnings in strict mode!
+=== any warning mentioning claude-hud? ===
+INFO    -  Doc file 'this_repo/upgrades.md' contains a link '../../dot_claude/plugins/claude-hud/config.json', but the target '../dot_claude/plugins/claude-hud/config.json' is not found among documentation files.
+INFO    -  Doc file 'tools/claude-hud.md' contains a link '../../dot_claude/plugins/claude-hud/config.json', but the target '../dot_claude/plugins/claude-hud/config.json' is not found among documentation files.
+INFO    -  Doc file 'tools/claude-hud.md' contains a link '../../dot_claude/modify_settings.json.tmpl', but the target '../dot_claude/modify_settings.json.tmpl' is not found among documentation files.
+INFO    -  Doc file 'tools/claude-hud.md' contains a link '../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py', but the target '../dot_ansible/roles/coding_agents/files/claude_hud_sync.py' is not found among documentation files.
+INFO    -  Doc file 'this_repo/upgrades.zh-TW.md' contains a link '../../dot_claude/plugins/claude-hud/config.json', but the target '../dot_claude/plugins/claude-hud/config.json' is not found among documentation files.
+INFO    -  Doc file 'tools/claude-hud.zh-TW.md' contains a link '../../dot_claude/plugins/claude-hud/config.json', but the target '../dot_claude/plugins/claude-hud/config.json' is not found among documentation files.
+INFO    -  Doc file 'tools/claude-hud.zh-TW.md' contains a link '../../dot_claude/modify_settings.json.tmpl', but the target '../dot_claude/modify_settings.json.tmpl' is not found among documentation files.
+INFO    -  Doc file 'tools/claude-hud.zh-TW.md' contains a link '../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py', but the target '../dot_ansible/roles/coding_agents/files/claude_hud_sync.py' is not found among documentation files.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:43:42Z)**_
+
+<think><details><summary>Thought Process</summary>
+The warning count remains at 11 with no changes, and I'm noticing the claude-hud mentions are all INFO level rather than WARNING. These follow the same pattern already established in the repo's documentation—like in `upgrades.md` and `lsp.md`—where relative links using `../../` to reference repo files are the standard convention here.
+
+The anchor and link issues are tracked as INFO-level in the backlog, so I'm not tightening validation on those. Now I need to verify the new zh-TW page renders correctly in the built site and check that the i18n plugin picks it up properly before committing.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:43:42Z)**_
+
+11 warnings — baseline unchanged. The `claude-hud` lines are all INFO-level repo-file links, matching the existing convention in `lsp.md`/`upgrades.md`. Verifying both pages actually built:
+
+_**Agent (claude-opus-5 2026-07-27 19:43:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm both language pages built
+
+`cd ~/.local/share/chezmoi && ls site/tools/ 2>/dev/null | grep -i "claude-hud" ; echo "--- zh-TW variant ---"; ls site/zh-TW/tools/ 2>/dev/null | grep -i "claude-hud" || find site -path "*claude-hud*" -name "index.html" 2>/dev/null | head -4`
+
+```text
+claude-hud
+--- zh-TW variant ---
+claude-hud
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:43:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Review changes before commit
+
+`cd ~/.local/share/chezmoi && git status --short && echo "=== diffstat ===" && git diff --stat`
+
+```text
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+ M docs/this_repo/upgrades.md
+ M docs/this_repo/upgrades.zh-TW.md
+ M mkdocs.yml
+?? docs/tools/claude-hud.md
+?? docs/tools/claude-hud.zh-TW.md
+=== diffstat ===
+ .../2026-07-26_14-13-19Z-image-hash-1-claude.md    | 1317 ++++++++++++++++++++
+ docs/this_repo/upgrades.md                         |    5 +-
+ docs/this_repo/upgrades.zh-TW.md                   |    5 +-
+ mkdocs.yml                                         |    1 +
+ 4 files changed, 1320 insertions(+), 8 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:44:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the dedicated claude-hud doc
+
+```bash
+cd ~/.local/share/chezmoi && git add -A && git commit -F - <<'MSG'
+docs(claude-hud): explain the numbers, because several of them lie
+
+Four separate questions came up in one session, all of the same shape: a number
+on the HUD means something other than what it looks like. Worth its own page
+rather than more bullets buried in upgrades.md.
+
+  Tokens 22.5M on a 1M-context session
+    Cumulative sum over every API request, not a water level. Inference is
+    stateless, so each turn re-sends the whole prefix and it is counted again.
+    Measured on a real transcript: 103.88M cumulative vs a 383k peak single
+    request, ratio 271x. NOT caused by compaction — one compaction across 508
+    requests, and compaction reduces subsequent context anyway.
+
+  Tokens excludes subagents, Cost includes them
+    Different sources, which is why they disagree. Tokens sums the one
+    transcript passed on stdin; subagent turns live in a sibling
+    <session-id>/subagents/agent-*.jsonl dir that is never read (1,333,449 vs
+    814,250 on one session, ~38% under-report). Cost prefers Claude Code's
+    native stdin cost.total_cost_usd, whose accumulator adds every request
+    unconditionally — `attributionAgent` only drives a per-agent breakdown, it
+    does not gate the total. Cost is the complete figure.
+
+  Cache countdown frozen at 5m 0s
+    Not a bug and not stuck. It is `(lastAssistantResponseAt + TTL) - now`
+    evaluated at render time, and Claude Code only re-invokes the statusline on
+    state change (debounced 300ms), never on a wall clock. During a turn
+    lastAssistantResponseAt keeps advancing so it genuinely resets; once idle
+    nothing triggers a redraw so the last string freezes. Verified live by
+    calling the command by hand on a fixed transcript: 5m 0s -> 4m 56s -> 4m
+    52s. The limitation is the inverse of what you want — it cannot warn you
+    about an expiring cache while you sit idle.
+
+  There is no output cache
+    Caching is input-side only. Documents the four usage fields and their
+    ~1x / 1.25x / 0.1x pricing, and why letting the TTL lapse is a 12.5x swing
+    on the prefix — which is what makes the countdown worth showing at all.
+
+Also carries over the first-line truncation order and the sessionName-is-a-
+random-slug finding, so upgrades.md can shrink to a pointer.
+
+mkdocs nav entry added; `mkdocs build --strict` unchanged at the 11-warning
+baseline and both language variants build. The new `../../` repo-file links are
+INFO-level only, matching the existing convention in lsp.md and upgrades.md.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+</details></tool-use>

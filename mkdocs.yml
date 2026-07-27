@@ -307,6 +307,7 @@ nav:
           - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
           - Agent quota warmup (agent-warmup): tools/agent-warmup.md
           - Agent skills: tools/agent-skills.md
+          - claude-hud (Claude Code statusline): tools/claude-hud.md
           - Claude Code keybindings: tools/claude-code-keybindings.md
           - Copilot → Claude Code proxy: tools/copilot-claude-proxy.md
           - Copilot embeddings (semantic search): tools/copilot-embeddings.md

@@ -86,10 +86,7 @@ flowchart LR
 
 升級**不需要**啟用該 plugin —— `claude_hud_sync.py` 從不讀取 `enabledPlugins`，而 `claude-hud@claude-hud` 是刻意設為 `false` 的（見 [lsp.md](../tools/lsp.md) § 透過 Claude Code 外掛）。statusline 會以 `sort -V | tail -1` 選取最新的快取版本，因此舊版目錄會原地保留，要回退只需刪掉較新的那個目錄。
 
-已啟用元素中有兩件反直覺的事：
-
-- **`showSessionTokens` 只計算主執行緒。** 它是在 Claude Code 由 stdin 傳入的那一份 transcript 上加總 `message.usage`。subagent 與 workflow 的回合不在那個檔案裡 —— 它們位於同層的 `~/.claude/projects/<project>/<session-id>/subagents/agent-*.jsonl` 目錄，claude-hud 從不讀取（主 transcript 中也沒有任何 `isSidechain` 紀錄）。以本機一個真實 session 實測：主執行緒 1,333,449 tokens，subagent 814,250 tokens，即 HUD 少報約 38%。`Cost` **沒有**這個盲點 —— 它來自 Claude Code 自己的 stdin `cost.total_cost_usd`。
-- **第一行的 segment 是照固定順序截斷**，而非依重要性：`model, project, advisor, sessionName, version, extra, duration, cost, speed, auth`。`cost` 排在 10 個之中的第 8 個，所以一旦該行溢出，它會是最早消失的項目之一。與其加 `maxWidth`，不如騰出寬度。最好的手段是 `projectLineOrder`：把你在意的 segment 排在前面，**任何你沒列出的 segment 會自動落到後面**（`orderFirstLineParts` 會把未列出的 key 接在已列出的之後），這樣被截斷的就會是低價值的項目。終端夠寬時全部都看得到，不夠寬時則以合理的順序降級 —— 這比直接關掉元素好，因為 `showClaudeCodeVersion` 正是你察覺某台主機悄悄停在舊版 Claude Code 的方式。本 repo 採用的順序是 `model, project, duration, cost, …, sessionName, version`。`modelFormat: "compact"` 還能再省約 13 字元，它移除的是多餘的 `(1M context)` 後綴 —— Context 那行本來就已經寫著 `218k/1.0M`。注意 `sessionName` 除非你用 `claude -n <name>` 啟動，否則就是隨機 slug（`magical-noodling-horizon`）；它只是 `/resume` 選單與終端標題的標籤，跟 `--resume` 實際依據的 session UUID 無關。
+如何正確解讀這些已啟用的元素本身就是一個主題 —— `Tokens` 是累計值而非水位且不含 subagent，`Cost` 來源不同且包含它們，cache 倒數是會在閒置時凍住的快照，而第一行是依固定 segment 順序截斷、`cost` 排在 10 個中的第 8 個。這些全部整理在 [tools/claude-hud.md](../tools/claude-hud.md)。
 
 ## 語意：盡力而為，並非全有全無
 
