@@ -43,6 +43,24 @@ just check    # Full lint + dry-run (run before commits)
 | `chezmoi state delete-bucket --bucket=scriptState` | `just chezmoi-clear-scripts` | Reset run_once script state |
 | *(clear + apply)* | `just chezmoi-rerun-scripts` | Clear script state then re-apply |
 
+### Reading `chezmoi diff` — which side is which
+
+`chezmoi diff` is shaped exactly like `git diff`: **old → new**, where *old* is your machine right now and *new* is what `apply` is about to write.
+
+| Unified diff | Side-by-side (delta) | Means |
+|---|---|---|
+| `--- a/<path>`, `-` lines | **left** pane | **Destination state** — the real file on this machine *now* |
+| `+++ b/<path>`, `+` lines | **right** pane | **Target state** — what chezmoi will write from the source/template |
+
+So a **red line on the left** = present on the machine, `apply` will **delete** it. A **green line on the right** = not on the machine yet, `apply` will **add** it. Nothing in the diff describes the source *tree*; it describes the *rendered result*.
+
+The side-by-side layout comes from this repo's `[diff] pager` in `.chezmoi.toml.tmpl` (`delta --side-by-side --line-numbers --navigate`). `--navigate` means `n` / `N` jump between files inside the pager. Drop to a plain unified diff any time with `chezmoi --no-pager diff`.
+
+Two directional gotchas that follow from the table:
+
+- **`chezmoi diff` never shows what you just edited in the source tree unless it changes the rendered output.** Comment-only or template-refactor edits produce an empty diff.
+- `chezmoi status` uses the opposite mental model — it is a *status letter* per path (`M`/`A`/`D` = what apply would do), not a from/to comparison.
+
 ---
 
 ## Ansible

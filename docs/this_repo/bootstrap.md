@@ -165,6 +165,23 @@ go through the mirror.
 > `DOTFILES_RAW_URL`. Stick with `ghproxy.com`-style transparent proxies, or
 > just clone locally and use `just bootstrap-local`.
 
+## Why bootstrap edits `~/.bashrc` and then `apply` undoes it
+
+Step 7 of `run_once_before_00_bootstrap.sh.tmpl` appends this to `~/.bashrc`:
+
+```bash
+# Added by chezmoi bootstrap - ~/.local/bin for uv, mise, chezmoi
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+and a later `chezmoi diff` shows it being **removed** again (red on the left side = "on the machine now, apply will delete it" — see [cheatsheet → Reading `chezmoi diff`](cheatsheet.md#reading-chezmoi-diff--which-side-is-which)). **This is expected, and nothing is lost.**
+
+The script is `run_once_**before**_`, so it runs before chezmoi has written a single dotfile. `chezmoi`, `uv` and `mise` all live in `~/.local/bin`, and the append is a shim for exactly that pre-apply window — it keeps them reachable if you open a bash shell before apply finishes, or if apply dies half-way. Once apply writes `~/.bashrc` from `dot_bashrc.tmpl` the shim is superseded: the managed `~/.bashrc` sources `$XDG_CONFIG_HOME/shell`, and [`dot_config/shell/00_exports.sh.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/shell/00_exports.sh.tmpl) already exports `PATH="$HOME/.dotfiles/bin:$HOME/bin:$HOME/.local/bin:$PATH"` for **both** shells (the in-script comment claiming "dotfiles only wire this up in zsh" is stale — `00_exports.sh` predates it).
+
+On a normal `chezmoi init --apply` both steps happen inside one invocation, so you never see the intermediate state. You see the diff only if you look between them — e.g. bootstrap ran but the apply that rewrites `.bashrc` hasn't, or a previous apply was interrupted. Running `chezmoi apply` clears it.
+
+Do **not** "fix" it by redirecting the append to `~/.bashrc.adhoc`: that file is an untracked [user-override surface](../shells/adhoc-and-secrets.md), so the duplicate `PATH` entry would then persist forever instead of being cleaned up.
+
 ## What the inner `dotfiles_init.py` does
 
 See `scripts/init/dotfiles_init.py` (~836 lines) — it pre-flights chezmoi /

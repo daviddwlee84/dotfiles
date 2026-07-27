@@ -142,6 +142,23 @@ curl -fsSL "${DOTFILES_RAW_URL}/${DOTFILES_REF}/bootstrap.sh" | bash
 
 > **注意 — jsdelivr / cdn.statically.io 風格的 CDN** 使用不同的 URL scheme (`/gh/owner/repo@ref/path`)，不能直接當作 `DOTFILES_RAW_URL`。請使用 `ghproxy.com` 風格的透明 proxy，或乾脆 clone 到本機並使用 `just bootstrap-local`。
 
+## 為什麼 bootstrap 會改 `~/.bashrc`，然後 `apply` 又把它改回去
+
+`run_once_before_00_bootstrap.sh.tmpl` 的第 7 步會往 `~/.bashrc` 追加：
+
+```bash
+# Added by chezmoi bootstrap - ~/.local/bin for uv, mise, chezmoi
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+之後 `chezmoi diff` 就會顯示它要被**移除**（左側紅色 = 「機器上現在有、apply 會刪掉」——見 [cheatsheet → 怎麼讀 `chezmoi diff`](cheatsheet.zh-TW.md#怎麼讀-chezmoi-diff--哪一邊是哪一邊)）。**這是預期行為，而且沒有任何東西遺失。**
+
+這支腳本是 `run_once_**before**_`，所以它在 chezmoi 寫下任何一個 dotfile *之前*就跑了。`chezmoi`、`uv`、`mise` 都住在 `~/.local/bin`，這段追加正是為了涵蓋「apply 之前」那個空窗期——萬一你在 apply 跑完前開了一個 bash shell，或 apply 中途掛掉，這三個工具仍然找得到。等 apply 用 `dot_bashrc.tmpl` 寫出 `~/.bashrc` 之後，這個墊片就被取代了：受管的 `~/.bashrc` 會 source `$XDG_CONFIG_HOME/shell`，而 [`dot_config/shell/00_exports.sh.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/shell/00_exports.sh.tmpl) 早已為**兩種 shell** 都匯出 `PATH="$HOME/.dotfiles/bin:$HOME/bin:$HOME/.local/bin:$PATH"`（腳本裡那句「dotfiles 只在 zsh 接了這個」的註解已經過時——`00_exports.sh` 比它更早存在）。
+
+正常的 `chezmoi init --apply` 會在同一次呼叫裡完成這兩步，所以你根本看不到中間狀態。只有在你剛好卡在兩步之間才會看到這個 diff——例如 bootstrap 跑過了、但重寫 `.bashrc` 的那次 apply 還沒跑，或上一次 apply 被中斷。跑一次 `chezmoi apply` 就清掉了。
+
+**不要**把這段追加改寫到 `~/.bashrc.adhoc` 來「修掉」這個 diff：那個檔案是不被追蹤的[使用者覆寫層](../shells/adhoc-and-secrets.zh-TW.md)，重複的 `PATH` 條目就會永遠留著，而不再被清理。
+
 ## 內層 `dotfiles_init.py` 做了什麼
 
 請參閱 `scripts/init/dotfiles_init.py`（約 836 行）— 它預檢 chezmoi / git / SSH，透過 `questionary` 呈現分組的功能旗標 (feature-flag) 提示，然後呼叫 `chezmoi init <repo> --apply --promptString …`。子命令：

@@ -48,6 +48,24 @@ just check    # Full lint + dry-run (run before commits)
 | `chezmoi state delete-bucket --bucket=scriptState` | `just chezmoi-clear-scripts` | 重設 `run_once` 腳本狀態 |
 | *(清除 + 套用)* | `just chezmoi-rerun-scripts` | 清除腳本狀態後重新 apply |
 
+### 怎麼讀 `chezmoi diff` —— 哪一邊是哪一邊
+
+`chezmoi diff` 的形狀和 `git diff` 完全一樣：**舊 → 新**，其中「舊」是你這台機器**現在**的樣子，「新」是 `apply` 即將寫入的內容。
+
+| Unified diff | 並排（delta） | 意義 |
+|---|---|---|
+| `--- a/<path>`、`-` 行 | **左**邊 | **Destination state**（目的狀態）—— 這台機器上**當下**的真實檔案 |
+| `+++ b/<path>`、`+` 行 | **右**邊 | **Target state**（目標狀態）—— chezmoi 將從 source/template 寫出的內容 |
+
+所以**左邊的紅色行** = 機器上有、`apply` 會**刪掉**；**右邊的綠色行** = 機器上還沒有、`apply` 會**加上**。diff 描述的從來不是 source *樹*本身，而是**算繪（render）後的結果**。
+
+並排版面來自本 repo 在 `.chezmoi.toml.tmpl` 的 `[diff] pager`（`delta --side-by-side --line-numbers --navigate`）。`--navigate` 表示在 pager 裡可用 `n` / `N` 在檔案間跳轉。任何時候都能用 `chezmoi --no-pager diff` 退回純 unified diff。
+
+由上表可以推出兩個方向性陷阱：
+
+- **只要算繪結果沒變，`chezmoi diff` 就不會顯示你剛在 source 樹改的東西。** 只動註解或重構 template 的編輯會產生空 diff。
+- `chezmoi status` 用的是相反的心智模型——它是每個路徑一個*狀態字母*（`M`/`A`/`D` = apply 會做什麼），而不是 from/to 的比較。
+
 ---
 
 ## Ansible
