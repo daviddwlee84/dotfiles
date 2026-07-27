@@ -2991,3 +2991,1996 @@ Say the word and I'll commit that second stream too.
 I also moved my index row above `sudo-shared-setsid-macos` to respect the file's "Keep alphabetical" rule — note the surrounding list has already drifted in a few places (`npm-…` → `sudo-…` → `nvim-…`), so it's not fully sorted regardless.
 
 Nothing was pushed.
+
+---
+
+_**User (2026-07-27 19:00:30Z)**_
+
+[Image #2] 是說爲什麼 claude-hud 在Windows上好像功能更多？
+(目前多一個 Cost 預估 & Cache 過期倒數)
+是否實現上有所不同 還是我們沒有更新到latest？
+
+_**User (2026-07-27 19:00:30Z)**_
+
+[Image: source: /Users/david/.claude/image-cache/7164bbb2-786d-4d22-aadb-ff7d769f61d7/2.png]
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 19:00:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm wondering if there's a version mismatch here—we're running 0.0.11 locally, but the Windows display is showing extra features like cost estimates and cache expiry countdowns that we're not seeing. I should check whether these are newer features in a later upstream version, or if they're being controlled through the config file. I'm noticing the Windows machine displays the raw model ID with a `[1m]` suffix, which typically indicates Claude Code is too old to send a proper display name — yet that same machine shows newer claude-hud features overall. That's an interesting contradiction worth investigating: newer plugin version paired with older Claude Code. Let me pull together the actual data to see what's really going on.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:00:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read managed and live claude-hud config
+
+`cd ~/.local/share/chezmoi && echo "=== our managed config ==="; cat dot_claude/plugins/claude-hud/config.json; echo; echo "=== live config ==="; cat ~/.claude/plugins/claude-hud/config.json`
+
+```text
+=== our managed config ===
+{
+  "gitStatus": {
+    "enabled": true,
+    "showDirty": true,
+    "showAheadBehind": true,
+    "showFileStats": true
+  },
+  "display": {
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true,
+    "showDuration": true,
+    "showConfigCounts": true,
+    "showSessionName": true,
+    "showSpeed": true,
+    "showClaudeCodeVersion": true,
+    "showMemoryUsage": true,
+    "contextValue": "both"
+  }
+}
+
+=== live config ===
+{
+  "gitStatus": {
+    "enabled": true,
+    "showDirty": true,
+    "showAheadBehind": true,
+    "showFileStats": true
+  },
+  "display": {
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true,
+    "showDuration": true,
+    "showConfigCounts": true,
+    "showSessionName": true,
+    "showSpeed": true,
+    "showClaudeCodeVersion": true,
+    "showMemoryUsage": true,
+    "contextValue": "both"
+  }
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:00:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if 0.0.11 has cost/cache features
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.0.11; echo "=== cost/cache in 0.0.11 src? ==="; grep -rn "cost\|Cost" $P/src/config.ts 2>/dev/null | head -10; echo "--- cache countdown ---"; grep -rln "cacheExpiry\|cacheCountdown\|Cache " $P/src/ 2>/dev/null | head`
+
+```text
+=== cost/cache in 0.0.11 src? ===
+--- cache countdown ---
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.0.11/src/speed-tracker.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.0.11/src/transcript.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.0.11/src/version.ts
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+So `cost` doesn't exist in the 0.0.11 config at all—this really does point to running an older version. I need to check what the latest upstream version is and when Cost and Cache-countdown were actually added by looking at the CHANGELOG.
+
+Our docs mention that 0.0.12+ follows Claude Code's official stdin rate_limits, so there's definitely a newer version out there. The Cost display might be gated on Claude Code sending cost data through stdin, and that "Cache 4m59s" is likely the prompt-cache TTL countdown that claude-hud computes from the transcript. Let me pull the upstream releases and changelog to see when these features landed.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:12Z)**_
+
+No `cost` anywhere in 0.0.11's config schema — so it's not a flag we've turned off. Checking upstream:
+
+_**Agent (claude-opus-5 2026-07-27 19:01:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check upstream claude-hud releases
+
+`curl -s "https://api.github.com/repos/jarrodwatts/claude-hud/releases/latest" | jq -r '.tag_name, .published_at, (.body｜tostring)' 2>/dev/null | head -5; echo "=== recent tags ==="; curl -s "https://api.github.com/repos/jarrodwatts/claude-hud/releases?per_page=10" | jq -r '.[] | "\(.tag_name)  \(.published_at)"'`
+
+```text
+=== recent tags ===
+v0.6.0  2026-07-20T07:45:15Z
+v0.5.1  2026-07-20T07:13:40Z
+v0.5.0  2026-07-15T23:40:46Z
+v0.4.2  2026-07-15T00:24:34Z
+v0.4.1  2026-07-13T23:18:04Z
+v0.4.0  2026-07-13T00:09:48Z
+v0.3.0  2026-06-19T16:34:40Z
+v0.2.1  2026-06-18T19:57:10Z
+v0.2.0  2026-06-15T13:20:17Z
+v0.1.1  2026-06-09T18:10:58Z
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read local changelog and config schema
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.0.11; echo "=== our CHANGELOG top ==="; head -30 $P/CHANGELOG.md; echo "=== config.ts display keys (0.0.11) ==="; grep -n "show[A-Z]\|contextValue" $P/src/config.ts | head -25`
+
+```text
+=== our CHANGELOG top ===
+# Changelog
+
+All notable changes to Claude HUD will be documented in this file.
+
+## [Unreleased]
+
+### Changed
+- Simplify usage display to rely only on Claude Code's official stdin `rate_limits` fields.
+- Remove the background OAuth usage API fallback, related cache/lock behavior, and credential-derived subscriber plan labels from the HUD.
+
+## [0.0.10] - 2026-03-23
+
+### Added
+- Configurable HUD color overrides, including named presets, 256-color indices, and hex values.
+- `display.customLine` support for a short custom phrase in the HUD.
+- New opt-in display toggles for session name, combined context mode (`display.contextValue: "both"`), Claude Code version, and approximate system RAM usage in expanded layout.
+
+### Changed
+- Setup and plugin detection now better handle `CLAUDE_CONFIG_DIR`, Windows shell quoting, and Bun `--env-file` installs without inheriting project environment files.
+- Usage display now prefers Claude Code stdin `rate_limits` data when available, still falls back to the existing OAuth/cache path, and presents weekly-only/free-user usage more cleanly.
+- Context percentages and token displays now follow Claude Code's reported context window size, including newer 1M-context sessions, with a lower fallback autocompact estimate that better matches `/context`.
+- Usage text output now keeps the last successful values visible while syncing, shows the 7-day reset countdown when applicable, and clarifies that standard proxy environment variables are the supported way to route Anthropic traffic.
+- Progress bars and expanded-layout output now adapt more cleanly to narrow terminal widths.
+
+### Fixed
+- Setup is more reliable in sessions that previously failed to surface the HUD until Claude Code restarted, and plugin command discovery no longer fails with unknown-skill errors after install.
+- Usage handling is more resilient under OAuth token refreshes, proxy tunnels, explicit TLS overrides, zero-byte lock files, stale-cache recovery, and rate-limit edge cases that previously caused repeated `429` or syncing failures.
+- Account-scoped credential lookup and plugin selection are more reliable for multi-account setups and multiple installed plugin versions.
+- Expanded-layout rendering now preserves speed, duration, extra labels, and weekly-only usage output correctly.
+- Tool execution no longer scrolls the terminal to the top, and transcript reparsing now avoids repeatedly caching partial parse results on large histories.
+=== config.ts display keys (0.0.11) ===
+53:  showSeparators: boolean;
+58:    showDirty: boolean;
+59:    showAheadBehind: boolean;
+60:    showFileStats: boolean;
+63:    showModel: boolean;
+64:    showProject: boolean;
+65:    showContextBar: boolean;
+66:    contextValue: ContextValueMode;
+67:    showConfigCounts: boolean;
+68:    showDuration: boolean;
+69:    showSpeed: boolean;
+70:    showTokenBreakdown: boolean;
+71:    showUsage: boolean;
+73:    showTools: boolean;
+74:    showAgents: boolean;
+75:    showTodos: boolean;
+76:    showSessionName: boolean;
+77:    showClaudeCodeVersion: boolean;
+78:    showMemoryUsage: boolean;
+90:  showSeparators: false,
+95:    showDirty: true,
+96:    showAheadBehind: false,
+97:    showFileStats: false,
+100:    showModel: true,
+101:    showProject: true,
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm seeing a significant version mismatch here — we're running 0.0.11 from March, but the upstream is at v0.6.0 from July. This isn't a platform-specific issue at all; it's simply that we're several major versions behind, and the versioning scheme jumped through multiple increments between our installed version and the latest release.
+
+The real puzzle is why `just upgrade-plugins` didn't catch this. The sync script should be pulling the latest version via the GitHub API, but something's preventing the upgrade — either the user never ran the command, there's a bug in the version comparison logic (maybe the `v0.6.0` tag format isn't being parsed correctly against the `0.0.11` directory name), or the script has a guard that's keeping us pinned to the older version. The installed plugins metadata shows it hasn't been touched since March, which suggests the upgrade mechanism never fired.
+
+I also notice the raw model ID display in the Windows screenshot — that's a known sign that Claude Code is too old for the newer claude-hud. Let me pull the upstream changelog to confirm when Cost and Cache countdown landed, and then dig into why the sync is stuck.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:36Z)**_
+
+Found it — upstream is on **v0.6.0** (2026-07-20); we're pinned at **0.0.11** from March. Let me confirm when those features landed and why our sync is stuck:
+
+_**Agent (claude-opus-5 2026-07-27 19:01:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find when Cost and Cache features landed
+
+`curl -s "https://raw.githubusercontent.com/jarrodwatts/claude-hud/main/CHANGELOG.md" 2>/dev/null | grep -n -i -B3 -A6 "cost\|cache.*countdown\|cache.*expir" | head -60`
+
+```text
+46-## [0.4.0] - 2026-07-13
+47-
+48-### Added
+49:- Add opt-in routed-provider cost display for Bedrock and Vertex sessions, with explicit native-versus-estimated labeling (#648).
+50-- Add opt-in authentication method and account display with terminal-safe truncation and active API-key precedence (#652).
+51-- Add Traditional Chinese (`zh-Hant` / `zh-TW`) across configuration, onboarding, and rendered labels (#645).
+52-- Add opt-in transcript and automatic model-source modes for proxy users, with bounded terminal-safe model labels (#643).
+53-
+54-### Changed
+55-- Show ultracode sessions as `ultracode(xhigh)` from transcript attachment and `/effort` signals (#640).
+--
+86-### Fixed
+87-- Require explicit `CLAUDE_HUD_ALLOW_EXTRA_CMD` opt-in before running `--extra-cmd`, and document the local command trust boundary (#619).
+88-- Merge missing seven-day usage from a configured external snapshot when stdin only supplies the five-hour usage window (#617).
+89:- Correct Opus 4.5+ local cost estimates to the current standard Anthropic rate while keeping older Opus 4.0/4.1 pricing unchanged (#625).
+90-
+91-## [0.2.0] - 2026-06-15
+92-
+93-### Added
+94-- Add opt-in session compaction count display from reliable transcript `compact_boundary` entries (#609).
+95-- Add `CLAUDE_HUD_DISABLE` as a per-session environment kill switch that exits before stdin, transcript, config, or git work (#610).
+96-
+97-### Changed
+98:- Sync `/claude-hud:configure` documentation with current display options, including compaction count, Skills, MCP, prompt cache, memory, cost, and reset-label controls (#613).
+99-
+100-### Dependencies
+101-- Bump `@types/node` from 25.9.2 to 25.9.3 (#614).
+102-
+103-## [0.1.1] - 2026-06-09
+104-
+--
+126-
+127-### Added
+128-- Effort-level display in the model bracket (#471).
+129:- Native stdin `cost.total_cost_usd` support, external usage snapshot fallback, prompt-cache countdown, and optional JSON snapshots for stdin `rate_limits` (#381, #477, #478, #570).
+130:- Vertex AI provider detection with cost estimation disabled for Vertex sessions (#479).
+131-- Usage display controls for reset labels, absolute/relative reset times, compact display, remaining mode, elapsed/percentage mode, and third-party balance labels (#415, #421, #433, #536, #541, #572).
+132-- Layout and configuration controls for expanded merge groups, wrapped branch display, terminal width fallbacks, `/add-dir` workspace directories, progress bar colors, tool name wrapping/truncation, and custom line placement (#474, #476, #501, #502, #505, #571, #575).
+133-- Session start date, last response timestamp, and Skill tool target display (#497, #537).
+134-
+135-### Changed
+136-- Setup is more defensive around marketplace install paths, Windows runtime guidance, Git Bash/MSYS routing, existing statusline backups, and PowerShell wrapper generation (#399, #473, #532, #538, #546, #567).
+--
+143-- Transcript and task state handling for default subagent labels, duplicate-content `TodoWrite` task IDs, background-agent timing, stale transcript agent caches, and adjacent session usage deduplication (#455, #456, #515, #560, #579).
+144-- Git and render correctness for renamed files, quoted arrow filenames, Unicode paths, line diffs, and OSC link truncation (#451, #543, #561).
+145-- Platform-specific behavior for Bedrock provider labels, Linux memory parsing, Windows console flashes, unsafe progress-bar code points, and PowerShell setup output (#468, #523, #567).
+146:- Speed and cost display edge cases, including native cost fallback, speed cache scoping, short-window accumulation, Claude Haiku 4.x pricing, enterprise aliases, and effort schema changes (#440, #453, #486, #491, #496).
+147-- Windows + PowerShell `/claude-hud:setup` now writes a `statusline.ps1` wrapper with a guarded width fallback and corrected version-directory glob (#521).
+148-- Added Windows PowerShell 5.1 guidance for writing `settings.json` without a UTF-8 BOM.
+149-
+150-### Dependencies
+151-- Bumped TypeScript and `@types/node` development dependencies across the 0.1.0 cycle (#383, #426, #465, #533, #554, #565).
+152-
+--
+155-### Added
+156-- Chinese (`zh`) HUD labels as an explicit opt-in, while keeping English as the default.
+157-- Guided language selection in `/claude-hud:configure` so users can choose English or Chinese without hand-editing JSON.
+158:- Offline estimated session cost display via `display.showCost` for known Anthropic model families, derived from local transcript token usage only.
+159-- Session token totals, output-style display, git push count threshold coloring, configurable model badge formatting, and a custom model override.
+160-- Git file diff rendering with per-file and total line deltas, plus clickable OSC 8 file links where supported.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read sync script logic
+
+`cd ~/.local/share/chezmoi && sed -n '1,60p' dot_ansible/roles/coding_agents/files/claude_hud_sync.py`
+
+```text
+#!/usr/bin/env python3
+"""Sync the claude-hud plugin into Claude Code's versioned plugin cache.
+
+This helper is shared by:
+- the coding_agents ansible role for first-install only
+- scripts/upgrade_tools.sh for explicit refreshes via `just upgrade-plugins`
+
+It keeps older cached versions on disk while updating installed_plugins.json to
+the latest versioned checkout.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+GITHUB_API_LATEST = "https://api.github.com/repos/jarrodwatts/claude-hud/releases/latest"
+PLUGIN_KEY = "claude-hud@claude-hud"
+PLUGIN_REPO = "https://github.com/jarrodwatts/claude-hud.git"
+USER_AGENT = "chezmoi-claude-hud-sync"
+
+
+@dataclass(frozen=True)
+class ReleaseInfo:
+    tag: str
+    version: str
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--home",
+        type=Path,
+        default=Path.home(),
+        help="Home directory to manage (defaults to the current user's home).",
+    )
+    parser.add_argument(
+        "--only-if-installed",
+        action="store_true",
+        help="Skip without network access when claude-hud is not already installed.",
+    )
+    parser.add_argument(
+        "--only-if-missing",
+        action="store_true",
+        help="Skip without network access when claude-hud is already installed.",
+    )
+    parser.add_argument(
+        "--version",
+        help="Optional version override (for example: 0.0.12 or v0.0.12).",
+    )
+    return parser.parse_args()
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:54Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm trying to pinpoint which release introduced the `display.showCost` feature for showing estimated session costs based on local token usage, and I'm working through the changelog structure to match it with the correct version number.
+
+Looking at the version headers, I can see that `display.showCost` and the prompt-cache countdown both landed in the 0.1.0 cycle around June 2026 — well after the current 0.0.11 release from March 2026. This isn't a Windows-specific issue at all; in fact, the changelog shows Windows actually had more historical problems that were being fixed.
+
+Now I need to understand why the Mac version hasn't upgraded despite running the upgrade command, so I'm examining the sync script's version comparison logic to see if there's a blocker or if the user simply hasn't executed it yet.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Map cost/cache features to release versions
+
+`curl -s "https://raw.githubusercontent.com/jarrodwatts/claude-hud/main/CHANGELOG.md" 2>/dev/null | awk '/^## \[/{v=$0} /showCost|prompt-cache countdown|cost\.total_cost_usd/{print v" <<< "substr($0,1,110)}' | head`
+
+```text
+## [0.1.0] - 2026-06-03 <<< - Native stdin `cost.total_cost_usd` support, external usage snapshot fallback, prompt-cache countdown, and op
+## [0.0.12] - 2026-04-04 <<< - Offline estimated session cost display via `display.showCost` for known Anthropic model families, derived fr
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:01:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect sync update decision logic
+
+`cd ~/.local/share/chezmoi && grep -n "only_if_missing\|only_if_installed\|current_version\|latest\|return\b" dot_ansible/roles/coding_agents/files/claude_hud_sync.py | sed -n '1,45p'`
+
+```text
+9:the latest versioned checkout.
+25:GITHUB_API_LATEST = "https://api.github.com/repos/jarrodwatts/claude-hud/releases/latest"
+59:    return parser.parse_args()
+63:    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+67:    return version_or_tag if version_or_tag.startswith("v") else f"v{version_or_tag}"
+72:        return json.loads(path.read_text())
+74:        return default
+90:    return result.stdout.strip()
+96:        return ReleaseInfo(tag=tag, version=tag.removeprefix("v"))
+109:    return ReleaseInfo(tag=tag, version=tag.removeprefix("v"))
+115:    return cache_root, installed_plugins
+119:    return any(path.is_dir() for path in cache_root.glob("*"))
+124:    return bool(data.get("plugins", {}).get(PLUGIN_KEY))
+129:    return has_cached_version(cache_root) or has_plugin_entry(installed_plugins)
+136:        return destination, commit, False
+148:    return destination, commit, True
+172:        return False
+176:    return True
+191:    if args.only_if_installed and not installed:
+193:        return 0
+194:    if args.only_if_missing and installed:
+196:        return 0
+207:    return 0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:02:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm mapping out which features correspond to which versions—the cost display landed in v0.0.12 (just after our current v0.0.11), and the cache countdown with native cost tracking is coming in v0.1.0. The issue is in the sync script's logic around line 194 where it's checking conditions for missing installations.
+
+The ansible role runs the sync with `--only-if-missing`, which means it skips entirely if the plugin is already installed—that's intentional design since install and upgrade are handled separately. Upgrades only happen when running `just upgrade-plugins`, which calls the upgrade script without that guard. So the Mac hasn't had a recent upgrade run; the last update timestamp in the installed plugins file is from late March, right after the initial install.
+
+I should verify that the upgrade script actually calls the sync without the guard, and check whether the Windows machine got a fresher installation. There's also an important note that the docs already warn about usage rendering changes in v0.0.12+, and jumping from v0.0.11 all the way to v0.6.0 is a massive leap with potential config schema changes to consider.
+
+Since I just disabled the plugin, that won't block the upgrade process—the sync script doesn't check the enabled plugins list. But there's a practical issue: with the plugin disabled, the `/claude-hud:configure` command won't be available, so if the user wants to enable new display options like `showCost` after upgrading, they'd either need to re-enable the plugin temporarily or manually edit the config file. The `showCost` feature appears to be opt-in based on the changelog, so it might not show up automatically even after upgrading unless it's explicitly configured.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:02:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check upgrade path invocation
+
+`cd ~/.local/share/chezmoi && grep -n "claude_hud_sync\|claude-hud" scripts/upgrade_tools.sh | head`
+
+```text
+1048:  local claude_hud_helper="$_REPO_ROOT/dot_ansible/roles/coding_agents/files/claude_hud_sync.py"
+1066:  # claude-hud plugin cache / installed_plugins.json
+1067:  if [[ -d "$HOME/.claude/plugins/cache/claude-hud" ]]; then
+1070:    && grep -q '"claude-hud@claude-hud"' "$HOME/.claude/plugins/installed_plugins.json"; then
+1076:    info "Refreshing claude-hud plugin"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:02:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if cost/cache are opt-in flags upstream
+
+`curl -s "https://raw.githubusercontent.com/jarrodwatts/claude-hud/main/src/config.ts" 2>/dev/null | grep -n "showCost\|showPromptCache\|promptCache\|cacheCountdown" | head -20`
+
+```text
+40:  | 'promptCache'
+113:  'promptCache',
+179:    showCost: boolean;
+180:    // Also show cost for routed providers (Bedrock/Vertex) that `showCost`
+181:    // hides by default. Requires `showCost` too. Default off.
+209:    showPromptCache: boolean;
+210:    promptCacheTtlSeconds: number;
+292:    showCost: false,
+316:    showPromptCache: false,
+317:    promptCacheTtlSeconds: 300,
+709:    showCost: typeof migrated.display?.showCost === 'boolean'
+710:      ? migrated.display.showCost
+711:      : DEFAULT_CONFIG.display.showCost,
+784:    showPromptCache: typeof migrated.display?.showPromptCache === 'boolean'
+785:      ? migrated.display.showPromptCache
+786:      : DEFAULT_CONFIG.display.showPromptCache,
+787:    promptCacheTtlSeconds: validateDurationSeconds(
+788:      migrated.display?.promptCacheTtlSeconds,
+789:      DEFAULT_CONFIG.display.promptCacheTtlSeconds,
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:02:47Z)**_
+
+<think><details><summary>Thought Process</summary>
+So this isn't a platform-specific issue—claude-hud is a single TypeScript codebase without Windows-specific feature gates. The real problem is that the installed version is significantly outdated, sitting at 0.0.11 from March while the latest release is v0.6.0 from July, meaning we're missing several months of updates and improvements. I'm now mapping out which specific features correspond to which versions to understand what's been added. To enable those flags, they'd need to either hand-edit the config.json file directly (since it's chezmoi-managed and `/claude-hud:configure` changes would get reverted anyway) or temporarily re-enable the plugin. I should also note that the Windows screenshot shows the raw model ID `[claude-opus-5[1m]]` because Claude Code there is too old to send the display name — so Windows has the newer claude-hud but older Claude Code. For the exact config keys to add: `display.showCost`, `display.showPromptCache`, and `display.promptCacheTtlSeconds` (default 300).
+
+The user's question in Chinese is asking whether this is an implementation difference or if they haven't updated to the latest version — that's a question, not a request to make changes. I should answer directly and offer the upgrade path using `just upgrade-plugins`, though I'll be cautious about suggesting a major version jump without being asked since there's schema migration risk. Since they wrote in Chinese, I'll respond in Chinese to match. I see there's migration handling in place for the config, which is a good sign that the version upgrade should work smoothly with their existing setup.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:03:01Z)**_
+
+兩個問題的答案都很明確：**不是實作差異，是我們落後了 4 個月。**
+
+## 版本落差
+
+| | 版本 | 日期 |
+|---|---|---|
+| 這台 Mac | `0.0.11` | 2026-03-29 |
+| upstream latest | `v0.6.0` | 2026-07-20 |
+
+`installed_plugins.json` 的 `lastUpdated` 還停在 `2026-03-29` — 從安裝那天起就沒refresh過。
+
+claude-hud 是單一份 TypeScript codebase，**沒有任何平台功能分支**。實際上 CHANGELOG 顯示 Windows historically 是比較*落後*的那邊（PowerShell wrapper、console flashes、UTF-8 BOM 指引都是後來補的修正）。
+
+## 那兩個功能各自的來源
+
+我對照了 upstream CHANGELOG 與 `src/config.ts`：
+
+- **`Cost $33.92`** → `display.showCost`，加在 **v0.0.12**（2026-04-04）—— 就是我們這版的**下一個 release**，差一步錯過。
+- **`Cache ⏱4m59s`** → prompt-cache 倒數，`display.showPromptCache` + `promptCacheTtlSeconds`（預設 `300` 秒，正好對上截圖的 5 分鐘），加在 **v0.1.0**（2026-06-03）。
+
+## 重點：光升級不會出現
+
+兩個都是 **opt-in，預設 `false`**：
+
+```
+config.ts:292    showCost: false,
+config.ts:316    showPromptCache: false,
+config.ts:317    promptCacheTtlSeconds: 300,
+```
+
+所以 Windows 那台是有人「升級過 **且** 明確打開」。要對齊得做兩件事。
+
+## 為什麼 Mac 一直沒更新
+
+不是 bug，是 repo 刻意的設計。ansible role 跑的是 `claude_hud_sync.py --only-if-missing`，第 194 行遇到已安裝就直接 `return 0` —— 符合 CLAUDE.md 那條「install vs upgrade is split on purpose」的 invariant。refresh 只走 `just upgrade-plugins`，而這台顯然沒跑過（或很久沒跑）。
+
+## 兩個要注意的地方
+
+**1. 我剛剛把 plugin disable 了，但不影響升級。** `claude_hud_sync.py` 完全不讀 `enabledPlugins`（我剛確認過），所以 `just upgrade-plugins` 照常運作。但 `/claude-hud:configure` 在 disabled 狀態下叫不出來 —— 不過反正那個指令寫進去的東西會被 `chezmoi apply` 蓋掉（你 memory 裡記過），要開新 flag 本來就該改 source：`dot_claude/plugins/claude-hud/config.json`。
+
+**2. 0.0.11 → 0.6.0 是跨 6 個 minor 的大跳。** 你們 repo 已經記過 v0.0.12+ 改用官方 stdin `rate_limits`、舊的 credential-derived `Max` badge 會消失（`docs/this_repo/upgrades.md:86`）。好消息是 upstream `config.ts` 有 `migrated.*` 的 migration path，現有的 `contextValue: "both"` 那些應該會被接住。
+
+順帶一提：Windows 那張截圖的 model badge 顯示原始 id `[claude-opus-5[1m]]`，按你們自己的 `pitfalls/claude-hud-shows-raw-model-id.md`，那代表**那台的 Claude Code 版本太舊**，沒送 `display_name` 過去。所以那台是「claude-hud 新、Claude Code 舊」，剛好跟這台相反。
+
+要我幫你跑 `just upgrade-plugins` 並把那兩個 flag 加進 managed config 嗎？我會先確認升級後 statusline 還正常再收尾。
+
+---
+
+_**User (2026-07-27 19:05:29Z)**_
+
+好啊 升級一下 先把這兩個flag打開 然還有哪些feature沒有使用到？
+
+(BTW Windows那臺我已經 claude upgrade 顯示 Claude Code is up to date (2.1.215) 有點奇怪 還是說Windows binary本身就比較落後？)
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 19:05:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've got a few things to tackle here: upgrading the claude-hud plugin, adding some new flags to the config, checking what other features we're missing compared to the upstream version, and figuring out the Windows Claude Code version discrepancy. Let me start by checking what needs to be done first.
+
+Actually, I'm realizing that running the full `just upgrade-plugins` command would update a lot more than just claude-hud — it would also sync nvim plugins, TPM, pre-commit hooks, tldr, and gh extensions. Since the request was specifically to upgrade claude-hud, I should run the `claude_hud_sync.py` script directly instead. That's more targeted and avoids unnecessary updates. Let me check the script's CLI options first to make sure I'm running it correctly, then verify the new version installs properly.
+
+The statusline command automatically picks the highest version from the cache directory using `sort -V | tail -1`, so after upgrading to 0.6.0 it should automatically use that. But I need to verify that the new release includes the `dist/` directory — if it's gitignored in the repo and the machine doesn't have bun installed, the statusline could break since it falls back to `node dist/index.js` when bun isn't available.
+
+I should also check whether this machine has bun, and investigate the Claude Code version discrepancy on Windows versus Mac — it could be a difference in installation method or release channels.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:05:55Z)**_
+
+好，開始。先做幾項前置確認（升級腳本會 clone git，我要先確認 `dist/` 是否在 repo 裡 —— 沒有 bun 的機器靠它跑）：
+
+_**Agent (claude-opus-5 2026-07-27 19:06:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check bun/node and whether dist ships in git
+
+`command -v bun node | head; echo "=== upstream .gitignore: dist? ==="; curl -s "https://raw.githubusercontent.com/jarrodwatts/claude-hud/main/.gitignore" 2>/dev/null | grep -n "dist" ; echo "=== does v0.6.0 tag contain dist/? ==="; curl -s "https://api.github.com/repos/jarrodwatts/claude-hud/contents/dist?ref=v0.6.0" 2>/dev/null | jq -r 'if type=="array" then "dist/ EXISTS ("+(length|tostring)+" files)" else .message end'`
+
+```text
+/Users/david/.local/share/mise/installs/bun/1.3.9/bin/bun
+/Users/david/.local/share/mise/installs/node/24.13.1/bin/node
+=== upstream .gitignore: dist? ===
+5:# dist/ is gitignored but exists on main - CI builds and commits it after each merge.
+6:# See .github/workflows/build-dist.yml
+7:dist/
+=== does v0.6.0 tag contain dist/? ===
+dist/ EXISTS (83 files)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:06:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check latest Claude Code version vs local
+
+`echo "=== latest CC on npm ==="; curl -s "https://registry.npmjs.org/@anthropic-ai/claude-code/latest" 2>/dev/null | jq -r '.version, .dist.tarball' 2>/dev/null | head -2; echo "=== our local CC ==="; ls ~/.local/share/claude/versions/ 2>/dev/null; claude --version 2>/dev/null`
+
+```text
+=== latest CC on npm ===
+2.1.220
+https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.220.tgz
+=== our local CC ===
+2.1.207
+2.1.217
+2.1.220
+2.1.220 (Claude Code)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:06:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+Both bun and node are available, so the statusline will use bun to run `src/index.ts` without needing a dist folder, though one exists in the v0.6.0 tag anyway from CI. I'm also noticing that the latest Claude CLI on npm is 2.1.220, which matches what's on my Mac, but Windows is running 2.1.215—five patch versions behind—and the update command incorrectly reports being up to date, which is a Windows-specific update issue.
+
+Now I'm going to run the plugin sync script directly as a more targeted approach rather than the full upgrade command. Let me review the script's arguments once more, back up the current installed_plugins.json file just in case, and then execute it.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:06:12Z)**_
+
+bun + node both present, and `dist/` **is** committed on the tag (CI builds it) — so the statusline is safe either way. Running the surgical upgrade rather than the full `just upgrade-plugins` (which would also touch nvim/TPM/pre-commit/tldr/gh):
+
+_**Agent (claude-opus-5 2026-07-27 19:06:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run claude-hud sync to latest
+
+`cd ~/.local/share/chezmoi && cp ~/.claude/plugins/installed_plugins.json /tmp/installed_plugins.bak.json && python3 dot_ansible/roles/coding_agents/files/claude_hud_sync.py 2>&1 | tail -20; echo "=== exit: $? ==="`
+
+```text
+status=changed version=0.6.0 commit=2bbfaedb32ac2619c172b0d825bbf172369a1147 path=/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0
+=== exit: 0 ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:06:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify upgrade and statusline renders on new version
+
+`cd /tmp && jq -r '.plugins["claude-hud@claude-hud"][0] | "version=\(.version) updated=\(.lastUpdated)"' ~/.claude/plugins/installed_plugins.json; echo "=== statusline picks which version? ==="; ls -d ~/.claude/plugins/cache/claude-hud/claude-hud/*/ | sort -V | tail -1; echo "=== live render test ==="; TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1); printf '%s' "{\"model\":{\"id\":\"claude-opus-5\",\"display_name\":\"Opus 5\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\"}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)"; echo; echo "--- exit: $? ---"`
+
+```text
+version=0.6.0 updated=2026-07-27T19:06:16.708Z
+=== statusline picks which version? ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0
+=== live render test ===
+[Opus 5] │ CC v2.1.220 │ ⏱️  601h 31m
+Context    ░░░░░░░░░░ 0%
+Approx RAM ██████░░░░ 18 GB / 32 GB (57%)
+2 MCPs | 10 hooks
+✓ WebSearch ×3
+
+--- exit: 0 ---
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:06:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+After upgrading to 0.6.0, the statusline is rendering correctly and now properly displays the updated version number. I'm going to compare our current config against the full upstream schema to identify which features we haven't implemented yet, then add those two missing flags.
+
+Looking at the config file...
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:06:39Z)**_
+
+Upgraded to **0.6.0**, statusline renders clean (and now reports `CC v2.1.220` correctly — the old build was showing a stale `2.1.207`). Now surveying the full new schema against our config:
+
+_**Agent (claude-opus-5 2026-07-27 19:06:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Dump 0.6.0 default config
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '/^export const DEFAULT_CONFIG/,/^};/p' $P/src/config.ts | grep -E "^\s+[a-zA-Z]+:" | sed 's/^\s*//' | head -80`
+
+```text
+  language: 'en',
+  lineLayout: 'expanded',
+  showSeparators: false,
+  pathLevels: 1,
+  maxWidth: null,
+  forceMaxWidth: false,
+  elementOrder: [...DEFAULT_ELEMENT_ORDER],
+  projectLineOrder: [...DEFAULT_PROJECT_LINE_ORDER],
+  gitStatus: {
+    enabled: true,
+    showDirty: true,
+    showAheadBehind: false,
+    showFileStats: false,
+    branchOverflow: 'truncate',
+    pushWarningThreshold: 0,
+    pushCriticalThreshold: 0,
+  display: {
+    showModel: true,
+    showProject: true,
+    showAddedDirs: true,
+    addedDirsLayout: 'inline',
+    showContextBar: true,
+    contextValue: 'percent',
+    showConfigCounts: false,
+    showCost: false,
+    showRoutedCost: false,
+    showDuration: false,
+    showSpeed: false,
+    showTokenBreakdown: true,
+    showUsage: true,
+    usageValue: 'percent',
+    usageBarEnabled: true,
+    showResetLabel: true,
+    usageCompact: false,
+    showTools: false,
+    showSkills: false,
+    showMcp: false,
+    toolNameMaxLength: 0,
+    toolsMaxVisible: 4,
+    showAgents: false,
+    showTodos: false,
+    showSessionName: false,
+    showAuth: false,
+    showAuthUser: false,
+    authUserLength: 8,
+    showClaudeCodeVersion: false,
+    showEffortLevel: false,
+    showMemoryUsage: false,
+    showPromptCache: false,
+    promptCacheTtlSeconds: 300,
+    showSessionTokens: false,
+    showOutputStyle: false,
+    showSessionStartDate: false,
+    showLastResponseAt: false,
+    showCompactions: false,
+    mergeGroups: DEFAULT_MERGE_GROUPS.map(group => [...group]),
+    autocompactBuffer: 'enabled',
+    contextWarningThreshold: 70,
+    contextCriticalThreshold: 85,
+    usageThreshold: 0,
+    sevenDayThreshold: 80,
+    environmentThreshold: 0,
+    externalUsagePath: '',
+    externalUsageWritePath: '',
+    externalUsageFreshnessMs: 300000,
+    modelFormat: 'full',
+    modelOverride: '',
+    modelSource: 'stdin',
+    showProvider: false,
+    providerName: '',
+    customLine: '',
+    customLinePosition: 'last',
+    timeFormat: 'relative',
+    showAdvisor: false,
+    advisorOverride: '',
+    autoCompactWindow: null,
+  colors: {
+    context: 'green',
+    usage: 'brightBlue',
+    warning: 'yellow',
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:07Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm comparing the current configuration against the 0.6.0 schema to see what settings we have enabled, starting with git status options and display preferences.
+
+Looking at the new features available in 0.6.0 that aren't currently enabled, several stand out as particularly relevant for this user. The cost display was something they requested, and the prompt cache countdown would be useful too. I notice they're using ultracode with effort levels based on their Windows screenshot, so showing effort level would be valuable. They've got MCP integrations set up and just completed skills work, so displaying those would be timely. A few settings jump out from their screenshot—they're already showing session start date and last response time, which means enabling those display options would align with what they're already tracking. There are also options for auth display, provider info, and language support including Traditional Chinese that could enhance their setup.
+
+Examining their Windows screenshot more closely, I can see they have the model identifier displayed, project name with what looks like added directories, and git status with file statistics and branch tracking information. I'm seeing the session metadata and git status changes, then noticing the user is asking in Chinese to enable those two flags and identify which features aren't being used yet. So I need to turn on showCost and showPromptCache, then scan through what's still disabled.
+
+Let me update the config file — I should verify it's a plain managed file first since I remember it working directly. Then I'll apply the changes with chezmoi and check if the Cost and Cache info render properly. After that I can do a full audit of which features remain unused.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:07Z)**_
+
+Now enabling the two flags. Confirming the source file first:
+
+_**Agent (claude-opus-5 2026-07-27 19:07:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm config source path and prefix
+
+`cd ~/.local/share/chezmoi && ls dot_claude/plugins/claude-hud/ && chezmoi source-path ~/.claude/plugins/claude-hud/config.json 2>&1`
+
+```text
+config.json
+/Users/david/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:12Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_claude/plugins/claude-hud/config.json`
+
+```text
+1	{
+2	  "gitStatus": {
+3	    "enabled": true,
+4	    "showDirty": true,
+5	    "showAheadBehind": true,
+6	    "showFileStats": true
+7	  },
+8	  "display": {
+9	    "showTools": true,
+10	    "showAgents": true,
+11	    "showTodos": true,
+12	    "showDuration": true,
+13	    "showConfigCounts": true,
+14	    "showSessionName": true,
+15	    "showSpeed": true,
+16	    "showClaudeCodeVersion": true,
+17	    "showMemoryUsage": true,
+18	    "contextValue": "both"
+19	  }
+20	}
+21
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply config and verify Cost/Cache render
+
+`cd ~/.local/share/chezmoi && chezmoi apply ~/.claude/plugins/claude-hud/config.json && jq -c '.display | {showCost, showPromptCache, promptCacheTtlSeconds}' ~/.claude/plugins/claude-hud/config.json && echo "=== render with a REAL active transcript ===" && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1) && printf '%s' "{\"model\":{\"id\":\"claude-opus-5\",\"display_name\":\"Opus 5\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":12.34}}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)"`
+
+```text
+{"showCost":true,"showPromptCache":true,"promptCacheTtlSeconds":300}
+=== render with a REAL active transcript ===
+[Opus 5] │ CC v2.1.220 │ ⏱️  601h 32m │ Cost $12.34
+Context    ░░░░░░░░░░ 0%
+Cache ⏱ expired
+Approx RAM ██████░░░░ 18 GB / 32 GB (58%)
+2 MCPs | 10 hooks
+✓ WebSearch ×3
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:41Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm checking that both the cost display and cache timer are working correctly in my test setup, then I need to systematically map out all the display keys available in version 0.6.0 and compare them against what's actually shown in the Windows screenshot to identify which features aren't being used.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:41Z)**_
+
+Both live: `Cost $12.34` from stdin, and the Cache line (shows `expired` here only because my synthetic payload has a stale transcript — in a real session it counts down from 5m).
+
+Now the unused-feature survey. Let me pull the actual descriptions rather than guess:
+
+_**Agent (claude-opus-5 2026-07-27 19:07:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Extract descriptions for unused display flags
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '/interface .*DisplayConfig\|^  display: {/,/^  };/p' $P/src/config.ts | grep -B4 -E "showEffortLevel|showSkills|showMcp|showSessionTokens|showCompactions|showLastResponseAt|showSessionStartDate|showAuth:|showAdvisor|showOutputStyle|showProvider:" | grep -E "//|show[A-Z]" | head -50`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check language and layout ordering options
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== language options ==="; grep -n "type Language\|'zh-Hant'\|'zh-TW'\|Language =" $P/src/config.ts | head -5; echo "=== element order defaults ==="; grep -n "DEFAULT_ELEMENT_ORDER\s*=\|DEFAULT_PROJECT_LINE_ORDER\s*=" -A4 $P/src/config.ts | head -14`
+
+```text
+=== language options ===
+382:  return value === 'en' || value === 'zh' || value === 'zh-Hans' || value === 'zh-Hant' || value === 'zh-TW';
+=== element order defaults ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Get inline docs for each unused flag
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; for k in showEffortLevel showSkills showMcp showSessionTokens showCompactions showLastResponseAt showSessionStartDate showAuth showAdvisor showOutputStyle; do echo "--- $k ---"; grep -B3 "^\s*$k[:?]" $P/src/config.ts | grep "//" | head -3; done 2>/dev/null | head -50`
+
+```text
+--- showEffortLevel ---
+--- showSkills ---
+--- showMcp ---
+--- showSessionTokens ---
+--- showCompactions ---
+--- showLastResponseAt ---
+--- showSessionStartDate ---
+--- showAuth ---
+--- showAdvisor ---
+--- showOutputStyle ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:58Z)**_
+
+<think><details><summary>Thought Process</summary>
+I should look at the configure command documentation from version 0.6.0 instead, since that has the user-facing descriptions of each option. Let me search for that in the commands directory.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:07:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read user-facing option descriptions
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; grep -E "showEffortLevel|showSkills|showMcp|showSessionTokens|showCompactions|showLastResponseAt|showSessionStartDate|showAuth|showAdvisor|showOutputStyle|showCost|showPromptCache|language" $P/commands/configure.md | head -30`
+
+```text
+description: Configure HUD display options (layout, language, presets, display elements) while preserving advanced manual overrides
+`display.showAuth`, `display.showAuthUser`, `display.authUserLength`, and the
+- question: "Choose your HUD label language:"
+Save as `language: "en"`, `language: "zh-Hans"`, or `language: "zh-Hant"`.
+- question: "Update HUD label language? (current: '{English, 简体中文, or 繁體中文}')"
+If user chooses "Keep current", leave `language` unchanged.
+If user chooses "English (Recommended)", save `language: "en"`.
+If user chooses "简体中文", save `language: "zh-Hans"`.
+If user chooses "繁體中文", save `language: "zh-Hant"`.
+| English (Recommended) | `language: "en"` |
+| 简体中文 | `language: "zh-Hans"` |
+| 繁體中文 | `language: "zh-Hant"` |
+| Skills activity | `display.showSkills` |
+| MCP status | `display.showMcp` |
+| Session cost | `display.showCost` |
+| Auth method | `display.showAuth` (plan label, e.g. "Claude Max 20x", own segment at end of first line) |
+| Auth user | `display.showAuthUser` (login account, truncated to `display.authUserLength` chars, 0 = full) |
+| Session tokens | `display.showSessionTokens` |
+| Session start date | `display.showSessionStartDate` |
+| Last response time | `display.showLastResponseAt` |
+| Compaction count | `display.showCompactions` |
+| Reasoning level | `display.showEffortLevel` |
+| Output style | `display.showOutputStyle` |
+| Prompt cache | `display.showPromptCache` (TTL via `display.promptCacheTtlSeconds`) |
+| Advisor model | `display.showAdvisor` (override via `display.advisorOverride`) |
+2. Apply chosen language
+7. If language change selected, apply it
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:08:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm putting together the final comparison with the updated configuration settings, showing which options are enabled and which remain at their defaults.
+
+Looking at what's unused in version 0.6.0, I can see several options that would be particularly valuable for this user. They're clearly using effort levels (their settings already reference `effortLevel` and their screenshot header shows "ultracode"), so showing the reasoning level would be highly relevant. They've also been doing skills work and have multiple MCPs active, making those display options useful. Session metadata like start date and token counts would round out the picture. There's also a language preference consideration since they maintain Traditional Chinese documentation, plus some privacy implications around showing authentication details in screenshots.
+
+Beyond the feature toggles, there are layout and tuning options that could improve the HUD presentation—reordering elements, adjusting git status thresholds for visual warnings, controlling tool name truncation, setting context warning levels, and choosing between relative or absolute time formats. Some of these are more niche (like routed cost display for Bedrock/Vertex, which doesn't apply here), but the layout controls and threshold customizations would give them fine-grained control over what matters most.
+
+On the Windows version issue: the latest npm release is 2.1.220, which matches what's on Mac, but Windows is stuck at 2.1.215 and the updater falsely reports being current—so there's a genuine five-patch gap and a bug in the update mechanism.
+
+The native installer channel might be lagging behind npm, or the update check could be reading a stale manifest. I should be careful not to overstate what I've verified versus what I'm inferring. Let me try querying the native installer manifest directly to get accurate information.
+
+I'll also hold off on auto-committing since the user didn't explicitly ask for it this time — I'll present the changes and offer instead. Before I write everything up, I need to check the native install channel and consider whether to update the docs per the repo rules, particularly the version notes in upgrades.md since there's a version bump involved.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:08:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check native installer channel version
+
+`echo "=== native installer stable manifest ==="; curl -s "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/stable" 2>/dev/null | head -3; echo; echo "=== npm dist-tags ==="; curl -s "https://registry.npmjs.org/@anthropic-ai/claude-code" 2>/dev/null | jq -c '."dist-tags"'`
+
+```text
+=== native installer stable manifest ===
+2.1.212
+=== npm dist-tags ===
+{"stable":"2.1.212","latest":"2.1.220","next":"2.1.220"}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:08:50Z)**_
+
+<think><details><summary>Thought Process</summary>
+So there are actually two separate release channels — `stable` at 2.1.212 which the native installer and `claude update` use by default, and `latest` at 2.1.220 which npm installs with `@latest`. The Windows machine sitting at 2.1.215 falls between these two versions.
+
+The key insight is that `claude update` on Windows correctly reports "up to date" because 2.1.215 is already ahead of the stable channel (2.1.212), so the updater won't downgrade it. Meanwhile, the Mac is running 2.1.220 because it's been pulling from the `latest` channel. This isn't a Windows-versus-macOS platform difference at all — it's purely a matter of which release channel each installation is following.
+
+Now I should write up the full answer and check if there's any documentation that needs updating, particularly around the upgrades section.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:08:50Z)**_
+
+That settles the Windows question definitively. Let me check final repo state:
+
+_**Agent (claude-opus-5 2026-07-27 19:08:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check repo state and stale version references
+
+`cd ~/.local/share/chezmoi && git status --short && echo "=== stale version claim in docs? ===" && grep -n "0\.0\.1[12]" docs/this_repo/upgrades.md README.md docs/this_repo/upgrades.zh-TW.md 2>/dev/null | head`
+
+```text
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+ M dot_claude/plugins/claude-hud/config.json
+=== stale version claim in docs? ===
+docs/this_repo/upgrades.zh-TW.md:83:`claude-hud` 沒被放進 [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl)：它使用了帶版本的快取 (cache) 路徑，並會改寫 `~/.claude/plugins/installed_plugins.json`，所以放在顯式的 `plugins` 升級路徑比放在 chezmoi externals 更合適。Upstream `v0.0.12+` 也把使用量渲染切換到 Claude Code 的官方 stdin `rate_limits`，這代表升級後舊有的、由憑證推導出的 `Max` 標誌可能會消失。
+docs/this_repo/upgrades.md:88:`claude-hud` stays out of [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl): it uses a versioned cache path and rewrites `~/.claude/plugins/installed_plugins.json`, so it fits the explicit `plugins` upgrade path better than chezmoi externals. Upstream `v0.0.12+` also switched usage rendering to Claude Code's official stdin `rate_limits`, which means the old credential-derived `Max` badge may disappear after upgrade.
+README.md:390:latest upstream release. Upstream `claude-hud` `v0.0.12+` now follows Claude
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:09:20Z)**_
+
+升級完成並驗證。
+
+## 1. 升級結果
+
+`0.0.11` → **`0.6.0`**（跑 `claude_hud_sync.py` 而非整包 `just upgrade-plugins`，避免順便動到 nvim/TPM/pre-commit/tldr/gh）。statusline 正常，而且順帶修好一件事 —— 舊版顯示 `CC v2.1.207`（stale），新版正確報 `CC v2.1.220`。
+
+舊的 `0.0.11` 目錄保留在 cache 裡，statusline 的 `sort -V | tail -1` 會自動選 `0.6.0`。要回退把新目錄砍掉即可。
+
+## 2. 兩個 flag 已開（`dot_claude/plugins/claude-hud/config.json`）
+
+```json
+"showCost": true,
+"showPromptCache": true,
+"promptCacheTtlSeconds": 300,
+```
+
+實測輸出：
+
+```
+[Opus 5] │ CC v2.1.220 │ ⏱ 601h 32m │ Cost $12.34
+Context    ░░░░░░░░░░ 0%
+Cache ⏱ expired
+```
+
+`Cache` 顯示 `expired` 只是因為我灌的是合成 payload、transcript 時間戳是舊的；真實 session 會從 5m 開始倒數。
+
+## 3. 還沒用到的 feature
+
+**跟你高度相關的（都預設 off）：**
+
+| Flag | 說明 |
+|---|---|
+| `showEffortLevel` | Reasoning level。你 `settings.json` 有 `effortLevel`，Windows 那台正在跑 ultracode —— v0.1.0 起會顯示成 `ultracode(xhigh)` |
+| `showSkills` | Skills activity |
+| `showMcp` | MCP status（你有 2 個 MCP） |
+| `showLastResponseAt` | `Last reply: 1s ago` —— Windows 截圖有 |
+| `showSessionStartDate` | `Started: 2026-07-27 15:04` —— Windows 截圖有 |
+| `showCompactions` | compaction 次數，長 session 有用 |
+| `showSessionTokens` | session token 總量 |
+| `language: "zh-Hant"` | **繁中 HUD labels**，v0.4.0 才加的，跟你 zh-TW 文件習慣一致 |
+
+**其他：** `showAuth`/`showAuthUser`（方案標籤與登入帳號 —— 截圖分享時要注意）、`showOutputStyle`、`showAdvisor`、`showProvider`。`showRoutedCost` 只對 Bedrock/Vertex 有意義，你走直連可略過。
+
+**新調校旋鈕（非功能）：** `elementOrder` / `projectLineOrder`（重排版面）、`gitStatus.pushWarningThreshold`（替 `↑N` 上色）、`toolsMaxVisible`（預設 4，就是截圖那個 `+2 more`）、`maxWidth`、`customLine`、`contextWarningThreshold`（70/85）、`timeFormat`、`colors.*` presets。
+
+要開哪些跟我說，我直接改 source。**注意 `/claude-hud:configure` 現在叫不出來**（plugin 已 disable），不過那本來就會被 `chezmoi apply` 蓋掉，改 source 才是對的路。
+
+## 4. Windows 的版本問題 —— 不是 Windows 落後，是 channel 不同
+
+查到關鍵：
+
+```
+npm dist-tags:  {"stable":"2.1.212", "latest":"2.1.220", "next":"2.1.220"}
+native installer stable channel:  2.1.212
+```
+
+有**兩條發布 channel**。`claude update` 跟的是 **stable（2.1.212）**，而你 Windows 上是 **2.1.215 —— 已經高於 stable**，所以 updater 回報「up to date」完全正確，它不會幫你降級。這台 Mac 是 2.1.220，跟的是 `latest`。
+
+所以不是 Windows binary 比較舊，是兩台跟的 channel 不一樣。順帶修正我上一輪的推測：我當時說 Windows 顯示 raw model id 是「Claude Code 太舊」—— 方向對，但更精確的成因是 stable channel 落後 latest 8 個版本。
+
+---
+
+目前未 commit：`dot_claude/plugins/claude-hud/config.json`（+ 本次 transcript）。另外 `docs/this_repo/upgrades.md:88`、其 zh-TW 版與 `README.md:390` 都還寫著 `v0.0.12+` 的說法，現在跳到 0.6.0 後有點過時。要我一起更新並 commit 嗎？
+
+---
+
+_**User (2026-07-27 19:11:40Z)**_
+
+更新相關docs git commit 吧 然後幫我打開跟我們比較高度相關的features我看看好不好用 (language維持英文)
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 19:11:54Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to enable several high-relevance features in the codebase, update the documentation files for version 0.6.0, and then commit the changes. I'll start by enabling the features and testing the render, then move on to updating the docs before finalizing with a commit.
+
+I'm concerned about the HUD becoming too tall with all these features enabled, so I'll need to check the render after making changes. I'm adding the seven features to the config file and want to verify that `showMcp` (which displays MCP server status) doesn't duplicate what `showConfigCounts` already shows (which displays counts of MCPs and hooks). Let me make the edits and then verify the output looks reasonable.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:11:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply and render with all new features on
+
+`cd ~/.local/share/chezmoi && chezmoi apply ~/.claude/plugins/claude-hud/config.json && echo "=== render (real transcript + effort + cost) ===" && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1) && printf '%s' "{\"model\":{\"id\":\"claude-opus-5\",\"display_name\":\"Opus 5\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":12.34}}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)"; echo; echo "--- exit $? · line count above matters (menu height) ---"`
+
+```text
+=== render (real transcript + effort + cost) ===
+[Opus 5] │ CC v2.1.220 │ ⏱️  601h 36m │ Cost $12.34
+Context    ░░░░░░░░░░ 0%
+Cache ⏱ expired
+Approx RAM ██████░░░░ 18 GB / 32 GB (57%)
+2 MCPs | 10 hooks
+✓ WebSearch ×3
+Started: 2026-07-03 01:35 │ Last reply: 25d 1h ago
+Tokens 151k (in: 38k, out: 648, cache: 112k)
+
+--- exit 0 · line count above matters (menu height) ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:19Z)**_
+
+<think><details><summary>Thought Process</summary>
+The display is working correctly with the started time, last reply, and token count all showing up. The effort level flag isn't visibly appearing because the test environment doesn't have an effort signal, though it would display something like `ultracode(xhigh)` in a real session. The skills and MCP sections also aren't adding visible lines in this setup, likely due to similar environmental constraints.
+
+I'm realizing the HUD is getting quite tall at 8 lines now, which might be worth considering. Let me verify that the effort level detection is actually working by checking how it's implemented in the current version.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:19Z)**_
+
+`Started:`, `Last reply:`, and `Tokens` are live. Three of the new flags produced nothing in that render — let me confirm whether that's correct-but-conditional rather than broken:
+
+_**Agent (claude-opus-5 2026-07-27 19:12:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Trace what drives the three silent flags
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== effort source ==="; grep -rn "showEffortLevel" $P/src/*.ts | grep -v config.ts | head -5; echo "=== skills source ==="; grep -rn "showSkills" $P/src/*.ts | grep -v "config.ts" | head -3; echo "=== mcp source ==="; grep -rn "showMcp" $P/src/*.ts | grep -v "config.ts" | head -3`
+
+```text
+=== effort source ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/index.ts:159:    const effortInfo = config.display.showEffortLevel
+=== skills source ===
+=== mcp source ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect effort/skills/mcp render conditions
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '155,170p' $P/src/index.ts; echo "=== skills/mcp render (renderer files) ==="; grep -rln "showSkills\|showMcp" $P/src/ | head; echo "--- usage ---"; grep -rn "showSkills\|showMcp" $P/src/render*.ts $P/src/**/*.ts 2>/dev/null | head -6`
+
+```text
+    );
+    const claudeCodeVersion = config.display.showClaudeCodeVersion
+      ? await deps.getClaudeCodeVersion()
+      : undefined;
+    const effortInfo = config.display.showEffortLevel
+      ? resolveEffortLevel(stdin.effort, { ultracodeActive: transcript.ultracodeActive })
+      : null;
+    const memoryUsage =
+      config.display.showMemoryUsage && config.lineLayout === "expanded"
+        ? await deps.getMemoryUsage()
+        : null;
+    const authInfo =
+      config.display.showAuth || config.display.showAuthUser
+        ? deps.readAuthInfo()
+        : null;
+
+=== skills/mcp render (renderer files) ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/index.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/tools-line.ts
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/skills-mcp-line.ts
+--- usage ---
+(eval):1: no matches found: /Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render*.ts
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:41Z)**_
+
+<think><details><summary>Thought Process</summary>
+The `showEffortLevel` function pulls from `stdin.effort` and checks for the `transcript.ultracodeActive` flag—since my test payload lacked the effort field and the old transcript had no ultracode marker, nothing renders, which is the expected behavior. For skills and MCP rendering, there's a dedicated line component that only activates when there's actual activity to display.
+
+Now I'll inject an `effort` value into stdin to verify the flag actually renders in practice.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify effort level renders when stdin supplies it
+
+`cd /tmp && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1); printf '%s' "{\"model\":{\"id\":\"claude-opus-5\",\"display_name\":\"Opus 5\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":12.34},\"effort\":\"xhigh\"}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)" | head -2`
+
+```text
+[Opus 5 ◕ xhigh] │ CC v2.1.220 │ ⏱️  601h 37m │ Cost $12.34
+Context    ░░░░░░░░░░ 0%
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:56Z)**_
+
+<think><details><summary>Thought Process</summary>
+All the flags are working as expected—the effort level just needs stdin input, which Claude Code handles automatically in a real session. I've now verified or explained each one: cost display, prompt cache status, effort level, session start date, last response timestamp, and session token counts.
+
+For the remaining flags, there's dedicated code for skills and MCP rendering that activates on activity, and compactions only appear if the transcript contains compact boundary entries. Now I need to update the documentation across three files—the upgrade notes in both English and Traditional Chinese, plus the main README—to reflect these v0.0.12+ changes. Let me check those specific locations and see if I should add a dedicated claude-hud config doc or just keep the version story in upgrades.md.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:12:56Z)**_
+
+`[Opus 5 ◕ xhigh]` — effort confirmed. It just needs Claude Code to supply `effort` on stdin, which it does live. Now the docs:
+
+_**Agent (claude-opus-5 2026-07-27 19:12:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read doc passages to update
+
+`cd ~/.local/share/chezmoi && echo "=== upgrades.md 84-90 ==="; sed -n '84,90p' docs/this_repo/upgrades.md; echo "=== README 386-394 ==="; sed -n '386,394p' README.md`
+
+```text
+=== upgrades.md 84-90 ===
+```
+
+Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`go`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.
+
+`claude-hud` stays out of [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl): it uses a versioned cache path and rewrites `~/.claude/plugins/installed_plugins.json`, so it fits the explicit `plugins` upgrade path better than chezmoi externals. Upstream `v0.0.12+` also switched usage rendering to Claude Code's official stdin `rate_limits`, which means the old credential-derived `Max` badge may disappear after upgrade.
+
+## Semantics: best-effort, not all-or-nothing
+=== README 386-394 ===
+docs, rationale, run-order diagram, and extension guide live in
+[docs/this_repo/upgrades.md](docs/this_repo/upgrades.md).
+
+When installed, `just upgrade-plugins` also refreshes `claude-hud` to the
+latest upstream release. Upstream `claude-hud` `v0.0.12+` now follows Claude
+Code's official stdin `rate_limits` only, so the old credential-derived `Max`
+plan badge may disappear after upgrade.
+
+## Multi-host apply (`just fleet-apply`)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:13:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:13:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:13:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/README.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:15:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify docs build has no new warnings
+
+`cd ~/.local/share/chezmoi && uv run mkdocs build --strict 2>&1 | grep -c "WARNING" ; echo "--- warnings above; check none are ours ---"; uv run mkdocs build --strict 2>&1 | grep "WARNING" | grep -i "upgrades\|lsp" || echo "none of the warnings touch upgrades.md / lsp.md"`
+
+```text
+12
+--- warnings above; check none are ours ---
+none of the warnings touch upgrades.md / lsp.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:15:25Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing a discrepancy in the warning count — the output shows 12 warnings when I grep for "WARNING", but earlier it reported 11 warnings in strict mode. I need to figure out if that 12th match is actually a separate warning or if it's picking up something else like the abort message itself.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:15:25Z)**_
+
+Let me confirm the warning count didn't change from the pre-existing baseline:
+
+_**Agent (claude-opus-5 2026-07-27 19:16:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare warning count against clean baseline
+
+`cd ~/.local/share/chezmoi && uv run mkdocs build --strict 2>&1 | tail -1; echo "=== baseline check: stash our docs edits and rebuild ==="; git stash push -q docs/this_repo/upgrades.md docs/this_repo/upgrades.zh-TW.md README.md docs/tools/lsp.md docs/tools/lsp.zh-TW.md 2>/dev/null && uv run mkdocs build --strict 2>&1 | tail -1; git stash pop -q && echo "(restored)"`
+
+```text
+Aborted with 11 warnings in strict mode!
+=== baseline check: stash our docs edits and rebuild ===
+Aborted with 11 warnings in strict mode!
+(restored)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:16:28Z)**_
+
+<think><details><summary>Thought Process</summary>
+The warning count is consistent at 11 across both runs, so there's no regression from my changes. The stash only affected the dirty files—`upgrades.md` and its Chinese variant plus `README.md`—since the LSP docs were already committed and clean, so the baseline comparison is valid with just those modified files.
+
+Now I'm checking the final state of the config and what's uncommitted in git before committing everything.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:16:28Z)**_
+
+Identical baseline — 11 warnings with and without my docs edits, no regression. Final state check before committing:
+
+_**Agent (claude-opus-5 2026-07-27 19:16:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify applied state and staging candidates
+
+`cd ~/.local/share/chezmoi && chezmoi diff ~/.claude/plugins/claude-hud/config.json 2>&1 | head -3; echo "(empty above = applied cleanly)"; echo "=== final config ==="; jq -c '.display' dot_claude/plugins/claude-hud/config.json; echo "=== git status ==="; git status --short`
+
+```text
+(empty above = applied cleanly)
+=== final config ===
+{"showTools":true,"showAgents":true,"showTodos":true,"showDuration":true,"showConfigCounts":true,"showSessionName":true,"showSpeed":true,"showClaudeCodeVersion":true,"showMemoryUsage":true,"showCost":true,"showPromptCache":true,"promptCacheTtlSeconds":300,"showEffortLevel":true,"showSkills":true,"showMcp":true,"showSessionTokens":true,"showCompactions":true,"showSessionStartDate":true,"showLastResponseAt":true,"contextValue":"both"}
+=== git status ===
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+ M README.md
+ M docs/this_repo/upgrades.md
+ M docs/this_repo/upgrades.zh-TW.md
+ M dot_claude/plugins/claude-hud/config.json
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:16:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user is seeing the cost display getting truncated on the first line of their prompt. Looking at the screenshot, the issue is that the model badge with the context window and settings is taking up too much space, pushing the cost indicator off the visible area.
+
+I'm identifying the culprits: the session name (`magical-noodling-horizon`) is auto-generated and seems unnecessary, the model format is set to full which makes the badge verbose, and the cost is positioned last in the element order. I can fix this by either disabling the session name display, switching to a shorter model format, or reordering elements to put cost earlier. I also need to address the user's second question about whether `showSessionTokens` accounts for dynamic workflows and subagents by checking how the token count is actually calculated.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:16:49Z)**_
+
+Good catch — let me diagnose the overflow and answer the tokens question before committing.
+
+_**Agent (claude-opus-5 2026-07-27 19:16:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Diagnose first-line overflow contributors
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== modelFormat options ==="; grep -n "ModelFormat\s*=\|modelFormat" $P/src/config.ts | head -6; echo "=== sessionName source (magical-noodling-horizon?) ==="; grep -rn "showSessionName" $P/src/*.ts $P/src/render/*.ts 2>/dev/null | head -4; echo "=== DEFAULT_ELEMENT_ORDER ==="; grep -n "DEFAULT_ELEMENT_ORDER" -A 20 $P/src/config.ts | head -26`
+
+```text
+=== modelFormat options ===
+223:    modelFormat: ModelFormatMode;
+323:    modelFormat: 'full',
+811:    modelFormat: validateModelFormat(migrated.display?.modelFormat)
+812:      ? migrated.display.modelFormat
+813:      : DEFAULT_CONFIG.display.modelFormat,
+=== sessionName source (magical-noodling-horizon?) ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:193:    showSessionName: boolean;
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:299:    showSessionName: false,
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:740:    showSessionName: typeof migrated.display?.showSessionName === 'boolean'
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:741:      ? migrated.display.showSessionName
+=== DEFAULT_ELEMENT_ORDER ===
+108:export const DEFAULT_ELEMENT_ORDER: HudElement[] = [
+109-  'project',
+110-  'addedDirs',
+111-  'context',
+112-  'usage',
+113-  'promptCache',
+114-  'memory',
+115-  'environment',
+116-  'tools',
+117-  'skills',
+118-  'mcp',
+119-  'agents',
+120-  'todos',
+121-  'sessionTime',
+122-];
+123-
+124-export const DEFAULT_MERGE_GROUPS: HudElement[][] = [
+125-  ['context', 'usage'],
+126-];
+127-
+128-const PROJECT_LINE_SEGMENTS: FirstLineSegment[] = [
+--
+145:const KNOWN_ELEMENTS = new Set<HudElement>(DEFAULT_ELEMENT_ORDER);
+146-const KNOWN_FIRST_LINE_SEGMENTS = new Set<FirstLineSegment>(PROJECT_LINE_SEGMENTS);
+147-
+148-export interface HudConfig {
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:16:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Trace session token accounting scope
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== sessionTokens computation ==="; grep -rn "sessionTokens\|showSessionTokens" $P/src/transcript.ts $P/src/index.ts 2>/dev/null | head -8; echo "=== does transcript parse sidechain/subagent entries? ==="; grep -n "isSidechain\|sidechain\|subagent\|agent-" $P/src/transcript.ts | head -12`
+
+```text
+=== sessionTokens computation ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:91:  sessionTokens?: SessionTokenUsage;
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:245:    sessionTokens: data.sessionTokens,
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:274:    sessionTokens: normalizeSessionTokens(data.sessionTokens),
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:380:  const sessionTokens: SessionTokenUsage = {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:483:            sessionTokens.inputTokens += normalizeTokenCount(usage.input_tokens);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:484:            sessionTokens.outputTokens += normalizeTokenCount(usage.output_tokens);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:485:            sessionTokens.cacheCreationTokens += normalizeTokenCount(usage.cache_creation_input_tokens);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts:486:            sessionTokens.cacheReadTokens += normalizeTokenCount(usage.cache_read_input_tokens);
+=== does transcript parse sidechain/subagent entries? ===
+39:  // block. For Agent calls it reports `resolvedModel`, the model the subagent
+621:          type: (input?.subagent_type as string) ?? 'agent',
+713:        // `resolvedModel` is the model the subagent actually ran on, so it wins
+715:        // entirely whenever the subagent inherits the session model).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:02Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm realizing that `magical-noodling-horizon` is actually the `showSessionName` setting, which was already enabled in our config before I made any changes—it's just Claude Code's auto-generated session name. Now I need to look at the `PROJECT_LINE_SEGMENTS` list to identify what's causing the first line to overflow.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Get first-line segment order and model format options
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== PROJECT_LINE_SEGMENTS (first-line order) ==="; sed -n '128,145p' $P/src/config.ts; echo "=== ModelFormatMode values ==="; grep -rn "ModelFormatMode" $P/src/*.ts | head -3`
+
+```text
+=== PROJECT_LINE_SEGMENTS (first-line order) ===
+const PROJECT_LINE_SEGMENTS: FirstLineSegment[] = [
+  'model',
+  'project',
+  'advisor',
+  'sessionName',
+  'version',
+  'extra',
+  'duration',
+  'cost',
+  'speed',
+  'auth',
+];
+
+// An empty order is deliberate: renderers retain their byte-for-byte native
+// order until the user opts in to moving one or more segments.
+export const DEFAULT_PROJECT_LINE_ORDER: FirstLineSegment[] = [];
+
+const KNOWN_ELEMENTS = new Set<HudElement>(DEFAULT_ELEMENT_ORDER);
+=== ModelFormatMode values ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:24:export type ModelFormatMode = 'full' | 'compact' | 'short';
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:223:    modelFormat: ModelFormatMode;
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/config.ts:385:function validateModelFormat(value: unknown): value is ModelFormatMode {
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read sessionTokens accumulation loop
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '455,495p' $P/src/transcript.ts`
+
+```text
+          }
+        }
+        // Accumulate token usage from assistant messages.
+        // Claude Code can write the same API response to the transcript 2-3 times
+        // (dual-logging). Prefer the API-response-level message.id so duplicates
+        // can be removed even when another record appears between them. Only
+        // bounded string IDs are retained, and the set is capped to keep a
+        // malformed transcript from growing memory without limit. Records with
+        // missing or invalid IDs keep the previous consecutive usage-fingerprint
+        // fallback.
+        if (entry.type === 'assistant' && entry.message?.usage) {
+          const usage = entry.message.usage;
+          const msgId = normalizeMessageId(entry.message.id);
+          let shouldCount = false;
+
+          if (msgId !== null) {
+            lastUsageKey = undefined;
+            if (!seenMessageIds.has(msgId)) {
+              rememberMessageId(seenMessageIds, msgId);
+              shouldCount = true;
+            }
+          } else {
+            const usageKey = `${usage.input_tokens}|${usage.output_tokens}|${usage.cache_creation_input_tokens}|${usage.cache_read_input_tokens}`;
+            shouldCount = usageKey !== lastUsageKey;
+            lastUsageKey = usageKey;
+          }
+
+          if (shouldCount) {
+            sessionTokens.inputTokens += normalizeTokenCount(usage.input_tokens);
+            sessionTokens.outputTokens += normalizeTokenCount(usage.output_tokens);
+            sessionTokens.cacheCreationTokens += normalizeTokenCount(usage.cache_creation_input_tokens);
+            sessionTokens.cacheReadTokens += normalizeTokenCount(usage.cache_read_input_tokens);
+          }
+        } else {
+          lastUsageKey = undefined;
+        }
+        // Track Claude Code's compact_boundary marker. Both manual (/compact)
+        // and auto compaction emit this system entry with compactMetadata; we
+        // take the most recent one's timestamp so callers can distinguish a
+        // legitimate post-compact zero frame from a transient stdin glitch.
+        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:21Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to figure out whether subagent and workflow assistant turns show up in the main transcript file or get written to separate files, since that determines whether `showSessionTokens` would capture them when iterating through the single transcript passed on stdin.
+
+From my earlier investigation, the Task/Agent tool outputs subagent conversations as separate JSONL files, and workflow agents write to `agent-<id>.jsonl` files in a transcript directory. But Claude Code has historically embedded subagent turns directly into the session JSONL with `isSidechain: true` markers. The best way to resolve this is to check the actual transcript from the current session — looking for `isSidechain` entries and seeing if the token counts add up to just the main thread or include sidechains. The session shows 14.1M tokens total with cache reads dominating, and I didn't spawn any subagents this session, so if there are no `isSidechain` entries in the transcript, that would confirm the token count is main-thread only.
+
+Now I need to grep through project transcripts to find one that actually had subagents and check how they're recorded. I also want to tackle the overflow issue in the status line — either by hiding the session name (which the user found unhelpful anyway), using a compact model format to shorten the model description, or reordering the elements. Let me test what each approach looks like and run both the subagent check and the format renders.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Empirically check if subagent turns are in main transcript
+
+`cd ~/.claude/projects/-Users-david--local-share-chezmoi && echo "=== do subagent turns land in the MAIN transcript? ==="; for f in $(ls -t *.jsonl | head -6); do n=$(grep -c '"isSidechain":true' "$f" 2>/dev/null); a=$(grep -c '"type":"assistant"' "$f" 2>/dev/null); echo "$f  sidechain=$n  assistant=$a"; done`
+
+```text
+=== do subagent turns land in the MAIN transcript? ===
+0c92028f-ba22-46e1-a667-ae719c526bb1.jsonl  sidechain=0  assistant=7
+02eed419-0a56-40a7-bb87-dfaa9eb9c96d.jsonl  sidechain=0  assistant=53
+03c60d5c-3444-4362-b84f-3ee0e98c91ed.jsonl  sidechain=0  assistant=1
+0473843f-e4d3-4efa-abe7-71680c037c9c.jsonl  sidechain=0  assistant=101
+1b81f096-db81-4e0c-9028-ddab68812e70.jsonl  sidechain=0  assistant=18
+1c97d4ce-2d76-4287-9bab-67838d15463c.jsonl  sidechain=0  assistant=80
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm not finding any sidechain entries in the transcripts I've sampled, so I need to search more comprehensively across all of them. I'm specifically looking for sessions that used the Agent or Task tool to see if their token counts capture subagent work.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate subagent transcripts and sidechain entries
+
+`cd ~/.claude/projects/-Users-david--local-share-chezmoi && echo "=== any sidechain anywhere in this project? ==="; grep -l '"isSidechain":true' *.jsonl 2>/dev/null | head -3 || echo "NONE"; echo "=== sessions that DID spawn subagents (Task/Agent tool) ==="; grep -l '"name":"Task"\|"name":"Agent"' *.jsonl 2>/dev/null | head -3; echo "=== separate subagent transcript dirs? ==="; ls -d ~/.claude/projects/-Users-david--local-share-chezmoi/*/ 2>/dev/null | head -5`
+
+```text
+=== any sidechain anywhere in this project? ===
+=== sessions that DID spawn subagents (Task/Agent tool) ===
+1b81f096-db81-4e0c-9028-ddab68812e70.jsonl
+169716f2-ea37-4fcb-b841-57c526c26a7f.jsonl
+18063f9d-8090-44ce-a818-b973c77e47da.jsonl
+=== separate subagent transcript dirs? ===
+/Users/david/.claude/projects/-Users-david--local-share-chezmoi/1b81f096-db81-4e0c-9028-ddab68812e70
+/Users/david/.claude/projects/-Users-david--local-share-chezmoi/1c97d4ce-2d76-4287-9bab-67838d15463c
+/Users/david/.claude/projects/-Users-david--local-share-chezmoi/3c0423c2-60de-452c-b7e8-fc479ee80472
+/Users/david/.claude/projects/-Users-david--local-share-chezmoi/5afca442-f1bd-4edb-9692-26e1b0bdf931
+/Users/david/.claude/projects/-Users-david--local-share-chezmoi/5fab5703-3274-42e3-87b2-5024b67553b2
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+So subagent transcripts are stored in their own subdirectory structure keyed by session ID, separate from the main transcript file, which means `showSessionTokens` is only counting tokens from the main thread and not including any subagent or workflow usage. Let me verify the subdirectory contains those agent transcripts and calculate the actual token magnitude to illustrate the difference, then I'll address the layout issue.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Quantify main vs subagent token split
+
+```bash
+D=~/.claude/projects/-Users-david--local-share-chezmoi/1b81f096-db81-4e0c-9028-ddab68812e70; echo "=== subagent transcripts for that session ==="; ls "$D" | head -5; echo "count: $(ls "$D" | wc -l)"; echo "=== main-thread tokens vs subagent tokens ==="; python3 -c "
+import json,glob,os
+def tok(p):
+    t=0
+    for line in open(p,errors='ignore'):
+        try: e=json.loads(line)
+        except: continue
+        u=(e.get('message') or {}).get('usage') or {}
+        t+=sum(u.get(k,0) or 0 for k in ('input_tokens','output_tokens','cache_creation_input_tokens','cache_read_input_tokens'))
+    return t
+main='$D.jsonl'
+print(f'main thread : {tok(main):,}')
+sub=sum(tok(f) for f in glob.glob('$D/*.jsonl'))
+print(f'subagents   : {sub:,}   <- NOT counted by showSessionTokens')
+"
+```
+
+```text
+=== subagent transcripts for that session ===
+subagents
+tool-results
+count:        2
+=== main-thread tokens vs subagent tokens ===
+main thread : 1,333,449
+subagents   : 0   <- NOT counted by showSessionTokens
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:17:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Measure subagent token volume
+
+```bash
+D=~/.claude/projects/-Users-david--local-share-chezmoi/1b81f096-db81-4e0c-9028-ddab68812e70; ls "$D/subagents" | head -3; echo "count: $(ls "$D/subagents" 2>/dev/null | wc -l)"; python3 -c "
+import json,glob
+def tok(p):
+    t=0
+    for line in open(p,errors='ignore'):
+        try: e=json.loads(line)
+        except: continue
+        u=(e.get('message') or {}).get('usage') or {}
+        t+=sum(u.get(k,0) or 0 for k in ('input_tokens','output_tokens','cache_creation_input_tokens','cache_read_input_tokens'))
+    return t
+sub=sum(tok(f) for f in glob.glob('$D/subagents/*.jsonl'))
+print(f'subagent tokens: {sub:,}  <- lives OUTSIDE the main transcript')
+"
+```
+
+```text
+agent-a0ab51641dbef3d9c.jsonl
+agent-a0ab51641dbef3d9c.meta.json
+count:        2
+subagent tokens: 814,250  <- lives OUTSIDE the main transcript
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the real issue is that `showSessionTokens` is missing about 38% of the token count because subagents store their data in a separate directory structure that the function never checks — those tokens live in `<session-id>/subagents/agent-*.jsonl` files. The same problem affects workflow agents since they're also subagents. I'm now wondering whether the `Cost` field accounts for subagent tokens, since it comes from Claude Code's `cost.total_cost_usd` calculation.
+
+For the layout issue, I'm going to try turning off `showSessionName` first to see if that gives enough breathing room, and if needed I'll also test the `modelFormat: "compact"` option. Let me quickly measure the first-line length across these variants to compare fairly.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:12Z)**_
+
+Decisive. Now the layout fix — measuring each lever's effect on first-line length:
+
+_**Agent (claude-opus-5 2026-07-27 19:18:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare first-line length across layout options
+
+```bash
+cd /tmp && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1); CFG=~/.claude/plugins/claude-hud/config.json; cp $CFG /tmp/hud.bak.json
+PAYLOAD="{\"model\":{\"id\":\"claude-opus-5[1m]\",\"display_name\":\"Opus 5 (1M context)\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":33.92},\"effort\":\"xhigh\"}"
+CMD=$(jq -r '.statusLine.command' ~/.claude/settings.json)
+for variant in "current" "no-sessionName" "no-sessionName+compact" "no-sessionName+short"; do
+  case $variant in
+    current) jq '.' /tmp/hud.bak.json > $CFG ;;
+    no-sessionName) jq '.display.showSessionName=false' /tmp/hud.bak.json > $CFG ;;
+    "no-sessionName+compact") jq '.display.showSessionName=false|.display.modelFormat="compact"' /tmp/hud.bak.json > $CFG ;;
+    "no-sessionName+short") jq '.display.showSessionName=false|.display.modelFormat="short"' /tmp/hud.bak.json > $CFG ;;
+  esac
+  L=$(printf '%s' "$PAYLOAD" | eval "$CMD" | head -1 | sed 's/\x1b\[[0-9;]*m//g')
+  printf '%-24s len=%3d  %s\n' "$variant" "${#L}" "$L"
+done
+cp /tmp/hud.bak.json $CFG
+```
+
+```text
+current                  len= 72  [Opus 5 (1M context) ◕ xhigh] │ CC v2.1.220 │ ⏱️  601h 43m │ Cost $33.92
+no-sessionName           len= 72  [Opus 5 (1M context) ◕ xhigh] │ CC v2.1.220 │ ⏱️  601h 43m │ Cost $33.92
+no-sessionName+compact   len= 59  [Opus 5 ◕ xhigh] │ CC v2.1.220 │ ⏱️  601h 43m │ Cost $33.92
+no-sessionName+short     len= 59  [Opus 5 ◕ xhigh] │ CC v2.1.220 │ ⏱️  601h 43m │ Cost $33.92
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:34Z)**_
+
+<think><details><summary>Thought Process</summary>
+My synthetic test isn't capturing the session name or git segment the way the real prompt does—the test session ID "t" has no associated name, and the project context isn't showing up. But the meaningful finding is that using `modelFormat: compact/short` trims 13 characters from the model segment, shrinking `[Opus 5 (1M context) ◕ xhigh]` down to `[Opus 5 ◕ xhigh]`.
+
+The session name itself—`magical-noodling-horizon`—accounts for roughly 27 characters including separators, making it the single largest space consumer on the line. Looking at their actual prompt output, the full line runs about 139 characters on what appears to be a ~135-character-wide terminal, so dropping the session name entirely would free up enough space to fit comfortably, and setting `modelFormat` to compact would save an additional 13 characters. Since the session name is just Claude Code's auto-generated nickname with no real informational value, the recommendation is to disable `showSessionName` and switch to compact formatting.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:34Z)**_
+
+My synthetic session can't reproduce the name segment, but the arithmetic on your real line is clear. `modelFormat` saves 13 chars; `magical-noodling-horizon` is ~27 with its separator — the biggest single win.
+
+Worth noting: **`showSessionName` was already in your config before today** — I didn't add it. What changed is that `Cost` sits 8th out of 10 in the first-line segment order (`model, project, advisor, sessionName, version, extra, duration, cost, speed, auth`), so it's among the first things truncated when the line overflows.
+
+_**Agent (claude-opus-5 2026-07-27 19:18:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify trimmed layout renders
+
+`cd ~/.local/share/chezmoi && chezmoi apply ~/.claude/plugins/claude-hud/config.json && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1) && printf '%s' "{\"model\":{\"id\":\"claude-opus-5[1m]\",\"display_name\":\"Opus 5 (1M context)\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":33.92},\"effort\":\"xhigh\"}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)"`
+
+```text
+[Opus 5 ◕ xhigh] │ CC v2.1.220 │ ⏱️  601h 43m │ Cost $33.92
+Context    ░░░░░░░░░░ 0%
+Cache ⏱ expired
+Approx RAM ██████░░░░ 18 GB / 32 GB (55%)
+2 MCPs | 10 hooks
+✓ WebSearch ×3
+Started: 2026-07-03 01:35 │ Last reply: 25d 1h ago
+Tokens 151k (in: 38k, out: 648, cache: 112k)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:53Z)**_
+
+<think><details><summary>Thought Process</summary>
+I should add a caveat about the sessionTokens scope to the upgrades.md documentation since that's where I already listed the flag, then update both the English and zh-TW versions before committing.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:18:53Z)**_
+
+One more doc note — the token-scope finding is non-obvious enough to record:
+
+_**Agent (claude-opus-5 2026-07-27 19:19:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:29Z)**_
+
+<think><details><summary>Thought Process</summary>
+They're asking whether to hide the Claude Code version display too. I could set `showClaudeCodeVersion: false`, but that display has been useful for catching version drift issues like the stale 2.1.207 we found earlier. The user's phrasing suggests they'd prefer it off though, so I'll disable it since they explicitly asked.
+
+Now I need to understand what the session name does — specifically whether it's Claude Code's generated nickname and if it works with the `--resume` flag. Let me check the help documentation and how the session name gets created in claude-hud to see if there's a connection.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Trace sessionName source in claude-hud
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== where does claude-hud get sessionName? ==="; grep -rn "sessionName" $P/src/*.ts | grep -v config.ts | head -6`
+
+```text
+=== where does claude-hud get sessionName? ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/context-cache.ts:136:  sessionName?: string
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/context-cache.ts:151:      session_name: sessionName ?? null,
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/context-cache.ts:296:  sessionName?: string,
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/context-cache.ts:339:    writeCache(homeDir, transcriptPath, contextWindow, now, sessionName);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/index.ts:102:    deps.applyContextWindowFallback(stdin, {}, transcript.sessionName, {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/types.ts:148:  sessionName?: string;
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check resume CLI semantics
+
+`claude --help 2>&1 | grep -iA2 "resume\|--continue" | head -20`
+
+```text
+  -c, --continue                        Continue the most recent conversation in
+                                        the current directory
+  --dangerously-skip-permissions        Bypass all permission checks.
+--
+                                        with --resume or --continue)
+  --forward-subagent-text               Forward subagent text and thinking
+                                        blocks as assistant/user messages with
+--
+  --from-pr [value]                     Resume a session linked to a PR by PR
+                                        number/URL, or open interactive picker
+                                        with optional search term
+--
+                                        (shown in the prompt box, /resume
+                                        picker, and terminal title)
+  --no-chrome                           Disable Claude in Chrome integration
+--
+                                        resumed (only works with --print)
+  --output-format <format>              Output format (only works with --print):
+                                        "text" (default), "json" (single
+--
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm looking for the CLI flag that controls the session name display in the prompt box, resume picker, and terminal title — likely something like `--session-name`. Let me check the full help output and see what field the transcript uses to store this value.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find session-name CLI flag and transcript field
+
+`claude --help 2>&1 | grep -B3 "shown in the prompt box" ; echo "=== sessionName in transcript ==="; grep -n "sessionName" ~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/transcript.ts | head -5`
+
+```text
+                                        model's full name (e.g.
+                                        'claude-fable-5').
+  -n, --name <name>                     Set a display name for this session
+                                        (shown in the prompt box, /resume
+=== sessionName in transcript ===
+89:  sessionName?: string;
+243:    sessionName: data.sessionName,
+272:    sessionName: data.sessionName,
+553:  result.sessionName = customTitle ?? latestSlug;
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:53Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the `--name` flag sets a custom display name for the session that appears in the prompt and the `/resume` picker, but if it's not provided, the system falls back to an auto-generated slug like `magical-noodling-horizon`. That slug is what shows up in the terminal title and session list when no custom name is specified.
+
+I need to trace through the `latestSlug` derivation in the code around line 545-555 to understand exactly how it's generated, then I can make the necessary edits and commit. I should also disable the `showClaudeCodeVersion` setting while I'm at it.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:19:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Determine session slug origin
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '540,556p' $P/src/transcript.ts; echo "=== does our current transcript carry a custom title or slug? ==="; TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1); grep -o '"\(customTitle\|slug\|title\)":"[^"]*"' "$TP" 2>/dev/null | sort -u | head -5`
+
+```text
+      agent.status = 'completed';
+    }
+  }
+  for (const agent of agentMap.values()) {
+    if (agent.status === 'running' && agent.endTime) {
+      agent.status = 'completed';
+    }
+  }
+  result.tools = Array.from(toolMap.values()).slice(-20);
+  result.skills = Array.from(skillSet.values());
+  result.mcpServers = Array.from(mcpServerSet.values());
+  result.agents = Array.from(agentMap.values()).slice(-10);
+  result.todos = latestTodos;
+  result.sessionName = customTitle ?? latestSlug;
+  result.sessionTokens = sessionTokens;
+  result.lastCompactBoundaryAt = lastCompactBoundaryAt;
+  result.lastCompactPostTokens = lastCompactPostTokens;
+=== does our current transcript carry a custom title or slug? ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:20:01Z)**_
+
+<think><details><summary>Thought Process</summary>
+The current transcript doesn't have a custom title or slug yet, so I'll make that final config change to disable the Claude code version flag and then commit everything. There's a trade-off here since that setting helped us catch the stale version, but the user requested it and it's simple to revert if needed.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:20:01Z)**_
+
+Now turning off the CC version line as asked:
+
+_**Agent (claude-opus-5 2026-07-27 19:20:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:20:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify final first-line length
+
+`cd ~/.local/share/chezmoi && chezmoi apply ~/.claude/plugins/claude-hud/config.json && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1) && printf '%s' "{\"model\":{\"id\":\"claude-opus-5[1m]\",\"display_name\":\"Opus 5 (1M context)\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":33.92},\"effort\":\"xhigh\"}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)" | head -1 | sed 's/\x1b\[[0-9;]*m//g' | awk '{print "len="length($0)"  "$0}'`
+
+```text
+len=55  [Opus 5 ◕ xhigh] │ ⏱️  601h 45m │ Cost $33.92
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:20:23Z)**_
+
+<think><details><summary>Thought Process</summary>
+The synthetic test shows a solid reduction from 72 down to 55 characters, which translates to roughly 139 to 86 characters on their actual line with the project and git segments included. I should update the documentation to note the showClaudeCodeVersion trade-off and add it to the list of options for freeing up width, though I'll keep the adjustment minimal since I've already covered the truncation-order principle.
+
+I'll revise the doc sentence to include showClaudeCodeVersion alongside the existing notes about modelFormat and showSessionName, then rebuild the docs and commit the changes.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:20:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:20:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:21:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Final validation before commit
+
+`cd ~/.local/share/chezmoi && uv run mkdocs build --strict 2>&1 | tail -1 && jq -e . dot_claude/plugins/claude-hud/config.json >/dev/null && echo "config JSON OK" && chezmoi diff ~/.claude/plugins/claude-hud/config.json | head -3; echo "(empty = applied)"; git status --short`
+
+```text
+Aborted with 11 warnings in strict mode!
+config JSON OK
+(empty = applied)
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+ M README.md
+ M docs/this_repo/upgrades.md
+ M docs/this_repo/upgrades.zh-TW.md
+ M dot_claude/plugins/claude-hud/config.json
+```
+</details></tool-use>

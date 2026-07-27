@@ -389,7 +389,11 @@ docs, rationale, run-order diagram, and extension guide live in
 When installed, `just upgrade-plugins` also refreshes `claude-hud` to the
 latest upstream release. Upstream `claude-hud` `v0.0.12+` now follows Claude
 Code's official stdin `rate_limits` only, so the old credential-derived `Max`
-plan badge may disappear after upgrade.
+plan badge may disappear after upgrade. Install is deliberately install-only,
+so a host that never runs this recipe stays on its seeded version indefinitely;
+most HUD elements added since are opt-in and live in
+`dot_claude/plugins/claude-hud/config.json`. See
+[docs/this_repo/upgrades.md](docs/this_repo/upgrades.md).
 
 ## Multi-host apply (`just fleet-apply`)
 

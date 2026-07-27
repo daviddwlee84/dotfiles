@@ -82,6 +82,15 @@ flowchart LR
 
 `claude-hud` 沒被放進 [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl)：它使用了帶版本的快取 (cache) 路徑，並會改寫 `~/.claude/plugins/installed_plugins.json`，所以放在顯式的 `plugins` 升級路徑比放在 chezmoi externals 更合適。Upstream `v0.0.12+` 也把使用量渲染切換到 Claude Code 的官方 stdin `rate_limits`，這代表升級後舊有的、由憑證推導出的 `Max` 標誌可能會消失。
 
+由於安裝路徑走的是 `claude_hud_sync.py --only-if-missing`（install-only，遵循整個 repo 的 install/upgrade 分離原則），一台從來沒跑過 `just upgrade-plugins` 的機器會無聲地停在它第一次安裝時的版本 —— 這台主機就從 2026-03 的 `0.0.11` 一路留到 2026-07，而 upstream 當時已經到 `v0.6.0`。可辨識的徵兆：另一台機器的 HUD 顯示了你這台沒有的元素。`0.0.11` 之後新增的元素幾乎都是 **opt-in、預設 `false`**，所以光升級不會有任何可見變化；這些 flag 位於 [`dot_claude/plugins/claude-hud/config.json`](../../dot_claude/plugins/claude-hud/config.json)。`0.0.11` 之後值得注意的新增項目：`showCost`（v0.0.12）、`showPromptCache` + `promptCacheTtlSeconds`（v0.1.0，TTL 預設 300 秒）、`showEffortLevel`（依 stdin 的 `effort` 顯示 `ultracode`/`xhigh`）、`showSkills`、`showMcp`、`showSessionTokens`、`showCompactions`、`showSessionStartDate`、`showLastResponseAt`，以及 `language: "zh-Hant"`（v0.4.0）。
+
+升級**不需要**啟用該 plugin —— `claude_hud_sync.py` 從不讀取 `enabledPlugins`，而 `claude-hud@claude-hud` 是刻意設為 `false` 的（見 [lsp.md](../tools/lsp.md) § 透過 Claude Code 外掛）。statusline 會以 `sort -V | tail -1` 選取最新的快取版本，因此舊版目錄會原地保留，要回退只需刪掉較新的那個目錄。
+
+已啟用元素中有兩件反直覺的事：
+
+- **`showSessionTokens` 只計算主執行緒。** 它是在 Claude Code 由 stdin 傳入的那一份 transcript 上加總 `message.usage`。subagent 與 workflow 的回合不在那個檔案裡 —— 它們位於同層的 `~/.claude/projects/<project>/<session-id>/subagents/agent-*.jsonl` 目錄，claude-hud 從不讀取（主 transcript 中也沒有任何 `isSidechain` 紀錄）。以本機一個真實 session 實測：主執行緒 1,333,449 tokens，subagent 814,250 tokens，即 HUD 少報約 38%。`Cost` **沒有**這個盲點 —— 它來自 Claude Code 自己的 stdin `cost.total_cost_usd`。
+- **第一行的 segment 是照固定順序截斷**，而非依重要性：`model, project, advisor, sessionName, version, extra, duration, cost, speed, auth`。`cost` 排在 10 個之中的第 8 個，所以一旦該行溢出，它會是最早消失的項目之一。與其加 `maxWidth`，不如騰出寬度 —— `modelFormat: "compact"` 可省約 13 字元，`showSessionName: false` 移除 Claude Code 自動產生的 session 暱稱（約 27 字元；它只是 `/resume` 選單的標籤，且除非你用 `claude -n <name>` 啟動，否則就是隨機 slug），`showClaudeCodeVersion: false` 再省約 14 字元。但要記得最後這項正是你察覺某台主機悄悄停在舊版 Claude Code 的方式。若想全部保留，可用 `projectLineOrder` 重新排序。
+
 ## 語意：盡力而為，並非全有全無
 
 每個類別都被包進一個 `run_category` 輔助函式中：

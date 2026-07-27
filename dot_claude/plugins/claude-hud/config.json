@@ -11,10 +11,21 @@
     "showTodos": true,
     "showDuration": true,
     "showConfigCounts": true,
-    "showSessionName": true,
+    "showSessionName": false,
+    "modelFormat": "compact",
     "showSpeed": true,
-    "showClaudeCodeVersion": true,
+    "showClaudeCodeVersion": false,
     "showMemoryUsage": true,
+    "showCost": true,
+    "showPromptCache": true,
+    "promptCacheTtlSeconds": 300,
+    "showEffortLevel": true,
+    "showSkills": true,
+    "showMcp": true,
+    "showSessionTokens": true,
+    "showCompactions": true,
+    "showSessionStartDate": true,
+    "showLastResponseAt": true,
     "contextValue": "both"
   }
 }
