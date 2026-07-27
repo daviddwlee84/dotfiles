@@ -4984,3 +4984,470 @@ config JSON OK
  M dot_claude/plugins/claude-hud/config.json
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:21:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit upgrade, config and docs
+
+```bash
+cd ~/.local/share/chezmoi && git add -A && git commit -F - <<'MSG'
+feat(claude-hud): upgrade 0.0.11 -> 0.6.0 and enable the elements we were missing
+
+This host had been sitting on 0.0.11 since 2026-03 while upstream reached
+v0.6.0 (2026-07-20) — four months and six minor releases. Not a bug: the
+install path is `claude_hud_sync.py --only-if-missing`, so a box that never
+runs `just upgrade-plugins` keeps whatever version first seeded it. Noticed
+only because a peer machine's HUD showed elements this one didn't.
+
+Enable the post-0.0.11 elements worth having. Almost everything added since is
+opt-in and defaults to false, so the upgrade alone changed nothing visible:
+
+  showCost            (v0.0.12 — the release right after ours)
+  showPromptCache     (v0.1.0, TTL 300s)
+  showEffortLevel     renders `[Opus 5 ◕ xhigh]` from stdin `effort`
+  showSkills / showMcp / showSessionTokens / showCompactions
+  showSessionStartDate / showLastResponseAt
+
+Language stays English. Two width fixes, because the first line overflowed and
+ate `Cost`: segments truncate in a fixed order (model, project, advisor,
+sessionName, version, extra, duration, cost, speed, auth) and cost is 8th of
+10, so it goes early. Dropped `showSessionName` — a random slug unless you
+launch with `claude -n <name>`, only ever a /resume-picker label — and set
+`modelFormat: "compact"` plus `showClaudeCodeVersion: false`. First line goes
+72 -> 55 chars in a synthetic render.
+
+Documents one trap worth knowing: `showSessionTokens` counts the MAIN THREAD
+ONLY. Subagent and workflow turns are not in the transcript Claude Code passes
+on stdin — they live in a sibling <session-id>/subagents/agent-*.jsonl dir that
+claude-hud never reads, and no isSidechain records appear in the main file.
+Measured on a real session here: 1,333,449 main-thread vs 814,250 subagent
+tokens, ~38% under-reported. `Cost` has no such blind spot; it comes from
+Claude Code's own stdin cost.total_cost_usd.
+
+Verified: sync reports version=0.6.0, statusline renders on the new build
+(and now reports CC v2.1.220 — the old build was showing a stale v2.1.207),
+`mkdocs build --strict` warning count unchanged at the 11-warning baseline.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1785180094-41207.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..................................Passed
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..........................................................(no files to check)Skipped
+check json..............................................................................Passed
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1785180094-41207.
+[main 1ec7d4b] feat(claude-hud): upgrade 0.0.11 -> 0.6.0 and enable the elements we were missing
+ 5 files changed, 2029 insertions(+), 3 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:21:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to double-check that the escape-escape files are still there since I used `git add -A`, which stages everything including untracked files. The commit message shows only 5 files changed, which matches what git status showed before, so those files should still be untracked and intact.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:21:55Z)**_
+
+Committed as `1ec7d4b`. Let me verify I didn't sweep in the other work-stream with that `git add -A`:
+
+_**Agent (claude-opus-5 2026-07-27 19:21:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm commit scope and other work-stream state
+
+`cd ~/.local/share/chezmoi && echo "=== files in my commit ==="; git show --stat --format="" HEAD; echo "=== escape-escape work: where is it now? ==="; git log --oneline -2 -- pitfalls/escape-escape-chord-never-completes.md 2>/dev/null || echo "(not committed)"; git status --short; echo "=== log ==="; git log --oneline -3`
+
+```text
+=== files in my commit ===
+ .../2026-07-26_14-13-19Z-image-hash-1-claude.md    | 1993 ++++++++++++++++++++
+ README.md                                          |    6 +-
+ docs/this_repo/upgrades.md                         |    9 +
+ docs/this_repo/upgrades.zh-TW.md                   |    9 +
+ dot_claude/plugins/claude-hud/config.json          |   15 +-
+ 5 files changed, 2029 insertions(+), 3 deletions(-)
+=== escape-escape work: where is it now? ===
+6aa9f3e docs(pitfalls): record why Esc can't be made a double-press interrupt
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+=== log ===
+1ec7d4b feat(claude-hud): upgrade 0.0.11 -> 0.6.0 and enable the elements we were missing
+0b68ef5 fix(codexbar): drop the arm64 gate; stop handing Linux a binary that can't run
+f20e580 docs(chezmoi): which side of `chezmoi diff` is the machine, and why bootstrap's bashrc edit gets undone
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:15Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to reorder the display so less critical information appears at the end while still being visible. I can use a `projectLineOrder` configuration that defaults to an empty array for native ordering, but allows explicitly positioning fields like `cost` earlier and pushing `sessionName` and `version` toward the end. The native sequence runs through model, project, advisor, sessionName, version, extra, duration, cost, speed, and auth, but we'd reorganize it to prioritize model, project, and duration before cost, leaving the less essential fields like sessionName and version at the tail end.
+
+The key insight is that truncation happens by terminal width from left to right, so placing low-value segments last means they're the ones that get cut off when space runs out—exactly what the user wants. I need to verify the valid segment names match what's available in PROJECT_LINE_SEGMENTS and confirm whether the renderer truncates mid-segment with an ellipsis or handles it differently.
+
+I should also re-enable showClaudeCodeVersion and showSessionName since the user wants those back, and I need to check how projectLineOrder normalization works—whether it requires all segments listed or supports partial ordering. Since this is a follow-up commit to the one already made, I'll implement the changes, test them, and then commit.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:15Z)**_
+
+Yes — `projectLineOrder` does exactly that. Let me check whether it accepts a partial order and how truncation interacts:
+
+_**Agent (claude-opus-5 2026-07-27 19:22:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check projectLineOrder partial-order semantics
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; echo "=== projectLineOrder normalization ==="; grep -n "projectLineOrder" -A12 $P/src/config.ts | grep -A12 "function normalize\|projectLineOrder:" | head -30; echo "=== how is it applied in render? ==="; grep -rn "projectLineOrder" $P/src/render/*.ts | head -5`
+
+```text
+=== projectLineOrder normalization ===
+156:  projectLineOrder: FirstLineSegment[];
+157-  gitStatus: {
+158-    enabled: boolean;
+159-    showDirty: boolean;
+160-    showAheadBehind: boolean;
+161-    showFileStats: boolean;
+162-    branchOverflow: GitBranchOverflowMode;
+163-    pushWarningThreshold: number;
+164-    pushCriticalThreshold: number;
+165-  };
+166-  display: {
+167-    showModel: boolean;
+168-    showProject: boolean;
+--
+264:  projectLineOrder: [...DEFAULT_PROJECT_LINE_ORDER],
+265-  gitStatus: {
+266-    enabled: true,
+267-    showDirty: true,
+268-    showAheadBehind: false,
+269-    showFileStats: false,
+270-    branchOverflow: 'truncate',
+271-    pushWarningThreshold: 0,
+272-    pushCriticalThreshold: 0,
+273-  },
+274-  display: {
+275-    showModel: true,
+276-    showProject: true,
+=== how is it applied in render? ===
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/session-line.ts:383:  const order = ctx.config?.projectLineOrder ?? DEFAULT_PROJECT_LINE_ORDER;
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read segment ordering application and validation
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '378,405p' $P/src/render/session-line.ts; echo "=== validator: partial list allowed? ==="; grep -n "sanitizeProjectLineOrder\|validateProjectLineOrder\|KNOWN_FIRST_LINE_SEGMENTS" -A10 $P/src/config.ts | head -24`
+
+```text
+  if (customLine && customLinePosition === 'last') {
+    push(customColor(customLine, colors));
+  }
+
+  const order = ctx.config?.projectLineOrder ?? DEFAULT_PROJECT_LINE_ORDER;
+  let line = orderFirstLineParts(parts, order).join(' | ');
+
+  // Token breakdown at high context
+  if (display?.showTokenBreakdown !== false && percent >= (display?.contextCriticalThreshold ?? 85)) {
+    const usage = ctx.stdin.context_window?.current_usage;
+    if (usage) {
+      const input = formatTokens(usage.input_tokens ?? 0);
+      const cache = formatTokens((usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0));
+      line += label(` (${t('format.in')}: ${input}, ${t('format.cache')}: ${cache})`, colors);
+    }
+  }
+
+  return line;
+}
+
+function formatCompactWindowPart(
+  windowLabel: string,
+  percent: number | null,
+  resetAt: Date | null,
+  timeFormat: TimeFormatMode,
+  colors?: RenderContext['config']['colors'],
+  usageValueMode: UsageValueMode = 'percent',
+=== validator: partial list allowed? ===
+146:const KNOWN_FIRST_LINE_SEGMENTS = new Set<FirstLineSegment>(PROJECT_LINE_SEGMENTS);
+147-
+148-export interface HudConfig {
+149-  language: Language;
+150-  lineLayout: LineLayoutType;
+151-  showSeparators: boolean;
+152-  pathLevels: PathLevels;
+153-  maxWidth: number | null;
+154-  forceMaxWidth: boolean;
+155-  elementOrder: HudElement[];
+156-  projectLineOrder: FirstLineSegment[];
+--
+463:function validateProjectLineOrder(value: unknown): FirstLineSegment[] {
+464-  if (!Array.isArray(value)) {
+465-    return [...DEFAULT_PROJECT_LINE_ORDER];
+466-  }
+467-
+468-  const seen = new Set<FirstLineSegment>();
+469-  const order: FirstLineSegment[] = [];
+470-
+471-  for (const item of value) {
+472:    if (typeof item !== 'string' || !KNOWN_FIRST_LINE_SEGMENTS.has(item as FirstLineSegment)) {
+473-      continue;
+474-    }
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:38Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm checking how `orderFirstLineParts` handles segments that aren't in the provided order list — it should place the ordered ones first and then append any remaining segments. Once I understand that behavior, I can implement the full solution.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read orderFirstLineParts semantics for unlisted segments
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; grep -rn "function orderFirstLineParts" -A22 $P/src/render/*.ts | head -28`
+
+```text
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts:17:export function orderFirstLineParts(
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-18-  parts: FirstLinePart[],
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-19-  order: readonly FirstLineSegment[],
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-20-): string[] {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-21-  const keyedSlots: number[] = [];
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-22-  const byKey = new Map<FirstLineSegment, string[]>();
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-23-
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-24-  parts.forEach((part, index) => {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-25-    if (part.key === null) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-26-      return;
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-27-    }
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-28-    keyedSlots.push(index);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-29-    const texts = byKey.get(part.key);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-30-    if (texts) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-31-      texts.push(part.text);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-32-    } else {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-33-      byKey.set(part.key, [part.text]);
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-34-    }
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-35-  });
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-36-
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-37-  const reordered: string[] = [];
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-38-  for (const key of order) {
+/Users/david/.claude/plugins/cache/claude-hud/claude-hud/0.6.0/src/render/first-line-order.ts-39-    const texts = byKey.get(key);
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:46Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm trying to understand how unlisted keys are handled—specifically, `keyedSlots` tracks the positions of keyed parts while unkeyed parts remain fixed, and then `reordered` fills those keyed slots according to the given order. I need to see the rest of the logic to confirm what happens to keys that aren't in the order list.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:22:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read remainder of ordering logic
+
+`P=~/.claude/plugins/cache/claude-hud/claude-hud/0.6.0; sed -n '36,70p' $P/src/render/first-line-order.ts`
+
+```text
+  const reordered: string[] = [];
+  for (const key of order) {
+    const texts = byKey.get(key);
+    if (texts) {
+      reordered.push(...texts);
+      byKey.delete(key);
+    }
+  }
+  for (const texts of byKey.values()) {
+    reordered.push(...texts);
+  }
+
+  const result = parts.map(part => part.text);
+  keyedSlots.forEach((slot, index) => {
+    result[slot] = reordered[index];
+  });
+  return result;
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:04Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm working through the ordering logic for segments—the ones specified in the `order` list come first in that sequence, then any keyed segments not listed get appended in their original insertion order, while unkeyed parts stay put. This means I can use a partial list to prioritize the important segments and let everything else fall into place naturally. My plan is to re-enable `showSessionName` and `showClaudeCodeVersion`, then configure `projectLineOrder` to arrange them properly.
+
+For the full ordering, I'll list `["model", "project", "duration", "cost", "extra", "advisor", "speed", "auth", "sessionName", "version"]` to explicitly place sessionName and version at the end—less prominent but still visible. I'm keeping `modelFormat: "compact"` since it saves space and the output like `[Opus 5 ◕ xhigh]` is clear enough without the redundant context information.
+
+Testing the layout, the resulting line should be around 126 characters, which fits within their ~135 width limit, and if truncation happens, it'll cut the version and sessionName rather than the cost. Now I'll implement this and update the config.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:04Z)**_
+
+Confirmed: listed segments come first in your order, **unlisted ones fall to the back automatically** — so a partial list works, and whatever lands last is what gets truncated. Exactly what you want.
+
+_**Agent (claude-opus-5 2026-07-27 19:23:05Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Set projectLineOrder and restore both segments
+
+```bash
+cd ~/.local/share/chezmoi && python3 - <<'PY'
+import json, pathlib
+p = pathlib.Path("dot_claude/plugins/claude-hud/config.json")
+c = json.loads(p.read_text())
+c["display"]["showClaudeCodeVersion"] = True
+# Important-first; whatever is listed last is what truncation eats first.
+c["projectLineOrder"] = [
+    "model", "project", "duration", "cost",
+    "extra", "advisor", "speed", "auth",
+    "sessionName", "version",
+]
+p.write_text(json.dumps(c, indent=2) + "\n")
+print(json.dumps(c, indent=2))
+PY
+```
+
+```text
+{
+  "gitStatus": {
+    "enabled": true,
+    "showDirty": true,
+    "showAheadBehind": true,
+    "showFileStats": true
+  },
+  "display": {
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true,
+    "showDuration": true,
+    "showConfigCounts": true,
+    "showSessionName": true,
+    "modelFormat": "compact",
+    "showSpeed": true,
+    "showClaudeCodeVersion": true,
+    "showMemoryUsage": true,
+    "showCost": true,
+    "showPromptCache": true,
+    "promptCacheTtlSeconds": 300,
+    "showEffortLevel": true,
+    "showSkills": true,
+    "showMcp": true,
+    "showSessionTokens": true,
+    "showCompactions": true,
+    "showSessionStartDate": true,
+    "showLastResponseAt": true,
+    "contextValue": "both"
+  },
+  "projectLineOrder": [
+    "model",
+    "project",
+    "duration",
+    "cost",
+    "extra",
+    "advisor",
+    "speed",
+    "auth",
+    "sessionName",
+    "version"
+  ]
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify cost now precedes version on first line
+
+`cd ~/.local/share/chezmoi && chezmoi apply ~/.claude/plugins/claude-hud/config.json && TP=$(ls -t ~/.claude/projects/-Users-david--local-share-chezmoi/*.jsonl | head -1) && printf '%s' "{\"model\":{\"id\":\"claude-opus-5[1m]\",\"display_name\":\"Opus 5 (1M context)\"},\"workspace\":{\"current_dir\":\"/Users/david/.local/share/chezmoi\",\"project_dir\":\"/Users/david/.local/share/chezmoi\"},\"session_id\":\"t\",\"transcript_path\":\"$TP\",\"version\":\"2.1.220\",\"cost\":{\"total_cost_usd\":33.92},\"effort\":\"xhigh\"}" | eval "$(jq -r '.statusLine.command' ~/.claude/settings.json)" | head -1 | sed 's/\x1b\[[0-9;]*m//g' | awk '{print "len="length($0)"\n"$0}'`
+
+```text
+len=71
+[Opus 5 ◕ xhigh] │ ⏱️  601h 48m │ Cost $33.92 │ CC v2.1.220
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:42Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm working through the field ordering for the render output—cost needs to come before version, and if a session name were present, it would slot between auth and version. Looking at the actual rendered format, I can see the model, duration, cost, and version displayed in sequence.
+
+On a real terminal with all fields, the overflow behavior would drop the version first, then the session name, keeping cost visible since it's critical information. Now I need to update the documentation to reflect this reordering strategy instead of the current approach that recommends disabling fields—the docs are out of sync with how we're actually handling this.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:42Z)**_
+
+`Cost` now sits ahead of `CC v2.1.220`, so version is what gets eaten first. Updating the docs to lead with reordering, since that's now what we actually do:
+
+_**Agent (claude-opus-5 2026-07-27 19:23:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:23:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/this_repo/upgrades.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:24:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate before follow-up commit
+
+`cd ~/.local/share/chezmoi && uv run mkdocs build --strict 2>&1 | tail -1; jq -e . dot_claude/plugins/claude-hud/config.json >/dev/null && echo "config JSON OK"; chezmoi diff ~/.claude/plugins/claude-hud/config.json | head -3; echo "(empty = applied)"; git status --short`
+
+```text
+Aborted with 11 warnings in strict mode!
+config JSON OK
+(empty = applied)
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+ M docs/this_repo/upgrades.md
+ M docs/this_repo/upgrades.zh-TW.md
+ M dot_claude/plugins/claude-hud/config.json
+```
+</details></tool-use>

@@ -11,10 +11,10 @@
     "showTodos": true,
     "showDuration": true,
     "showConfigCounts": true,
-    "showSessionName": false,
+    "showSessionName": true,
     "modelFormat": "compact",
     "showSpeed": true,
-    "showClaudeCodeVersion": false,
+    "showClaudeCodeVersion": true,
     "showMemoryUsage": true,
     "showCost": true,
     "showPromptCache": true,
@@ -27,5 +27,17 @@
     "showSessionStartDate": true,
     "showLastResponseAt": true,
     "contextValue": "both"
-  }
+  },
+  "projectLineOrder": [
+    "model",
+    "project",
+    "duration",
+    "cost",
+    "extra",
+    "advisor",
+    "speed",
+    "auth",
+    "sessionName",
+    "version"
+  ]
 }
