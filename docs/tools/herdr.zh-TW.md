@@ -217,6 +217,8 @@ Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic
 
 原本綁 tmux 的 `sesh` / `agent-panes` channel 保持不變以利共存。
 
+> **綁在 command pane 的 channel，Enter action 要用 `mode = "execute"` 而不是 `"fork"`。** `type = "pane"` 綁定只有在它的指令結束時才會消失，而 tv 在 `execute` action 之後會退出、在 `fork` 之後則會繼續活著——所以 `fork` 的 Enter 會讓 picker pane 懸在你剛 focus 的 workspace 上面。`herdr-sesh` 的 `[actions.open]` 正是為此改用 `execute`；它的 `ctrl-d`（`close_ws`）仍保留 `fork`，因為它與 `reload_source` 搭配，tv 必須活著才能重繪清單。同樣的取捨也適用於 `herdr-agent-panes` / `herdr-review`，這兩個目前仍是 `fork`（Enter 重新 focus 但不離開 picker——對分診（triage）是刻意設計；若你想要一次性跳轉就改掉它）。
+
 ## Agent 狀態（取代 6 檔案的 workmux 整合）
 
 herdr 原生偵測 agent 狀態並彙整進側欄（一個 blocked 的 agent 會標記它的 pane/tab/workspace）。Claude Code 是靠 **screen-manifest 啟發式 (heuristics)**（終端標題 + OSC progress）偵測，而非生命週期 hook。若啟發式不夠用，可以明確推送狀態：

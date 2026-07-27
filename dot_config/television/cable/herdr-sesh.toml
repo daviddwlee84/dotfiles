@@ -59,7 +59,12 @@ case "$kind" in
   dir) herdr workspace create --cwd "$ref" --focus >/dev/null 2>&1 ;;
 esac
 '''
-mode = "fork"
+# `execute` (not `fork`) so tv EXITS after the action — the binding is a herdr
+# `type = "pane"` command pane, which only vanishes when its command exits. With
+# `fork` tv stays alive and the picker pane lingers over the workspace you just
+# focused. `close_ws` below deliberately keeps `fork`: it pairs with
+# `reload_source`, so tv must stay open to redraw the list.
+mode = "execute"
 
 [actions.close_ws]
 description = "Close the selected herdr workspace"

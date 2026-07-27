@@ -212,6 +212,8 @@ Most `tv` channels (`tools`, `fleet-hosts`, `mlflow`, `kill-process`, `ssh-confi
 
 The original tmux-bound `sesh` / `agent-panes` channels are left intact for coexistence.
 
+> **`mode = "execute"`, not `"fork"`, for the Enter action of a channel bound to a command pane.** A `type = "pane"` binding only vanishes when its command exits, and tv exits after an `execute` action but stays alive after a `fork` one — so a `fork` Enter leaves the picker pane hovering over the workspace you just focused. `herdr-sesh`'s `[actions.open]` is `execute` for exactly this reason; its `ctrl-d` (`close_ws`) keeps `fork` because it pairs with `reload_source` and tv must survive to redraw the list. Same trade-off applies to `herdr-agent-panes` / `herdr-review`, which are still `fork` (their Enter re-focuses without leaving the picker — deliberate for triage, change it if you want one-shot jumps).
+
 ## Agent state (replaces the 6-file workmux integration)
 
 herdr detects agent state natively and rolls it up into the sidebar (a blocked agent marks its pane/tab/workspace). Claude Code is detected via **screen-manifest heuristics** (terminal title + OSC progress), not lifecycle hooks. If the heuristics prove insufficient, state can be pushed explicitly:
