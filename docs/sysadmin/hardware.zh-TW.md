@@ -57,6 +57,13 @@ NVMe / BMC 的機器不會裝用不到的套件：
 
 偵測使用唯讀的 `lspci` / `dmidecode` 探測；role 的 `debug` task 會印出判定結果。
 
+**CentOS/RHEL 7（`oldEL`）走另一條路徑**：ansible-core >= 2.19 把
+`ansible.builtin.yum` 導向 dnf backend，在 yum3/python2 的主機上會以
+`Could not detect which major revision of dnf is in use` + `pkg_mgr: unknown`
+中止整個 play。因此這些主機改為直接呼叫系統 `yum`，並用 `rpm -q` 前置檢查維持
+冪等（沒有變更的 apply 完全不會呼叫 yum）。`pciutils`/`dmidecode` 這兩個前置
+套件也會先用 `command -v` 探測——EL7 上通常本來就有，這種情況下不會安裝任何東西。
+
 ## 安裝 storcli
 
 `storcli` **不在 distro repo** — Broadcom 以 zip 形式放在 support portal 後面。

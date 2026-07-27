@@ -38,8 +38,21 @@
     # See pitfalls/apt-update-fails-base-role-empty-error.md.
     update_cache: false
 
-- name: Install detection prerequisites (RHEL / CentOS / Rocky / Alma)
+- name: Check detection prerequisites (RHEL / CentOS / Rocky / Alma)
   when: ansible_facts["os_family"] == "RedHat"
+  ansible.builtin.shell: >-
+    command -v lspci >/dev/null 2>&1 && command -v dmidecode >/dev/null 2>&1
+  args:
+    executable: /bin/bash
+  register: homelab_prereq_check
+  changed_when: false
+  failed_when: false
+
+- name: Install detection prerequisites (RHEL / CentOS / Rocky / Alma)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - homelab_prereq_check.rc | default(1) != 0
+    - not (oldEL | default(false))
   become: true
   tags: [sudo]
   ansible.builtin.yum:
@@ -47,6 +60,20 @@
       - pciutils
       - dmidecode
     state: present
+
+# EL7 needs the system yum, not the module: ansible-core >= 2.19 routes
+# `ansible.builtin.yum` through the dnf backend, which on CentOS 7
+# (yum3 + python2) aborts the whole play with `Could not detect which major
+# revision of dnf is in use` and `pkg_mgr: unknown`. Both packages are
+# usually present already on EL7, so the probe above skips this entirely.
+- name: Install detection prerequisites (EL7, system yum)
+  when:
+    - oldEL | default(false)
+    - homelab_prereq_check.rc | default(1) != 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.command: yum install -y pciutils dmidecode
+  changed_when: true
 
 # -----------------------------------------------------------------------------
 # Hardware detection — register facts that gate the per-tool installs below.
@@ -160,11 +187,39 @@
   when:
     - ansible_facts["os_family"] == "RedHat"
     - homelab_pkgs | length > 0
+    - not (oldEL | default(false))
   become: true
   tags: [sudo]
   ansible.builtin.yum:
     name: "{{ homelab_pkgs }}"
     state: present
+
+# EL7 fallback — see the prerequisites task above for why the yum *module*
+# can't be used here. `rpm -q` keeps it idempotent so a no-op apply doesn't
+# shell out to yum at all.
+- name: Determine missing homelab packages (EL7)
+  when:
+    - oldEL | default(false)
+    - homelab_pkgs | length > 0
+  ansible.builtin.shell: |
+    missing=""
+    for p in {{ homelab_pkgs | join(' ') }}; do
+      rpm -q "$p" >/dev/null 2>&1 || missing="$missing $p"
+    done
+    printf '%s' "${missing# }"
+  args:
+    executable: /bin/bash
+  register: homelab_missing_el7
+  changed_when: false
+
+- name: Install homelab hardware tools (EL7, system yum)
+  when:
+    - oldEL | default(false)
+    - homelab_missing_el7.stdout | default('') | trim != ''
+  become: true
+  tags: [sudo]
+  ansible.builtin.command: yum install -y {{ homelab_missing_el7.stdout }}
+  changed_when: true
 
 # -----------------------------------------------------------------------------
 # storcli — only when a RAID controller is present. Not in distro repos, so

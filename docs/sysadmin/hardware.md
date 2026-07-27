@@ -63,6 +63,15 @@ unused packages:
 Detection runs read-only `lspci` / `dmidecode` / `lsusb` probes; results are
 printed by the role's `debug` task so you can see what it decided.
 
+**CentOS/RHEL 7 (`oldEL`)** takes a separate path: `ansible.builtin.yum` is
+routed through the dnf backend in ansible-core >= 2.19, which aborts the whole
+play on yum3/python2 hosts with `Could not detect which major revision of dnf
+is in use` + `pkg_mgr: unknown`. On those hosts the role shells out to the
+system `yum` instead, keeping it idempotent with an `rpm -q` pre-check (so a
+no-op apply never invokes yum). The `pciutils`/`dmidecode` prerequisites are
+also probed with `command -v` first — on EL7 they are normally present
+already, in which case nothing is installed at all.
+
 The role also persists the **Super-I/O kernel module** into
 `/etc/modules-load.d/board-sensors.conf`, resolving which module actually backs the
 fan channels (`nct6775` on Nuvoton boards, `it87` on ITE) rather than assuming.
