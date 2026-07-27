@@ -95,6 +95,42 @@ if (e.totalCost += r, e.requestCount++, t.attributionAgent)
 total. So **`Cost` includes subagents and workflows, `Tokens` does not.** When
 the two disagree, `Cost` is the complete one.
 
+### Verified, not inferred
+
+A controlled run pins both halves down at once. Force the main thread onto
+haiku and the subagent onto sonnet, then read `--output-format json`:
+
+```console
+$ claude -p --output-format json --model claude-haiku-4-5-20251001 \
+    'Use the Agent tool with subagent_type "general-purpose" and model "sonnet" …'
+```
+
+```text
+total_cost_usd                        0.13825985
+  claude-haiku-4-5  (main thread)     0.06095585
+  claude-sonnet-5[1m] (subagent)      0.077304
+                                      ──────────
+  sum                                 0.13825985   exact match
+```
+
+The subagent is 56% of the bill and is unambiguously counted. Meanwhile the
+transcripts show the reverse:
+
+```text
+MAIN transcript  (the only file claude-hud reads)
+   models = ['claude-haiku-4-5-20251001']
+<session-id>/subagents/agent-*.jsonl  (never read)
+   models = ['claude-sonnet-5']
+```
+
+The subagent's model never appears in the main transcript, but does appear in
+`modelUsage` and in the cost. One experiment, both claims.
+
+> Naively summing `usage` over the main transcript gives ~1.7× the figure in
+> `modelUsage`, because Claude Code dual-logs the same API response 2–3 times.
+> claude-hud dedupes by `message.id` (see the comment in `src/transcript.ts`);
+> ad-hoc scripts must do the same or they will overcount.
+
 ## Cache: input-side only, and the countdown is a snapshot
 
 ### There is no output cache

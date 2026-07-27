@@ -83,6 +83,41 @@ if (e.totalCost += r, e.requestCount++, t.attributionAgent)
 `attributionAgent` 只是驅動 per-agent 拆帳，並不會擋住總額。所以
 **`Cost` 包含 subagent 與 workflow，`Tokens` 不包含。** 兩者不一致時，`Cost` 才是完整的。
 
+### 這是實測，不是推論
+
+一次受控實驗可以同時釘死兩邊。強制主執行緒用 haiku、subagent 用 sonnet，
+再讀 `--output-format json`：
+
+```console
+$ claude -p --output-format json --model claude-haiku-4-5-20251001 \
+    'Use the Agent tool with subagent_type "general-purpose" and model "sonnet" …'
+```
+
+```text
+total_cost_usd                        0.13825985
+  claude-haiku-4-5  （主執行緒）        0.06095585
+  claude-sonnet-5[1m]（subagent）      0.077304
+                                      ──────────
+  合計                                 0.13825985   精確吻合
+```
+
+subagent 佔了帳單的 56%，且毫無疑問被計入。而 transcript 那側呈現相反的結果：
+
+```text
+MAIN transcript  （claude-hud 唯一讀的檔案）
+   models = ['claude-haiku-4-5-20251001']
+<session-id>/subagents/agent-*.jsonl  （從不讀取）
+   models = ['claude-sonnet-5']
+```
+
+subagent 的 model 從未出現在主 transcript，卻出現在 `modelUsage` 與成本中。
+一個實驗，兩個結論。
+
+> 若直接對主 transcript 的 `usage` 做天真加總，會得到約 `modelUsage` 數字的 1.7 倍，
+> 因為 Claude Code 會把同一個 API response 重複寫進 transcript 2–3 次。
+> claude-hud 是以 `message.id` 去重的（見 `src/transcript.ts` 的註解）；
+> 臨時腳本若不比照辦理就會多算。
+
 ## Cache：只存在於 input 側，而倒數是快照
 
 ### 沒有 output cache

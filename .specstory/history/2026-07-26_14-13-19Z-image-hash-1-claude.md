@@ -6793,7 +6793,7 @@ Review changes before commit
 ```
 </details></tool-use>
 
-_**Agent (claude-opus-5 2026-07-27 19:44:16Z)**_
+_**Agent (claude-opus-5 2026-07-27 19:44:24Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -6848,4 +6848,571 @@ INFO-level only, matching the existing convention in lsp.md and upgrades.md.
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 MSG
 ```
+
+```text
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..............................................................................Passed
+check toml..........................................................(no files to check)Skipped
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[main c9b1919] docs(claude-hud): explain the numbers, because several of them lie
+ 6 files changed, 1776 insertions(+), 8 deletions(-)
+ create mode 100644 docs/tools/claude-hud.md
+ create mode 100644 docs/tools/claude-hud.zh-TW.md
+```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:44:54Z)**_
+
+## Cache timer 不是 bug —— 是「沒人去叫它」
+
+`src/render/lines/prompt-cache.ts` 只有一行算式，在**渲染當下**求值：
+
+```js
+const remainingMs = (lastAssistantResponseAt.getTime() + ttlSeconds * 1000) - now;
+```
+
+claude-hud 內部**沒有計時器**。而 Claude Code 那端是 `Dee(() => { M() }, 300)` —— 狀態改變時才重繪（debounce 300ms），**不看牆上時鐘**。
+
+所以兩種情況疊在一起：
+
+- **回合進行中**顯示 `5m 0s`：`lastAssistantResponseAt` 會隨每則 assistant 訊息前進，而 agent 回合每幾秒就產生一則。它是真的一直在重置，不是卡住。
+- **回合結束後**凍住：沒有事件 → 沒有重繪 → 最後算出的字串留在畫面上。
+
+倒數本身是活的，我拿固定的 transcript 每 4 秒手動呼叫一次驗證：
+
+```
+Cache ⏱ 5m 0s
+Cache ⏱ 4m 56s
+Cache ⏱ 4m 52s
+```
+
+**但這個限制剛好跟需求相反** —— 它沒辦法在你閒置時提醒你快取快過期了，而那正是你最需要它的時候。實務上請把它讀成「上一次渲染時快取有多新」。
+
+## 新增了專門的 docs
+
+`docs/tools/claude-hud.md` + `.zh-TW` 鏡像，已加進 mkdocs nav（commit `c9b1919`）。內容涵蓋這幾輪釐清的全部：
+
+| 章節 | 重點 |
+|---|---|
+| `Tokens` 是累計值 | 103.88M 累計 vs 383k 單次峰值，271x ≈ 輪數；**不是** compaction |
+| `Tokens` 只算主執行緒 | subagent 在 `<session-id>/subagents/` 獨立目錄，少報 38% |
+| `Cost` 沒有這盲點 | native stdin vs estimate 兩條路；累加器 `totalCost += r` 無條件執行 |
+| Cache 機制 | 四個 usage 欄位、1× / 1.25× / **0.1×**、沒有 output cache |
+| 倒數凍住 | 上面那套，含手動驗證 |
+| 第一行截斷順序 | `cost` 排第 8/10，用 `projectLineOrder` 而非關掉元素 |
+| `sessionName` | `customTitle ?? latestSlug`，跟 resume UUID 無關 |
+
+`upgrades.md` 及其 zh-TW 版對應縮成一句指標，避免兩邊重複漂移。
+
+驗證：`mkdocs build --strict` 維持 **11 warnings** 的既有 baseline（沒有新增），兩個語言版本都成功產出。新增的 `../../` repo 檔案連結只有 INFO 級，跟 `lsp.md`／`upgrades.md` 現有慣例一致 —— 依 `backlog/mkdocs-anchor-drift.md` 的規定，我沒有去動 `validation.links.not_found`。
+
+---
+
+這輪總共三個 commit，都沒 push：
+
+```
+c9b1919 docs(claude-hud): explain the numbers, because several of them lie
+dcd5786 feat(claude-hud): order the first line by importance instead of switching elements off
+1ec7d4b feat(claude-hud): upgrade 0.0.11 -> 0.6.0 and enable the elements we were missing
+```
+
+一個誠實的但書：`Cost` 含 subagent 這點，我是從 Claude Code binary 反編譯出的累加器那行推導的，沒有實際跑一個帶 subagent 的 session 去對帳。要完全確認的話，可以跑 `claude -p --output-format json` 配一個會 spawn subagent 的 prompt，比對回傳的 `total_cost_usd` 與主執行緒 token 推算的成本。需要我做這個驗證嗎？
+
+---
+
+_**User (2026-07-27 19:47:02Z)**_
+
+是也可以做個小實驗
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 19:47:31Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to design an experiment that verifies whether the total cost includes subagent usage. I'll run the CLI with JSON output formatting, using a prompt that triggers a subagent call, then compare the reported costs against a baseline run without subagents. I should use Haiku to keep expenses minimal and ensure the subagent spawning is reliable through the Task or Agent tool.
+
+The cleanest approach is a single controlled run: spawn a subagent doing meaningful work, then cross-reference the JSON's `total_cost_usd` against the main-thread tokens from the transcript and the subagent tokens from the session files to see if the total matches main-only or main-plus-subagent costs. I could also force the subagent onto a different model to make the breakdown unmistakable in the `modelUsage` field.
+
+For the test, I'll run the main thread on Haiku and spawn an agent using Sonnet, so if subagent costs are included, `modelUsage` will show both models. The subagent task should be small but real—something like counting files in a directory. I need to verify that `--output-format json` actually returns `total_cost_usd` and `modelUsage`, then construct the command with the right model flags and Agent tool invocation. I'll run the command now, making sure to set a permission mode to avoid any prompts hanging in headless mode.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:47:31Z)**_
+
+好，來做個決定性的實驗。設計：讓 main thread 跑 **haiku**、subagent 強制跑 **sonnet** —— 這樣如果 `modelUsage` 裡出現 sonnet，就直接證明 subagent 的用量被算進去了。
+
+_**Agent (claude-opus-5 2026-07-27 19:48:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run headless session that spawns a sonnet subagent
+
+`cd /tmp && rm -rf /tmp/hudtest && mkdir -p /tmp/hudtest && cd /tmp/hudtest && timeout 400 claude -p --output-format json --model claude-haiku-4-5-20251001 --permission-mode bypassPermissions 'Use the Agent tool with subagent_type "general-purpose" and model "sonnet" to run exactly one Bash command: echo SUBAGENT_RAN. Report the output. Do nothing else.' > /tmp/hudtest/run.json 2>/tmp/hudtest/run.err; echo "exit=$?"; jq -r '{session_id, num_turns, total_cost_usd, modelUsage}' /tmp/hudtest/run.json 2>/dev/null || { echo "--- raw ---"; head -c 800 /tmp/hudtest/run.json; echo; head -5 /tmp/hudtest/run.err; }`
+
+```text
+exit=0
+{
+  "session_id": "0e8bd14e-e719-42b4-9409-8d1789a39f3b",
+  "num_turns": 4,
+  "total_cost_usd": 0.13825985,
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 25,
+      "outputTokens": 559,
+      "cacheReadInputTokens": 98221,
+      "cacheCreationInputTokens": 38651,
+      "webSearchRequests": 0,
+      "costUSD": 0.060955850000000006,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty"
+    },
+    "claude-sonnet-5[1m]": {
+      "inputTokens": 128,
+      "outputTokens": 105,
+      "cacheReadInputTokens": 17825,
+      "cacheCreationInputTokens": 18666,
+      "webSearchRequests": 0,
+      "costUSD": 0.077304,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "canonicalModel": "claude-sonnet-5",
+      "provider": "firstParty"
+    }
+  }
+}
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:48:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm verifying the cost breakdown: the main thread used Haiku at $0.061 and the subagent used Sonnet at $0.077, which adds up perfectly to the total of $0.138.
+
+Now I need to check the token counts to confirm they work differently — the main transcript should only show Haiku's token numbers while the subagent's tokens are stored separately. Let me locate the session files and calculate the expected token totals for each model to prove that costs include subagents but token counts don't.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:48:32Z)**_
+
+`total_cost_usd = 0.13825985`, and the breakdown:
+
+- haiku (main thread) = `0.06095585`
+- **sonnet[1m] (the subagent) = `0.077304`**
+
+`0.06095585 + 0.077304 = 0.13825985` — exact match. Now the other half: does the transcript-side accounting see that sonnet work?
+
+_**Agent (claude-opus-5 2026-07-27 19:48:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify transcript-side split for the experiment
+
+```bash
+D=~/.claude/projects/-tmp-hudtest; echo "=== layout ==="; find $D -type f -name "*.jsonl" | sed "s|$D/||"; echo; python3 - <<'PY'
+import json, glob, os
+D=os.path.expanduser("~/.claude/projects/-tmp-hudtest")
+sid="0e8bd14e-e719-42b4-9409-8d1789a39f3b"
+def acc(paths):
+    t={"in":0,"out":0,"cc":0,"cr":0}; models=set()
+    for p in paths:
+        for line in open(p,errors="ignore"):
+            try: e=json.loads(line)
+            except: continue
+            if e.get("type")!="assistant": continue
+            m=e.get("message") or {}
+            u=m.get("usage") or {}
+            if not u: continue
+            if m.get("model"): models.add(m["model"])
+            t["in"]+=u.get("input_tokens",0) or 0; t["out"]+=u.get("output_tokens",0) or 0
+            t["cc"]+=u.get("cache_creation_input_tokens",0) or 0; t["cr"]+=u.get("cache_read_input_tokens",0) or 0
+    return t, models
+main,mm = acc([f"{D}/{sid}.jsonl"])
+sub,sm = acc(glob.glob(f"{D}/{sid}/subagents/*.jsonl"))
+tot=lambda t: sum(t.values())
+print(f"MAIN transcript (what showSessionTokens reads)")
+print(f"  total={tot(main):,}  models={sorted(mm)}")
+print(f"SUBAGENT dir (never read by claude-hud)")
+print(f"  total={tot(sub):,}  models={sorted(sm)}")
+PY
+```
+
+```text
+Exit code 1
+=== layout ===
+bfs: error: /Users/david/.claude/projects/-tmp-hudtest: No such file or directory.
+
+Traceback (most recent call last):
+  File "<stdin>", line 18, in <module>
+  File "<stdin>", line 7, in acc
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/david/.claude/projects/-tmp-hudtest/0e8bd14e-e719-42b4-9409-8d1789a39f3b.jsonl'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:48:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate the experiment transcript
+
+`find ~/.claude/projects -name "0e8bd14e*" 2>/dev/null | head; echo "=== or by recency ==="; find ~/.claude/projects -name "*.jsonl" -newermt "-15 minutes" 2>/dev/null | head -5`
+
+```text
+/Users/david/.claude/projects/-private-tmp-hudtest/0e8bd14e-e719-42b4-9409-8d1789a39f3b.jsonl
+/Users/david/.claude/projects/-private-tmp-hudtest/0e8bd14e-e719-42b4-9409-8d1789a39f3b
+=== or by recency ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:49:00Z)**_
+
+<think><details><summary>Thought Process</summary>
+Found the file in the macOS private temp directory and I'm running the token analysis now. The `find -newermt` command didn't catch it even though the file exists, so the modification time must be different than expected, but that's not critical right now.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:49:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compute main vs subagent token split for experiment
+
+```bash
+python3 - <<'PY'
+import json, glob, os
+D=os.path.expanduser("~/.claude/projects/-private-tmp-hudtest")
+sid="0e8bd14e-e719-42b4-9409-8d1789a39f3b"
+def acc(paths):
+    t={"in":0,"out":0,"cache_create":0,"cache_read":0}; models=set()
+    for p in paths:
+        for line in open(p,errors="ignore"):
+            try: e=json.loads(line)
+            except: continue
+            if e.get("type")!="assistant": continue
+            m=e.get("message") or {}; u=m.get("usage") or {}
+            if not u: continue
+            if m.get("model"): models.add(m["model"])
+            t["in"]+=u.get("input_tokens",0) or 0; t["out"]+=u.get("output_tokens",0) or 0
+            t["cache_create"]+=u.get("cache_creation_input_tokens",0) or 0
+            t["cache_read"]+=u.get("cache_read_input_tokens",0) or 0
+    return t, models
+print("layout:", [p.replace(D+"/","") for p in glob.glob(f"{D}/**/*.jsonl", recursive=True)])
+print()
+main,mm = acc([f"{D}/{sid}.jsonl"])
+sub,sm  = acc(glob.glob(f"{D}/{sid}/subagents/*.jsonl"))
+print(f"MAIN transcript  <- the ONLY file claude-hud reads")
+print(f"   total={sum(main.values()):,}   models={sorted(mm)}")
+print(f"SUBAGENT dir     <- never read")
+print(f"   total={sum(sub.values()):,}   models={sorted(sm)}")
+PY
+```
+
+```text
+layout: ['0e8bd14e-e719-42b4-9409-8d1789a39f3b.jsonl', '0e8bd14e-e719-42b4-9409-8d1789a39f3b/subagents/agent-ac398926a7737d21e.jsonl']
+
+MAIN transcript  <- the ONLY file claude-hud reads
+   total=238,790   models=['claude-haiku-4-5-20251001']
+SUBAGENT dir     <- never read
+   total=36,724   models=['claude-sonnet-5']
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:49:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+The cost breakdown checks out perfectly—Haiku handled the main thread at $0.061 while Sonnet managed the subagent work at $0.077, totaling exactly $0.138. On the token side, I'm seeing Haiku exclusively in the main transcript with 238,790 tokens and Sonnet solo in the subagent directory with 36,724 tokens, confirming the subagent was definitely involved in the processing.
+
+There's a discrepancy between my token count (238,790) and the model usage sum (137,456)—about 1.74x difference—because Claude Code dual-logs API responses multiple times while claude-hud dedupes them by message ID, but that doesn't change the core finding. The decisive proof is the model attribution: Sonnet shows up in the cost and model usage data but never appears in the main transcript itself.
+
+I should add a verified section to the documentation with these measurements to strengthen the claims from theory to empirical evidence, then clean up and commit.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:49:39Z)**_
+
+兩邊都證實了。
+
+## 實驗結果
+
+**Cost 側 —— 精確吻合：**
+
+```
+total_cost_usd            0.13825985
+  haiku  (main thread)    0.06095585
+  sonnet (subagent)       0.077304
+  ─────────────────────────────────
+  sum                     0.13825985   ✓
+```
+
+subagent 佔了總成本的 **56%**，而且它**確實被算進去**。
+
+**Token 側 —— model 歸屬是鐵證：**
+
+```
+MAIN transcript  <- claude-hud 唯一讀的檔案
+   models=['claude-haiku-4-5-20251001']      只有主執行緒的 model
+
+SUBAGENT dir     <- 從不讀取
+   models=['claude-sonnet-5']                 subagent 的 model 完全不在主檔案裡
+```
+
+我強制 subagent 用 sonnet，而 sonnet **從未出現在主 transcript**，卻出現在 `modelUsage` 和 cost 裡。這同時證明了兩件事。
+
+（一個誠實的註記：主 transcript 我粗算是 238,790，但 `modelUsage` 的 haiku 加總是 137,456。差異來自 Claude Code 會把同一個 API response 重複寫進 transcript 2–3 次 —— `transcript.ts` 的註解明講了這點，claude-hud 用 `message.id` 去重，我的快速腳本沒有。這不影響結論，決定性的是 model 歸屬。）
+
+把實測結果補進 docs：
+
+_**Agent (claude-opus-5 2026-07-27 19:49:41Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/claude-hud.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:49:59Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+ENOSPC: no space left on device, rename '/Users/david/.local/share/chezmoi/docs/tools/claude-hud.zh-TW.md.tmp.32918.ea0565b0cc11' -> '/Users/david/.local/share/chezmoi/docs/tools/claude-hud.zh-TW.md'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:50:11Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm hitting a disk space error — the system ran out of storage. I need to alert the user right away and figure out what's consuming space. The mkdocs build output and plugin cache are likely culprits, plus I created some temporary files earlier that might be taking up room.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:50:11Z)**_
+
+Disk is full — that's a real problem, let me deal with it before anything else:
+
+_**Agent (claude-opus-5 2026-07-27 19:50:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check disk space and file integrity
+
+`df -h / /System/Volumes/Data 2>/dev/null | head -5; echo "=== my temp artifacts from this session ==="; du -sh /tmp/cc_strings.txt /tmp/hudtest /tmp/fake.jsonl /tmp/s.json /tmp/hud.bak.json /tmp/README.full.md 2>/dev/null; echo "=== did the zh-TW file survive? ==="; ls -la ~/.local/share/chezmoi/docs/tools/claude-hud.zh-TW.md 2>&1 | head -2; ls ~/.local/share/chezmoi/docs/tools/*.tmp.* 2>/dev/null | head`
+
+```text
+Filesystem        Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk1s1s1   466Gi    17Gi   801Mi    96%    455k  8.2M    5%   /
+/dev/disk1s2     466Gi   425Gi   801Mi   100%    3.2M  8.2M   28%   /System/Volumes/Data
+=== my temp artifacts from this session ===
+ 35M	/tmp/cc_strings.txt
+8.0K	/tmp/hudtest
+4.0K	/tmp/fake.jsonl
+8.0K	/tmp/s.json
+4.0K	/tmp/hud.bak.json
+ 44K	/tmp/README.full.md
+=== did the zh-TW file survive? ===
+.rw-r--r--@ 8.8k david 28 Jul 03:41 /Users/david/.local/share/chezmoi/docs/tools/claude-hud.zh-TW.md
+(eval):1: no matches found: /Users/david/.local/share/chezmoi/docs/tools/*.tmp.*
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:50:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+The disk is nearly full at 801MB available on a 466GB drive, with my 35MB strings file being a minor contributor to the overall problem. The zh-TW file came through unchanged, so I should delete my artifacts first and attempt the edit again, but I need to alert the user that this is really a system-level storage issue they'll need to address.
+
+I'll remove the temp files I created this session — cc_strings.txt, hudtest, fake.jsonl, s.json, hud.bak.json, and README.full.md — then check if the site/ directory in the chezmoi repo is large and regenerable before cleaning that up too.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:50:27Z)**_
+
+The `.zh-TW` file is intact (my edit simply didn't apply). Disk is at **100%, 801Mi free of 466Gi** — that's a pre-existing condition, but let me clear my own session artifacts first:
+
+_**Agent (claude-opus-5 2026-07-27 19:50:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Remove session temp artifacts and check space
+
+`rm -f /tmp/cc_strings.txt /tmp/fake.jsonl /tmp/s.json /tmp/hud.bak.json /tmp/README.full.md /tmp/installed_plugins.bak.json; rm -rf /tmp/hudtest; echo "cleaned my temp files"; du -sh ~/.local/share/chezmoi/site 2>/dev/null; df -h /System/Volumes/Data | tail -1`
+
+```text
+cleaned my temp files
+ 53M	/Users/david/.local/share/chezmoi/site
+/dev/disk1s2   466Gi   424Gi   1.5Gi   100%    3.2M   15M   17%   /System/Volumes/Data
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:50:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/claude-hud.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:53:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Rebuild docs and check status
+
+`cd ~/.local/share/chezmoi && uv run mkdocs build --strict 2>&1 | tail -1; git status --short`
+
+```text
+Aborted with 11 warnings in strict mode!
+ M .specstory/history/2026-07-26_14-13-19Z-image-hash-1-claude.md
+ M docs/tools/claude-hud.md
+ M docs/tools/claude-hud.zh-TW.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:55:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the experimental verification
+
+```bash
+cd ~/.local/share/chezmoi && git add -A && git commit -F - <<'MSG'
+docs(claude-hud): replace the cost-includes-subagents inference with a measurement
+
+The claim was previously read off Claude Code's minified accumulator
+(`totalCost += r` running unconditionally). That is suggestive, not proof, so
+it gets a controlled experiment instead.
+
+Pin the main thread to haiku and force the subagent onto sonnet, so the two
+are distinguishable in `modelUsage`:
+
+  total_cost_usd                    0.13825985
+    claude-haiku-4-5    (main)      0.06095585
+    claude-sonnet-5[1m] (subagent)  0.077304
+                                    ──────────
+    sum                             0.13825985     exact
+
+The subagent is 56% of the bill and is counted. The transcripts show the exact
+inverse — the main file contains only claude-haiku-4-5, while claude-sonnet-5
+appears solely in <session-id>/subagents/agent-*.jsonl, which claude-hud never
+opens. One run, both halves: Cost includes subagents, Tokens does not.
+
+Also records a trap for anyone auditing this by hand: naively summing `usage`
+over the main transcript overshoots `modelUsage` by ~1.7x, because Claude Code
+dual-logs the same API response 2-3 times. claude-hud dedupes by message.id;
+ad-hoc scripts must too.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[INFO] Initializing environment for https://github.com/gitleaks/gitleaks.
+[INFO] Initializing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Initializing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Initializing environment for https://github.com/scop/pre-commit-shfmt.
+[INFO] Initializing environment for https://github.com/rhysd/actionlint.
+[INFO] Installing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/scop/pre-commit-shfmt.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..........................................................(no files to check)Skipped
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[main 342eca2] docs(claude-hud): replace the cost-includes-subagents inference with a measurement
+ 3 files changed, 541 insertions(+), 1 deletion(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 19:57:58Z)**_
+
+<think><details><summary>Thought Process</summary>
+The pre-commit passed after reinstalling environments due to cache eviction. Now I'm pulling together a final summary and flagging the disk issue—we're at 100% capacity with only 1.5Gi available out of 466Gi total.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 19:58:16Z)**_
+
+實驗完成，已 commit（`342eca2`）。
+
+## 結論：兩個猜想都被實測釘死
+
+我把主執行緒鎖在 haiku、強制 subagent 用 sonnet，讓兩者在 `modelUsage` 裡可以區分。
+
+**Cost 側 —— 精確吻合到小數點：**
+
+```
+total_cost_usd                    0.13825985
+  claude-haiku-4-5    (main)      0.06095585
+  claude-sonnet-5[1m] (subagent)  0.077304
+                                  ──────────
+  sum                             0.13825985
+```
+
+**Token 側 —— 完全相反：**
+
+```
+主 transcript                        models = ['claude-haiku-4-5-20251001']
+<session-id>/subagents/agent-*.jsonl  models = ['claude-sonnet-5']
+```
+
+sonnet 從未出現在主 transcript，卻出現在 `modelUsage` 和帳單裡。**一次實驗，兩個結論** —— `Cost` 含 subagent、`Tokens` 不含。之前那個「反編譯累加器」的推論現在被實測取代了。
+
+順帶挖到一個做手動稽核時會踩的坑，也寫進 docs 了：直接對主 transcript 加總 `usage` 會**多算約 1.7 倍**，因為 Claude Code 會把同一個 API response 重複寫進去 2–3 次。claude-hud 用 `message.id` 去重，臨時腳本沒去重就會超估。（我自己第一版腳本就中了 —— 238,790 vs 實際 137,456。）
+
+---
+
+## ⚠️ 你的磁碟滿了
+
+實驗途中一次檔案寫入直接 `ENOSPC: no space left on device` 失敗。
+
+```
+/dev/disk1s2   466Gi   424Gi   1.5Gi   100%   /System/Volumes/Data
+```
+
+**466G 只剩 1.5G。** 這不是我造成的（我的暫存檔總共才 35M，已全部清掉），是既有狀況，但它已經開始造成實際失敗了 —— 那次寫入失敗、以及剛才 pre-commit 得重新安裝所有 hook 環境（快取被擠掉了），都是徵兆。
+
+我已經清理的只有自己這個 session 的產物。**沒有動任何你的東西** —— 包括 `~/.local/share/chezmoi/site/`（53M 的 mkdocs 產出，可重建但我不會擅自刪）、Claude Code 的舊版本目錄、plugin cache 裡的舊 `0.0.11` 等等。
+
+要我幫你查一下空間都去哪了嗎？（`~/.claude/projects` 的 transcript、舊的 CC 版本、brew cache、Docker 之類的通常是大宗）我會只做調查、列清單給你，刪除全部等你點頭。
+
+---
+
+這輪累計四個 commit，都還沒 push：
+
+```
+342eca2 docs(claude-hud): replace the cost-includes-subagents inference with a measurement
+c9b1919 docs(claude-hud): explain the numbers, because several of them lie
+dcd5786 feat(claude-hud): order the first line by importance instead of switching elements off
+1ec7d4b feat(claude-hud): upgrade 0.0.11 -> 0.6.0 and enable the elements we were missing
+```
