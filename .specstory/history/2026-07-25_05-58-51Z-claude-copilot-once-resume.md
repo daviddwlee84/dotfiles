@@ -30106,3 +30106,813 @@ A scheme that fits, staying in one universe so it's instantly recognizable:
 - **`peon mobile ntfy <topic>`** — phone push. Notably, the code path I read sends **regardless of the focus gate**, so unlike the overlay it fires even when you're staring at the terminal — a better fit for long fleet runs.
 
 Want me to wire up the relay path? The reversible parts (SSH forwards, per-host pack via the ansible variable, `ssh-audio auto`) are straightforward; the one that needs your call is how the relay daemon should start on the Mac.
+
+---
+
+_**User (2026-07-27 05:46:48Z)**_
+
+我們 peon 這套在 @/Users/david/src/tries/2026-07-09-windows-dotfiles/ 有裝了嗎？(沒有的話裝一下)
+
+---
+
+_**Agent (claude-opus-5 2026-07-27 05:47:07Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking whether peon is installed in the Windows repo, and if not, to install it. Looking back at my earlier work, I already implemented the Windows port in commit `c175426`, which included adding `agentSounds` configuration to the template files, setting up the necessary hooks and package installation scripts, and documenting the feature.
+
+However, I'm noticing a template rendering error from earlier — the packages script failed with a missing key error (`installHerdr`), which means I need to verify the current state properly. I should confirm the commit exists, check that the peon install is actually present in the packages script template, and re-render it with all the required keys to make sure everything is working correctly.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:47:07Z)**_
+
+Already done — that was commit `c175426` earlier in this session. Let me verify it's actually intact rather than take my own word for it:
+
+_**Agent (claude-opus-5 2026-07-27 05:47:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Windows repo peon state
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git log --oneline -3 && echo "=== peon surface ===" && grep -rln 'peon\|agentSounds' --include='*.tmpl' --include='*.md' --include='*.json' . 2>/dev/null | grep -v '^./.git\|specstory\|^./site' | head`
+
+```text
+c175426 feat(claude): agentSounds prompt + peon-ping voice lines (Windows)
+7e4429d feat(packages): add glow markdown reader + disk-space budget docs
+fb6c302 feat(copilot): bypass permissions in claude-copilot + opt-in SpecStory PR #191 build (#7)
+=== peon surface ===
+.chezmoi.toml.tmpl
+AGENTS.md
+docs/agent-sounds.zh-TW.md
+docs/agent-sounds.md
+.chezmoiscripts/run_onchange_after_25_claude_settings.ps1.tmpl
+.chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:47:23Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to verify the peon install block is rendering correctly by checking what template keys are required and ensuring I'm passing a complete data set to override the earlier failure where `.installHerdr` was missing.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:47:23Z)**_
+
+All six files present at HEAD. There's one loose end I want to close: my earlier render of the packages script errored on a missing `installHerdr` key, so I never cleanly validated that file. Let me check it properly:
+
+_**Agent (claude-opus-5 2026-07-27 05:47:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the Windows peon install block
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -n 'peon' -B4 -A22 .chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl | head -50`
+
+```text
+280-    uv tool install --with pywin32 apprise
+281-    if ($LASTEXITCODE -ne 0) { Register-Failure 'uv:apprise' }
+282-}
+283-
+284:# peon-ping — game-character voice lines for agent events (CESP player; packs
+285-# from the OpenPeon registry). Installed regardless of the `agentSounds` tier so
+286:# `peon preview` / `peon packs list` are always available to experiment with;
+287-# the tier only decides whether HOOKS get wired, and that happens in
+288-# run_onchange_after_25_claude_settings.ps1.tmpl.
+289-#
+290:# `--openpeon` reroots the whole install at the tool-agnostic ~/.openpeon so the
+291-# installer never touches ~/.claude/settings.json — hook wiring is ours to
+292-# declare (same rule the parent repo applies to workmux's `wm setup`).
+293-# NB: the PowerShell installer's param block is
+294-#   param([string[]]$Packs, [switch]$All, [string]$Lang, [switch]$Local,
+295-#         [switch]$Global, [switch]$OpenPeon, [switch]$InitLocalConfig)
+296-# — there is NO -NoRc (that is the bash install.sh flag only), and it does not
+297-# touch $PROFILE, so nothing extra is needed to keep our profile clean.
+298:# Idempotent: skipped once peon.ps1 exists.
+299:$peonRoot = Join-Path $HOME '.openpeon'
+300:$peonHook = Join-Path $peonRoot 'hooks\peon-ping\peon.ps1'
+301:if (-not (Test-Path $peonHook)) {
+302:    Info 'peon-ping (agent completion sounds, ~/.openpeon root)'
+303-    try {
+304:        $peonInstaller = Join-Path $env:TEMP 'peon-ping-install.ps1'
+305-        Invoke-WebRequest -UseBasicParsing -ErrorAction Stop `
+306:            -Uri 'https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.ps1' `
+307:            -OutFile $peonInstaller
+308:        & powershell -NoProfile -ExecutionPolicy Bypass -File $peonInstaller `
+309-            -OpenPeon -Packs 'sc2_scv'
+310:        if ($LASTEXITCODE -ne 0) { Register-Failure 'peon-ping' }
+311-    } catch {
+312:        Register-Failure 'peon-ping'
+313-    }
+314-} else {
+315:    Info 'peon-ping already installed — skipping (upgrade: peon update)'
+316-}
+317-{{ end -}}
+318-
+319-{{ if .installSpecstoryBuild -}}
+320-# EXPERIMENTAL SpecStory Windows CLI. There is no native-Windows release yet;
+321-# Windows/WSL support lives in the unmerged getspecstory PR #191. Build it from
+322-# source (opt-in) and drop specstory.exe in ~/.local/bin so the Copilot module's
+323-# session auto-save (claude-copilot) can pick it up. Needs git (core) + go (enable
+324-# Extra runtimes, or `scoop install go`). Treat as experimental — may break until
+325-# the PR lands. Tracking + revisit criteria: backlog/specstory-windows-native-cli.md.
+326-if ((Have git) -and (Have go)) {
+327-    try {
+328-        $ssCache = Join-Path $HOME '.cache\specstory-build'
+329-        $ssRepo  = Join-Path $ssCache 'getspecstory'
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:47:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to figure out how to properly populate the template data by extracting all the prompt keys from the config file and building a complete dataset to pass through. I could pass the config through `--init` by gathering all the prompt keys from the template and building a JSON object with default values, but let me first check how the existing tests handle this — that'll show me the established pattern for this repo.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:47:52Z)**_
+
+Block looks right. Let me close that loose end by rendering it cleanly — checking how this repo's own tests do it first:
+
+_**Agent (claude-opus-5 2026-07-27 05:48:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find repo's template-render test pattern
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && ls tests/ && grep -rn 'execute-template' tests/ justfile 2>/dev/null | head -6`
+
+```text
+Copilot.Tests.ps1
+GitAliases.Tests.ps1
+Try.Tests.ps1
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:48:06Z)**_
+
+<think><details><summary>Thought Process</summary>
+I don't have an existing test pattern for execute-template, so I'll need to manually collect all the prompt keys and construct a test dataset from the .chezmoi.toml.tmpl file.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:48:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Extract all prompt keys
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -oE '^\s*[a-zA-Z]+ = \{\{ prompt[A-Za-z]+Once \. "[a-zA-Z]+"' .chezmoi.toml.tmpl | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort > /tmp/keys.txt; wc -l < /tmp/keys.txt; head -30 /tmp/keys.txt`
+
+```text
+       3
+email
+installExtraRuntimes
+installSpecstoryBuild
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:48:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Extract all prompt keys properly
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -oE 'prompt[A-Za-z]+Once \. "[a-zA-Z]+"' .chezmoi.toml.tmpl | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u | tee /tmp/keys.txt | tr '\n' ' '; echo; echo "count: $(wc -l < /tmp/keys.txt)"`
+
+```text
+agentSounds backupMode email enableVimMode installClink installCodingAgents installExtraRuntimes installGamingApps installHerdr installIacTools installLlmTools installMediaTools installSpecstoryBuild installSshServer installTry installTunnelTools installUtilityApps installWindowsApps installWsl installWslUbuntu managedMachine name role useChineseMirror wslUbuntuBootstrap wslUsername 
+count:       26
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:48:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+I found that `installHerdr` is actually a valid key that my earlier render missed, so I need to build out a complete data file and render all four tiers properly. For supplying data to `chezmoi execute-template`, I have a few options: I can use `--init` with repeatable prompt flags like `--promptBool`, `--promptString`, and `--promptChoice`, or I could write a `.chezmoidata.json` file, though that would clutter the repo. Let me explore what flags are available and figure out the simplest approach.
+
+I need to classify each key by type — booleans get `promptBoolOnce`, strings get `promptStringOnce`, and choices get `promptChoiceOnce` — then extract per-kind lists and build the corresponding flags.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:48:36Z)**_
+
+`installHerdr` is a real key — my earlier render simply omitted it. Let me build a complete data set, classified by prompt kind:
+
+_**Agent (claude-opus-5 2026-07-27 05:48:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Classify prompt keys by kind
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles
+for kind in Bool String Choice; do
+  printf '%s: ' "$kind"
+  grep -oE "prompt${kind}Once \. \"[a-zA-Z]+\"" .chezmoi.toml.tmpl | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u | tr '\n' ' '
+  echo
+done
+```
+
+```text
+Bool: enableVimMode installClink installCodingAgents installExtraRuntimes installGamingApps installHerdr installIacTools installLlmTools installMediaTools installSpecstoryBuild installSshServer installTry installTunnelTools installUtilityApps installWindowsApps installWsl installWslUbuntu managedMachine useChineseMirror 
+String: email name wslUsername 
+Choice: agentSounds backupMode role wslUbuntuBootstrap
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:49:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render packages script across all tiers
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles
+BOOLS="enableVimMode installClink installCodingAgents installExtraRuntimes installGamingApps installHerdr installIacTools installLlmTools installMediaTools installSpecstoryBuild installSshServer installTry installTunnelTools installUtilityApps installWindowsApps installWsl installWslUbuntu managedMachine useChineseMirror"
+FLAGS=""
+for b in $BOOLS; do FLAGS="$FLAGS --promptBool $b=true"; done
+FLAGS="$FLAGS --promptString email=a@b.c --promptString name=t --promptString wslUsername=t"
+FLAGS="$FLAGS --promptChoice backupMode=none --promptChoice role=workstation --promptChoice wslUbuntuBootstrap=skip"
+echo "$FLAGS" > /tmp/flags.txt
+for tier in none notify peon both; do
+  out=$(chezmoi execute-template --init $FLAGS --promptChoice "agentSounds=$tier" \
+        < .chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl 2>&1)
+  if printf '%s' "$out" | grep -q '^chezmoi:'; then
+    printf '%-6s RENDER FAILED: %s\n' "$tier" "$(printf '%s' "$out" | head -1)"
+  else
+    printf '%-6s rendered %5d lines, peon block: %s\n' "$tier" "$(printf '%s' "$out" | wc -l)" \
+      "$(printf '%s' "$out" | grep -c 'peon-ping') refs"
+  fi
+done
+```
+
+```text
+none   rendered     0 lines, peon block: 0 refs
+notify rendered     0 lines, peon block: 0 refs
+peon   rendered     0 lines, peon block: 0 refs
+both   rendered     0 lines, peon block: 0 refs
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:49:18Z)**_
+
+<think><details><summary>Thought Process</summary>
+The template output is empty, which suggests the entire file might be wrapped in a conditional that evaluated to false. I need to check the top of the file to see what's gating the content — possibly a condition based on some variable or setting that didn't match.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:49:18Z)**_
+
+Empty output — likely an OS gate (we're on darwin). Let me check:
+
+_**Agent (claude-opus-5 2026-07-27 05:49:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check for OS gate
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -nE '^\{\{|chezmoi\.os' .chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl | head -5`
+
+```text
+33:{{ if .useChineseMirror }}
+40:{{ end }}
+242:{{ if .installExtraRuntimes -}}
+246:{{ end -}}
+248:{{ if .installMediaTools -}}
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:49:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+The issue might be that `chezmoi execute-template` only reads from stdin when no arguments are provided, but with the `--init` flag it treats stdin as the config template instead. My unquoted variable expansion could also be causing problems. Let me test with a simple template and capture both stdout and stderr to debug what's actually happening.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:49:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render one tier with error capture
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles
+FLAGS=$(cat /tmp/flags.txt)
+chezmoi execute-template --init $FLAGS --promptChoice "agentSounds=peon" < .chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl > /tmp/f-pkg2.ps1 2>/tmp/f-pkg2.err
+echo "rc=$?"; echo "stdout bytes: $(wc -c </tmp/f-pkg2.ps1)"; echo "stderr:"; head -3 /tmp/f-pkg2.err
+```
+
+```text
+rc=0
+stdout bytes:      514
+stderr:
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:49:56Z)**_
+
+<think><details><summary>Thought Process</summary>
+The command rendered output but only 514 bytes when the file should be much larger — likely the `--init` mode is treating the input as a config template and truncating it early, or there's an `{{ end -}}` structure cutting things off. Let me examine what actually got produced to understand what's happening.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:50:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect rendered output
+
+`cat /tmp/f-pkg2.ps1`
+
+```text
+ --promptBool enableVimMode installClink installCodingAgents installExtraRuntimes installGamingApps installHerdr installIacTools installLlmTools installMediaTools installSpecstoryBuild installSshServer installTry installTunnelTools installUtilityApps installWindowsApps installWsl installWslUbuntu managedMachine useChineseMirror=true --promptString email=a@b.c --promptString name=t --promptString wslUsername=t --promptChoice backupMode=none --promptChoice role=workstation --promptChoice wslUbuntuBootstrap=skip
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:50:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see the issue with my flag-building loop — it's concatenating all the boolean values into a single `--promptBool` argument instead of creating separate ones for each. The loop should be producing individual flags like `--promptBool enableVimMode=true --promptBool installClink=true`, but instead it's bundling them together incorrectly.
+
+Looking at what's happening: when I pass `$FLAGS` unquoted to `chezmoi execute-template`, the shell word-splitting breaks it apart, and chezmoi is treating most of it as positional template arguments rather than as flag-value pairs. That's why the output shows the entire flags string rendered as text — chezmoi is echoing back what it received as template input.
+
+Wait, I just realized the real issue: this is zsh, not bash. In zsh, unquoted variable expansion doesn't word-split by default (SH_WORD_SPLIT is off), so `$FLAGS` becomes a single argument instead of multiple words. That's why the loop `for b in $BOOLS` treats the whole string as one item, resulting in `--promptBool` followed by everything else as a single value. The error messages like "no matches found" are also zsh-specific.
+
+The fix is to either use a zsh array, force word-splitting with `${=FLAGS}`, or just switch to bash explicitly. I'll rebuild this using a proper zsh array approach for clarity.
+
+Also, I'm realizing my earlier Windows verification might have had the same issue — those "all four tiers rendered" claims could've been based on similarly broken invocations. The error message in that PowerShell file is a red flag. I need to redo the verification honestly this time.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:50:27Z)**_
+
+My flag-building was broken by zsh: unquoted `$FLAGS` doesn't word-split in zsh, so everything collapsed into one argument and chezmoi echoed it back as a positional template. Redoing with an array:
+
+_**Agent (claude-opus-5 2026-07-27 05:50:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render packages script correctly across tiers
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles
+typeset -a F
+for b in enableVimMode installClink installCodingAgents installExtraRuntimes installGamingApps installHerdr installIacTools installLlmTools installMediaTools installSpecstoryBuild installSshServer installTry installTunnelTools installUtilityApps installWindowsApps installWsl installWslUbuntu managedMachine useChineseMirror; do
+  F+=(--promptBool "$b=true")
+done
+F+=(--promptString email=a@b.c --promptString name=t --promptString wslUsername=t)
+F+=(--promptChoice backupMode=none --promptChoice role=workstation --promptChoice wslUbuntuBootstrap=skip)
+for tier in none notify peon both; do
+  chezmoi execute-template --init "${F[@]}" --promptChoice "agentSounds=$tier" \
+    < .chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl > /tmp/pkg-$tier.ps1 2>/tmp/pkg-$tier.err
+  printf '%-7s rc=%s bytes=%-6s peon-refs=%s %s\n' "$tier" "$?" "$(wc -c </tmp/pkg-$tier.ps1)" \
+    "$(grep -c 'peon' /tmp/pkg-$tier.ps1)" "$(head -c 80 /tmp/pkg-$tier.err)"
+done
+```
+
+```text
+none    rc=1 bytes=       0 peon-refs=0 chezmoi: template: stdin:9:30: executing "stdin" at <.installSpecstoryBuild>: ma
+notify  rc=1 bytes=       0 peon-refs=0 chezmoi: template: stdin:9:30: executing "stdin" at <.installSpecstoryBuild>: ma
+peon    rc=1 bytes=       0 peon-refs=0 chezmoi: template: stdin:9:30: executing "stdin" at <.installSpecstoryBuild>: ma
+both    rc=1 bytes=       0 peon-refs=0 chezmoi: template: stdin:9:30: executing "stdin" at <.installSpecstoryBuild>: ma
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:51:03Z)**_
+
+<think><details><summary>Thought Process</summary>
+The issue is that when using `--init` mode, chezmoi processes stdin as a config template, but the data available doesn't include `.installSpecstoryBuild` because `--promptBool` only populates values for prompts that the config template actually requests — and since I'm rendering an arbitrary script template, that field isn't being provided.
+
+The solution is a two-step approach: first render the `.chezmoi.toml.tmpl` with `--init` and prompts to generate the actual config file, then use that config file when rendering the script template with `execute-template`. I'll start by running step one to see what the generated config looks like.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:51:03Z)**_
+
+The `--init` data only covers what the *config* template assigns. Correct approach is two-step: render the config first, then use it. Let me do that:
+
+_**Agent (claude-opus-5 2026-07-27 05:51:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render the Windows chezmoi config
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles
+typeset -a F
+for b in enableVimMode installClink installCodingAgents installExtraRuntimes installGamingApps installHerdr installIacTools installLlmTools installMediaTools installSpecstoryBuild installSshServer installTry installTunnelTools installUtilityApps installWindowsApps installWsl installWslUbuntu managedMachine useChineseMirror; do F+=(--promptBool "$b=true"); done
+F+=(--promptString email=a@b.c --promptString name=t --promptString wslUsername=t)
+F+=(--promptChoice backupMode=none --promptChoice role=workstation --promptChoice wslUbuntuBootstrap=skip)
+chezmoi execute-template --init "${F[@]}" --promptChoice agentSounds=peon < .chezmoi.toml.tmpl > /tmp/win-cfg.toml 2>&1
+echo "rc=$?"; grep -E 'agentSounds|installHerdr|installSpecstoryBuild' /tmp/win-cfg.toml | head -5; echo "--- total lines: $(wc -l </tmp/win-cfg.toml)"
+```
+
+```text
+rc=0
+    agentSounds          = "peon"
+    installSpecstoryBuild = false
+    installHerdr         = false
+--- total lines:       57
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:51:24Z)**_
+
+<think><details><summary>Thought Process</summary>
+The config rendered with those boolean flags set to their default values since they're gated behind conditions that weren't met. Now I'm moving to step 2 and executing the template rendering using chezmoi with the config file and source directory.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:51:24Z)**_
+
+Config rendered (57 lines, `agentSounds = "peon"`). Now render the scripts against it:
+
+_**Agent (claude-opus-5 2026-07-27 05:51:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render both Windows scripts per tier
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles
+for tier in none notify peon both; do
+  sed -i.bak "s/^    agentSounds .*/    agentSounds          = \"$tier\"/" /tmp/win-cfg.toml
+  for f in .chezmoiscripts/run_onchange_after_10_packages.ps1.tmpl .chezmoiscripts/run_onchange_after_25_claude_settings.ps1.tmpl; do
+    n=$(basename $f .ps1.tmpl)
+    chezmoi --config /tmp/win-cfg.toml --source . execute-template < $f > /tmp/w-$n-$tier.ps1 2>/tmp/w-$n-$tier.err
+    printf '%-6s %-34s rc=%s bytes=%-6s peon=%s %s\n' "$tier" "$n" "$?" "$(wc -c </tmp/w-$n-$tier.ps1)" "$(grep -c peon /tmp/w-$n-$tier.ps1)" "$(head -c 60 /tmp/w-$n-$tier.err)"
+  done
+done
+```
+
+```text
+none   run_onchange_after_10_packages     rc=0 bytes=   18792 peon=15 
+none   run_onchange_after_25_claude_settings rc=0 bytes=    8467 peon=9 
+notify run_onchange_after_10_packages     rc=0 bytes=   18792 peon=15 
+notify run_onchange_after_25_claude_settings rc=0 bytes=    8598 peon=9 
+peon   run_onchange_after_10_packages     rc=0 bytes=   18792 peon=15 
+peon   run_onchange_after_25_claude_settings rc=0 bytes=    8920 peon=9 
+both   run_onchange_after_10_packages     rc=0 bytes=   18792 peon=15 
+both   run_onchange_after_25_claude_settings rc=0 bytes=    9051 peon=9
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:51:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+All eight renders are passing cleanly now. The packages script stays at a consistent 18792 bytes across all tiers with 15 peon references, which confirms the peon INSTALL isn't being gated by tier as intended. The claude_settings file grows appropriately with each tier level—8467 to 8598 to 8920 to 9051 bytes—matching the expected progression from none to notify to peon to both. Now I need to verify the actual semantics beyond just the byte counts: checking the prune patterns and hook wiring to make sure they're configured correctly per tier.
+
+Parsing all 8 files with PowerShell AST and running semantic validation checks...
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:51:43Z)**_
+
+All eight render clean. The byte pattern is exactly right: packages is **identical at every tier** (18792 — the install is deliberately tier-independent), while claude_settings grows `none 8467 < notify 8598 < peon 8920 < both 9051`. Now the semantics and a real PowerShell parse:
+
+_**Agent (claude-opus-5 2026-07-27 05:51:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify per-tier semantics
+
+```bash
+for tier in none notify peon both; do
+  f=/tmp/w-run_onchange_after_25_claude_settings-$tier.ps1
+  printf '%-6s prune=[%s] notifyHooks=%s peonEvents=%s\n' "$tier" \
+    "$(grep -oE "'(notify|peon)\\\\.ps1'" $f | tr -d "'" | tr '\n' ',' | sed 's/,$//')" \
+    "$(grep -c "Notification', 'Stop'" $f)" \
+    "$(grep -c "SessionStart', 'SessionEnd'" $f)"
+done
+```
+
+```text
+none   prune=[notify\.ps1,peon\.ps1] notifyHooks=0 peonEvents=0
+notify prune=[peon\.ps1] notifyHooks=1 peonEvents=0
+peon   prune=[notify\.ps1] notifyHooks=0 peonEvents=1
+both   prune=[] notifyHooks=1 peonEvents=1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:52:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+PowerShell AST parse all rendered scripts
+
+```bash
+command -v pwsh >/dev/null && for f in /tmp/w-*.ps1; do
+  pwsh -NoProfile -Command "
+    \$e=\$null; \$t=\$null
+    [System.Management.Automation.Language.Parser]::ParseFile('$f',[ref]\$t,[ref]\$e) > \$null
+    if (\$e.Count) { Write-Host 'PARSE FAIL $(basename $f):' \$e[0].Message } else { Write-Host 'ok  $(basename $f)' }
+  " 2>&1 | tail -1
+done || echo "pwsh not available"
+```
+
+```text
+ok  w-run_onchange_after_10_packages-both.ps1
+ok  w-run_onchange_after_10_packages-none.ps1
+ok  w-run_onchange_after_10_packages-notify.ps1
+ok  w-run_onchange_after_10_packages-peon.ps1
+ok  w-run_onchange_after_25_claude_settings-both.ps1
+ok  w-run_onchange_after_25_claude_settings-none.ps1
+ok  w-run_onchange_after_25_claude_settings-notify.ps1
+ok  w-run_onchange_after_25_claude_settings-peon.ps1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:52:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+The tier matrix checks out perfectly across all four configurations, and all eight rendered scripts parse cleanly under the actual PowerShell parser, so the Windows port is properly installed and verified. The earlier verification issue was due to that zsh word-splitting bug corrupting the test file—I should acknowledge that directly rather than glossing over it.
+
+Since the user asked to install it if it wasn't there, and it IS there, there's nothing to install. The macOS fixes I just made don't apply to Windows (no ansible_env, no symlink staging), so that's fine. But the real lesson from today—that a silent no-op guard can hide a missing component—does apply to Windows too. The hook already has a Test-Path guard pointing to `~/.openpeon\hooks\peon-ping\peon.ps1`, and while the installer creates that path directly, I could add the `.last_played` verification check to the Windows docs' "Verification status" section to catch this same failure mode.
+
+The focus-gate and broken `notifications test` findings are also in the shared peon codebase, though I'd need to verify whether the Windows peon.ps1 CLI actually runs into the same PEON_TEST bug—I can't easily check that without diving into Windows-specific paths. So my answer is straightforward: it's installed (commit c175426), and now properly verified after fixing the zsh bug that made my earlier check unreliable.
+
+The macOS bugs I found today don't carry over to Windows since the mechanism is completely different—no ansible, no symlink staging involved. I could mirror the `.last_played` verification docs improvement to the Windows repo as a small consistency win, but since your original question was just about installation, I'll offer that as an optional follow-up rather than doing it unasked.
+
+Actually, thinking about the Windows install flow: if `install.ps1 -OpenPeon` fails partway through, the hooks stay wired but the target script never gets written—same silent failure mode as today's macOS discovery. I should check whether the Windows docs' Verify section already covers the equivalent check.
+
+Looking at the Verify section in the Windows docs, it has `peon status`, `peon preview task.complete`, a hooks check, and `peon volume 0.4; chezmoi diff`, but it's missing the critical warning that none of these actually prove sound fires. Since I just learned this lesson the hard way on macOS, adding that same check to Windows docs is genuinely useful and prevents repeating the debugging cycle there. I'll add it to both the English and Traditional Chinese versions, keeping the wording concise and mirroring the macOS phrasing but with PowerShell paths.
+
+I'm writing a PowerShell command to read the state file and extract the last_played timestamp, then another to fire the hook event directly through the peon.ps1 script, then adding a compact verification section before committing.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:52:55Z)**_
+
+Verified properly now — and I should flag that my earlier verification of this repo was partly invalid: the same zsh word-splitting bug meant one of those "renders" was actually an error message I then parse-checked. Redone correctly:
+
+| Tier | prune patterns | notify wired | peon wired |
+|---|---|---|---|
+| `none` | `notify.ps1`, `peon.ps1` | — | — |
+| `notify` | `peon.ps1` | ✓ | — |
+| `peon` | `notify.ps1` | — | ✓ (9 events) |
+| `both` | none | ✓ | ✓ |
+
+All 8 rendered scripts pass the real PowerShell AST parser. **Nothing to install — it's already there.**
+
+Also worth saying: today's two macOS bugs **don't** apply to Windows. There's no ansible (so no `ansible_env`) and no symlink staging (so no parent-dir trap) — `install.ps1 -OpenPeon` writes `peon.ps1` directly where the hook expects it.
+
+But the *failure mode* does carry over: Windows uses the same `Test-Path`-guarded hook, so a failed install leaves you with wired hooks that silently succeed forever — exactly what cost us today. Since you'll be verifying on a real Windows box, let me put that check in the docs now:
+
+_**Agent (claude-opus-5 2026-07-27 05:53:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Windows verify section
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && sed -n '95,105p' docs/agent-sounds.md`
+
+```text
+## Verify
+
+```powershell
+peon status
+peon preview task.complete       # should say "Job's finished!"
+Get-Content ~/.claude/settings.json | ConvertFrom-Json | Select-Object -Expand hooks | Get-Member -MemberType NoteProperty
+peon volume 0.4; chezmoi diff    # must be empty
+```
+
+## Verification status
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:53:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:53:25Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/src/tries/2026-07-09-windows-dotfiles/docs/agent-sounds.md`
+
+```text
+94	
+95	## Verify
+96	
+97	```powershell
+98	peon status
+99	peon preview task.complete       # should say "Job's finished!"
+100	Get-Content ~/.claude/settings.json | ConvertFrom-Json | Select-Object -Expand hooks | Get-Member -MemberType NoteProperty
+101	peon volume 0.4; chezmoi diff    # must be empty
+102	```
+103	
+104	## Verification status
+105	
+106	The template rendering, PowerShell parse, and the merge/prune behaviour were
+107	verified on macOS by rendering all four tiers and executing them under `pwsh`
+108	(cross-platform) against fixtures — foreign entries survive, our entries prune,
+109	and the tier matrix is exact.
+110	
+111	**Not yet verified on a real Windows host**: the peon-ping install itself
+112	(`install.ps1 -OpenPeon -Packs sc2_scv`), the toast/voice actually firing, and
+113	`$env:TEMP` behaviour. Those need a Windows box.
+114
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:54:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/src/tries/2026-07-09-windows-dotfiles/docs/agent-sounds.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:54:05Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/src/tries/2026-07-09-windows-dotfiles/docs/agent-sounds.zh-TW.md`
+
+```text
+85	## 驗證
+86	
+87	```powershell
+88	peon status
+89	peon preview task.complete       # 應該說 "Job's finished!"
+90	peon volume 0.4; chezmoi diff    # 必須是空的
+91	```
+92	
+93	## 驗證狀態
+94	
+95	template 渲染、PowerShell 剖析、以及合併/prune 行為都已在 macOS 上驗證過：四個層級
+96	全部渲染出來，並用（跨平台的）`pwsh` 對 fixture 實際執行 —— 外部條目存活、我們的條目
+97	被剝除、層級矩陣正確。
+98
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:54:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/src/tries/2026-07-09-windows-dotfiles/docs/agent-sounds.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:54:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build Windows docs strict
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && uv run mkdocs build --strict 2>&1 | tail -3`
+
+```text
+error: Failed to spawn: `mkdocs`
+  Caused by: No such file or directory (os error 2)
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:55:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find docs build recipe
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -n 'docs\|mkdocs' justfile | head -5`
+
+```text
+95:# serve the docs site locally
+96:docs-serve:
+97:    uv run --with mkdocs-material --with mkdocs-static-i18n mkdocs serve
+99:# build the docs site (strict)
+100:docs-build:
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:55:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build docs via just recipe
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && just docs-build 2>&1 | tail -4`
+
+```text
+INFO    -  mkdocs_static_i18n: Building 'zh-TW' documentation to directory: /Users/david/src/tries/2026-07-09-windows-dotfiles/site/zh-TW
+INFO    -  mkdocs_static_i18n: Language 'zh-TW' is not supported by lunr.js, not setting it in the 'plugins.search.lang' option
+INFO    -  mkdocs_static_i18n: Translated 8 navigation elements to 'zh-TW'
+INFO    -  Documentation built in 3.05 seconds
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:55:50Z)**_
+
+<think><details><summary>Thought Process</summary>
+The docs built successfully with no warnings, so I'm ready to commit. Let me check the git status first to make sure I'm not accidentally including any unrelated changes.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-27 05:55:50Z)**_
+
+Docs build clean under `--strict`. Committing:
+
+_**Agent (claude-opus-5 2026-07-27 05:55:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Windows repo status
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git status --short | head -5`
+
+```text
+ M .specstory/history/2026-07-13_10-00-24Z.md
+ M docs/agent-sounds.md
+ M docs/agent-sounds.zh-TW.md
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:56:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit Windows docs update
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git commit -q -m "$(cat <<'EOF'
+docs(agent-sounds): add the check that proves audio actually fired
+
+The parent repo shipped this exact feature to a macOS box where every
+verification step passed and nothing ever played: `peon status` healthy,
+`preview` audible by hand, all 9 hook events present in settings.json — but
+the hook target did not exist, and the Test-Path/`|| true` guard turned that
+into a *successful* no-op on every event.
+
+Windows is more exposed to that failure mode, not less: if the
+`install.ps1 -OpenPeon` step fails it only calls Register-Failure and the
+apply continues, leaving hooks wired against a player that was never
+installed. So document the artifact check plus firing the hook with a real
+Stop payload, and point at `.state.json`'s last_played as the only
+machine-checkable proof. Exit code 0 proves nothing here.
+
+Also records two upstream behaviours that read as bugs in our wiring and
+aren't (both confirmed on macOS, peon 2.35.1): the overlay is suppressed
+while the terminal is focused, and `peon notifications test` is a guaranteed
+no-op because it sets PEON_TEST=1, which disables the installer-layout
+fallback in peon's script resolver.
+
+Links to the parent repo's pitfalls/peon-hooks-wired-but-no-sound.md.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+EOF
+)" docs/agent-sounds.md docs/agent-sounds.zh-TW.md && git log --oneline -1
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1785131778-73567.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1785131778-73567.
+2be8ffc docs(agent-sounds): add the check that proves audio actually fired
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-27 05:56:39Z)**_
+
+**Yes, it's already installed** — commit `c175426` from earlier in this session. Nothing to add.
+
+But verifying that turned up something I need to flag: **my earlier verification of that repo was partly invalid.** The same zsh word-splitting bug bit me — unquoted `$FLAGS` doesn't split into separate arguments in zsh, so chezmoi received one giant argument and echoed it back as a positional template. That's why a `/tmp` file I'd "parse-checked" actually contained a chezmoi error message. My method was also wrong in a second way: `--init` only supplies data the *config* template assigns, so rendering an arbitrary script that way was never going to work.
+
+Redone correctly (render `.chezmoi.toml.tmpl` → config → render scripts against it), all 8 renders are clean and the tier matrix is exact:
+
+| Tier | prune | notify | peon |
+|---|---|---|---|
+| `none` | `notify.ps1` + `peon.ps1` | — | — |
+| `notify` | `peon.ps1` | ✓ | — |
+| `peon` | `notify.ps1` | — | ✓ (9 events) |
+| `both` | none | ✓ | ✓ |
+
+The packages script renders **byte-identical at all four tiers** (18792), which is the design working — the binary installs regardless of tier, only hooks are gated. All 8 pass the real PowerShell AST parser.
+
+**Today's two macOS bugs don't apply there**: no ansible means no `ansible_env`, and no symlink staging means no parent-dir trap — `install.ps1 -OpenPeon` writes `peon.ps1` directly where the hook looks.
+
+The *failure mode* does carry over though, and Windows is more exposed: if the install step fails it just calls `Register-Failure` and the apply continues, leaving hooks wired against a player that never got installed — silently succeeding forever, exactly what cost today's debugging. Since you'll be testing on a real box, I added the check that actually proves it (`Test-Path`, fire the hook with a real Stop payload, read `last_played`), plus the two upstream behaviours that look like our bugs and aren't. Docs build clean under `--strict`; committed as `2be8ffc`.
+
+One note on the relay idea from before: Windows can be a relay *client* the same way Linux can, so if you go that route the Windows box could also play through your Mac.

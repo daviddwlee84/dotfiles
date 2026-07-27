@@ -52,6 +52,31 @@ function _herdr_tool_tab() {
     [ -n "$pane" ] && herdr pane run "$pane" "$4" >/dev/null 2>&1
 }
 
+# Absolutize + validate a `-p/--path DIR` argument in THIS shell. Echoes the
+# canonical (symlink-resolved) path; on a non-directory, echoes nothing and
+# returns 1 after a message on stderr.
+#
+# LOAD-BEARING for every `--cwd` below: herdr resolves a *relative* `--cwd`
+# against the SERVER's launch directory (wherever `herdr server` was started),
+# not the caller's cwd — and on a miss it silently falls back to $HOME, so
+# `hhere -p ../sibling` opens a workspace at `~` with no error anywhere. tmux
+# resolves `new-session -c` client-side, which is why the sesh originals
+# (shere/svibe/scode) never needed this.
+# See pitfalls/hhere-p-relative-path-opens-workspace-at-home.md.
+#
+# `CDPATH=''` + `--` + `>/dev/null` keep a CDPATH hit from silently retargeting
+# the cd or echoing the resolved dir into the capture.
+# $1=dir  $2=caller name (for the error message)
+function _herdr_abs_dir() {
+    local abs
+    abs=$(CDPATH=''; cd -- "$1" >/dev/null 2>&1 && pwd -P)
+    if [ -z "$abs" ]; then
+        echo "${2:-herdr}: --path is not a directory: $1" >&2
+        return 1
+    fi
+    printf '%s\n' "$abs"
+}
+
 # Resolve the target herdr session for hvibe/hcode from an optional --session
 # value. Echoes "<name><TAB><socket_override_or_empty>". The socket field is
 # non-empty ONLY when the caller must override HERDR_SOCKET_PATH (explicit
@@ -271,10 +296,12 @@ EOF
         *) echo "hvibe: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
     esac
 
-    # Resolve git root (required, like svibe).
+    # Resolve git root (required, like svibe). `-p DIR` is absolutized first so
+    # a bad path reports itself instead of masquerading as "not a git repo".
     local repo_root
     if [ -n "$target" ]; then
-        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+        target=$(_herdr_abs_dir "$target" hvibe) || return 1
+        repo_root=$(cd -- "$target" >/dev/null 2>&1 && _sesh_git_root)
     else
         repo_root=$(_sesh_git_root)
     fi
@@ -451,7 +478,8 @@ EOF
 
     local repo_root
     if [ -n "$target" ]; then
-        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+        target=$(_herdr_abs_dir "$target" hcode) || return 1
+        repo_root=$(cd -- "$target" >/dev/null 2>&1 && _sesh_git_root)
     else
         repo_root=$(_sesh_git_root)
     fi
@@ -542,6 +570,10 @@ EOF
 #   hhere -p ~/proj                # explicit path, plain shell
 #   hhere -p ~/proj npm run dev    # explicit path + command
 #
+# `-p DIR` is absolutized in THIS shell before it reaches herdr — the server
+# resolves a relative `--cwd` against its own launch directory and falls back to
+# $HOME on a miss (silently). A non-existent DIR is a hard error.
+#
 # The command (if any) runs raw — no specstory/on-exit wrapping. That agent
 # treatment stays with hcode/hvibe; hhere is deliberately lightweight.
 #
@@ -579,7 +611,12 @@ Smart argument handling:
   hhere npm run dev            # bare args → run as the root-pane command
   hhere -c "npm run dev"       # explicit --command flag
   hhere -p ~/proj              # explicit path, plain shell
+  hhere -p ../sibling          # relative paths resolve against YOUR shell
   hhere -p ~/proj npm run dev  # explicit path + command
+
+--path DIR is resolved (and symlink-canonicalized) here, in your shell, before
+it reaches herdr — a DIR that does not exist is a hard error, not a silent
+workspace at $HOME.
 
 Idempotent: re-running in the same dir focuses the existing workspace.
 --session NAME targets a running herdr session (default: current session when
@@ -593,6 +630,11 @@ EOF
     done
     [ $# -gt 0 ] && [ -z "$cmd" ] && cmd="$*"
     target="${target:-$PWD}"
+
+    # ABSOLUTIZE — load-bearing, do NOT pass `$target` through verbatim; herdr
+    # resolves a relative `--cwd` server-side and falls back to $HOME on a miss.
+    # See _herdr_abs_dir above.
+    target=$(_herdr_abs_dir "$target" hhere) || return 1
 
     local label
     label=$(_sesh_sanitize "$(basename "$target")")
