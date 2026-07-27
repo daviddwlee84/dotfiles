@@ -60,8 +60,18 @@ fi
 # ----------------------------------------------------------------------------
 # Homebrew PATH detection (mirrors .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl)
 # ----------------------------------------------------------------------------
+# Probe brew by OUTPUT, not exit status. A fake `brew` stub on PATH
+# (`#!/bin/sh` + `exit 0` — used to stop bootstrap from installing Linuxbrew
+# on a distro Homebrew doesn't support) satisfies `command -v brew` and
+# returns 0 for *every* subcommand while printing nothing, which would make
+# `brew list --formula <x>` succeed and misclassify install styles.
+# See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+brew_usable() {
+  [[ -n "$(brew --prefix 2>/dev/null)" ]]
+}
+
 setup_brew_path() {
-  if command -v brew >/dev/null 2>&1; then
+  if brew_usable; then
     return 0
   fi
   local candidates=(
@@ -385,7 +395,7 @@ _uv_install_style() {
   case "$p" in
     */homebrew/* | */Cellar/* | */linuxbrew/*) echo brew ;;
     /usr/local/bin/uv)
-      if command -v brew >/dev/null 2>&1 \
+      if brew_usable \
         && brew list --formula uv >/dev/null 2>&1; then
         echo brew
       else
@@ -394,7 +404,7 @@ _uv_install_style() {
       ;;
     "$HOME"/.local/bin/uv | "$HOME"/.cargo/bin/uv) echo curl ;;
     *)
-      if command -v brew >/dev/null 2>&1 \
+      if brew_usable \
         && brew list --formula uv >/dev/null 2>&1; then
         echo brew
       else
@@ -806,7 +816,7 @@ _herdr_install_style() {
     *"/.local/share/mise/"* | */mise/installs/*) echo mise ;;
     "$HOME"/.local/bin/herdr) echo self ;;
     *)
-      if command -v brew >/dev/null 2>&1 \
+      if brew_usable \
         && brew list --formula herdr >/dev/null 2>&1; then
         echo brew
       else

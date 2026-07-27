@@ -55,8 +55,12 @@ elif [[ -d "$HOME/.linuxbrew" ]]; then
 fi
 {{ end -}}
 
-# Check if brew is available
-if ! command -v brew &> /dev/null; then
+# Check if brew is available.
+# Probe by OUTPUT, not exit status: a fake `brew` stub (`#!/bin/sh` +
+# `exit 0`) satisfies `command -v brew` and returns 0 for every subcommand
+# while printing nothing, so `brew bundle` would appear to succeed while
+# installing exactly nothing. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+if [[ -z "$(brew --prefix 2>/dev/null)" ]]; then
     {{ if eq .chezmoi.os "darwin" -}}
     error "Homebrew not found. It should have been installed by bootstrap."
     exit 1
@@ -168,7 +172,7 @@ export HOMEBREW_NO_INSTALL_UPGRADE=1
 adopt_existing_casks() {
     local file="$1"
     [[ -f "$file" ]] || return 0
-    command -v brew >/dev/null 2>&1 || return 0
+    [[ -n "$(brew --prefix 2>/dev/null)" ]] || return 0
 
     # Resolve Caskroom path once (arm64 vs intel).
     local caskroom=""

@@ -158,6 +158,32 @@ else
     BREW_REAL_ARCH="$(uname -m)"
 fi
 
+# glibc floor. Homebrew/Linux advertises glibc >= 2.13, but every modern
+# bottle is built against a much newer one, so on an old distro `brew
+# install` silently degrades to compiling *everything* from source — hours
+# per formula, and the installer itself often aborts first (CentOS 7 ships
+# curl < 7.41; see the -x guard above). 2.28 is the RHEL 8 / Debian 10
+# floor: it excludes CentOS/RHEL 7 (2.17) while leaving Ubuntu 20.04
+# (2.31) and everything newer on the normal path.
+#
+# Without this gate, the only way to stop bootstrap from re-attempting the
+# install on a CentOS 7 box was to drop a fake `brew` stub (`#!/bin/sh` +
+# `exit 0`) on PATH — which then silently poisoned every `command -v brew`
+# probe in the ansible roles. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+BREW_GLIBC_OK=1
+BREW_GLIBC_VER="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+([0-9.]*)?$' || true)"
+if [[ -n "$BREW_GLIBC_VER" ]]; then
+    if ! awk -v v="$BREW_GLIBC_VER" 'BEGIN {
+            split(v, a, ".");
+            exit !((a[1] > 2) || (a[1] == 2 && a[2] >= 28))
+        }'; then
+        BREW_GLIBC_OK=0
+    fi
+fi
+
+if [[ "$BREW_GLIBC_OK" -eq 0 ]]; then
+    warn "Skipping Linuxbrew: glibc $BREW_GLIBC_VER is older than 2.28 — Homebrew would compile every formula from source. Use the distro package manager / mise / uv / cargo instead."
+else
 case "$BREW_REAL_ARCH" in
     amd64|x86_64|arm64|aarch64)
         if ! command -v brew &> /dev/null; then
@@ -195,6 +221,7 @@ case "$BREW_REAL_ARCH" in
         fi
         ;;
 esac
+fi
 {{ end -}}
 {{ end -}}
 # 1. Install uv if missing

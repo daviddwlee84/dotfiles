@@ -50,7 +50,12 @@
 
 - name: Check if Homebrew is available
   when: ansible_facts["os_family"] in ["Debian", "RedHat"]
-  ansible.builtin.command: which brew
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub on PATH
+  # satisfies `which brew` and returns 0 for everything while printing
+  # nothing. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ]'
+  args:
+    executable: /bin/bash
   register: llm_tools_brew_check
   changed_when: false
   failed_when: false

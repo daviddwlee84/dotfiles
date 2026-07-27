@@ -156,6 +156,31 @@ Three Brewfile templates + scattered `community.general.homebrew[_cask]`
 tasks in ansible roles. The split is **macOS-centric**: Linux Brewfile is
 empty, Linuxbrew use happens role-by-role.
 
+**Linux glibc floor**: bootstrap skips the Linuxbrew install entirely when
+glibc < 2.28 (RHEL 8 / Debian 10 floor — excludes CentOS/RHEL 7's 2.17,
+leaves Ubuntu 20.04's 2.31 alone). Below that, every bottle would be
+compiled from source and the installer usually aborts first anyway. Same
+threshold the mise installer uses to force its musl build.
+
+**Probe brew by output, never by exit status.** Every "is brew here?" check
+in this repo tests that `brew --prefix` prints a non-empty path:
+
+```bash
+brew_usable() { [[ -n "$(brew --prefix 2>/dev/null)" ]]; }        # shell
+```
+```yaml
+ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
+```
+
+A fake `brew` stub (`#!/bin/sh` + `exit 0`) — historically recommended in
+the README to stop bootstrap installing Linuxbrew on CentOS 7 — satisfies
+`command -v brew` / `which brew` and returns 0 for *every* subcommand while
+printing nothing. That makes `brew list --formula <x>` succeed (misclassifying
+install styles, §2.3), makes `brew bundle` "succeed" while installing
+nothing, and kills `community.general.homebrew` on empty JSON with
+`Expecting value: line 1 column 1 (char 0)`. See
+[`pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md).
+
 #### 2.1 Brewfiles
 
 | File | Owns |

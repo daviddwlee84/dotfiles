@@ -151,6 +151,29 @@ Ansible roles 小節再依主題切分,因為 26 個 role 擠在同一個表格�
 `community.general.homebrew[_cask]` task。切分是**以 macOS 為中心**:
 Linux Brewfile 是空的,Linuxbrew 的使用是 role-by-role。
 
+**Linux glibc 下限**：當 glibc < 2.28 時 bootstrap 直接跳過 Linuxbrew 安裝
+（RHEL 8 / Debian 10 的下限——排除 CentOS/RHEL 7 的 2.17，不影響 Ubuntu
+20.04 的 2.31）。低於此線時每個 bottle 都得從原始碼編譯，而且安裝程式通常會
+先失敗。這與 mise 安裝程式強制改用 musl build 的門檻相同。
+
+**一律用「輸出」而非「離開碼」偵測 brew。** 本 repo 所有「brew 在不在？」的
+檢查都是驗證 `brew --prefix` 印出非空路徑：
+
+```bash
+brew_usable() { [[ -n "$(brew --prefix 2>/dev/null)" ]]; }        # shell
+```
+```yaml
+ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
+```
+
+假的 `brew` stub（`#!/bin/sh` + `exit 0`——README 早期建議用它阻止 bootstrap
+在 CentOS 7 上安裝 Linuxbrew）會滿足 `command -v brew` / `which brew`，且對
+**每個**子命令都回傳 0 並且不印任何東西。於是 `brew list --formula <x>` 會成功
+（誤判安裝方式，見 §2.3）、`brew bundle` 會「成功」但什麼都沒裝、
+`community.general.homebrew` 則會因空 JSON 而死於
+`Expecting value: line 1 column 1 (char 0)`。詳見
+[`pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md)。
+
 #### 2.1 Brewfiles
 
 | 檔案 | 擁有什麼 |

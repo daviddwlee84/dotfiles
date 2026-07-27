@@ -66,7 +66,12 @@
         echo brew
         ;;
       /usr/local/bin/uv)
-        if command -v brew >/dev/null 2>&1 \
+        # `-n "$(brew --prefix)"` not `command -v brew`: a fake brew stub
+        # exits 0 for every subcommand (incl. `brew list`), which would
+        # misclassify a curl-installed uv as brew-managed and make the
+        # min-version upgrade a silent no-op.
+        # See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+        if [ -n "$(brew --prefix 2>/dev/null)" ] \
            && brew list --formula uv >/dev/null 2>&1; then
           echo brew
         else
@@ -79,7 +84,12 @@
       *)
         # Best-effort fallback: if brew owns the formula, treat as brew;
         # else assume self-update-capable (curl style or stand-alone binary).
-        if command -v brew >/dev/null 2>&1 \
+        # `-n "$(brew --prefix)"` not `command -v brew`: a fake brew stub
+        # exits 0 for every subcommand (incl. `brew list`), which would
+        # misclassify a curl-installed uv as brew-managed and make the
+        # min-version upgrade a silent no-op.
+        # See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+        if [ -n "$(brew --prefix 2>/dev/null)" ] \
            && brew list --formula uv >/dev/null 2>&1; then
           echo brew
         else

@@ -124,7 +124,9 @@ The wrapper validates the password against `sudo -v` before invoking `chezmoi`, 
 
 **Even simpler alternative** if you have root and don't mind editing sudoers: add `$USER ALL=(ALL) NOPASSWD: ALL` to `/etc/sudoers.d/99-bootstrap`, run `chezmoi apply`, then remove the line. The shared helper short-circuits cleanly when sudo is truly passwordless.
 
-> CentOS 7 also blocks Linuxbrew install because system curl 7.29 is older than Homebrew's 7.41 minimum, and Homebrew bottles built on Ubuntu 22.04+ don't run on glibc 2.17 anyway. Linuxbrew is fully optional on Linux — every ansible task that uses it has a non-brew fallback (cargo / GitHub musl release / AppImage). On CentOS 7, drop a stub `~/.local/bin/brew` (`#!/bin/sh\nexit 0`) before applying to short-circuit the bootstrap's brew step.
+> CentOS 7 also blocks Linuxbrew install because system curl 7.29 is older than Homebrew's 7.41 minimum, and Homebrew bottles built on Ubuntu 22.04+ don't run on glibc 2.17 anyway. Linuxbrew is fully optional on Linux — every ansible task that uses it has a non-brew fallback (cargo / GitHub musl release / AppImage). **Bootstrap now skips Linuxbrew automatically when glibc < 2.28** (the RHEL 8 / Debian 10 floor; Ubuntu 20.04's 2.31 is unaffected), so nothing needs doing on CentOS 7.
+>
+> Do **not** short-circuit the brew step with a stub `~/.local/bin/brew` (`#!/bin/sh` + `exit 0`) — this README used to recommend exactly that, and it silently poisons every brew probe in the ansible roles: the stub returns 0 with empty output for *every* subcommand, so `command -v brew` says "available" and `community.general.homebrew` then dies on empty JSON with `Expecting value: line 1 column 1 (char 0)`, aborting the play. If a stub is already on a host, delete it. See [`pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md`](pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md).
 
 Full diagnosis: [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md) and [`pitfalls/centos7-noroot.md`](pitfalls/centos7-noroot.md).
 

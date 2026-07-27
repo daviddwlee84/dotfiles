@@ -634,7 +634,11 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-  ansible.builtin.command: command -v brew
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ]'
+  args:
+    executable: /bin/bash
   register: codexbar_brew_check
   changed_when: false
   failed_when: false
@@ -826,7 +830,11 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
-  ansible.builtin.command: command -v brew
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ]'
+  args:
+    executable: /bin/bash
   register: td_brew_check
   changed_when: false
   failed_when: false
@@ -1010,7 +1018,11 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
-  ansible.builtin.command: command -v brew
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ]'
+  args:
+    executable: /bin/bash
   register: sidecar_brew_check
   changed_when: false
   failed_when: false

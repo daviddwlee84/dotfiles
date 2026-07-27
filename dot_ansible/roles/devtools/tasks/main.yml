@@ -511,7 +511,9 @@
 
 - name: Detect Linuxbrew for bat (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: bat_brew_probe
@@ -854,7 +856,9 @@
     - ansible_facts["os_family"] == "Debian"
     - eza_recheck.rc != 0
     - target_architecture in ['aarch64', 'arm64']
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: eza_brew_probe
@@ -963,7 +967,9 @@
     - ansible_facts["os_family"] == "Debian"
     - delta_check.rc != 0
     - target_architecture in ['aarch64', 'arm64']
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: delta_brew_probe
@@ -1076,7 +1082,9 @@
     - ansible_facts["os_family"] == "Debian"
     - delta_recheck.rc != 0
     - target_architecture in ['aarch64', 'arm64']
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: delta_brew_probe_user
@@ -2184,7 +2192,9 @@
 
 - name: Detect Linuxbrew for shfmt (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: shfmt_brew_probe
@@ -2435,7 +2445,9 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - resvg_check.rc != 0
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: resvg_brew_probe
@@ -2756,7 +2768,9 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - tmux_upgrade_needed | bool
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: tmux_brew_probe
@@ -3816,7 +3830,9 @@
     - ansible_facts["os_family"] == "Debian"
     - tv_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
-  ansible.builtin.shell: command -v brew || true
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew || true'
   args:
     executable: /bin/bash
   register: tv_brew_probe
