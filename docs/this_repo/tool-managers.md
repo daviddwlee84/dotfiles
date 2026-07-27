@@ -39,7 +39,7 @@ If you want to know:
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
-| **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallbacks for specstory/codexbar | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
+| **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallback for specstory | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
 | **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
 | **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
@@ -217,7 +217,7 @@ Most CLI formulae land via ansible roles, not the Brewfile. Examples:
 
 - `base/tasks/main.yml`: `git`, `git-lfs`, `curl`, `wget`, `ripgrep`, `fd`, `jq`, `tree`, `just`
 - `devtools/tasks/main.yml`: large set — `bat`, `gh`, `glab`, `diffnav`, `git-delta`, `eza`, `tlrc`, `glow`, `gum`, `vhs`, `freeze`, `thefuck`, `zoxide`, `direnv`, `yazi`, `superfile`, `tmux`, `sesh`, `worktrunk`, `workmux`, `zellij`, `btop`, `htop`, `duckdb`, `rclone`, `coreutils`, `taplo`, `television`, `pandoc`, `tailspin`, `lnav`, `grc`, `dasel`, `yq`, `jnv`, `witr`, `figlet`, `toilet`, `lolcat`, `fastfetch`, `shellcheck`, `shfmt`, `bats-core`, `git-graph`, `mosh`, `doxx`, `libreoffice`
-- `coding_agents/tasks/main.yml`: `claude-code` (cask), `codex` (cask), `gemini-cli` (formula), `rtk` (formula), `specstory`, `codexbar`, `td`, `sidecar` (all with tap setup)
+- `coding_agents/tasks/main.yml`: `claude-code` (cask), `codex` (cask), `gemini-cli` (formula), `rtk` (formula), `specstory`, `codexbar`, `td`, `sidecar` (all with tap setup except `codexbar`, whose cask is in homebrew-cask core)
 - `networking_tools/`: `nmap`, `arp-scan`, `mtr`, `iperf3`, `doggo`, `httpie`, `gping`, `trippy`, `bandwhich`, `rustscan`, `speedtest` (tap `teamookla/speedtest`), `ngrok`, `cloudflared`
 - `media_tools/`: `ffmpeg`, `imagemagick`, `exiftool`, `vips`
 - `iac_tools/`: `azure-cli`, `hashicorp/tap/terraform`, `opentofu`
@@ -233,7 +233,8 @@ explicit `when: ansible_facts["os_family"] == "Darwin"` guard.
 
 **Tap inventory** (added by various roles): `nikitabobko/tap`,
 `wxtsky/tap` (CodeIsland), `hashicorp/tap` (terraform),
-`teamookla/speedtest`, `specstoryai/tap`, `steipete/tap` (CodexBar),
+`teamookla/speedtest`, `specstoryai/tap`, `steipete/tap` (CodexBar **CLI formula** — the
+cask is in homebrew-cask core, no tap needed),
 `marcus/tap` (td, sidecar), `dlvhdr/formulae`, `raine/workmux`.
 
 Homebrew 6+ refuses formulae/casks from untrusted third-party taps. Role-driven
@@ -362,9 +363,9 @@ ships via a different mechanism upstream, and the role mirrors that.
 | **Antigravity CLI** (`agy` + `agyc` symlink) | `curl https://antigravity.google/cli/install.sh` patched mid-flight via `sed` → `--skip-path --skip-aliases` | same | lines 317–355. Two gotchas: (a) name collision with the Antigravity IDE — collision-free `agyc` symlink keys the AICAP stack; (b) installer mutates shell profiles by default — patched away. Both documented in-source |
 | **RTK** | brew formula `rtk` | `curl https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh \| sh` → `~/.local/bin/rtk` | lines 359–413 |
 | **SpecStory** | brew tap `specstoryai/tap` + formula → GitHub release zip fallback | GitHub release tarball | lines 417–595 |
-| **CodexBar** | brew tap `steipete/tap` + cask (arm64 only) | Linuxbrew → GitHub release `steipete/CodexBar` | lines 599–764 |
-| **td** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/td` | lines 768–975. Includes "is current td Sidecar-compatible?" version check; removes conflicting formula if not |
-| **sidecar** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/sidecar` | lines 979–1149 |
+| **CodexBar** | brew cask `codexbar` — homebrew-cask **core** (no tap), universal binary, macOS 14+ | glibc ≥ 2.38: Linuxbrew `steipete/tap/codexbar` → GitHub release; below that: static-musl GitHub release only | lines 597–864. Guards on `/Applications/CodexBar.app`, not `which codexbar`; removes a conflicting CLI formula first (both link the same binary name); the prebuilt Linux CLI needs `GLIBC_2.38`, so old-glibc hosts skip Linuxbrew entirely. See [codexbar.md](../tools/codexbar.md) |
+| **td** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/td` | lines 865–1078. Includes "is current td Sidecar-compatible?" version check; removes conflicting formula if not |
+| **sidecar** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/sidecar` | lines 1080–1256 |
 | **Specify CLI** | `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git` | same | lines 1153–1184. Only role-installed tool currently using `uv tool install` directly (not via `python_uv_tools` defaults) |
 | **OpenChamber** | npm `@openchamber/web` | `mise exec -- npm install -g` | lines 1188–1222 |
 | **claude-hud** plugin | runs `files/claude_hud_sync.py --only-if-missing` | same | lines 1239–1247; install-only, explicit `just upgrade-plugins` for refresh |
@@ -901,7 +902,7 @@ with rationale.
 | **OpenAI Codex CLI** | macOS: brew cask; Linux: npm `@openai/codex` | macOS has the brewed `.app` (richer); Linux only ships npm CLI |
 | **Gemini CLI** | macOS: brew formula `gemini-cli` → npm fallback; Linux: npm | brew formula availability is inconsistent |
 | **Specstory** | macOS: brew tap → GitHub release fallback; Linux: GitHub release tarball | brew formula availability + version freshness |
-| **CodexBar** | macOS: brew tap (arm64 only); Linux: Linuxbrew → GitHub release | arm64-specific package |
+| **CodexBar** | macOS: brew cask (homebrew-cask core, universal); Linux: Linuxbrew formula → GitHub release | macOS ships the menu bar app, which bundles the CLI (a superset of the formula); Linux has CLI only |
 | **td** / **sidecar** | macOS: brew tap; Linux: Linuxbrew → GitHub release | same maintainer (`marcus/tap`); Linuxbrew is fast path when present |
 | **Ollama** | brew formula always (CLI); brew cask `ollama-app` when `installAiDesktopApps + installLlmTools`; Linux: `curl ollama.com/install.sh` | CLI vs GUI split; vendor installer is the canonical Linux path |
 | **fzf** | macOS: `lazyvim_deps` brew. Linux: chezmoi external + `~/.fzf/install --bin` | brew is fine on macOS; Linux gets the latest git tip |
@@ -1033,7 +1034,7 @@ list.
 | **claude-hud** | python helper run from role | same | coding_agents |
 | **cloudflared** | brew | GitHub `.deb`/binary / `.rpm` | networking_tools (tunnel) |
 | **CMux** | brew cask | n/a | Brewfile.darwin |
-| **CodexBar** | brew cask `codexbar` (arm64, tap `steipete/tap`) | Linuxbrew → GitHub release | coding_agents |
+| **CodexBar** | brew cask `codexbar` (homebrew-cask core) | Linuxbrew `steipete/tap/codexbar` → GitHub release; static-musl asset (and no Linuxbrew) when glibc < 2.38 | coding_agents |
 | **codex-app** | brew cask (arm64) | n/a | Brewfile.darwin |
 | **codex** (OpenAI Codex CLI) | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | coding_agents |
 | **CodeIsland** | brew cask (`wxtsky/tap`) | n/a | Brewfile.darwin |

@@ -499,7 +499,7 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cbu` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code CLI 使用統計 (`codexbar usage --provider claude --source cli`) |
+| `cbu` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code 使用統計 (`codexbar usage --provider claude`) |
 | `cbc` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code 成本明細 (`codexbar cost --provider claude`) |
 | `cbca` | alias | `dot_config/shell/40_codexbar.sh` | 跨所有 provider 的成本明細 (`codexbar cost`) |
 | `ccusage` | alias | `dot_config/shell/07_bunx_cli.sh` | 透過 `bunx ccusage` 的 Claude Code 用量追蹤 |

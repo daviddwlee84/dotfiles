@@ -525,7 +525,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cbu` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code CLI usage stats (`codexbar usage --provider claude --source cli`) |
+| `cbu` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code usage stats (`codexbar usage --provider claude`) |
 | `cbc` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code cost breakdown (`codexbar cost --provider claude`) |
 | `cbca` | alias | `dot_config/shell/40_codexbar.sh` | Cost breakdown across all providers (`codexbar cost`) |
 | `ccusage` | alias | `dot_config/shell/07_bunx_cli.sh` | Claude Code usage tracker via `bunx ccusage` |

@@ -595,33 +595,83 @@
         state: absent
 
 # === CodexBar ===
+#
+# macOS installs the GUI cask, which is a SUPERSET of the CLI: the cask's
+# `binary "…/CodexBar.app/Contents/Helpers/CodexBarCLI", target: "codexbar"`
+# stanza puts the same `codexbar` on PATH that the steipete/tap FORMULA does.
+# Two upstream changes make the cask the right default everywhere:
+#   - v0.17.0 (2026-02): cask moved into homebrew-cask CORE, so no tap.
+#   - v0.26.0 (2026-05): the app ships as `CodexBar-macos-universal-*.zip` and
+#     the cask dropped `depends_on arch: :arm64`. Intel Macs are supported;
+#     the only requirement left is macOS 14+ (Sonoma).
+# Do NOT reintroduce an arm64 gate — it silently skipped every Intel Mac.
+#
+# Guard on the APP, not on `which codexbar`: the formula and the cask both own
+# that binary name, so a `which` guard makes a CLI-only host skip the GUI
+# forever, and brew aborts the cask link with "It seems there is already a
+# Binary at …" when the formula owns it. Same conflicting-formula shape as td
+# below, with a rescue so a failed cask install never leaves the host with no
+# codexbar at all.
 
-- name: Check if CodexBar is installed (macOS, ARM only)
+- name: Check if CodexBar.app is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.stat:
+    path: /Applications/CodexBar.app
+  register: codexbar_macos_app
+
+- name: Check whether the CLI-only formula owns the codexbar binary (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - target_architecture == "arm64"
-  ansible.builtin.command: which codexbar
-  register: codexbar_macos_check
+    - not codexbar_macos_app.stat.exists
+  # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
+  # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
+  ansible.builtin.shell: |
+    [ -n "$(brew --prefix 2>/dev/null)" ] || exit 1
+    brew list --formula 2>/dev/null | grep -qx codexbar
+  args:
+    executable: /bin/bash
+  register: codexbar_macos_formula
   changed_when: false
   failed_when: false
 
-- name: Tap steipete/tap for CodexBar (macOS, ARM only)
+- name: Install CodexBar (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - target_architecture == "arm64"
-    - codexbar_macos_check.rc != 0
-  community.general.homebrew_tap:
-    name: steipete/tap
-    state: present
+    - not codexbar_macos_app.stat.exists
+    # The cask's own `depends_on macos: :sonoma` would hard-fail the play on an
+    # older mac; skip explicitly instead so the message is ours.
+    - ansible_facts["distribution_version"] is version('14.0', '>=')
+  block:
+    - name: Remove conflicting CodexBar CLI formula (macOS)
+      when: codexbar_macos_formula.rc == 0
+      community.general.homebrew:
+        name: codexbar
+        state: absent
 
-- name: Install CodexBar (macOS, ARM only)
+    - name: Install CodexBar cask (macOS)
+      # homebrew-cask core, no tap needed (see block comment above).
+      community.general.homebrew_cask:
+        name: codexbar
+        state: present
+  rescue:
+    - name: Restore CodexBar CLI formula after failed cask install (macOS)
+      when: codexbar_macos_formula.rc == 0
+      community.general.homebrew:
+        name: steipete/tap/codexbar
+        state: present
+      failed_when: false
+
+    - name: Warn CodexBar cask installation failed (macOS)
+      ansible.builtin.debug:
+        msg: "CodexBar cask install failed - skipping (CLI formula restored if it was present)"
+
+- name: Warn CodexBar skipped on macOS older than 14 (Sonoma)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - target_architecture == "arm64"
-    - codexbar_macos_check.rc != 0
-  community.general.homebrew_cask:
-    name: codexbar
-    state: present
+    - not codexbar_macos_app.stat.exists
+    - ansible_facts["distribution_version"] is version('14.0', '<')
+  ansible.builtin.debug:
+    msg: "CodexBar skipped: requires macOS 14+ (Sonoma), found {{ ansible_facts['distribution_version'] }}"
 
 - name: Check if CodexBar is installed (Linux)
   when: ansible_facts["os_family"] in ["Debian", "RedHat"]
@@ -630,10 +680,49 @@
   changed_when: false
   failed_when: false
 
+- name: Detect whether the prebuilt glibc CLI can run here (Linux)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - codexbar_check.rc != 0
+  # The floor is glibc >= 2.38, NOT the usual 2.28 Linuxbrew line. Verified by
+  # reading `.gnu.version_r` out of v0.45.2's own tarballs (`objdump -p`):
+  # BOTH `linux-x86_64` and `linux-aarch64` require `GLIBC_2.38` from libc.so.6
+  # plus `GLIBCXX_3.4.30` (GCC 12+) from libstdc++. That excludes far more than
+  # CentOS 7 — Ubuntu 22.04 (2.35), Debian 12 (2.36) and RHEL 9 (2.34) all fail
+  # too; only Ubuntu 23.10+/24.04 (2.39) clears it. The static-musl variant
+  # (upstream since v0.37.0, 2026-06) has an empty NEEDED list and zero GLIBC
+  # references, so it runs anywhere.
+  #
+  # This gates the LINUXBREW path as well, on purpose: `steipete/tap/codexbar`
+  # is a binary-download formula that fetches the same glibc tarball, so on a
+  # Jammy/bookworm/RHEL-9 host `brew install` would "succeed" and leave a
+  # binary that cannot execute — and the `which codexbar` guard above would
+  # then skip the working fallback on every later run.
+  #
+  # rc != 0 also covers "could not determine glibc"; failing towards the static
+  # build is the safe direction, it just costs ~36 MB more download.
+  ansible.builtin.shell: |
+    ver="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+([0-9.]*)?$' || true)"
+    [ -n "$ver" ] || exit 1
+    awk -v v="$ver" 'BEGIN { split(v, a, "."); exit !((a[1] > 2) || (a[1] == 2 && a[2] >= 38)) }'
+  args:
+    executable: /bin/bash
+  register: codexbar_glibc_check
+  changed_when: false
+  failed_when: false
+
+- name: Decide CodexBar Linux install path (Linux)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - codexbar_check.rc != 0
+  ansible.builtin.set_fact:
+    codexbar_static_required: "{{ codexbar_glibc_check.rc | default(1) != 0 }}"
+
 - name: Check if Homebrew (Linuxbrew) is available
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
+    - not (codexbar_static_required | bool)
   # Probe brew by OUTPUT, not exit status — a fake `brew` stub returns 0 for
   # everything. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md.
   ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ]'
@@ -647,7 +736,8 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-    - codexbar_brew_check.rc == 0
+    - not (codexbar_static_required | bool)
+    - codexbar_brew_check.rc | default(1) == 0
   block:
     - name: Tap steipete/tap for CodexBar (Linuxbrew)
       community.general.homebrew_tap:
@@ -656,7 +746,7 @@
 
     - name: Install CodexBar (Linuxbrew)
       community.general.homebrew:
-        name: codexbar
+        name: steipete/tap/codexbar
         state: present
   rescue:
     - name: Mark Linuxbrew install as failed
@@ -667,7 +757,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_static_required | bool or codexbar_brew_check.rc | default(1) != 0 or (codexbar_brew_failed | default(false))
   ansible.builtin.file:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
     state: directory
@@ -677,7 +767,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_static_required | bool or codexbar_brew_check.rc | default(1) != 0 or (codexbar_brew_failed | default(false))
   ansible.builtin.uri:
     url: https://api.github.com/repos/steipete/CodexBar/releases/latest
     return_content: true
@@ -687,7 +777,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_static_required | bool or codexbar_brew_check.rc | default(1) != 0 or (codexbar_brew_failed | default(false))
     - codexbar_release is defined
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.set_fact:
@@ -698,19 +788,24 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_static_required | bool or codexbar_brew_check.rc | default(1) != 0 or (codexbar_brew_failed | default(false))
     - codexbar_tag is defined
   ansible.builtin.set_fact:
-    codexbar_asset: "CodexBarCLI-{{ codexbar_tag }}-linux-{{ codexbar_arch }}.tar.gz"
+    codexbar_asset: >-
+      CodexBarCLI-{{ codexbar_tag }}-linux-{{ 'musl-' if codexbar_static_required | bool else '' }}{{ codexbar_arch }}.tar.gz
 
 - name: Install CodexBar from GitHub releases (Linux fallback)
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_static_required | bool or codexbar_brew_check.rc | default(1) != 0 or (codexbar_brew_failed | default(false))
     - codexbar_asset is defined
   block:
     - name: Download CodexBar release (Linux fallback)
+      # No `checksum:` — upstream's sibling `<asset>.sha256` records the
+      # build machine's absolute temp path (`/tmp/tmp.XXXX/CodexBarCLI-…`),
+      # not a bare filename, so get_url's checksum-URL lookup can never match
+      # it. Don't "fix" this by pointing checksum at that URL.
       ansible.builtin.get_url:
         url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
         dest: /tmp/codexbar.tar.gz

@@ -40,7 +40,7 @@
 | **dotnet** (全域工具) | `azure-cost-cli`（binary `azure-cost`） | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli`（binary `try`）、`tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
-| **GitHub-release 下載** | ~30 個 Linux 使用者層級 fallback：ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS specstory/codexbar 的 fallback | 每個 role 的 `_release_fallback` 區塊 | **無**（install-only — 見 [覆蓋落差](#coverage-gaps-install-only-no-automated-upgrade)） |
+| **GitHub-release 下載** | ~30 個 Linux 使用者層級 fallback：ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS specstory 的 fallback | 每個 role 的 `_release_fallback` 區塊 | **無**（install-only — 見 [覆蓋落差](#coverage-gaps-install-only-no-automated-upgrade)） |
 | **chezmoi externals** | 每週刷新的 git checkout：oh-my-zsh + 插件、oh-my-bash、ble.sh、TPM、fzf（Linux）、toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | 發行版套件（編譯依賴、ffmpeg、audit、fontconfig、libnotify-bin、系統 git/zsh/bash 等） | role 中散布的 `ansible.builtin.apt:` / `ansible.builtin.yum:` | **無**（依賴 repo 流程外的 `apt upgrade`） |
 | **flatpak** | Discord（Linux 上的預設頻道） | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
@@ -208,7 +208,7 @@ ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew
 
 - `base/tasks/main.yml`:`git`、`git-lfs`、`curl`、`wget`、`ripgrep`、`fd`、`jq`、`tree`、`just`
 - `devtools/tasks/main.yml`:大量集合——`bat`、`gh`、`glab`、`diffnav`、`git-delta`、`eza`、`tlrc`、`glow`、`gum`、`vhs`、`freeze`、`thefuck`、`zoxide`、`direnv`、`yazi`、`superfile`、`tmux`、`sesh`、`worktrunk`、`workmux`、`zellij`、`btop`、`htop`、`duckdb`、`rclone`、`coreutils`、`taplo`、`television`、`pandoc`、`tailspin`、`lnav`、`grc`、`dasel`、`yq`、`jnv`、`witr`、`figlet`、`toilet`、`lolcat`、`fastfetch`、`shellcheck`、`shfmt`、`bats-core`、`git-graph`、`mosh`
-- `coding_agents/tasks/main.yml`:`claude-code`(cask)、`codex`(cask)、`gemini-cli`(formula)、`rtk`(formula)、`specstory`、`codexbar`、`td`、`sidecar`(都有 tap 設定)
+- `coding_agents/tasks/main.yml`:`claude-code`(cask)、`codex`(cask)、`gemini-cli`(formula)、`rtk`(formula)、`specstory`、`codexbar`、`td`、`sidecar`(除 `codexbar` 外都有 tap 設定;它的 cask 在 homebrew-cask core)
 - `networking_tools/`:`nmap`、`arp-scan`、`mtr`、`iperf3`、`doggo`、`httpie`、`gping`、`trippy`、`bandwhich`、`rustscan`、`speedtest`(tap `teamookla/speedtest`)、`ngrok`、`cloudflared`
 - `media_tools/`:`ffmpeg`、`imagemagick`、`exiftool`、`vips`
 - `iac_tools/`:`azure-cli`、`hashicorp/tap/terraform`、`opentofu`
@@ -224,7 +224,7 @@ Linuxbrew(存在時)或 GitHub releases。每個 role 都有明確的
 
 **Tap 清單**(各 role 加進來的):`nikitabobko/tap`、`wxtsky/tap`
 (CodeIsland)、`hashicorp/tap`(terraform)、`teamookla/speedtest`、
-`specstoryai/tap`、`steipete/tap`(CodexBar)、`marcus/tap`(td、sidecar)、
+`specstoryai/tap`、`steipete/tap`(CodexBar 的 **CLI formula**——cask 在 homebrew-cask core,不需要 tap)、`marcus/tap`(td、sidecar)、
 `dlvhdr/formulae`、`raine/workmux`。
 
 **透過 homebrew 新增**:只在「macOS 出貨且 Linux 對應品走 apt 或
@@ -347,9 +347,9 @@ Role:`dot_ansible/roles/coding_agents/tasks/main.yml`。由
 | **Antigravity CLI**(`agy` + `agyc` symlink) | `curl https://antigravity.google/cli/install.sh`,中途用 `sed` 改寫成 `--skip-path --skip-aliases` | 同 | 317–355 行。兩個雷區:(a) 與 Antigravity IDE 同名 — 無衝突的 `agyc` symlink 是 AICAP 堆疊的鑰匙;(b) installer 預設會改 shell profiles — 已 patch 掉。兩者皆有 in-source 文件 |
 | **RTK** | brew formula `rtk` | `curl https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh \| sh` → `~/.local/bin/rtk` | 359–413 行 |
 | **SpecStory** | brew tap `specstoryai/tap` + formula → GitHub release zip fallback | GitHub release tarball | 417–595 行 |
-| **CodexBar** | brew tap `steipete/tap` + cask(僅 arm64) | Linuxbrew → GitHub release `steipete/CodexBar` | 599–764 行 |
-| **td** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/td` | 768–975 行。包含「現有 td 是否與 Sidecar 相容?」版本檢查;不相容則移除衝突的 formula |
-| **sidecar** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/sidecar` | 979–1149 行 |
+| **CodexBar** | brew cask `codexbar`——homebrew-cask **core**(不需 tap)、universal binary、macOS 14+ | glibc ≥ 2.38:Linuxbrew `steipete/tap/codexbar` → GitHub release;低於此:只走 static-musl GitHub release | 597–864 行。判斷依據是 `/Applications/CodexBar.app` 而非 `which codexbar`;會先移除衝突的 CLI formula(兩者連結同一個 binary 名稱);預編的 Linux CLI 需要 `GLIBC_2.38`,所以舊 glibc 主機會整個跳過 Linuxbrew。見 [codexbar.md](../tools/codexbar.md) |
+| **td** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/td` | 865–1078 行。包含「現有 td 是否與 Sidecar 相容?」版本檢查;不相容則移除衝突的 formula |
+| **sidecar** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/sidecar` | 1080–1256 行 |
 | **Specify CLI** | `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git` | 同 | 1153–1184 行。目前唯一在 role 中直接用 `uv tool install` 而非透過 `python_uv_tools` defaults 的工具 |
 | **OpenChamber** | npm `@openchamber/web` | `mise exec -- npm install -g` | 1188–1222 行 |
 | **claude-hud** 插件 | 執行 `files/claude_hud_sync.py --only-if-missing` | 同 | 1239–1247 行;install-only,顯式的 `just upgrade-plugins` 才會刷新 |
@@ -829,7 +829,7 @@ GitHub release tarball 並解壓到 `~/.local/bin`(使用者可寫,已在 PATH)�
 | **OpenAI Codex CLI** | macOS:brew cask;Linux:npm `@openai/codex` | macOS 有 brew 的 `.app`(較豐富);Linux 只出 npm CLI |
 | **Gemini CLI** | macOS:brew formula `gemini-cli` → npm fallback;Linux:npm | brew formula 可用性不穩 |
 | **Specstory** | macOS:brew tap → GitHub release fallback;Linux:GitHub release tarball | brew formula 可用性 + 版本新鮮度 |
-| **CodexBar** | macOS:brew tap(僅 arm64);Linux:Linuxbrew → GitHub release | arm64 專屬套件 |
+| **CodexBar** | macOS:brew cask(homebrew-cask core、universal);Linux:Linuxbrew formula → GitHub release | macOS 裝的是選單列應用程式,本身就內含 CLI(formula 的超集);Linux 只有 CLI |
 | **td** / **sidecar** | macOS:brew tap;Linux:Linuxbrew → GitHub release | 同維護者(`marcus/tap`);Linuxbrew 存在時走快路 |
 | **Ollama** | 永遠 brew formula(CLI);`installAiDesktopApps + installLlmTools` 時 brew cask `ollama-app`;Linux:`curl ollama.com/install.sh` | CLI vs GUI 切分;廠商 installer 是 Linux 標準路徑 |
 | **fzf** | macOS:`lazyvim_deps` brew。Linux:chezmoi external + `~/.fzf/install --bin` | macOS 用 brew 沒問題;Linux 拿到最新的 git tip |
@@ -952,7 +952,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **claude-hud** | role 內跑 python 輔助 | 同 | coding_agents |
 | **cloudflared** | brew | GitHub `.deb`/binary / `.rpm` | networking_tools(tunnel) |
 | **CMux** | brew cask | n/a | Brewfile.darwin |
-| **CodexBar** | brew cask `codexbar`(arm64,tap `steipete/tap`) | Linuxbrew → GitHub release | coding_agents |
+| **CodexBar** | brew cask `codexbar`(homebrew-cask core) | Linuxbrew `steipete/tap/codexbar` → GitHub release;glibc < 2.38 時改抓 static-musl asset 並跳過 Linuxbrew | coding_agents |
 | **codex-app** | brew cask(arm64) | n/a | Brewfile.darwin |
 | **codex**(OpenAI Codex CLI) | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | coding_agents |
 | **CodeIsland** | brew cask(`wxtsky/tap`) | n/a | Brewfile.darwin |
