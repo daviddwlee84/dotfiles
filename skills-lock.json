@@ -11,13 +11,13 @@
       "source": "daviddwlee84/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local/mkdocs-site-bootstrap/SKILL.md",
-      "computedHash": "e8aab23a5cf942887954003617ec5e700ad52968cddc8f809e2534a9773af06b"
+      "computedHash": "976267291b56eb84d845733f3eb0e4b2427157e42449c2d75c5c4102ff712eae"
     },
     "project-knowledge-harness": {
       "source": "daviddwlee84/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local/project-knowledge-harness/SKILL.md",
-      "computedHash": "eaac5f167596223c62c3fac9588137762f715cf2e5843a1a0d0d1b961c2a4984"
+      "computedHash": "0a8d0b4888de715160f947499408251de0530ccb5f7e8bb65c9c994b685e5d5a"
     }
   }
 }

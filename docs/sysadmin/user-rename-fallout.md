@@ -106,7 +106,11 @@ findings are visible), then rebuild, then relink.
 
 ```bash
 # --- Tier 3: caches. Nothing of value is lost. ---
-uv cache clean
+# `uv cache prune` takes an exclusive lock on ~/.cache/uv and does NOT wait
+# politely: it errors out after 300s if any other uv process is alive. A long
+# scheduled job (here `dongwu-tick index`, 2h+ over a 4M-row manifest) blocks it
+# indefinitely — run this when nothing else uses uv, or raise the timeout.
+UV_LOCK_TIMEOUT=1200 uv cache prune
 rm -rf ~/.bun/install/cache ~/.cache/.bun/install ~/.codex/tmp/arg0 ~/.codex/tmp/path
 
 # --- Tier 1: uv tools. uv's own suggested fix. ---
@@ -117,8 +121,14 @@ uv tool list                       # expect: no warnings
 
 # --- Tier 1: virtualenvs. Recreate, never hand-edit pyvenv.cfg ---
 # (editing `home =` leaves bin/python still dangling)
-rm -rf ~/.venv && uv sync                       # home uv workspace
+#
+# Verify the recreate path works BEFORE deleting anything. A venv whose
+# interpreter dangles is already dead weight, but `uv sync` still needs a
+# pyproject.toml next to it — and a documented "home uv workspace" may not
+# actually exist on this host. Removing first and discovering that after is
+# how you turn a broken venv into a missing one.
 for p in ~/David/dongwu-tick-downloader ~/David/Tardis-Downloader; do
+  [ -f "$p/pyproject.toml" ] || { echo "skip $p: no pyproject.toml"; continue; }
   rm -rf "$p/.venv" && uv sync --directory "$p"
 done
 
