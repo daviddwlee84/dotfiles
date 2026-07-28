@@ -380,6 +380,7 @@ nav:
       - Scheduled jobs (cron / timers / launchd): sysadmin/scheduled-jobs.md
       - Disk / filesystem monitoring: sysadmin/disk.md
       - "Shared storage permissions (group + ACL, raid-perm-check)": sysadmin/shared-storage-permissions.md
+      - "User rename fallout (absolute $HOME paths)": sysadmin/user-rename-fallout.md
       - Hardware monitoring (homelab): sysadmin/hardware.md
       - GPU driver (NVIDIA drift / upgrades / iGPU): sysadmin/gpu-driver.md
       - Wake-on-LAN (remote power-on): sysadmin/wake-on-lan.md
