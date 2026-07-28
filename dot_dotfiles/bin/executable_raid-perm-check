@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+#
+# raid-perm-check — audit a group+ACL-shared data mount and the two traps that
+# silently break access to it.
+#
+# Written after a 2026-07-28 incident on ta-stg where a nightly pipeline died
+# with EACCES on /mnt/raid while an interactive shell read the same path fine.
+# Two independent causes, neither visible to the obvious `ls -l`:
+#
+#   1. Files owned by an orphaned uid/gid (an account was deleted, or data was
+#      restored from another host). They resolve to a bare number, belong to no
+#      current group, and therefore exclude everyone — including the group that
+#      is supposed to own them.
+#   2. A stale `systemd --user` manager. It freezes supplementary groups at
+#      start, so `usermod -aG` is invisible to every timer/service until the
+#      manager restarts, while `id` in your login shell shows the new group.
+#      This is why "it works when I run it by hand" happens.
+#
+# Both are read-only checks — this script never modifies anything. It prints
+# the fixing command for you to run yourself.
+#
+# Usage:
+#   raid-perm-check [summary] [ROOT]   # dirs, groups, ACLs, your own access
+#   raid-perm-check orphans   [ROOT]   # files with no passwd/group entry
+#   raid-perm-check groups             # who is in which data group
+#   raid-perm-check units              # systemd user-manager group staleness
+#   raid-perm-check user NAME [ROOT]   # what NAME can actually reach
+#   raid-perm-check all       [ROOT]   # every check above
+#
+# ROOT defaults to $RAID_PERM_CHECK_ROOT, else /mnt/raid.
+# Orphan scans are depth-limited ($RAID_PERM_CHECK_DEPTH, default 3) — an
+# unbounded walk over a multi-TB array is slow enough that nobody runs it twice.
+#
+# Exit: 0 clean, 1 findings, 2 usage/environment error.
+
+set -uo pipefail
+
+ROOT_DEFAULT="${RAID_PERM_CHECK_ROOT:-/mnt/raid}"
+DEPTH="${RAID_PERM_CHECK_DEPTH:-3}"
+FINDINGS=0
+
+if [[ -t 1 ]]; then
+    B=$'\e[1m'; DIM=$'\e[2m'; R=$'\e[31m'; G=$'\e[32m'; Y=$'\e[33m'; N=$'\e[0m'
+else
+    B=''; DIM=''; R=''; G=''; Y=''; N=''
+fi
+
+die() { printf '%s\n' "$*" >&2; exit 2; }
+head_() { printf '\n%s%s%s\n' "$B" "$*" "$N"; }
+ok()   { printf '  %s✔%s %s\n' "$G" "$N" "$*"; }
+warn() { printf '  %s!%s %s\n' "$Y" "$N" "$*"; FINDINGS=1; }
+bad()  { printf '  %s✘%s %s\n' "$R" "$N" "$*"; FINDINGS=1; }
+hint() { printf '    %s%s%s\n' "$DIM" "$*" "$N"; }
+
+usage() { sed -n '3,/^# Exit:/p' "$0" | sed 's/^#\ \?//'; exit "${1:-0}"; }
+
+# Data groups = groups actually used by the mount, discovered from the
+# top-level dirs rather than hard-coded, so this works on any host.
+# Read-only tiers usually appear ONLY as an ACL entry (never as the owning
+# group), so scan both or they stay invisible.
+_data_groups() {
+    local root="$1" d
+    for d in "$root"/*/; do
+        [[ -d "$d" ]] || continue
+        stat -c '%G' "$d" 2>/dev/null
+        getfacl -pE "$d" 2>/dev/null | grep -oE '^group:[^:]+' | cut -d: -f2
+    done | grep -vE '^(UNKNOWN|root)?$' | sort -u
+}
+
+check_summary() {
+    local root="$1"
+    [[ -d "$root" ]] || die "raid-perm-check: no such directory: $root"
+
+    head_ "Mount — $root"
+    printf '  %s\n' "$(findmnt -no SOURCE,FSTYPE,SIZE,USED,AVAIL --target "$root" 2>/dev/null || echo '(not a mount point)')"
+
+    head_ "Top-level directories"
+    printf '  %-22s %-10s %-16s %s\n' MODE OWNER GROUP NAME
+    local d mode owner group name
+    for d in "$root"/*/; do
+        [[ -d "$d" ]] || continue
+        name="$(basename "$d")"
+        mode="$(stat -c '%A' "$d" 2>/dev/null)"
+        owner="$(stat -c '%U' "$d" 2>/dev/null)"
+        group="$(stat -c '%G' "$d" 2>/dev/null)"
+        printf '  %-22s %-10s %-16s %s\n' "$mode" "$owner" "$group" "$name"
+        # An orphaned owner/group is the more serious finding and makes the
+        # setgid question moot — report it instead of "won't inherit UNKNOWN".
+        if [[ "$owner" == UNKNOWN || "$group" == UNKNOWN ]]; then
+            bad "$name: orphaned owner/group ($(stat -c '%u:%g' "$d" 2>/dev/null)) — see 'raid-perm-check orphans'"
+        elif [[ "$mode" != *s* ]]; then
+            # setgid is what makes new files inherit the group; without it a
+            # shared dir silently drifts back to per-user groups.
+            warn "$name: no setgid — new files will NOT inherit '$group'"
+        fi
+    done
+
+    head_ "ACL entries (group grants beyond the owning group)"
+    for d in "$root"/*/; do
+        [[ -d "$d" ]] || continue
+        name="$(basename "$d")"
+        local acl
+        acl="$(getfacl -pE "$d" 2>/dev/null | grep -E '^(default:)?group:[^:]+:' | sed 's/^/      /')"
+        if [[ -n "$acl" ]]; then
+            printf '    %s%s%s\n%s\n' "$B" "$name" "$N" "$acl"
+        else
+            printf '    %s%s%s\n      %s(none — plain group ownership only)%s\n' "$B" "$name" "$N" "$DIM" "$N"
+        fi
+    done
+
+    head_ "Your access ($(id -un))"
+    hint "groups: $(id -Gn | tr ' ' ',')"
+    for d in "$root"/*/; do
+        [[ -d "$d" ]] || continue
+        name="$(basename "$d")"
+        if ls "$d" >/dev/null 2>&1; then
+            if [[ -w "$d" ]]; then ok "$name — read+write"; else ok "$name — read-only"; fi
+        else
+            warn "$name — no access"
+        fi
+    done
+}
+
+check_orphans() {
+    local root="$1"
+    head_ "Orphaned owners under $root (depth $DEPTH)"
+    hint "uid/gid with no /etc/passwd or /etc/group entry — excludes everyone, including the intended group"
+
+    local out
+    # 2>/dev/null: unreadable subtrees are expected when running as a
+    # non-admin; we are reporting on what we *can* see.
+    out="$(find "$root" -maxdepth "$DEPTH" \( -nouser -o -nogroup \) \
+             -printf '%u:%g %M %p\n' 2>/dev/null)"
+
+    if [[ -z "$out" ]]; then
+        ok "none found"
+        return
+    fi
+    printf '%s\n' "$out" | head -40 | sed 's/^/    /'
+    local n; n="$(printf '%s\n' "$out" | wc -l)"
+    bad "$n path(s) with an orphaned uid/gid"
+    hint "fix: sudo chgrp -R <group> <path> && sudo find <path> -type d -exec chmod g+s {} +"
+}
+
+check_groups() {
+    head_ "Data-group membership"
+    local root="${1:-$ROOT_DEFAULT}" g members
+    local groups; groups="$(_data_groups "$root")"
+    [[ -n "$groups" ]] || { hint "no non-root groups own anything under $root"; return; }
+    while read -r g; do
+        [[ -n "$g" ]] || continue
+        members="$(getent group "$g" | cut -d: -f4)"
+        printf '  %-18s %s\n' "$g" "${members:-${DIM}(empty)${N}}"
+    done <<<"$groups"
+    hint "read-only tiers are conventionally the same name ending _r instead of _rw"
+}
+
+check_units() {
+    head_ "systemd --user manager group staleness"
+    local pid
+    pid="$(pgrep -u "$(id -u)" -f 'systemd --user' 2>/dev/null | head -1)"
+    if [[ -z "$pid" ]]; then
+        hint "no systemd --user manager running for $(id -un) — nothing to check"
+        return
+    fi
+
+    local mgr cur started
+    mgr="$(awk '/^Groups:/{$1=""; print}' "/proc/$pid/status" 2>/dev/null | xargs -n1 | sort -n | tr '\n' ' ')"
+    cur="$(id -G | xargs -n1 | sort -n | tr '\n' ' ')"
+    started="$(ps -o lstart= -p "$pid" 2>/dev/null | xargs)"
+
+    hint "manager pid $pid, started $started"
+    printf '    manager : %s\n' "$mgr"
+    printf '    current : %s\n' "$cur"
+
+    if [[ "$mgr" == "$cur" ]]; then
+        ok "in sync — user units see the same groups you do"
+    else
+        bad "STALE — user units are missing: $(comm -13 <(tr ' ' '\n' <<<"$mgr" | sort -u) <(tr ' ' '\n' <<<"$cur" | sort -u) | xargs)"
+        hint "every timer/service will hit EACCES on paths gated by those groups,"
+        hint "while your interactive shell works fine."
+        hint "fix: sudo systemctl restart user@$(id -u).service"
+        hint "NOT 'loginctl terminate-user' — that kills the session you are in."
+        hint "note: this stops rootless docker + pueued + all user timers."
+    fi
+}
+
+check_user() {
+    local who="$1" root="$2"
+    getent passwd "$who" >/dev/null || die "raid-perm-check: no such user: $who"
+
+    head_ "Effective access for '$who' under $root"
+    hint "groups: $(id -Gn "$who" 2>/dev/null | tr ' ' ',')"
+    hint "probing as $who requires privileges; falling back to group/ACL reasoning when it cannot"
+
+    local d name
+    for d in "$root"/*/; do
+        [[ -d "$d" ]] || continue
+        name="$(basename "$d")"
+        if [[ "$(id -u)" -eq 0 ]]; then
+            if runuser -u "$who" -- test -r "$d" 2>/dev/null; then
+                if runuser -u "$who" -- test -w "$d" 2>/dev/null; then ok "$name — read+write"; else ok "$name — read-only"; fi
+            else
+                printf '  %s·%s %s — no access\n' "$DIM" "$N" "$name"
+            fi
+        else
+            # Non-root: infer from the owning group + ACL group entries.
+            local owner_g acl_gs verdict=""
+            owner_g="$(stat -c '%G' "$d" 2>/dev/null)"
+            acl_gs="$(getfacl -pE "$d" 2>/dev/null | grep -oE '^group:[^:]+' | cut -d: -f2)"
+            while read -r g; do
+                [[ -n "$g" ]] || continue
+                if id -Gn "$who" 2>/dev/null | tr ' ' '\n' | grep -qx "$g"; then
+                    local perm
+                    perm="$(getfacl -pE "$d" 2>/dev/null | grep -E "^group:$g:" | cut -d: -f3)"
+                    [[ "$perm" == *w* ]] && verdict="read+write" || verdict="read-only"
+                fi
+            done <<<"$(printf '%s\n%s\n' "$owner_g" "$acl_gs")"
+            if [[ -n "$verdict" ]]; then ok "$name — $verdict"
+            else printf '  %s·%s %s — no access\n' "$DIM" "$N" "$name"; fi
+        fi
+    done
+}
+
+main() {
+    local cmd="${1:-summary}"
+    case "$cmd" in
+        -h|--help|help) usage 0 ;;
+    esac
+    shift 2>/dev/null || true
+
+    case "$cmd" in
+        summary) check_summary "${1:-$ROOT_DEFAULT}" ;;
+        orphans) check_orphans "${1:-$ROOT_DEFAULT}" ;;
+        groups)  check_groups  "${1:-$ROOT_DEFAULT}" ;;
+        units)   check_units ;;
+        user)    [[ $# -ge 1 ]] || die "raid-perm-check user: need a username"
+                 check_user "$1" "${2:-$ROOT_DEFAULT}" ;;
+        all)     local root="${1:-$ROOT_DEFAULT}"
+                 check_summary "$root"; check_groups "$root"
+                 check_orphans "$root"; check_units ;;
+        *)       # bare ROOT path, e.g. `raid-perm-check /mnt/other`
+                 if [[ -d "$cmd" ]]; then check_summary "$cmd"
+                 else die "raid-perm-check: unknown subcommand '$cmd' (try --help)"; fi ;;
+    esac
+
+    if ((FINDINGS)); then
+        printf '\n%sfindings above%s — nothing was modified\n' "$Y" "$N"
+        exit 1
+    fi
+    exit 0
+}
+
+main "$@"

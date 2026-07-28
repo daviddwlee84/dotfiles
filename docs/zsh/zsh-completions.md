@@ -157,6 +157,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `view-office` | `dot_dotfiles/bin/executable_view-office` | bash hand-rolled | B | `dot_config/zsh/tools/55_view_office_completion.zsh` + `dot_config/bash/55_view_office_completion.bash` |
 | `view-ebook` | `dot_dotfiles/bin/executable_view-ebook` | bash hand-rolled | B | `dot_config/zsh/tools/56_view_ebook_completion.zsh` + `dot_config/bash/56_view_ebook_completion.bash` |
 | `appsrc` | `dot_dotfiles/bin/executable_appsrc` | argparse (subcommands) | B | `dot_config/zsh/tools/57_appsrc_completion.zsh` + `dot_config/bash/57_appsrc_completion.bash` |
+| `raid-perm-check` | `dot_dotfiles/bin/executable_raid-perm-check` | bash hand-rolled | B | `dot_config/zsh/tools/58_raid_perm_check_completion.zsh` + `dot_config/bash/58_raid_perm_check_completion.bash` |
 | `docker-net` | `dot_config/shell/51_docker_net.sh` (**shell function**, not a bin CLI) | shell hand-rolled | B | `dot_config/zsh/tools/58_docker_net_completion.zsh` + `dot_config/bash/58_docker_net_completion.bash`. Guard with `command -v`, **not** `$+commands` / a PATH test — the target is a function, so those never see it |
 | `herdr-grep` | `dot_dotfiles/bin/executable_herdr-grep` | argparse | B | `dot_config/zsh/tools/59_herdr_grep_completion.zsh` + `dot_config/bash/59_herdr_grep_completion.bash`; `--session` candidates come from `herdr-grep --list-sessions`; `--pick` pipes filtered matches into fzf and focuses/attaches the selection |
 | `ytmv` | `dot_dotfiles/bin/executable_ytmv` + `scripts/ytmv/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/60_ytmv_completion.zsh` + `dot_config/bash/60_ytmv_completion.bash`; completes `help <leaf>` and `doctor --cookies`; `--profile` candidates come from `ytmv doctor --list-profiles`; enum flags (`--id3-version`, `--lrc-encoding`, `--lyrics`, …) complete their allowed values |
@@ -171,6 +172,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 - `wake` host names — `_wake` shells out to `wake --list-names` (reads `~/.config/wake/hosts.toml`), same pattern as `_fleet_hosts_one`.
 - `appsrc which <name>` / `appsrc size <name>` — `_appsrc_names` shells out to `appsrc scan --list-names` (installed GUI app names) and adds `_command_names -e` / `compgen -c` (PATH commands), so both a GUI app name and a shell command complete. Same shell-out pattern as `_wake` / `_fleet_hosts_one`.
 - `herdr-grep --session <name>` — both completion files shell out to `herdr-grep --list-sessions`, which reads the local Herdr session registry and returns sorted running names. Errors are silent so TAB still works when no Herdr server is running.
+- `raid-perm-check user <name>` — `_raid_perm_check_users` reads `getent passwd` filtered to uid ≥ 1000 (real accounts, not system users). The optional trailing `ROOT` argument completes from `findmnt -rno TARGET` minus the kernel pseudo-filesystems, falling back to plain directory completion.
 
 **Adding a new in-house CLI** (decision flow):
 
