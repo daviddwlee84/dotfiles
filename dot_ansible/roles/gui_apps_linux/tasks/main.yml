@@ -4,7 +4,8 @@
 #
 # Handles the "desktop-only" category of apps that aren't in the apt default
 # repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
-# (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
+# (Microsoft apt repo), Cursor (.deb with graceful fallback), Google Chrome
+# (.deb, x86_64-only), Discord (.deb,
 # x86_64-only), Steam (Valve apt repo, optional), Zen Browser (AppImage +
 # .desktop), libfuse2 (AppImage runtime on Ubuntu 22.04+), and a placeholder
 # hook for Antigravity once an official Linux package ships.
@@ -498,6 +499,80 @@
           download from https://cursor.com/download and drop it under
           ~/Applications/; AppImageLauncher will auto-integrate. See
           docs/tools/appimage.md for the full recipe.
+
+# =============================================================================
+# Google Chrome — official .deb, self-registering apt source
+#
+# Ubuntu ships no Chromium .deb (Canonical's `chromium-browser` is a snap
+# shim), so a Chromium-engine browser has to come from upstream. Chrome's
+# .deb postinst writes /etc/apt/sources.list.d/google-chrome.list plus its
+# keyring, so `apt upgrade` keeps it current afterwards — the same trick
+# Cursor/VSCode use, documented in docs/playbooks/linux-gui-apps.md
+# "Why .deb auto-update works". That is why we do NOT add a deb822 source
+# ourselves: doing both yields duplicate-source warnings on every apt run.
+#
+# x86_64 only — Google publishes no arm64 Linux build of Chrome (unlike
+# VSCode/Cursor). aarch64 desktops fall through to Firefox/Zen.
+# =============================================================================
+
+- name: Check if Google Chrome is installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+  ansible.builtin.command: dpkg -s google-chrome-stable
+  register: chrome_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Google Chrome via .deb
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (gui_apps_linux_no_root | bool)
+    - chrome_check.rc is defined
+    - chrome_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Download Google Chrome .deb
+      ansible.builtin.get_url:
+        url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        dest: /tmp/google-chrome-stable.deb
+        mode: '0644'
+        timeout: 300
+        force: true
+      register: chrome_dl
+      until: chrome_dl is succeeded
+      retries: 4
+      delay: 5
+      ignore_errors: true
+
+    # `is not skipped` alongside `is succeeded` — a task skipped by its `when:`
+    # also passes `is succeeded`, which is how the Zen block silently installed
+    # nothing for months. See
+    # pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md
+    - name: Install Google Chrome .deb
+      when:
+        - chrome_dl is defined
+        - chrome_dl is not skipped
+        - chrome_dl is succeeded
+      ansible.builtin.apt:
+        deb: /tmp/google-chrome-stable.deb
+        state: present
+      ignore_errors: true
+
+    - name: Remove downloaded Chrome .deb
+      ansible.builtin.file:
+        path: /tmp/google-chrome-stable.deb
+        state: absent
+  rescue:
+    - name: Warn Google Chrome install failed
+      ansible.builtin.debug:
+        msg: >-
+          Google Chrome install failed — rerun with --tags gui_apps after
+          fixing network/apt issues, or grab the .deb by hand from
+          https://www.google.com/chrome/. Zen and Firefox remain available
+          in the meantime.
 
 # =============================================================================
 # Discord — channel selectable via discord_channel ansible var (default: flatpak)

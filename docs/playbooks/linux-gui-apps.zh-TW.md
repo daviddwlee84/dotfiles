@@ -48,6 +48,7 @@ Ubuntu 對桌面應用 (desktop apps) 有**五種**打包機制 (packaging mecha
 |---|---|---|---|---|
 | **Cursor** | `.deb`（自動加入 `/etc/apt/sources.list.d/cursor.sources`） | ✅ `apt upgrade cursor` | [`gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install Cursor via .deb" | `/usr/share/cursor/` |
 | **VSCode** | `.deb`（自動加入 `vscode.sources`） | ✅ `apt upgrade code` | 同 role | `/usr/share/code/` |
+| **Google Chrome** | 來自 `dl.google.com` 的 `.deb`（postinst 自動加入 `google-chrome.list` ＋ `/usr/share/keyrings/google-chrome.gpg`）；**僅限 x86_64** —— Google 沒有發佈 arm64 的 Linux 版 | ✅ `apt upgrade google-chrome-stable` | 同 role，"Install Google Chrome via .deb" | `/opt/google/chrome/` |
 | **Discord** | `flatpak`（預設、推薦）或 `.deb`（無 apt source）—— 由 `discordChannel` chezmoi prompt 挑選 | ✅ 透過 `flatpak update`（預設）/ ❌ `.deb` 為手動 | 同 role | `~/.local/share/flatpak/app/com.discordapp.Discord/`（flatpak）或 `/usr/share/discord/`（.deb） |
 | **Steam** | Valve apt repo（`steam-launcher`），由 `installGamingApps=true` 與 x86_64 控制 | ✅ launcher/runtime 套件透過 apt；Steam client 啟動時自我更新 | 同 role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
 | **Zen Browser** | AppImage 在 `~/Applications/`，下載時叫 `zen.AppImage`，但用 glob `zen*.AppImage` **比對**（AppImageLauncher 會把整合過的改名成 `zen_<md5>.AppImage`）；從 `zen-browser/desktop` latest release 以精確名稱 `zen-<arch>.AppImage` 挑 asset | ❌ —— 先刪掉所有 `~/Applications/zen*.AppImage` **再**重跑 role（任何殘留的副本都算已安裝） | 同 role | glob 當下命中的那個；`.desktop` 每次 apply 都據此重寫。profile 在 `~/.zen/`（跨版本共用，升級不可逆） |
