@@ -22,7 +22,9 @@ Three entry points:
                               PATH (e.g. headless CI).
   fleet hosts NAME            SSH directly into NAME (skip the picker). Uses
                               ssh_alias if set; otherwise constructs
-                              `ssh -p PORT -i KEY user@hostname`.
+                              `ssh -p PORT -i KEY user@hostname`. Lands in an
+                              attach-or-create tmux session (`--no-tmux` opts
+                              out, `--tmux-session NAME` renames it).
   fleet hosts --list*         Script-friendly inventory dumps — also used by
                               the TV cable + your own shell glue:
                                 --list        plain names, one per line
@@ -50,6 +52,7 @@ import argparse
 import dataclasses
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -94,20 +97,47 @@ def _target(host: Host) -> str:
     return host.hostname or "?"
 
 
-def _ssh_argv(host: Host) -> list[str]:
+def _ssh_argv(host: Host, remote_cmd: str | None = None) -> list[str]:
     """argv for `ssh ...`. Mirrors apply.py:_connect_kwargs precedence —
     ssh_alias wins (let ssh_config resolve everything); otherwise build from
-    hostname/user/port/identity_file."""
-    if host.ssh_alias:
-        return ["ssh", host.ssh_alias]
+    hostname/user/port/identity_file.
+
+    When `remote_cmd` is given it is appended as the remote command and `-t` is
+    added to force a TTY (ssh does not allocate one when a command is present,
+    and tmux needs one)."""
     argv: list[str] = ["ssh"]
-    if host.port:
-        argv += ["-p", str(host.port)]
-    if host.identity_file:
-        argv += ["-i", str(Path(host.identity_file).expanduser())]
-    target = f"{host.user}@{host.hostname}" if host.user else (host.hostname or "")
-    argv.append(target)
+    if remote_cmd is not None:
+        argv.append("-t")
+    if host.ssh_alias:
+        argv.append(host.ssh_alias)
+    else:
+        if host.port:
+            argv += ["-p", str(host.port)]
+        if host.identity_file:
+            argv += ["-i", str(Path(host.identity_file).expanduser())]
+        argv.append(f"{host.user}@{host.hostname}" if host.user else (host.hostname or ""))
+    if remote_cmd is not None:
+        argv.append(remote_cmd)
     return argv
+
+
+_DEFAULT_TMUX_SESSION = "fleet"
+
+
+def _tmux_remote_cmd(session: str) -> str:
+    """Remote command that attaches to `session` or creates it, degrading to a
+    login shell on hosts without tmux.
+
+    `tmux new -A -s NAME` is attach-if-exists / create-otherwise (tmux >= 1.8),
+    which is the whole point: a dropped mobile connection reconnects into the
+    same session instead of losing the work. `exec` replaces the wrapper shell
+    so the SSH session ends when tmux does.
+    """
+    quoted = shlex.quote(session)
+    return (
+        f"command -v tmux >/dev/null 2>&1 && exec tmux new -A -s {quoted} "
+        '|| exec "${SHELL:-/bin/sh}" -l'
+    )
 
 
 def _load(config: Path) -> list[Host]:
@@ -353,7 +383,7 @@ def _cmd_probe(name: str, hosts: list[Host]) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _cmd_connect(name: str, hosts: list[Host]) -> int:
+def _cmd_connect(name: str, hosts: list[Host], tmux_session: str | None) -> int:
     h = _find_host(name, hosts)
     if h.local:
         print(
@@ -362,7 +392,8 @@ def _cmd_connect(name: str, hosts: list[Host]) -> int:
             file=sys.stderr,
         )
         return 0
-    argv = _ssh_argv(h)
+    remote_cmd = _tmux_remote_cmd(tmux_session) if tmux_session else None
+    argv = _ssh_argv(h, remote_cmd)
     # os.execvp replaces this process with ssh, so the user's terminal
     # becomes the SSH session directly — matches Enter in `tv ssh-config`.
     try:
@@ -378,7 +409,7 @@ def _cmd_connect(name: str, hosts: list[Host]) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _cmd_picker(hosts: list[Host]) -> int:
+def _cmd_picker(hosts: list[Host], tmux_session: str | None) -> int:
     tv = shutil.which("tv")
     if tv:
         try:
@@ -412,7 +443,7 @@ def _cmd_picker(hosts: list[Host]) -> int:
     except ValueError:
         print(f"fleet hosts: invalid choice {choice!r}", file=sys.stderr)
         return 2
-    return _cmd_connect(pickable[idx].name, hosts)
+    return _cmd_connect(pickable[idx].name, hosts, tmux_session)
 
 
 # ---------------------------------------------------------------------------
@@ -467,6 +498,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Include `local = true` hosts in --list-tsv (default: hidden).",
     )
     p.add_argument(
+        "--no-tmux",
+        action="store_true",
+        dest="no_tmux",
+        help="Land in a plain login shell instead of attaching to tmux.",
+    )
+    p.add_argument(
+        "--tmux-session",
+        metavar="NAME",
+        dest="tmux_session",
+        default=_DEFAULT_TMUX_SESSION,
+        help=(
+            "Remote tmux session to attach-or-create "
+            f"(default: {_DEFAULT_TMUX_SESSION!r}). Ignored with --no-tmux."
+        ),
+    )
+    p.add_argument(
         "--config",
         type=Path,
         default=DEFAULT_CONFIG_PATH,
@@ -489,9 +536,10 @@ def main() -> int:
         return _cmd_describe(args.describe, hosts, args.config)
     if args.probe:
         return _cmd_probe(args.probe, hosts)
+    tmux_session = None if args.no_tmux else args.tmux_session
     if args.name:
-        return _cmd_connect(args.name, hosts)
-    return _cmd_picker(hosts)
+        return _cmd_connect(args.name, hosts, tmux_session)
+    return _cmd_picker(hosts, tmux_session)
 
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ and is what powers the picker UX.
 |------|--------------|
 | `tv fleet-hosts` | Open the picker directly via television. Enter → SSH. |
 | `fleet hosts` | Same picker via the fleet umbrella (execs `tv fleet-hosts`). |
-| `fleet hosts NAME` | Skip the picker — SSH straight into `NAME`. |
+| `fleet hosts NAME` | Skip the picker — SSH straight into `NAME` (lands in tmux; see below). |
 | `fleet hosts --list` | Plain host names, one per line. Scriptable. |
 | `fleet hosts --list-tsv` | `name<TAB>target<TAB>kind` (the cable's source). |
 | `fleet hosts --list-json` | Full inventory as JSON (plain passwords redacted). |
@@ -41,6 +41,35 @@ and is what powers the picker UX.
 Direct invocation (`fleet hosts NAME`) uses `os.execvp("ssh", ...)`, so your
 terminal becomes the SSH session — no wrapper subprocess, no lost TTY
 attributes. Behaviour matches Enter inside the picker.
+
+## You land in tmux by default
+
+`fleet hosts NAME` (and Enter in the picker) runs `ssh -t` with a remote command
+that attaches to a tmux session named `fleet`, creating it if absent:
+
+```sh
+command -v tmux >/dev/null 2>&1 && exec tmux new -A -s fleet || exec "${SHELL:-/bin/sh}" -l
+```
+
+`tmux new -A -s` is attach-if-exists / create-otherwise. The point is
+resumability: drop the connection — laptop sleeps, Wi-Fi flips, an iPad
+backgrounds the terminal app — and the next `fleet hosts NAME` lands back in the
+same session with the work still running. Without it every disconnect is a lost
+shell.
+
+| Flag | Effect |
+|------|--------|
+| *(default)* | Attach-or-create session `fleet` |
+| `--tmux-session NAME` | Use a different session name |
+| `--no-tmux` | Plain login shell — argv is identical to the pre-tmux behaviour |
+
+Hosts without tmux installed fall through to a login shell, so this is safe to
+leave on for a mixed fleet. `exec` in both branches means the SSH session ends
+when tmux (or the shell) does, rather than leaving a wrapper behind.
+
+The tv cable inherits all of this for free — its Enter action shells out to
+`fleet hosts '{name}'`, so there is no second copy of the ssh invocation to keep
+in sync.
 
 `local = true` hosts are hidden from `--list-tsv` (you can't SSH into
 yourself). They still appear in `--list` / `--list-json` for scripts that

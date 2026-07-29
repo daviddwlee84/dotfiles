@@ -12,6 +12,11 @@
 # So this file stays small and the picker tracks any inventory changes
 # automatically (no parallel TOML parser to keep in sync).
 #
+# Enter lands you in an attach-or-create tmux session (`fleet`) on the remote,
+# so a dropped connection resumes instead of losing the shell. That lives in
+# `fleet hosts` itself, NOT here — do not inline an `ssh` invocation into this
+# cable or the two will drift. See docs/tools/fleet-hosts.md.
+#
 # Usage:
 #   tv fleet-hosts
 #   fleet hosts          # same picker via the fleet umbrella
