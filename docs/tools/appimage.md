@@ -92,7 +92,11 @@ Editor user settings (`settings.json`, `keybindings.json`) are independent of in
 
 ### Zen Browser (installed automatically)
 
-The [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role downloads the latest `zen-<arch>.AppImage` from [`zen-browser/desktop`](https://github.com/zen-browser/desktop/releases) to `~/Applications/zen.AppImage` and writes a `~/.local/share/applications/zen-browser.desktop` + SVG icon so the browser is immediately searchable in the GNOME/KDE launcher — no need to run the AppImage once to trigger AppImageLauncher's first-run integration prompt. macOS equivalent is Arc (Brewfile). To upgrade: delete `~/Applications/zen.AppImage` and re-run `just apply-ubuntu_desktop`, or download a newer AppImage over the existing path.
+The [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role downloads the latest `zen-<arch>.AppImage` from [`zen-browser/desktop`](https://github.com/zen-browser/desktop/releases) to `~/Applications/zen.AppImage` and writes a `~/.local/share/applications/zen-browser.desktop` + SVG icon, so the browser is searchable in the GNOME/KDE launcher **immediately** — without waiting for a first launch to produce an entry. macOS equivalent is Arc (Brewfile).
+
+Writing our own `.desktop` does **not** exempt Zen from AppImageLauncher, though — a common misreading of this recipe. AIL hooks execution through `binfmt_misc`, so the first launch integrates the file and renames it to `zen_<md5>.AppImage`, at which point a `.desktop` hard-coded to the old path silently *hides* itself. The role therefore globs `zen*.AppImage` rather than checking a fixed path, and rewrites the `.desktop` from whatever it finds on every apply. Details and the measurements (including why `ask_to_move = false` does not help): [`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md).
+
+To upgrade: delete **every** `~/Applications/zen*.AppImage` — not just the stable name, since an integrated copy also counts as installed — then re-run `just apply-ubuntu_desktop`. Or drop a newer AppImage over whichever file is currently there.
 
 ### Obsidian / Bitwarden Desktop / Joplin
 

@@ -77,7 +77,7 @@ follows when a vendor ships in multiple formats:
 | **VSCode** | `.deb` (auto-adds `vscode.sources`) | ✅ `apt upgrade code` | same role | `/usr/share/code/` |
 | **Discord** | `flatpak` (default, recommended) OR `.deb` (no apt source) — picked by `discordChannel` chezmoi prompt | ✅ via `flatpak update` (default) / ❌ manual on `.deb` | same role | `~/.local/share/flatpak/app/com.discordapp.Discord/` (flatpak) or `/usr/share/discord/` (.deb) |
 | **Steam** | Valve apt repo (`steam-launcher`), gated by `installGamingApps=true` and x86_64 | ✅ via apt for launcher/runtime packages; Steam client self-updates on launch | same role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
-| **Zen Browser** | AppImage at `~/Applications/zen.AppImage` (stable filename, no version suffix) | ❌ — re-run ansible task | same role | `~/Applications/zen.AppImage` |
+| **Zen Browser** | AppImage in `~/Applications/`, downloaded as `zen.AppImage` but **matched by glob** `zen*.AppImage` (AppImageLauncher renames integrated copies to `zen_<md5>.AppImage`); asset picked from the `zen-browser/desktop` latest release by exact name `zen-<arch>.AppImage` | ❌ — delete every `~/Applications/zen*.AppImage` **then** re-run the role (any surviving copy counts as installed) | same role | wherever the glob currently matches; the `.desktop` is rewritten from it each apply. Profile in `~/.zen/` (shared across versions, upgrade is one-way) |
 | **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
 | **Bitwarden CLI** (`bw`) | npm via mise (gated by `installBitwarden=true`) | ❌ — `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
@@ -229,21 +229,48 @@ versioned `/snap/<app>/<rev>/` layout).
 When upstream ships only an AppImage (Zen Browser, Cursor's old AppImage,
 many indie tools), our convention is:
 
-1. **Stable filename**: drop the file at `~/Applications/<app>.AppImage`
-   (no version or hash in the name). Re-runs of the ansible task just
-   overwrite it. Files like `zen-x86_64_fe71259e...AppImage` (old hash
-   suffix in filename) are the wrong shape — they accumulate forever.
+1. **Download to a stable filename, but never *depend* on it**: write the file
+   as `~/Applications/<app>.AppImage` (no version or hash), and guard the
+   install with a **glob** (`<app>*.AppImage`), not that exact path.
+   AppImageLauncher renames integrated AppImages to `<app>_<md5>.AppImage`, so
+   an exact-path guard turns every apply into a fresh multi-hundred-MB
+   re-download. Files like `zen-x86_64_fe71259e...AppImage` also accumulate —
+   warn when the glob matches more than one instead of silently picking.
 2. **Executable bit**: `mode: '0755'` in the ansible task.
 3. **AppImageLauncher integration**: `appimagelauncherd.service` (user
    systemd unit, set up by our role) watches `~/Applications/`. New
    AppImages trigger a first-run modal: *"Integrate or Run once?"* —
    integrating extracts the icon, generates a `.desktop` entry under
-   `~/.local/share/applications/`, and (optionally) moves the file to
-   AppImageLauncher's canonical location.
+   `~/.local/share/applications/`, and **moves the file to AppImageLauncher's
+   canonical name**. Writing our own `.desktop` does *not* opt us out: AIL
+   hooks execution itself through `binfmt_misc`, so any launch reaches it
+   first. `ask_to_move = false` suppresses only the dialog, not the move
+   (measured — see the pitfall below), and relocating the file outside
+   `~/Applications` just trades the rename for a move-prompt.
+4. **Re-assert desktop integration on every apply**, not only on download.
+   Resolve the current AppImage path into a fact and rewrite the `.desktop`
+   from it each run, so a rename self-heals instead of leaving a dangling
+   `TryExec=` — which the launcher *hides* rather than reporting. If you also
+   delete AIL's parallel `appimagekit_*.desktop` to keep one authority, make
+   both that and `ail-cli deintegrate` `failed_when: false`: `ail-cli` does not
+   exist under AppImageLauncher **Lite** (noRoot).
+   [`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md)
+5. **Gate the desktop-integration tasks on `is not skipped`**, not just
+   `is succeeded`. A task skipped by its `when:` still passes `is succeeded`,
+   so a failed/skipped download will happily go on to write an icon and a
+   `.desktop` whose `TryExec=` dangles — which hides the launcher entry
+   instead of erroring, and leaves `failed=0` in the apply log. Pair the
+   download with an explicit "no asset matched" `debug` warning too; a
+   `rescue:` block cannot catch a no-op. Full story:
+   [`pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md)
 
-For our managed AppImages we usually skip the modal by writing the
-`.desktop` entry ourselves in the same ansible task — see Zen Browser.
-For AppImages you drop manually (Frpc Desktop), let the modal handle it.
+For our managed AppImages we write the `.desktop` entry ourselves in the same
+ansible task so the app is searchable *immediately*, without waiting for a
+first launch — see Zen Browser. This buys instant availability and a stable
+`.desktop` id for `linux_app_register --desktop=`; it does **not** prevent
+AppImageLauncher from integrating and renaming the file later, which is why the
+role re-asserts the entry every apply. For AppImages you drop manually (Frpc
+Desktop), let the modal handle it.
 
 To check the daemon: `systemctl --user status appimagelauncherd`.
 Manual integration: `ail-cli integrate ~/Applications/foo.AppImage`.

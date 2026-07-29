@@ -885,7 +885,7 @@ arm64 bottle)、中國鏡像中斷。
 | **Docker 便利腳本安裝** | 沒有升級目標 | 重跑 `curl get.docker.com \| sh` |
 | **OrbStack** | macOS brew cask | 由 `cat_brew --cask --greedy` 涵蓋 |
 | **Cursor `.deb`** / **Discord `.deb`** / **VSCode (Microsoft apt)** | apt 端,不是 chezmoi 端 | apt 升級 |
-| **Zen Browser AppImage** / **AppImageLauncher Lite** | 一次性下載,`creates:` 守衛 | 刪 AppImage 後重 apply |
+| **Zen Browser AppImage** / **AppImageLauncher Lite** | 一次性下載;Zen 的守衛用 glob `zen*.AppImage`(AppImageLauncher 會把整合過的改名) | 刪掉**所有** `~/Applications/zen*.AppImage` 後重 apply |
 | **Hack Nerd Font** | `latest` URL,沒追版本 | 刪字型目錄後重 apply |
 | **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool** | 系統套件,沒升級自動化 | apt 升級 |
 | **auditd rules** | 設定檔,不是有版本的「工具」 | 編輯 rule 模板後重 apply |
@@ -1102,7 +1102,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
 | **yt-dlp** | uv tool | uv tool | python_uv_tools |
-| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage` | gui_apps_linux |
+| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`,之後以 glob `zen*.AppImage` 比對 | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl 官方 installer | devtools |
 | **zsh** | brew | apt/yum / 原始碼編譯(RHEL 7) | zsh |

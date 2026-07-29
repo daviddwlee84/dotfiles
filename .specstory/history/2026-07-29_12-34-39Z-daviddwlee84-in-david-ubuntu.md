@@ -4132,3 +4132,397 @@ echo "=== mtime + first lines ==="; ls -la .claude/plans/transient-cooking-donga
 something and disappears when it exits — but its command is hardcoded. The workarounds all
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:16:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+The plan file is an old, unmodified tracked file from a different context, so staging it would be a harmless no-op but could cause confusion. I'll stage just our transcript directly instead of running the script to keep things clean.
+
+I need to be careful though — the transcript is actively being written right now, so I should avoid grepping or printing anything that might expose secrets. Let me stage the transcript and then run the scan.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-29 13:16:49Z)**_
+
+Plan file is tracked, unmodified, from 26 Jul, and about an unrelated herdr feature — just the "newest plan" heuristic. Staging it would be a no-op, but I'll add only our transcript to keep the commit honest:
+
+_**Agent (claude-opus-5 2026-07-29 13:16:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage our transcript and review final set
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git add .specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+echo "=== final staged set ==="; git diff --cached --name-status
+echo "=== deliberately NOT staged ==="; git status --short | grep '^??'
+```
+
+```text
+=== final staged set ===
+A	.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl
+D	.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl
+A	.specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+M	CLAUDE.md
+M	docs/this_repo/tool-managers.md
+M	docs/tools/data-viewers.md
+M	docs/tools/office-viewers.md
+M	dot_ansible/roles/devtools/tasks/main.yml
+M	dot_config/yazi/init.lua
+M	dot_config/yazi/yazi.toml
+A	pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md
+=== deliberately NOT staged ===
+?? .specstory/history/2026-07-29_12-40-46Z-ubuntu-zen-browser-log.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:16:54Z)**_
+
+Now the pre-commit secret scan:
+
+_**Agent (claude-opus-5 2026-07-29 13:16:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Scan staged changes for secrets
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+bash /home/daviddwlee84/.claude/skills/agent-history-hygiene/scripts/scan-staged.sh 2>&1 | tail -20
+echo "scan exit=${PIPESTATUS[0]:-$?}"
+```
+
+```text
+scan exit=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:16Z)**_
+
+<think><details><summary>Thought Process</summary>
+The tests pass, so I'm ready to commit. Looking at the recent commit messages, they follow a consistent pattern with type and scope in parentheses, then an imperative description that carries real insight. I need to craft something similarly substantive for this change.
+
+I'm writing a commit message about installing `ya` alongside `yazi` — the missing CLI companion that was preventing plugins from working. The body will explain the fix, and I'll add the co-author attribution. I should be ready for the possibility that pre-commit hooks might modify the transcript, which would require re-staging before the commit goes through.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:16Z)**_
+
+Clean. Committing:
+
+_**Agent (claude-opus-5 2026-07-29 13:17:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the changes
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git commit -F - <<'MSG' 2>&1 | tail -30
+fix(yazi): install `ya` alongside `yazi` — a missing CLI companion left every plugin uninstalled
+
+`yazi` and `ya` ship as a matched pair in every upstream release asset. The
+user-level ansible fallback extracted the archive and copied exactly one file
+out of it, so any host taking that path got a yazi that can never acquire a
+plugin. Observed live on David-Ubuntu, where a manual install had made the same
+one-file mistake (the binary is byte-identical to yazi-x86_64-unknown-linux-gnu
+from v26.1.22).
+
+Three silent defects compounded into an unlaunchable file manager:
+
+  1. the installer dropped `ya`
+  2. the presence probe gated on `yazi` alone, so it never noticed
+  3. run-script 45 hit `command -v ya`, logged an *info*, and exited 0 — and
+     being `run_onchange_`, chezmoi then recorded the lockfile hash as
+     satisfied, so it would never re-run even once `ya` appeared
+
+`init.lua`'s bare `require("duckdb")` turned that into a fatal startup error
+that blamed duckdb.yazi for a missing binary. piper.yazi was equally absent,
+silently killing every Office/markdown/epub preview too.
+
+Fixes:
+
+- devtools role copies both binaries; both probes check `yazi` AND `ya`, with
+  the repo's standard `environment: PATH` block (without it ansible cannot see
+  a `ya` in ~/.local/bin and would re-trigger the sudo/apt path every run)
+- run_onchange_after_45 -> run_after_45: same generalisable rule as the bat
+  theme cache — hash-gating is only valid when the script's product lives in
+  chezmoi's tree, and ~/.config/yazi/plugins/ does not. Reinstalls when a
+  plugin dir is missing or the lockfile changed; won't stamp a half-failure.
+  Fast path ~2ms, no network.
+- the missing-`ya` branch is now a loud warn naming the consequence and the fix
+- init.lua wraps the require in pcall + ya.err/ya.notify, so a missing plugin
+  costs data previews rather than the whole file manager
+
+Verified against the real binary rather than assumed: pcall is yieldable in Lua
+5.4 and does catch the error thrown from require's internal poll yield; all
+four script branches exercised (fresh install, no-op, self-heal after deleting
+duckdb.yazi, missing-`ya` in a sandbox home); the new probe run through ansible
+reports install_would_trigger=False on this host.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1785331036-292701.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False).......................Passed
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..............................................................................Passed
+check toml..............................................................................Passed
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1785331036-292701.
+[fix/yazi-missing-ya-cli-plugins 46ae5c5] fix(yazi): install `ya` alongside `yazi` — a missing CLI companion left every plugin uninstalled
+ 11 files changed, 4515 insertions(+), 75 deletions(-)
+ create mode 100644 .chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl
+ delete mode 100644 .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl
+ create mode 100644 .specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+ create mode 100644 pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:24Z)**_
+
+<think><details><summary>Thought Process</summary>
+The commit went through successfully despite a warning about stashed changes conflicting with the hook auto-fixes, which got rolled back. The unstaged specstory file should still be intact. Let me verify the commit was recorded correctly and check that the working tree is in the expected state.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:24Z)**_
+
+Committed — all hooks passed. Let me verify the result and the working tree:
+
+_**Agent (claude-opus-5 2026-07-29 13:17:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit and working tree state
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git log --oneline -3
+echo "=== working tree ==="; git status --short
+echo "=== files in commit ==="; git show --stat --oneline HEAD | tail -14
+```
+
+```text
+46ae5c5 fix(yazi): install `ya` alongside `yazi` — a missing CLI companion left every plugin uninstalled
+a253bef docs(gpu): amdgpu confirmed innocent by live modprobe; blacklist removed
+88ac3ba docs(claude-hud): replace the cost-includes-subagents inference with a measurement
+=== working tree ===
+ M .specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+ M dot_ansible/roles/gui_apps_linux/tasks/main.yml
+?? .specstory/history/2026-07-29_12-40-46Z-ubuntu-zen-browser-log.md
+=== files in commit ===
+46ae5c5 fix(yazi): install `ya` alongside `yazi` — a missing CLI companion left every plugin uninstalled
+ .../global/run_after_45_yazi_plugins.sh.tmpl       |  135 +
+ .../run_onchange_after_45_yazi_plugins.sh.tmpl     |   57 -
+ ...07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md | 4134 ++++++++++++++++++++
+ CLAUDE.md                                          |    4 +-
+ docs/this_repo/tool-managers.md                    |    8 +-
+ docs/tools/data-viewers.md                         |   14 +-
+ docs/tools/office-viewers.md                       |    8 +-
+ dot_ansible/roles/devtools/tasks/main.yml          |   26 +-
+ dot_config/yazi/init.lua                           |   26 +-
+ dot_config/yazi/yazi.toml                          |    2 +-
+ .../yazi-lua-runtime-failed-plugin-main-lua.md     |  176 +
+ 11 files changed, 4515 insertions(+), 75 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see the commit went through, but now there's an unexpected modification showing up in `dot_ansible/roles/gui_apps_linux/tasks/main.yml` that wasn't in the earlier status output. Let me investigate what changed.
+
+Looking at the file list, this new modification must be from the concurrent Zen browser session that's working on Ubuntu GUI app management — that's exactly where that file would live. I definitely didn't touch `gui_apps_linux`, so this is just the other session's work in progress appearing in my working tree. The `.specstory/history` file is also modified because SpecStory keeps appending to our conversation log. Let me verify the committed run_after script is intact and do a quick sanity check on what actually got staged.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:37Z)**_
+
+Two things in the working tree I should confirm aren't mine:
+
+_**Agent (claude-opus-5 2026-07-29 13:17:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify the gui_apps_linux change is not mine
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== gui_apps_linux diff (should be the OTHER session's Zen browser work) ==="
+git diff --stat dot_ansible/roles/gui_apps_linux/tasks/main.yml
+git diff dot_ansible/roles/gui_apps_linux/tasks/main.yml | grep -iE "^\+" | grep -i "zen\|browser" | head -5
+```
+
+```text
+=== gui_apps_linux diff (should be the OTHER session's Zen browser work) ===
+ dot_ansible/roles/gui_apps_linux/tasks/main.yml | 45 ++++++++++++++++++++++---
+ 1 file changed, 40 insertions(+), 5 deletions(-)
++    # pattern `^zen-x86_64\\.AppImage$`. That silently resolved the URL to ''
++              | selectattr('name', 'equalto', 'zen-' + target_architecture + '.AppImage')
++    - name: Warn that no Zen AppImage asset matched
++      when: zen_appimage_url | length == 0
++          No asset named 'zen-{{ target_architecture }}.AppImage' in the latest
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify committed content is intact after the rollback warning
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== committed script intact? (pre-commit reported a rollback) ==="
+git show HEAD:.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl | md5sum
+md5sum .chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl
+echo "=== committed init.lua tail ==="
+git show HEAD:dot_config/yazi/init.lua | tail -8
+```
+
+```text
+=== committed script intact? (pre-commit reported a rollback) ===
+0f27e7869b7aff83e91c15c11a290e1b  -
+0f27e7869b7aff83e91c15c11a290e1b  .chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl
+=== committed init.lua tail ===
+	ya.err("duckdb.yazi failed to load: " .. tostring(err))
+	pcall(ya.notify, {
+		title = "duckdb.yazi not loaded",
+		content = "Data-file previews (csv/parquet/xlsx/db) are disabled. Run `ya pkg install` to restore them.",
+		level = "warn",
+		timeout = 10,
+	})
+end
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:17:52Z)**_
+
+Committed as `46ae5c5` on a new branch `fix/yazi-missing-ya-cli-plugins` (you were on `main`, so I branched rather than committing straight to it).
+
+**11 files, +4515/−75** — the fix, the pitfall entry, the doc mirrors, and this session's SpecStory transcript.
+
+On the two things left in your working tree — neither is mine, and both are correct to have left alone:
+
+- **`dot_ansible/roles/gui_apps_linux/tasks/main.yml`** is your **concurrent Zen-browser session's** work in progress (its diff adds `zen-x86_64.AppImage` asset matching). It appeared *during* my commit. That session also owns the untracked `2026-07-29_12-40-46Z-ubuntu-zen-browser-log.md` transcript — which is why I used `--session-only` instead of the default sweep. Staging it would have attached one session's transcript to another session's diff and broken your review trail.
+- **Our transcript shows as modified** because SpecStory kept appending after the snapshot went in. Normal.
+
+Two verifications worth calling out, since pre-commit printed `Stashed changes conflicted with hook auto-fixes... Rolling back fixes`: that rollback applied to the *unstaged* Zen-browser file, not the commit. I confirmed the committed script is byte-identical to the working copy (matching md5) and the committed `init.lua` retains the full `pcall` guard. Nothing was silently reverted.
+
+Not pushed. To put it on `main`:
+
+```sh
+git checkout main && git merge --ff-only fix/yazi-missing-ya-cli-plugins
+```
+
+One thing to flag for your other session: my `devtools` role edit and its `gui_apps_linux` edit are both in `dot_ansible/roles/`, but different files — no conflict.
+
+---
+
+_**User (2026-07-29 13:20:32Z)**_
+
+<bash-input>git checkout main && git merge --ff-only fix/yazi-missing-ya-cli-plugins</bash-input>
+
+_**User (2026-07-29 13:20:32Z)**_
+
+<bash-stdout></bash-stdout><bash-stderr>error: Your local changes to the following files would be overwritten by checkout:
+	.specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+Please commit your changes or stash them before you switch branches.
+Aborting
+</bash-stderr>
+
+---
+
+_**Agent (claude-opus-5 2026-07-29 13:20:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+The issue is that the transcript file was committed on the branch but doesn't exist on main, so checking out main would require deleting it—but since it has uncommitted changes from SpecStory appending to it, Git won't allow the switch. I'm weighing whether to merge the branch into main directly without switching branches, or handle the transcript file separately first.
+
+Actually, the cleanest approach is to fast-forward main to point to the current branch commit using a force-update, then switch to main. Since we're currently on the feature branch (not main), we can safely repoint main to this commit, and when we switch over, no file changes are needed because both branches point to the same commit—the local modifications to the transcript just stay in the working directory. Let me verify that main is actually an ancestor of the current branch to confirm this is a true fast-forward.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-29 13:20:52Z)**_
+
+The live SpecStory writer keeps appending to that transcript, so it has uncommitted changes and `checkout` refuses to swap it out. Since `main` isn't checked out and is a strict ancestor, I can fast-forward the ref without touching the working tree at all — which avoids stashing a file that's being actively written.
+
+_**Agent (claude-opus-5 2026-07-29 13:20:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify main is a strict ancestor before moving the ref
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== is main a strict ancestor? (true fast-forward) ==="
+git merge-base --is-ancestor main fix/yazi-missing-ya-cli-plugins && echo "YES — ff-only is safe" || echo "NO — would not be a fast-forward"
+echo "=== current ==="; git branch --show-current; git log --oneline -1 main
+```
+
+```text
+=== is main a strict ancestor? (true fast-forward) ===
+YES — ff-only is safe
+=== current ===
+fix/yazi-missing-ya-cli-plugins
+a253bef docs(gpu): amdgpu confirmed innocent by live modprobe; blacklist removed
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:20:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Fast-forward main without touching working tree, then switch
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git branch -f main fix/yazi-missing-ya-cli-plugins
+git checkout main 2>&1
+echo "=== result ==="; git log --oneline -2; echo "--- status ---"; git status --short
+```
+
+```text
+Switched to branch 'main'
+M	.specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+M	dot_ansible/roles/gui_apps_linux/tasks/main.yml
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+=== result ===
+46ae5c5 fix(yazi): install `ya` alongside `yazi` — a missing CLI companion left every plugin uninstalled
+a253bef docs(gpu): amdgpu confirmed innocent by live modprobe; blacklist removed
+--- status ---
+ M .specstory/history/2026-07-29_12-34-39Z-daviddwlee84-in-david-ubuntu.md
+ M dot_ansible/roles/gui_apps_linux/tasks/main.yml
+?? .specstory/history/2026-07-29_12-40-46Z-ubuntu-zen-browser-log.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-29 13:21:09Z)**_
+
+<think><details><summary>Thought Process</summary>
+The main branch is now updated to the latest commit with both in-progress files preserved. I notice there are 2 unpushed commits, so I should clean up the now-redundant `fix/yazi-missing-ya-cli-plugins` branch since it's pointing at the same commit.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-29 13:21:09Z)**_
+
+`main` is now at `46ae5c5`, and both in-progress files survived untouched — your Zen-browser session's `gui_apps_linux` edits and the live transcript appends are still there.
+
+Moving the ref instead of merging worked because `main` was a strict ancestor, so the result is byte-identical to the `--ff-only` merge you asked for — it just skipped the working-tree swap that was failing.
+
+Two notes:
+
+- **You're 2 commits ahead of `origin/main`**, not 1 — `a253bef` (the amdgpu docs commit) was already unpushed before today. Nothing is pushed yet.
+- The `fix/yazi-missing-ya-cli-plugins` branch still exists at the same commit. Fully merged, so `git branch -d fix/yazi-missing-ya-cli-plugins` is safe whenever you want it gone.

@@ -964,7 +964,7 @@ manually removed and re-installed.
 | **Docker convenience-script install** | No upgrade target | re-run `curl get.docker.com \| sh` |
 | **OrbStack** | Macos brew cask | Covered by `cat_brew --cask --greedy` |
 | **Cursor `.deb`** / **Discord `.deb`** / **VSCode (Microsoft apt)** | apt-side, not chezmoi-side | apt-upgrade |
-| **Zen Browser AppImage** / **AppImageLauncher Lite** | One-shot download, `creates:` guard | Delete AppImage, re-apply |
+| **Zen Browser AppImage** / **AppImageLauncher Lite** | One-shot download; Zen's guard globs `zen*.AppImage` (AppImageLauncher renames integrated copies) | Delete **every** `~/Applications/zen*.AppImage`, re-apply |
 | **Hack Nerd Font** | `latest` URL, no version tracking | Delete font dir, re-apply |
 | **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool** | System packages, no upgrade automation | apt-upgrade |
 | **auditd rules** | Config files, not a "tool" with versions | Edit rule template, re-apply |
@@ -1210,7 +1210,7 @@ list.
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
 | **yt-dlp** | uv tool | uv tool | python_uv_tools |
-| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage` | gui_apps_linux |
+| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`, thereafter matched by glob `zen*.AppImage` | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl official installer | devtools |
 | **zsh** | brew | apt/yum / source build (RHEL 7) | zsh |
