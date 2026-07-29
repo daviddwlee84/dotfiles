@@ -37,7 +37,8 @@ STUB
   setup_path_stub
   _make_nc_stub "$BATS_STUB_DIR"
 
-  # Pick 1087 — third in the probe order (7890, 7891, 1087, 8118, 8080).
+  # Pick 1087 — fifth in the probe order
+  # (7897, 7890, 7891, 17890, 1087, 8118, 8080).
   # If probe order regressed or skipped a port, this would return a different URL.
   result="$(EXPECT_PORT=1087 zsh -f -c "
     source '$PROXY_FILE'

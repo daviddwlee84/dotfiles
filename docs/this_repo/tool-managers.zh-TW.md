@@ -404,7 +404,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 | Role | 擁有什麼 | OS 機制 |
 |---|---|---|
 | `docker` | OrbStack(macOS)、Docker rootless(Linux) | macOS:brew cask `orbstack`(`/Applications/Docker.app` 存在則跳過) · Debian/Ubuntu:`apt` 前置條件(`uidmap`、`dbus-user-session`、`fuse-overlayfs`、`slirp4netns`、`iptables`)→ `curl https://get.docker.com \| sh` → `docker-ce-rootless-extras` → `dockerd-rootless-setuptool.sh install` 使用者 systemd unit |
-| `gui_apps_linux`(Linux Debian + `ubuntu_desktop` profile) | Alacritty、libfuse2、AppImageLauncher、VSCode、Cursor、Discord、Zen Browser、CopyQ、playerctl/wmctrl/xdotool | Alacritty:cargo 編譯(apt 依賴 `cmake`、`pkg-config`、字型/X 函式庫) · AppImageLauncher:PPA → GitHub `.deb` → Lite AppImage 到 `~/Applications/` · VSCode:Microsoft apt repo · Cursor:`.deb` 來自 `cursor.com/api/download` · Discord:flatpak(Flathub user-scope,預設)或 `.deb`,由 `discordChannel` 選擇 · Zen Browser:AppImage 到 `~/Applications/zen.AppImage` |
+| `gui_apps_linux`(Linux Debian + `ubuntu_desktop` profile) | Alacritty、libfuse2、AppImageLauncher、VSCode、Cursor、Google Chrome、Discord、Zen Browser、CopyQ、playerctl/wmctrl/xdotool | Alacritty:cargo 編譯(apt 依賴 `cmake`、`pkg-config`、字型/X 函式庫) · AppImageLauncher:PPA → GitHub `.deb` → Lite AppImage 到 `~/Applications/` · VSCode:Microsoft apt repo · Cursor:`.deb` 來自 `cursor.com/api/download` · Google Chrome:`.deb` 來自 `dl.google.com`(僅 x86_64) · Discord:flatpak(Flathub user-scope,預設)或 `.deb`,由 `discordChannel` 選擇 · Zen Browser:AppImage 到 `~/Applications/zen.AppImage` |
 | `auditd`(Linux,`installAuditd` 控管) | `auditd` + `audispd-plugins`(Debian)/ `audit`(RedHat);rule 檔 `00-baseline.rules`、`05-privileged.rules`、選用 `10-execve.rules`、`99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`、`gitleaks` | macOS:brew(`gitleaks`)+ uv(`pre-commit`) · Linux:gitleaks 來自 GitHub release(系統 → `/usr/local/bin`;使用者 fallback → `~/.local/bin`)+ uv pre-commit。**Go 已不在此** — 移到 mise(`go = "latest"`,gate 於 `installExtraRuntimes`)。 |
 | `bitwarden`(`installBitwarden` 控管) | `@bitwarden/cli` + Bitwarden Desktop(`bitwarden_install_desktop=true` 時) | CLI:`mise exec -- npm install -g @bitwarden/cli`(優先)/ 系統 npm fallback · Desktop:macOS brew cask · Linux:snap → `.deb` fallback |
@@ -886,7 +886,7 @@ arm64 bottle)、中國鏡像中斷。
 | **Docker 便利腳本安裝** | 沒有升級目標 | 重跑 `curl get.docker.com \| sh` |
 | **OrbStack** | macOS brew cask | 由 `cat_brew --cask --greedy` 涵蓋 |
 | **Cursor `.deb`** / **Discord `.deb`** / **VSCode (Microsoft apt)** | apt 端,不是 chezmoi 端 | apt 升級 |
-| **Zen Browser AppImage** / **AppImageLauncher Lite** | 一次性下載,`creates:` 守衛 | 刪 AppImage 後重 apply |
+| **Zen Browser AppImage** / **AppImageLauncher Lite** | 一次性下載;Zen 的守衛用 glob `zen*.AppImage`(AppImageLauncher 會把整合過的改名) | 刪掉**所有** `~/Applications/zen*.AppImage` 後重 apply |
 | **Hack Nerd Font** | `latest` URL,沒追版本 | 刪字型目錄後重 apply |
 | **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool** | 系統套件,沒升級自動化 | apt 升級 |
 | **auditd rules** | 設定檔,不是有版本的「工具」 | 編輯 rule 模板後重 apply |
@@ -984,6 +984,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **freeze** | brew | GitHub release | devtools |
 | **fzf** | brew(透過 `lazyvim_deps`) | chezmoi external + `~/.fzf/install --bin` | lazyvim_deps + externals |
 | **gawk** | brew | apt/yum | bash |
+| **google-chrome-stable** | (屬 Brewfile cask 範疇) | 來自 `dl.google.com` 的 `.deb`;postinst 會自行註冊 apt repo,之後由 `apt upgrade` 維護。**僅限 x86_64** —— 沒有 arm64 的 Linux 版 | gui_apps_linux —— Chromium 引擎的備用瀏覽器;Ubuntu 沒有 Chromium `.deb`,只有 snap shim |
 | **gcc / gcc-c++ / make** | (Xcode CLT) | apt(`build-essential`)/ yum | base + bootstrap |
 | **gemini**(Gemini CLI) | brew formula `gemini-cli` → npm fallback | `mise exec -- npm install -g @google/gemini-cli` | coding_agents |
 | **gh** | brew | 廠商 apt(.deb)→ GitHub tarball | base/devtools |
@@ -1104,7 +1105,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
 | **yt-dlp** | uv tool | uv tool | python_uv_tools |
-| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage` | gui_apps_linux |
+| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`,之後以 glob `zen*.AppImage` 比對 | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl 官方 installer | devtools |
 | **zsh** | brew | apt/yum / 原始碼編譯(RHEL 7) | zsh |

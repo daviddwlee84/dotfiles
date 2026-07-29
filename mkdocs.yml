@@ -330,6 +330,7 @@ nav:
           - Infrastructure-as-Code: tools/infrastructure-as-code.md
           - Containers: tools/containers.md
           - Container config map: tools/container-config-map.md
+          - docker-net (registry egress under the GFW): tools/docker-net.md
           - AppImage: tools/appimage.md
           - Networking: tools/networking.md
           - Services: tools/services.md

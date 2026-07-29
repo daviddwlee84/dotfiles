@@ -4,7 +4,8 @@
 #
 # Handles the "desktop-only" category of apps that aren't in the apt default
 # repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
-# (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
+# (Microsoft apt repo), Cursor (.deb with graceful fallback), Google Chrome
+# (.deb, x86_64-only), Discord (.deb,
 # x86_64-only), Steam (Valve apt repo, optional), Zen Browser (AppImage +
 # .desktop), libfuse2 (AppImage runtime on Ubuntu 22.04+), and a placeholder
 # hook for Antigravity once an official Linux package ships.
@@ -500,6 +501,80 @@
           docs/tools/appimage.md for the full recipe.
 
 # =============================================================================
+# Google Chrome — official .deb, self-registering apt source
+#
+# Ubuntu ships no Chromium .deb (Canonical's `chromium-browser` is a snap
+# shim), so a Chromium-engine browser has to come from upstream. Chrome's
+# .deb postinst writes /etc/apt/sources.list.d/google-chrome.list plus its
+# keyring, so `apt upgrade` keeps it current afterwards — the same trick
+# Cursor/VSCode use, documented in docs/playbooks/linux-gui-apps.md
+# "Why .deb auto-update works". That is why we do NOT add a deb822 source
+# ourselves: doing both yields duplicate-source warnings on every apt run.
+#
+# x86_64 only — Google publishes no arm64 Linux build of Chrome (unlike
+# VSCode/Cursor). aarch64 desktops fall through to Firefox/Zen.
+# =============================================================================
+
+- name: Check if Google Chrome is installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+  ansible.builtin.command: dpkg -s google-chrome-stable
+  register: chrome_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Google Chrome via .deb
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (gui_apps_linux_no_root | bool)
+    - chrome_check.rc is defined
+    - chrome_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Download Google Chrome .deb
+      ansible.builtin.get_url:
+        url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        dest: /tmp/google-chrome-stable.deb
+        mode: '0644'
+        timeout: 300
+        force: true
+      register: chrome_dl
+      until: chrome_dl is succeeded
+      retries: 4
+      delay: 5
+      ignore_errors: true
+
+    # `is not skipped` alongside `is succeeded` — a task skipped by its `when:`
+    # also passes `is succeeded`, which is how the Zen block silently installed
+    # nothing for months. See
+    # pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md
+    - name: Install Google Chrome .deb
+      when:
+        - chrome_dl is defined
+        - chrome_dl is not skipped
+        - chrome_dl is succeeded
+      ansible.builtin.apt:
+        deb: /tmp/google-chrome-stable.deb
+        state: present
+      ignore_errors: true
+
+    - name: Remove downloaded Chrome .deb
+      ansible.builtin.file:
+        path: /tmp/google-chrome-stable.deb
+        state: absent
+  rescue:
+    - name: Warn Google Chrome install failed
+      ansible.builtin.debug:
+        msg: >-
+          Google Chrome install failed — rerun with --tags gui_apps after
+          fixing network/apt issues, or grab the .deb by hand from
+          https://www.google.com/chrome/. Zen and Firefox remain available
+          in the meantime.
+
+# =============================================================================
 # Discord — channel selectable via discord_channel ansible var (default: flatpak)
 #
 # Values (set by .discordChannel chezmoi prompt, plumbed via
@@ -755,28 +830,45 @@
 # =============================================================================
 # Zen Browser — Firefox-based browser, shipped as an AppImage
 #
-# User-level install under ~/Applications/, mirrors the Alacritty pattern for
-# desktop integration (icon + .desktop entry + update-desktop-database) so
-# the app is searchable in GNOME/KDE launchers without needing to run the
-# AppImage once to let AppImageLauncher auto-integrate it.
+# User-level install under ~/Applications/. We write the icon + .desktop entry
+# ourselves so the browser is searchable in GNOME/KDE launchers immediately.
+#
+# IMPORTANT — the filename is NOT stable, and writing our own .desktop does NOT
+# opt us out of AppImageLauncher. AIL hooks *execution* itself (binfmt_misc →
+# binfmt-bypass, visible in `pgrep -af zen`), not just the ~/Applications
+# watch, so the first launch integrates the file and renames it to
+# `zen_<md5-of-path>.AppImage`. That is upstream by design — the checksum is how
+# AIL recognises an already-integrated AppImage (TheAssassin/AppImageLauncher#547).
+# Consequences encoded below:
+#   - the "is it installed?" guard globs `zen*.AppImage`; a fixed name made
+#     every apply re-download 125 MB and then get renamed again, forever;
+#   - desktop integration is re-asserted on EVERY apply (not only on download)
+#     so a rename self-heals instead of leaving a dangling TryExec, which the
+#     launcher hides silently rather than reporting;
+#   - AIL's parallel appimagekit_* entry is removed so `zen-browser.desktop`
+#     stays the single authority that `linux_app_register Zen --desktop=` and
+#     `applaunch Zen` can rely on.
+# See pitfalls/appimagelauncher-renames-managed-appimage.md
 #
 # noRoot-friendly: the whole block is user-level, no `become: true`, no
-# `tags: [sudo]`. Works identically in `gui_apps_linux_no_root=true` mode.
+# `tags: [sudo]`. `ail-cli` is absent under AppImageLauncher Lite, so every
+# deintegration task must stay non-fatal.
 # =============================================================================
 
-- name: Check if Zen AppImage is already installed
+- name: Find any installed Zen AppImage
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture in ['x86_64', 'aarch64']
-  ansible.builtin.stat:
-    path: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
-  register: zen_appimage_check
+  ansible.builtin.find:
+    paths: "{{ ansible_facts['env']['HOME'] }}/Applications"
+    patterns: 'zen*.AppImage'
+    file_type: file
+  register: zen_appimage_found
 
-- name: Install Zen Browser AppImage + desktop integration
+- name: Install / refresh Zen Browser AppImage + desktop integration
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture in ['x86_64', 'aarch64']
-    - not zen_appimage_check.stat.exists
   block:
     - name: Ensure ~/Applications exists (Zen)
       ansible.builtin.file:
@@ -784,44 +876,110 @@
         state: directory
         mode: '0755'
 
+    # Only hit the network when there is genuinely no Zen on disk. A renamed
+    # (integrated) AppImage still counts as installed.
     - name: Get latest Zen Browser release metadata
+      when: zen_appimage_found.matched | default(0) == 0
       ansible.builtin.uri:
         url: https://api.github.com/repos/zen-browser/desktop/releases/latest
         return_content: true
       register: zen_release
 
+    # Match the asset name literally — NOT with `match`/regex. A regex here
+    # has to escape the dot, and `\\.` inside a YAML folded scalar (`>-`)
+    # survives as *two* literal backslashes, producing the never-matching
+    # pattern `^zen-x86_64\\.AppImage$`. That silently resolved the URL to ''
+    # for months. Upstream asset names are exact and stable, so `equalto`
+    # removes the escaping hazard entirely.
+    # See pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md
     - name: Resolve Zen AppImage asset URL
+      when: zen_appimage_found.matched | default(0) == 0
       ansible.builtin.set_fact:
         zen_appimage_url: >-
           {{ (zen_release.json.assets
-              | selectattr('name', 'match', '^zen-' + target_architecture + '\\.AppImage$')
+              | selectattr('name', 'equalto', 'zen-' + target_architecture + '.AppImage')
               | map(attribute='browser_download_url')
               | list
               | first) | default('') }}
 
+    # Loud, non-fatal: an unresolved URL means upstream renamed the asset.
+    # Without this the whole block degrades to a no-op with zero output.
+    - name: Warn that no Zen AppImage asset matched
+      when:
+        - zen_appimage_found.matched | default(0) == 0
+        - zen_appimage_url | default('') | length == 0
+      ansible.builtin.debug:
+        msg: >-
+          No asset named 'zen-{{ target_architecture }}.AppImage' in the latest
+          zen-browser/desktop release — upstream probably renamed it. Zen was
+          NOT installed. Check
+          https://github.com/zen-browser/desktop/releases/latest and update the
+          'Resolve Zen AppImage asset URL' task.
+
     - name: Download Zen AppImage
-      when: zen_appimage_url | length > 0
+      when:
+        - zen_appimage_found.matched | default(0) == 0
+        - zen_appimage_url | default('') | length > 0
       ansible.builtin.get_url:
         url: "{{ zen_appimage_url }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
         mode: '0755'
         timeout: 300
+      register: zen_appimage_dl
+      until: zen_appimage_dl is succeeded
       retries: 3
       delay: 5
-      register: zen_appimage_dl
+
+    # Copies accumulate when AIL integrates a file we later re-download under
+    # the stable name. Say so rather than silently picking one.
+    - name: Warn about multiple Zen AppImages
+      when: zen_appimage_found.matched | default(0) > 1
+      ansible.builtin.debug:
+        msg: >-
+          {{ zen_appimage_found.matched }} Zen AppImages in ~/Applications
+          ({{ zen_appimage_found.files | map(attribute='path') | map('basename') | join(', ') }}).
+          Using the newest; delete the others once you have confirmed which one
+          you launch.
+
+    # Newest by mtime when one is already on disk, otherwise the file we just
+    # downloaded under the stable name.
+    - name: Resolve which Zen AppImage to integrate
+      ansible.builtin.set_fact:
+        zen_appimage_path: >-
+          {{ (zen_appimage_found.files | sort(attribute='mtime') | last).path
+             if (zen_appimage_found.matched | default(0)) > 0
+             else ansible_facts['env']['HOME'] + '/Applications/zen.AppImage' }}
+
+    # Guards every integration task below: covers "download skipped because the
+    # asset vanished" without depending on the download result at all.
+    - name: Check the resolved Zen AppImage exists
+      ansible.builtin.stat:
+        path: "{{ zen_appimage_path }}"
+      register: zen_appimage_stat
+
+    - name: Check whether the Zen icon is already present
+      ansible.builtin.stat:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/share/icons/hicolor/scalable/apps/zen-browser.svg"
+      register: zen_icon_stat
 
     - name: Download Zen SVG icon
-      when: zen_appimage_dl is defined and zen_appimage_dl is succeeded
+      when:
+        - zen_appimage_stat.stat.exists
+        - not zen_icon_stat.stat.exists
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/zen-browser/desktop/dev/docs/assets/zen-browser.svg
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/icons/hicolor/scalable/apps/zen-browser.svg"
         mode: '0644'
+      register: zen_icon_dl
+      until: zen_icon_dl is succeeded
       retries: 3
       delay: 5
       ignore_errors: true
 
+    # Re-written every apply against the CURRENT path — this is the self-heal.
+    # `copy` is content-idempotent, so it only reports changed after a rename.
     - name: Install Zen Browser .desktop entry
-      when: zen_appimage_dl is defined and zen_appimage_dl is succeeded
+      when: zen_appimage_stat.stat.exists
       ansible.builtin.copy:
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/applications/zen-browser.desktop"
         mode: '0644'
@@ -831,8 +989,8 @@
           Name=Zen Browser
           GenericName=Web Browser
           Comment=Experience tranquillity while browsing the web without people tracking you
-          Exec={{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage %U
-          TryExec={{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage
+          Exec={{ zen_appimage_path }} %U
+          TryExec={{ zen_appimage_path }}
           Icon=zen-browser
           Terminal=false
           StartupNotify=true
@@ -840,9 +998,45 @@
           Categories=Network;WebBrowser;
           MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rss+xml;application/rdf+xml;image/gif;image/jpeg;image/png;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/ftp;x-scheme-handler/chrome;video/webm;application/x-xpinstall;
           Keywords=web;browser;internet;firefox;zen;
+      register: zen_desktop_entry
+
+    - name: Find AppImageLauncher's parallel Zen desktop entries
+      when: zen_appimage_stat.stat.exists
+      ansible.builtin.find:
+        paths: "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
+        patterns: 'appimagekit_*Zen*.desktop'
+        file_type: file
+      register: zen_ail_entries
+
+    # `failed_when: false` is load-bearing: ail-cli ships only with the system
+    # AppImageLauncher package, never with Lite (noRoot), where `command` would
+    # otherwise abort the play on "Unable to find executable".
+    - name: Deintegrate AppImageLauncher's Zen entry
+      when:
+        - zen_appimage_stat.stat.exists
+        - zen_ail_entries.matched | default(0) > 0
+      ansible.builtin.command: ail-cli deintegrate "{{ zen_appimage_path }}"
+      register: zen_deintegrate
+      changed_when: zen_deintegrate.rc == 0
+      failed_when: false
+
+    - name: Remove leftover AppImageLauncher Zen desktop entries
+      when:
+        - zen_appimage_stat.stat.exists
+        - zen_ail_entries.matched | default(0) > 0
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ zen_ail_entries.files | default([]) }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      register: zen_ail_removed
 
     - name: Refresh desktop application database (Zen)
-      when: zen_appimage_dl is defined and zen_appimage_dl is succeeded
+      when: >-
+        zen_desktop_entry is changed
+        or zen_ail_removed is changed
+        or zen_icon_dl is changed
       ansible.builtin.command: update-desktop-database "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
       changed_when: false
       failed_when: false

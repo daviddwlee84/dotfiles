@@ -38,7 +38,7 @@ chezmoi apply
 | **Rustup** (dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` env vars | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` env vars | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` env var | `goproxy.cn` (Qiniu; TUNA has no Go proxy) | — |
-| **Docker Hub** (rootless Docker on Linux) | `~/.config/docker/daemon.json` via `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu (fallback chain) | — |
+| **Docker Hub** (rootless Docker on Linux) | `~/.config/docker/daemon.json` via `modify_daemon.json.tmpl` | DaoCloud only — the other four were measured dead (see [docker-net.md](docker-net.md)) | — |
 | **Ubuntu apt** (Docker image only) | `Dockerfile` | Huawei Cloud | [ubuntu](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/) |
 
 ## Security and trust model
@@ -93,6 +93,17 @@ security-sensitive** and the trust drops to Tier 1.
   by digest or enable Content Trust. `dockerhub.azk8s.cn` and `dockerproxy.com`
   were **removed** (2026-07): a dead/third-party mirror domain can lapse and be
   re-registered by an attacker into a malicious pull-through cache.
+
+  The list was cut again (2026-07) from five entries to **one**. Four were
+  measured non-functional — `docker.mirrors.ustc.edu.cn` has no DNS record at
+  all, `docker.nju.edu.cn` 403s outside its campus, `mirror.iscas.ac.cn` 502s,
+  and `mirror.baidubce.com` resets TLS from outside Baidu Cloud. Removing them
+  is a security improvement independent of the reliability one: **every entry is
+  another party that gets to decide what `latest` resolves to**, and a list kept
+  long "just in case" maximises that surface for hosts that never benefit from
+  it. The replacement for breadth is the daemon proxy plus a client-side fetch
+  (`docker-net pull`), neither of which delegates digest resolution to anyone.
+  Re-measure before adding anything back: `docker-net mirrors`.
 
 ### Residual risks (true even with reputable mirrors)
 

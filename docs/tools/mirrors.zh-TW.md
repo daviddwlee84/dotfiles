@@ -38,7 +38,7 @@ chezmoi apply
 | **Rustup**(dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` 環境變數 | `goproxy.cn`（Qiniu；TUNA 沒有 Go proxy） | — |
-| **Docker Hub**（Linux 上的 rootless Docker） | `~/.config/docker/daemon.json`，透過 `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu（fallback chain） | — |
+| **Docker Hub**（Linux 上的 rootless Docker） | `~/.config/docker/daemon.json`，透過 `modify_daemon.json.tmpl` | 只剩 DaoCloud —— 另外四個實測已死（見 [docker-net.md](docker-net.md)） | — |
 | **Ubuntu apt**（僅 Docker image） | `Dockerfile` | 華為雲 (Huawei Cloud) | [ubuntu](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/) |
 
 ## 安全性與信任模型 (Security and trust model)
@@ -73,6 +73,8 @@ chezmoi apply
 ### 第三級 —— 解析／中繼資料信任（最該盯的一項）
 
 - **Docker Hub `registry-mirrors`**：pull-through 鏡像負責解析 `tag→digest`，而 Docker Content Trust **預設關閉**，所以是鏡像決定 `latest` 這類 tag 對映到哪個 image。一旦你**以 digest 拉取**（`repo@sha256:…`）就是內容定址、安全。敏感 image 請以 digest 拉取或啟用 Content Trust。`dockerhub.azk8s.cn` 與 `dockerproxy.com` 已於 2026-07 **移除**：失效／第三方的鏡像域名可能註冊過期並被攻擊者重新註冊成惡意的 pull-through cache。
+
+  清單在 2026-07 又從五條砍到**一條**。其中四條實測不能用 —— `docker.mirrors.ustc.edu.cn` 網域完全沒有 DNS 紀錄、`docker.nju.edu.cn` 在校園網外回 403、`mirror.iscas.ac.cn` 回 502、`mirror.baidubce.com` 從百度雲外連會被 TLS reset。移除它們在「可靠性」之外還獨立地是一個**安全性**改善：**每一條都是一個有權決定 `latest` 解析到哪個 image 的第三方**，而「以防萬一」留長的清單，只是替那些根本用不到它的主機把這個攻擊面放到最大。取代廣度的是 daemon proxy 加上 client 端抓取（`docker-net pull`），這兩者都不會把 digest 解析權交給任何人。要加回任何一條之前先量測：`docker-net mirrors`。
 
 ### 殘餘風險（即使用可信鏡像也存在）
 

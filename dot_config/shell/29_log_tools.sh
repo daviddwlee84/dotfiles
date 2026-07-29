@@ -92,11 +92,16 @@ svclog() {
         else
             dom="system"
         fi
-        local path
-        path="$(launchctl print "$dom/$name" 2>/dev/null \
+        # NOT `local path`: zsh ties the `path` array to `PATH`, so declaring it
+        # blanks PATH for the rest of the function and `launchctl` below is not
+        # even found. zsh is the macOS default shell and this branch is
+        # macOS-only, so the bug had a 100% hit rate here.
+        # See pitfalls/zsh-local-path-blanks-PATH.md.
+        local logpath
+        logpath="$(launchctl print "$dom/$name" 2>/dev/null \
             | awk -F'= ' '/^[ \t]+stdout path / || /^[ \t]+standard out path /{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2; exit}')"
-        if [[ -n "$path" && -f "$path" ]]; then
-            tail -F "$path" | eval "$colorize"
+        if [[ -n "$logpath" && -f "$logpath" ]]; then
+            tail -F "$logpath" | eval "$colorize"
         else
             echo "[svclog] No StdoutPath for $dom/$name — streaming via log stream..."
             log stream --predicate "process == \"$name\"" --style syslog | eval "$colorize"

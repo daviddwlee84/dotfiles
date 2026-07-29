@@ -24,8 +24,8 @@
 | 讀取者 | 標準路徑 | 內容 | 備註 |
 |--------|----------------|----------|-------|
 | Docker CLI | `~/.docker/config.json` | `auths`、`credsStore`、`credHelpers`、`currentContext`、`proxies.default`、`plugins`、`features` | 不是 daemon 檔。可由 `$DOCKER_CONFIG` 覆寫。 |
-| Docker daemon（rootful） | `/etc/docker/daemon.json` | `registry-mirrors`、`data-root`、`dns`、`insecure-registries`、`experimental`、`features`、…… | 編輯需要 root 權限。 |
-| Docker daemon（rootless） | `~/.config/docker/daemon.json` | 與 rootful 相同 schema | 路徑刻意與 CLI 目錄（`~/.docker`）不同。 |
+| Docker daemon（rootful） | `/etc/docker/daemon.json` | `registry-mirrors`、`proxies`、`data-root`、`dns`、`insecure-registries`、`experimental`、`features`、…… | 編輯需要 root 權限。`proxies`（Engine ≥ 23）是 daemon 端的 proxy —— `docker pull` 只聽這一個。 |
+| Docker daemon（rootless） | `~/.config/docker/daemon.json` | 與 rootful 相同 schema | 路徑刻意與 CLI 目錄（`~/.docker`）不同。兩個 writer、各管一個 key —— 見下方。 |
 | systemd（rootful） | `/etc/systemd/system/docker.service.d/*.conf` | `Environment=HTTP_PROXY=...`、`ExecStart=` 覆寫 | drop-in，跑在 PID 1 之下。 |
 | systemd（rootless） | `~/.config/systemd/user/docker.service.d/*.conf` | 概念相同 | 在 `systemctl --user` 之下執行。 |
 | Docker Desktop（macOS） | `~/Library/Group Containers/group.com.docker/settings-store.json` | 完整的 Desktop 設定儲存（proxy、Kubernetes 開關、資源限制、……） | 不建議直接編輯；GUI 會覆寫。 |
@@ -130,13 +130,16 @@
 | 層級 | 檔案 | 由誰寫 |
 |-------|------|---------------|
 | 系統層（root） | `/etc/docker/...`、`/etc/systemd/...` | Ansible（搭配 `sudo`），僅供 rootful 退路使用；正常情況下不動 |
-| 使用者層（daemon） | `~/.config/docker/daemon.json` | chezmoi：[dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl) |
-| 使用者層（systemd 覆寫） | `~/.config/systemd/user/docker.service.d/proxy.conf` | 手動（食譜在 `containers.md`） |
+| 使用者層（daemon 的 `registry-mirrors`） | `~/.config/docker/daemon.json` | chezmoi：[dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl) |
+| 使用者層（daemon 的 `proxies`） | `~/.config/docker/daemon.json` | 執行期由 `docker-net on` / `off` 寫入（[docker-net.md](docker-net.md)） |
+| 使用者層（systemd 覆寫） | `~/.config/systemd/user/docker.service.d/proxy.conf` | 手動，且只有 Engine < 23 才需要（食譜在 `containers.md`） |
 | 使用者層（客戶端） | `~/.docker/config.json` | chezmoi：[dot_docker/modify_config.json.tmpl](../../dot_docker/modify_config.json.tmpl) |
 | 安裝本身 | Docker Engine + rootless 設定 | Ansible：[dot_ansible/roles/docker/tasks/main.yml](../../dot_ansible/roles/docker/tasks/main.yml) |
 | 桌面 app | OrbStack / Docker Desktop 設定 | 由 GUI 擁有；不要納入 dotfiles 追蹤 |
 
 原則：**系統層設定走 Ansible（搭配 sudo），使用者層設定走 chezmoi。** Linux 上做到 rootless 的轉向後，這條界線才劃得乾淨 —— 現在 chezmoi 管理的 Docker 設定全都是使用者範圍，所以無需 root 也能運作。
+
+`~/.config/docker/daemon.json` 是唯一有兩個 writer 的檔案，它們靠**互斥的 key** 互不干擾：chezmoi 的 `modify_` 腳本永遠只設定或刪除 `registry-mirrors`，所以 `docker-net` 寫的 `proxies` 區塊能撐過每一次 apply。這個切分是刻意的 —— mirror 清單在每台機器上都一樣，屬於 template；而 proxy URL 每台機器、每個 session 都在變，一旦在 apply 當下烤進去就馬上過期。
 
 ## 相關連結
 

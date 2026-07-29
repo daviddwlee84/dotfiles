@@ -48,9 +48,10 @@ Ubuntu 對桌面應用 (desktop apps) 有**五種**打包機制 (packaging mecha
 |---|---|---|---|---|
 | **Cursor** | `.deb`（自動加入 `/etc/apt/sources.list.d/cursor.sources`） | ✅ `apt upgrade cursor` | [`gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install Cursor via .deb" | `/usr/share/cursor/` |
 | **VSCode** | `.deb`（自動加入 `vscode.sources`） | ✅ `apt upgrade code` | 同 role | `/usr/share/code/` |
+| **Google Chrome** | 來自 `dl.google.com` 的 `.deb`（postinst 自動加入 `google-chrome.list` ＋ `/usr/share/keyrings/google-chrome.gpg`）；**僅限 x86_64** —— Google 沒有發佈 arm64 的 Linux 版 | ✅ `apt upgrade google-chrome-stable` | 同 role，"Install Google Chrome via .deb" | `/opt/google/chrome/` |
 | **Discord** | `flatpak`（預設、推薦）或 `.deb`（無 apt source）—— 由 `discordChannel` chezmoi prompt 挑選 | ✅ 透過 `flatpak update`（預設）/ ❌ `.deb` 為手動 | 同 role | `~/.local/share/flatpak/app/com.discordapp.Discord/`（flatpak）或 `/usr/share/discord/`（.deb） |
 | **Steam** | Valve apt repo（`steam-launcher`），由 `installGamingApps=true` 與 x86_64 控制 | ✅ launcher/runtime 套件透過 apt；Steam client 啟動時自我更新 | 同 role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
-| **Zen Browser** | AppImage 在 `~/Applications/zen.AppImage`（穩定檔名、無版本後綴） | ❌ —— 重新跑 ansible 任務 | 同 role | `~/Applications/zen.AppImage` |
+| **Zen Browser** | AppImage 在 `~/Applications/`，下載時叫 `zen.AppImage`，但用 glob `zen*.AppImage` **比對**（AppImageLauncher 會把整合過的改名成 `zen_<md5>.AppImage`）；從 `zen-browser/desktop` latest release 以精確名稱 `zen-<arch>.AppImage` 挑 asset | ❌ —— 先刪掉所有 `~/Applications/zen*.AppImage` **再**重跑 role（任何殘留的副本都算已安裝） | 同 role | glob 當下命中的那個；`.desktop` 每次 apply 都據此重寫。profile 在 `~/.zen/`（跨版本共用，升級不可逆） |
 | **Alacritty** | `cargo install alacritty` | ❌ —— `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb`（22.04 用 PPA、24.04 用 GitHub release） | ✅ 透過 apt | 同 role | system + `appimagelauncherd.service`（user） |
 | **Bitwarden CLI** (`bw`) | 透過 mise 用 npm 安裝（由 `installBitwarden=true` 控制） | ❌ —— `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
@@ -153,11 +154,13 @@ Ubuntu App Center 是 `snapd` 的 GTK 前端 —— Canonical 的通用套件管
 
 當上游只發佈 AppImage（Zen Browser、Cursor 的舊 AppImage、許多獨立工具）時，我們的慣例是：
 
-1. **穩定檔名**：把檔案放在 `~/Applications/<app>.AppImage`（檔名中無版本或雜湊）。重新跑 ansible 任務只會覆寫它。像 `zen-x86_64_fe71259e...AppImage`（檔名中有舊雜湊後綴）這種形狀是錯的 —— 它們會永遠累積。
+1. **下載用穩定檔名，但永遠不要*依賴*它**：檔案寫成 `~/Applications/<app>.AppImage`（無版本或雜湊），但安裝 guard 要用 **glob**（`<app>*.AppImage`），不是那個確切路徑。AppImageLauncher 會把整合過的 AppImage 改名成 `<app>_<md5>.AppImage`，所以確切路徑的 guard 會讓每次 apply 都重新下載幾百 MB。像 `zen-x86_64_fe71259e...AppImage` 這種也會一直累積 —— glob 命中超過一個時要警告，而不是默默挑一個。
 2. **執行位元 (executable bit)**：在 ansible 任務中用 `mode: '0755'`。
-3. **AppImageLauncher 整合**：`appimagelauncherd.service`（使用者 systemd unit、由我們的 role 設定）監看 `~/Applications/`。新的 AppImage 會觸發首次執行對話框：*"Integrate or Run once?"* —— integrate 會擷取圖示、在 `~/.local/share/applications/` 下產生 `.desktop` 條目，並（選擇性地）將檔案移到 AppImageLauncher 的標準位置。
+3. **AppImageLauncher 整合**：`appimagelauncherd.service`（使用者 systemd unit、由我們的 role 設定）監看 `~/Applications/`。新的 AppImage 會觸發首次執行對話框：*"Integrate or Run once?"* —— integrate 會擷取圖示、在 `~/.local/share/applications/` 下產生 `.desktop` 條目，並**把檔案改成 AppImageLauncher 的標準檔名**。自己寫 `.desktop` **並不能**讓我們豁免：AIL 是透過 `binfmt_misc` 掛在「執行」這件事本身上，任何啟動方式都會先經過它。`ask_to_move = false` 只壓掉對話框、壓不掉搬移（實測過 —— 見下方 pitfall），把檔案移出 `~/Applications` 也只是把改名換成「要不要搬進去」的提示。
+4. **每次 apply 都要重新確立桌面整合**，不是只在下載時做。把當前的 AppImage 路徑解析成一個 fact，每次都據此重寫 `.desktop`，這樣改名會自動自癒，而不是留下一個懸空的 `TryExec=` —— 啟動器對此是**隱藏**條目而不是報錯。如果你也要刪掉 AIL 那份 `appimagekit_*.desktop` 以維持單一權威，記得它和 `ail-cli deintegrate` 都要加 `failed_when: false`：AppImageLauncher **Lite**（noRoot）下沒有 `ail-cli`。[`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md)
+5. **桌面整合任務要 gate 在 `is not skipped`**，不能只用 `is succeeded`。被 `when:` 跳過的任務一樣通過 `is succeeded`，所以下載失敗／被跳過時，後續任務仍會照寫圖示與 `.desktop`，而其 `TryExec=` 指向不存在的檔案 —— 結果是啟動器把該條目**隱藏**而不是報錯，apply log 裡還是 `failed=0`。同時要為下載配一個明確的「沒有符合的 asset」`debug` 警告；`rescue:` 區塊接不住 no-op。完整記錄：[`pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md)
 
-對於我們管理的 AppImage，我們通常在同一個 ansible 任務中自己寫 `.desktop` 條目來跳過對話框 —— 見 Zen Browser。對於你手動丟入的 AppImage（Frpc Desktop），讓對話框處理。
+對於我們管理的 AppImage，我們在同一個 ansible 任務中自己寫 `.desktop` 條目，讓 app **立刻**可被搜尋、不必等第一次啟動 —— 見 Zen Browser。這換來的是即時可用，以及一個穩定的 `.desktop` id 給 `linux_app_register --desktop=` 用；它**不會**阻止 AppImageLauncher 之後整合並改名，所以 role 每次 apply 都會重新確立那個條目。對於你手動丟入的 AppImage（Frpc Desktop），讓對話框處理。
 
 要檢查常駐程式：`systemctl --user status appimagelauncherd`。手動整合：`ail-cli integrate ~/Applications/foo.AppImage`。
 

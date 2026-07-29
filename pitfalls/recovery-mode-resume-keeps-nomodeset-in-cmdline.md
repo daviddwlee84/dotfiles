@@ -81,6 +81,27 @@ If you diagnose the `-22` as a driver or kernel regression you will "fix" it by
 blacklisting a module that was never broken — and lose the iGPU permanently for
 no reason. That is exactly what happened here on 2026-07-25.
 
+Confirmed live on 2026-07-29 by removing the blacklist and loading the module
+by hand on a normal command line, no reboot needed:
+
+```
+$ sudo modprobe amdgpu
+[drm] Initialized amdgpu 3.64.0 for 0000:0c:00.0 on minor 0
+amdgpu 0000:0c:00.0: ring comp_1.3.1 / kiq_0.2.1.0 / sdma0 / vcn_dec_0 /
+                     vcn_enc_0.0 / jpeg_dec  … all initialised
+amdgpu 0000:0c:00.0: [drm] Cannot find any crtc or sizes   # expected: no monitor
+amdgpu 0000:0c:00.0: Runtime PM not available              # expected: desktop iGPU
+```
+
+Zero errors, `card0` appears, the PCI device binds. The module was fine the
+whole time.
+
+> **`modprobe` of a GPU driver restarts the X session.** The running Xorg picks
+> the new DRM device up via udev, then gdm rebuilds the session ~10 s later —
+> new Xorg and gnome-shell PIDs, every graphical app gone. It is a cheaper test
+> than a reboot only in wall-clock terms, not in disruption. Close your work
+> first, or just reboot.
+
 ## Workaround
 
 ```bash

@@ -1,0 +1,139 @@
+#!/bin/bash
+# Install yazi plugins declared in the managed lockfile via `ya pkg install`.
+# Materializes ~/.config/yazi/plugins/ (piper.yazi, duckdb.yazi, …) so the yazi
+# previewers in yazi.toml work.
+#
+# `run_after_*`, NOT `run_onchange_after_*` (which is what this used to be).
+# Same generalisable rule as run_after_25_bat_theme.sh.tmpl: an onchange hash is
+# only a valid gate when the script's PRODUCT lives in chezmoi's tree. This
+# script's product is ~/.config/yazi/plugins/, which chezmoi does not manage and
+# which disappears out-of-band via events that never touch package.toml:
+#
+#   - `ya` missing at apply time (the guard below exits 0) — chezmoi then records
+#     the hash as "done", so installing `ya` later NEVER re-ran this script and
+#     the host stayed plugin-less forever. This is the bug that shipped.
+#   - a $HOME restored/synced without ~/.config/yazi/plugins/
+#   - a hand-deleted or half-written plugin dir
+#
+# Under the old onchange hash none of those re-ran, and yazi then refused to
+# start at all (`init.lua`'s require was fatal — now pcall-guarded there):
+#
+#   Failed to load plugin from ".../duckdb.yazi/main.lua"
+#
+# See pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md.
+#
+# Cost when the plugins are already healthy: one stamp read + one stat per
+# plugin (~2 ms, no network). `ya pkg install` only runs when something is
+# actually missing or the lockfile rev changed.
+#
+# NOTE: `ya pkg install` REWRITES package.toml (normalizes it and strips
+# comments), so the managed source lockfile is kept comment-free to match its
+# canonical output — that is what avoids chezmoi drift. Never add comments to
+# dot_config/yazi/package.toml.
+#
+# Install-only by design — upgrades are `ya pkg upgrade`
+# (`just upgrade-yazi-plugins`). See docs/tools/office-viewers.md.
+#
+# Skip this hook entirely (plugins left exactly as-is):
+#   export CHEZMOI_SKIP_YAZI_PLUGINS=1
+
+set -eu
+
+[ "${CHEZMOI_SKIP_YAZI_PLUGINS:-0}" = "1" ] && exit 0
+
+export PATH="$HOME/.local/bin:$PATH"
+
+# `brew shellenv` costs ~190 ms — more than everything else this script does on
+# the healthy path. Only pay it when `ya` isn't already reachable.
+load_brew_env() {
+{{ if eq .chezmoi.os "darwin" -}}
+    if [[ -f /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -f /usr/local/bin/brew ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+{{ else -}}
+    if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    elif [[ -d "$HOME/.linuxbrew" ]]; then
+        eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+    fi
+{{ end -}}
+}
+
+# --- Shared console logging — info/warn/success/error/die + colour detection.
+# Inlined (not sourced): run-scripts render to a temp path with no route back
+# to the source tree. LOG_STREAM=stdout keeps stderr clean for fleet-apply's
+# local-host drift classifier. Full rationale in the lib header.
+LOG_STREAM=stdout
+{{ include "scripts/lib/log_shared.sh" }}
+# --- end logging helper
+
+command -v ya >/dev/null 2>&1 || load_brew_env
+
+PKG_FILE="$HOME/.config/yazi/package.toml"
+
+# yazi itself is optional — stay quiet on hosts that simply don't have it.
+if ! command -v yazi >/dev/null 2>&1; then
+    exit 0
+fi
+
+# `ya` is yazi's CLI companion; upstream ships it alongside `yazi` in EVERY
+# release asset, so its absence means a partial install (someone copied only the
+# `yazi` binary out of the archive). Warn loudly: without it no plugin can ever
+# be installed, and the failure otherwise surfaces much later as a confusing
+# "Failed to load plugin" from whichever plugin init.lua happens to require.
+if ! command -v ya >/dev/null 2>&1; then
+    warn "\`ya\` (yazi's CLI companion) is missing, but yazi is installed — this is a PARTIAL yazi install."
+    warn "  Consequence: ~/.config/yazi/plugins/ cannot be created, so ALL plugin previewers"
+    warn "  (duckdb.yazi data tables, piper.yazi Office/markdown/epub) are dead."
+    warn "  Fix: install \`ya\` from the SAME yazi release as your \`yazi\` binary, then re-run \`chezmoi apply\`:"
+    warn "    yazi --version   # note the version, then grab the matching release asset"
+    warn "  See pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md"
+    exit 0
+fi
+
+if [ ! -f "$PKG_FILE" ]; then
+    warn "yazi package.toml not found; skipping (chezmoi apply should deploy it)"
+    exit 0
+fi
+
+# Re-install when the managed lockfile changes (rev bump), which is what the old
+# run_onchange_ hash used to cover. Embedded at render time:
+LOCKFILE_HASH='{{ include "dot_config/yazi/package.toml" | sha256sum }}'
+STAMP_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/chezmoi"
+STAMP="$STAMP_DIR/yazi-plugins-lock"
+
+# Expected plugin directory names, derived from the lockfile's `use =` entries:
+#   use = "yazi-rs/plugins:piper"  -> piper.yazi
+#   use = "wylie102/duckdb"        -> duckdb.yazi
+# (take the segment after the last ':' when present, else after the last '/')
+plugins_missing() {
+    local line name
+    while IFS= read -r line; do
+        name="${line##*:}"
+        name="${name##*/}"
+        [ -n "$name" ] || continue
+        if [ ! -f "$HOME/.config/yazi/plugins/${name}.yazi/main.lua" ]; then
+            return 0
+        fi
+    done < <(sed -n 's/^[[:space:]]*use[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$PKG_FILE")
+    return 1
+}
+
+if [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$LOCKFILE_HASH" ] && ! plugins_missing; then
+    exit 0
+fi
+
+info "Installing yazi plugins from package.toml via \`ya pkg install\`"
+if ya pkg install >/dev/null 2>&1; then
+    if plugins_missing; then
+        warn "\`ya pkg install\` reported success but some plugins are still missing — not stamping; will retry next apply"
+        exit 0
+    fi
+    mkdir -p "$STAMP_DIR"
+    printf '%s\n' "$LOCKFILE_HASH" >"$STAMP"
+    success "yazi plugins installed"
+else
+    warn "\`ya pkg install\` failed (network?); plugin previewers unavailable until retried"
+fi

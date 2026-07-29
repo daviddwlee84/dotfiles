@@ -18,7 +18,7 @@ Primary pain points this doc addresses:
 |---------|------|---------------------|---------|
 | Container proxy env (`docker run`, `docker build`) | `~/.docker/config.json` `proxies.default` | Yes, cross-platform | `$LOCAL_PROXY_URL` set at apply time |
 | Rootless daemon registry mirrors (`docker pull` via mirror) | `~/.config/docker/daemon.json` `registry-mirrors` | Yes, Linux + `useChineseMirror` only | `useChineseMirror=true` in chezmoi data |
-| Rootless daemon HTTP proxy (`docker pull` via proxy) | `~/.config/systemd/user/docker.service.d/proxy.conf` | No, manual recipe below | — |
+| Rootless daemon HTTP proxy (`docker pull` via proxy) | `~/.config/docker/daemon.json` `proxies` (Engine ≥ 23) | No — written at runtime by [`docker-net on`](docker-net.md) | explicit command; needs a daemon restart |
 | System daemon proxy / mirrors | `/etc/docker/daemon.json` + `/etc/systemd/system/docker.service.d/http-proxy.conf` | No (requires sudo) | — |
 | Docker Desktop / OrbStack proxy + mirrors | GUI settings | No (GUI-managed) | — |
 | Non-Docker-Hub registries (`gcr.io`, `ghcr.io`, `quay.io`, ...) | Rewrite image refs | No (application-level) | See [kubesre strategy](#strategy-b-prefix-substitution-kubesre) below |
@@ -27,7 +27,8 @@ Source files:
 
 - [dot_docker/modify_config.json.tmpl](../../dot_docker/modify_config.json.tmpl) — client proxy merge script.
 - [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl) — rootless registry-mirrors merge script.
-- [dot_config/zsh/tools/50_networking.zsh](../../dot_config/zsh/tools/50_networking.zsh) — shared `$LOCAL_PROXY_URL` convention and `proxy-on` / `withproxy` helpers.
+- [dot_config/shell/50_networking.sh](../../dot_config/shell/50_networking.sh) — shared `$LOCAL_PROXY_URL` convention and `proxy-on` / `withproxy` helpers.
+- [dot_config/shell/51_docker_net.sh](../../dot_config/shell/51_docker_net.sh) — `docker-net`: diagnose all of the above against the live daemon, write the daemon proxy, and pull through a fallback ladder. Start here when a pull fails: [docker-net.md](docker-net.md).
 
 ## Runtimes at a glance
 
@@ -107,9 +108,25 @@ chezmoi apply
 # then chezmoi apply removes proxies.default on next run.
 ```
 
-## Daemon-side proxy (manual recipes)
+## Daemon-side proxy
 
-Needed when `docker pull` goes through the proxy (e.g. pulling images in GFW territory). Each install variant has its own recipe.
+Needed when `docker pull` goes through the proxy (e.g. pulling images in GFW territory) — which is every image no mirror carries: `ghcr.io`, `gcr.io`, `quay.io`, `registry.k8s.io`, and any Hub image the mirror rate-limits.
+
+### The short way: `docker-net on`
+
+```bash
+docker-net status      # what is configured right now, and is a proxy even needed
+docker-net on          # detect the local proxy, write daemon.json `proxies`, restart
+docker-net off
+```
+
+`docker-net` picks the right file for your install variant, resolves the proxy through the same detector as `proxy-status`, adds every configured mirror host to `no-proxy`, lists the containers a restart would kill, and verifies afterwards that `docker info` actually picked it up. Full guide, including why rootless *can* use a `127.0.0.1` proxy on Docker ≥ 25: [docker-net.md](docker-net.md).
+
+On Engine ≥ 23 this writes `daemon.json`'s `proxies` key rather than a systemd drop-in — one file, identical for rootless and rootful, and it works on hosts without systemd. The manual recipes below remain correct for older engines, and for anyone who prefers the systemd layer.
+
+**macOS**: `docker-net on` deliberately refuses. Docker Desktop and OrbStack run the daemon inside a VM, where `127.0.0.1` is the VM's loopback rather than your Mac's, so their proxy is a UI setting (OrbStack: Settings → Network → Proxy; Desktop: Settings → Resources → Proxies). Everything else — `status`, `doctor`, `mirrors`, and all three rungs of `docker-net pull` — works there unchanged. See [docker-net.md](docker-net.md).
+
+**macOS**: `docker-net on` deliberately refuses. Docker Desktop and OrbStack run the daemon inside a VM, where `127.0.0.1` is the VM's loopback rather than your Mac's, so their proxy is a UI setting (OrbStack: Settings → Network → Proxy; Desktop: Settings → Resources → Proxies). Everything else — `status`, `doctor`, `mirrors`, and all three rungs of `docker-net pull` — works there unchanged. See [docker-net.md](docker-net.md).
 
 ### Rootless Docker (Linux) — systemd --user drop-in
 
@@ -136,7 +153,9 @@ docker info | grep -iE 'proxy'
 #  No Proxy: localhost,127.0.0.1,...
 ```
 
-This is **not** chezmoi-managed. Reason: editing it requires a daemon restart, which kills running containers — unacceptable for an automated apply path. Manage it yourself when the proxy URL changes.
+This is **not** chezmoi-managed. Reason: editing it requires a daemon restart, which kills running containers — unacceptable for an automated apply path, and the proxy port differs per host and per session anyway (Clash Verge 7897, mihomo 7890, an ad-hoc SSH tunnel). An explicit command may do what an implicit `chezmoi apply` must not, which is why `docker-net on` exists. Manage it yourself when the proxy URL changes.
+
+A drop-in left behind here after switching to rootless is a common trap: it is read by the *rootful* `docker.service`, which the rootless pivot disabled, so `docker info` keeps reporting no proxy while a perfectly correct-looking config file sits on disk. `docker-net doctor` flags it. See [pitfalls/docker-proxy-set-but-docker-info-shows-empty.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/docker-proxy-set-but-docker-info-shows-empty.md).
 
 If the user unit is in a non-canonical location (some distros ship it differently), find it with `systemctl --user status docker` and look for the `Loaded:` line.
 
@@ -173,24 +192,32 @@ Native Docker mechanism. `daemon.json`:
 ```json
 {
   "registry-mirrors": [
-    "https://docker.m.daocloud.io",
-    "https://docker.mirrors.ustc.edu.cn",
-    "https://docker.nju.edu.cn",
-    "https://mirror.iscas.ac.cn",
-    "https://mirror.baidubce.com"
+    "https://docker.m.daocloud.io"
   ]
 }
 ```
 
-Order matters: Docker tries mirrors sequentially and falls back to `docker.io` on failure. DaoCloud first because it's the most complete, academic mirrors next as fallback.
+Order matters: Docker tries mirrors sequentially and falls back to `docker.io` on failure. **A dead entry is not free** — it costs a timeout, and a mirror that answers `403`/`502` produces an error containerd surfaces as `failed to resolve reference`, which reads like "that image does not exist". Keep the list short and measured, not aspirational. `docker-net mirrors` re-measures it in about a second.
 
 **Critical limitation**: `registry-mirrors` only mirrors `docker.io` (Docker Hub). It does **nothing** for `gcr.io` / `ghcr.io` / `quay.io` / `registry.k8s.io` / `mcr.microsoft.com` / `nvcr.io`. Those need [Strategy B](#strategy-b-prefix-substitution-kubesre).
 
-**Mirror endpoint rot**: mirror providers go dark, rate-limit, or get blocked. Current status notes (as of 2026):
+**Mirror endpoint rot**: mirror providers go dark, rate-limit, or get blocked — and the managed list rots silently, because nothing fails loudly until you pull. Measured 2026-07 from a CN residential line (`curl https://<host>/v2/`):
 
-- `docker.m.daocloud.io` — primary for most users. Known issue tracked at [DaoCloud/public-image-mirror#2328](https://github.com/DaoCloud/public-image-mirror/issues/2328) (large image pulls sometimes stall); workaround is retry or fall through to the next mirror.
-- `docker.mirrors.ustc.edu.cn`, `docker.nju.edu.cn`, `mirror.iscas.ac.cn` — academic mirrors; generally reliable, sometimes slower.
-- `mirror.baidubce.com` — Baidu Cloud; reliable but rate-limited.
+| Mirror | Result | Status |
+|---|---|---|
+| `docker.m.daocloud.io` | `401`, 47 ms | **kept** — the only survivor |
+| `docker.mirrors.ustc.edu.cn` | `Could not resolve host` | removed — the domain has no DNS record at all |
+| `docker.nju.edu.cn` | `403` | removed — campus network only |
+| `mirror.iscas.ac.cn` | `502` | removed |
+| `mirror.baidubce.com` | `SSL_ERROR_SYSCALL` | removed — reachable only from inside Baidu Cloud |
+
+DaoCloud still has the known stall on large pulls ([DaoCloud/public-image-mirror#2328](https://github.com/DaoCloud/public-image-mirror/issues/2328)), and it answers `403 Forbidden` for images it has not cached or has rate-limited. With four dead entries behind it there was nothing to fall through to, which is what made GFW pulls feel randomly broken. The replacement for "more mirrors" is the daemon proxy and [`docker-net pull`](docker-net.md#docker-net-pull--the-fallback-ladder), not a longer list — fewer pull-through caches is also a smaller `tag→digest` trust surface.
+
+Re-measure at any time:
+
+```bash
+docker-net mirrors
+```
 
 **Removed for supply-chain safety** (2026-07): `dockerhub.azk8s.cn` (deprecated Azure-China mirror) and `dockerproxy.com` (third-party, ToS-churned) were dropped from the managed list. A pull-through mirror resolves `tag→digest`, and Docker Content Trust is off by default, so a dead/third-party mirror domain that lapses and gets re-registered by an attacker becomes a malicious pull-through cache that can serve a tampered image for a tag like `latest`. If you re-add any mirror, prefer high-reputation operators; for sensitive images pull by digest (`repo@sha256:…`) or enable Content Trust. See [mirrors.md → Security and trust model](mirrors.md#security-and-trust-model).
 
@@ -205,10 +232,10 @@ docker info | grep -A10 'Registry Mirrors'
 - **Rootless Docker (Linux, repo default)** — `~/.config/docker/daemon.json`. **Chezmoi-managed** via [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl), gated on `useChineseMirror=true` + Linux OS. After apply, run:
 
   ```bash
-  systemctl --user daemon-reload && systemctl --user restart docker
+  systemctl --user reload docker      # SIGHUP — running containers survive
   ```
 
-  chezmoi intentionally does not auto-restart (would kill running containers; not safe for an implicit apply).
+  `registry-mirrors` is in Docker's SIGHUP-reloadable config set, so a **reload is enough** and your containers keep running (measured on Engine 29.6.2 rootless with 8 containers up: daemon PID and start timestamp unchanged). A full `restart` is only needed for keys that are not reloadable — notably `proxies`. chezmoi does neither automatically.
 
 - **OrbStack** — `~/.orbstack/config/docker.json` or GUI Settings > Docker > "Docker daemon config". OrbStack reapplies on save.
 
@@ -221,13 +248,11 @@ docker info | grep -A10 'Registry Mirrors'
   sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
   {
     "registry-mirrors": [
-      "https://docker.m.daocloud.io",
-      "https://docker.mirrors.ustc.edu.cn",
-      "https://mirror.baidubce.com"
+      "https://docker.m.daocloud.io"
     ]
   }
   EOF
-  sudo systemctl daemon-reload && sudo systemctl restart docker
+  sudo systemctl reload docker
   ```
 
 ##### Migration note: pre-pivot rootful installs
@@ -247,7 +272,7 @@ Turn mirrors off without editing the template:
 chezmoi init --force   # answer `n` to useChineseMirror
 chezmoi apply
 # the modify script strips .["registry-mirrors"] on next apply
-systemctl --user daemon-reload && systemctl --user restart docker
+systemctl --user reload docker
 ```
 
 ### Strategy B: prefix substitution (kubesre)

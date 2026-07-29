@@ -421,7 +421,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
 | `docker` | OrbStack (macOS), Docker rootless (Linux) | macOS: brew cask `orbstack` (skips if `/Applications/Docker.app` exists) · Debian/Ubuntu: `apt` prereqs (`uidmap`, `dbus-user-session`, `fuse-overlayfs`, `slirp4netns`, `iptables`) → `curl https://get.docker.com \| sh` → `docker-ce-rootless-extras` → `dockerd-rootless-setuptool.sh install` user systemd unit |
-| `gui_apps_linux` (Linux Debian + `ubuntu_desktop` profile) | Alacritty, libfuse2, AppImageLauncher, VSCode, Cursor, Discord, Zen Browser, CopyQ, playerctl/wmctrl/xdotool | Alacritty: cargo build (apt deps `cmake`, `pkg-config`, font/X libs) · AppImageLauncher: PPA → GitHub `.deb` → Lite AppImage to `~/Applications/` · VSCode: Microsoft apt repo · Cursor: `.deb` from `cursor.com/api/download` · Discord: flatpak (Flathub user-scope, default) or `.deb` via `discordChannel` chooser · Zen Browser: AppImage to `~/Applications/zen.AppImage` |
+| `gui_apps_linux` (Linux Debian + `ubuntu_desktop` profile) | Alacritty, libfuse2, AppImageLauncher, VSCode, Cursor, Google Chrome, Discord, Zen Browser, CopyQ, playerctl/wmctrl/xdotool | Alacritty: cargo build (apt deps `cmake`, `pkg-config`, font/X libs) · AppImageLauncher: PPA → GitHub `.deb` → Lite AppImage to `~/Applications/` · VSCode: Microsoft apt repo · Cursor: `.deb` from `cursor.com/api/download` · Google Chrome: `.deb` from `dl.google.com` (x86_64 only) · Discord: flatpak (Flathub user-scope, default) or `.deb` via `discordChannel` chooser · Zen Browser: AppImage to `~/Applications/zen.AppImage` |
 | `auditd` (Linux, gated `installAuditd`) | `auditd` + `audispd-plugins` (Debian) / `audit` (RedHat); rule files `00-baseline.rules`, `05-privileged.rules`, optional `10-execve.rules`, `99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`, `gitleaks` | macOS: brew (`gitleaks`) + uv (`pre-commit`) · Linux: gitleaks from GitHub release (system → `/usr/local/bin`; user fallback → `~/.local/bin`) + uv pre-commit. **Go is no longer here** — it moved to mise (`go = "latest"`, gated `installExtraRuntimes`). |
 | `bitwarden` (gated `installBitwarden`) | `@bitwarden/cli` + Bitwarden Desktop (when `bitwarden_install_desktop=true`) | CLI: `mise exec -- npm install -g @bitwarden/cli` (preferred) / system npm fallback · Desktop: macOS brew cask · Linux: snap → `.deb` fallback |
@@ -882,12 +882,14 @@ noRoot path if the tool is broadly useful.
 
 Yazi's built-in plugin manager. `ya` (the yazi CLI companion) clones a plugin, copies it into `~/.config/yazi/plugins/`, and pins its revision in `~/.config/yazi/package.toml`.
 
-In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by a hash-gated run-script, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever the lockfile changes. `ya pkg install` **rewrites** `package.toml` (normalizes it and strips comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift (never add comments to it).
+> **`ya` and `yazi` are a matched pair.** Every upstream release asset ships both binaries; installing only `yazi` yields a host that can never acquire a plugin, and yazi then refuses to start at all (`Failed to load plugin from …/duckdb.yazi/main.lua`). The `devtools` role installs and probes for both. See [pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md).
+
+In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by `.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever a declared plugin is missing from `~/.config/yazi/plugins/` **or** the lockfile hash changed. (It is deliberately `run_after_`, not `run_onchange_`: the plugins live outside chezmoi's tree, so a content hash cannot detect them going missing.) `ya pkg install` **rewrites** `package.toml` (normalizes it and strips comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift (never add comments to it).
 
 | Plugin | Purpose |
 |---|---|
 | `yazi-rs/plugins:piper` (`piper.yazi`) | "pipe any shell command as a previewer" — backs the Office-document previewers in `dot_config/yazi/yazi.toml` (`piper -- view-office --preview …`) and the feather/sqlite preview fallbacks. See [office-viewers.md](../tools/office-viewers.md). |
-| `wylie102/duckdb` (`duckdb.yazi`) | DuckDB-powered table previewer for data files (csv/tsv/parquet/xlsx/db/duckdb) — `run = "duckdb"` in `dot_config/yazi/yazi.toml` + required `require("duckdb"):setup{}` in `dot_config/yazi/init.lua`. Uses the `duckdb` CLI. See [data-viewers.md](../tools/data-viewers.md). |
+| `wylie102/duckdb` (`duckdb.yazi`) | DuckDB-powered table previewer for data files (csv/tsv/parquet/xlsx/db/duckdb) — `run = "duckdb"` in `dot_config/yazi/yazi.toml` + required (`pcall`-guarded) `require("duckdb"):setup{}` in `dot_config/yazi/init.lua`. Uses the `duckdb` CLI. See [data-viewers.md](../tools/data-viewers.md). |
 
 **Add a plugin:** `ya pkg add <owner>/<repo>:<plugin>`, then copy `~/.config/yazi/package.toml` back into the source. **Upgrade:** `ya pkg upgrade` → `just upgrade-yazi-plugins` (install-only by design; apply never bumps revs). Requires a recent yazi (`ya pkg` replaced the older `ya pack`).
 
@@ -963,7 +965,7 @@ manually removed and re-installed.
 | **Docker convenience-script install** | No upgrade target | re-run `curl get.docker.com \| sh` |
 | **OrbStack** | Macos brew cask | Covered by `cat_brew --cask --greedy` |
 | **Cursor `.deb`** / **Discord `.deb`** / **VSCode (Microsoft apt)** | apt-side, not chezmoi-side | apt-upgrade |
-| **Zen Browser AppImage** / **AppImageLauncher Lite** | One-shot download, `creates:` guard | Delete AppImage, re-apply |
+| **Zen Browser AppImage** / **AppImageLauncher Lite** | One-shot download; Zen's guard globs `zen*.AppImage` (AppImageLauncher renames integrated copies) | Delete **every** `~/Applications/zen*.AppImage`, re-apply |
 | **Hack Nerd Font** | `latest` URL, no version tracking | Delete font dir, re-apply |
 | **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool** | System packages, no upgrade automation | apt-upgrade |
 | **auditd rules** | Config files, not a "tool" with versions | Edit rule template, re-apply |
@@ -1069,6 +1071,7 @@ list.
 | **freeze** | brew | GitHub release | devtools |
 | **fzf** | brew (via `lazyvim_deps`) | chezmoi external + `~/.fzf/install --bin` | lazyvim_deps + externals |
 | **gawk** | brew | apt/yum | bash |
+| **google-chrome-stable** | (Brewfile cask territory) | `.deb` from `dl.google.com`; postinst self-registers the apt repo, so `apt upgrade` maintains it. **x86_64 only** — no arm64 Linux build exists | gui_apps_linux — a Chromium-engine backup browser; Ubuntu has no Chromium `.deb`, only a snap shim |
 | **gcc / gcc-c++ / make** | (Xcode CLT) | apt (`build-essential`) / yum | base + bootstrap |
 | **gemini** (Gemini CLI) | brew formula `gemini-cli` → npm fallback | `mise exec -- npm install -g @google/gemini-cli` | coding_agents |
 | **gh** | brew | vendor apt (.deb) → GitHub tarball | base/devtools |
@@ -1160,6 +1163,7 @@ list.
 | **sevenzip** (7-Zip; `7zz` / `7z`) | brew (`sevenzip`) | apt (`p7zip-full`) | devtools — yazi archive + dmg listing. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **shellcheck / shfmt** | brew | apt or release | devtools |
 | **sidecar** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
+| **skopeo** | brew | apt (`universe`) | devtools — client-side registry copy; rung 3 of `docker-net pull`. See [docker-net.md](../tools/docker-net.md) |
 | **smartmontools** (`smartctl`) | n/a | apt/yum | homelab_tools |
 | **specify-cli** | `uv tool install` from git | same | coding_agents |
 | **specstory** | brew tap `specstoryai/tap` → GitHub release | GitHub release tarball | coding_agents |
@@ -1210,7 +1214,7 @@ list.
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
 | **yt-dlp** | uv tool | uv tool | python_uv_tools |
-| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage` | gui_apps_linux |
+| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`, thereafter matched by glob `zen*.AppImage` | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl official installer | devtools |
 | **zsh** | brew | apt/yum / source build (RHEL 7) | zsh |
@@ -1278,7 +1282,7 @@ Is the tool a coding agent CLI (vendor-distributed, ships its own installer)?
 Is it a Yazi plugin?
 ├── Yes → ya pkg (Yazi's plugin manager; § 15). Lockfile
 │         dot_config/yazi/package.toml (chezmoi-managed), materialized by
-│         run_onchange_after_45_yazi_plugins. `ya pkg add owner/repo:plugin`,
+│         run_after_45_yazi_plugins. `ya pkg add owner/repo:plugin`,
 │         copy package.toml back; upgrade via `ya pkg upgrade` (just upgrade-yazi-plugins)
 └── No → continue
 

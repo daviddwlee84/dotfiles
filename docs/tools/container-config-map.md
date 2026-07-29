@@ -19,8 +19,8 @@ The canonical paths per reader:
 | Reader | Canonical path | Contents | Notes |
 |--------|----------------|----------|-------|
 | Docker CLI | `~/.docker/config.json` | `auths`, `credsStore`, `credHelpers`, `currentContext`, `proxies.default`, `plugins`, `features` | Not a daemon file. Overridable with `$DOCKER_CONFIG`. |
-| Docker daemon (rootful) | `/etc/docker/daemon.json` | `registry-mirrors`, `data-root`, `dns`, `insecure-registries`, `experimental`, `features`, ... | Requires root to edit. |
-| Docker daemon (rootless) | `~/.config/docker/daemon.json` | Same schema as rootful | Path deliberately different from the CLI dir (`~/.docker`). |
+| Docker daemon (rootful) | `/etc/docker/daemon.json` | `registry-mirrors`, `proxies`, `data-root`, `dns`, `insecure-registries`, `experimental`, `features`, ... | Requires root to edit. `proxies` (Engine ≥ 23) is the daemon-side proxy — the one `docker pull` obeys. |
+| Docker daemon (rootless) | `~/.config/docker/daemon.json` | Same schema as rootful | Path deliberately different from the CLI dir (`~/.docker`). Two writers, one key each — see below. |
 | systemd (rootful) | `/etc/systemd/system/docker.service.d/*.conf` | `Environment=HTTP_PROXY=...`, `ExecStart=` overrides | Drop-in, runs under PID 1. |
 | systemd (rootless) | `~/.config/systemd/user/docker.service.d/*.conf` | Same idea | Runs under `systemctl --user`. |
 | Docker Desktop (macOS) | `~/Library/Group Containers/group.com.docker/settings-store.json` | Full Desktop settings store (proxy, Kubernetes toggle, resource limits, ...) | Editing directly is discouraged; GUI overwrites. |
@@ -125,16 +125,20 @@ Recap of boundaries — full operating recipes are in [containers.md](containers
 | Layer | File | Who writes it |
 |-------|------|---------------|
 | System layer (root) | `/etc/docker/...`, `/etc/systemd/...` | Ansible (with `sudo`), only for the rootful fallback path; normally not touched |
-| User layer (daemon) | `~/.config/docker/daemon.json` | chezmoi: [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl) |
-| User layer (systemd override) | `~/.config/systemd/user/docker.service.d/proxy.conf` | Manual (recipe in `containers.md`) |
+| User layer (daemon, `registry-mirrors`) | `~/.config/docker/daemon.json` | chezmoi: [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl) |
+| User layer (daemon, `proxies`) | `~/.config/docker/daemon.json` | `docker-net on` / `off` at runtime ([docker-net.md](docker-net.md)) |
+| User layer (systemd override) | `~/.config/systemd/user/docker.service.d/proxy.conf` | Manual, and only needed on Engine < 23 (recipe in `containers.md`) |
 | User layer (client) | `~/.docker/config.json` | chezmoi: [dot_docker/modify_config.json.tmpl](../../dot_docker/modify_config.json.tmpl) |
 | Install itself | Docker Engine + rootless setup | Ansible: [dot_ansible/roles/docker/tasks/main.yml](../../dot_ansible/roles/docker/tasks/main.yml) |
 | Desktop apps | OrbStack / Docker Desktop settings | The GUI owns them; don't track in dotfiles |
 
 Principle: **system-layer config goes through Ansible (with sudo), user-layer config goes through chezmoi.** The rootless pivot is what makes that line clean on Linux — the only Docker config chezmoi manages now is user-scoped, so it works without root.
 
+`~/.config/docker/daemon.json` is the one file with two writers, and they stay out of each other's way by owning **disjoint keys**: the chezmoi `modify_` script only ever sets or deletes `registry-mirrors`, so a `proxies` block written by `docker-net` survives every apply. The split is deliberate — a mirror list is the same on every host and belongs in the template, while a proxy URL moves per host and per session and would go stale the moment it were baked in at apply time.
+
 ## Related
 
 - [containers.md](containers.md) — operating recipes, proxy strategies, mirror endpoint notes, troubleshooting.
 - [web-reader.md](web-reader.md) — the `$LOCAL_PROXY_URL` convention shared with the shell proxy helpers.
-- [dot_config/zsh/tools/50_networking.zsh](../../dot_config/zsh/tools/50_networking.zsh) — `proxy-on` / `withproxy` helpers and the rootless `DOCKER_HOST` export.
+- [docker-net.md](docker-net.md) — diagnosing which of these files the live daemon actually read, and writing the daemon proxy.
+- [dot_config/shell/50_networking.sh](../../dot_config/shell/50_networking.sh) — `proxy-on` / `withproxy` helpers and the rootless `DOCKER_HOST` export.

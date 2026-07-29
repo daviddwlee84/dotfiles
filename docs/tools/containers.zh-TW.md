@@ -23,7 +23,7 @@
 |---------|------|---------------------|---------|
 | 容器代理環境變數 (`docker run`、`docker build`) | `~/.docker/config.json` 的 `proxies.default` | 是，跨平台 | apply 時 `$LOCAL_PROXY_URL` 已設定 |
 | 無根 daemon 的 registry mirrors (`docker pull` 經由 mirror) | `~/.config/docker/daemon.json` 的 `registry-mirrors` | 是，僅限 Linux + `useChineseMirror` | chezmoi data 中 `useChineseMirror=true` |
-| 無根 daemon 的 HTTP 代理 (`docker pull` 經由代理) | `~/.config/systemd/user/docker.service.d/proxy.conf` | 否，下方有手動配方 | — |
+| 無根 daemon 的 HTTP 代理 (`docker pull` 經由代理) | `~/.config/docker/daemon.json` 的 `proxies`（Engine ≥ 23） | 否 —— 由 [`docker-net on`](docker-net.md) 在執行期寫入 | 明確下指令；需要重啟 daemon |
 | 系統 daemon 代理 / mirrors | `/etc/docker/daemon.json` + `/etc/systemd/system/docker.service.d/http-proxy.conf` | 否（需要 sudo） | — |
 | Docker Desktop / OrbStack 代理 + mirrors | GUI 設定 | 否（由 GUI 管理） | — |
 | 非 Docker Hub 的 registry (`gcr.io`、`ghcr.io`、`quay.io`、…) | 改寫 image 引用 | 否（應用層級） | 見下方 [kubesre 策略](#strategy-b-prefix-substitution-kubesre) |
@@ -32,7 +32,8 @@
 
 - [dot_docker/modify_config.json.tmpl](../../dot_docker/modify_config.json.tmpl) — client 端代理合併腳本。
 - [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl) — 無根 registry-mirrors 合併腳本。
-- [dot_config/zsh/tools/50_networking.zsh](../../dot_config/zsh/tools/50_networking.zsh) — 共用的 `$LOCAL_PROXY_URL` 慣例與 `proxy-on` / `withproxy` 輔助函式。
+- [dot_config/shell/50_networking.sh](../../dot_config/shell/50_networking.sh) — 共用的 `$LOCAL_PROXY_URL` 慣例與 `proxy-on` / `withproxy` 輔助函式。
+- [dot_config/shell/51_docker_net.sh](../../dot_config/shell/51_docker_net.sh) — `docker-net`：對「活著的」daemon 診斷上述所有層級、寫入 daemon 代理、以降級階梯拉取 image。pull 失敗時從這裡開始：[docker-net.md](docker-net.md)。
 
 ## 執行階段一覽
 
@@ -112,9 +113,23 @@ chezmoi apply
 # 下次 chezmoi apply 就會把 proxies.default 移除。
 ```
 
-## Daemon 端代理（手動配方）
+## Daemon 端代理
 
-當 `docker pull` 需要走代理時（例如在 GFW 範圍內拉 image）。每種安裝變體都有自己的配方。
+當 `docker pull` 需要走代理時（例如在 GFW 範圍內拉 image）—— 也就是每一個 mirror 不涵蓋的 image：`ghcr.io`、`gcr.io`、`quay.io`、`registry.k8s.io`，以及任何被 mirror 限流的 Hub image。
+
+### 快路徑：`docker-net on`
+
+```bash
+docker-net status      # 現在到底設了什麼，以及需不需要 proxy
+docker-net on          # 偵測本機 proxy、寫入 daemon.json 的 `proxies`、重啟
+docker-net off
+```
+
+`docker-net` 會依你的安裝變體挑對檔案、用和 `proxy-status` 同一個偵測器解析 proxy、把每個生效中的 mirror 主機加進 `no-proxy`、在重啟前列出會被殺掉的 container，並在事後用 `docker info` 驗證真的吃進去了。完整說明（含為什麼 rootless 在 Docker ≥ 25 上*可以*用 `127.0.0.1` proxy）：[docker-net.md](docker-net.md)。
+
+在 Engine ≥ 23 上這寫的是 `daemon.json` 的 `proxies` key 而不是 systemd drop-in —— 單一檔案、rootless 與 rootful 寫法相同，而且在沒有 systemd 的主機上也能用。下面的手動配方對舊版 engine 仍然正確，也留給偏好走 systemd 那層的人。
+
+**macOS**:`docker-net on` 會刻意拒絕。Docker Desktop 與 OrbStack 把 daemon 跑在 VM 裡,那裡的 `127.0.0.1` 是 VM 自己的 loopback 而不是你 Mac 的,所以它們的 proxy 是 UI 設定(OrbStack:Settings → Network → Proxy;Desktop:Settings → Resources → Proxies)。其餘功能 —— `status`、`doctor`、`mirrors`,以及 `docker-net pull` 的三階降級 —— 在 macOS 上都照常運作。見 [docker-net.md](docker-net.md)。
 
 ### 無根 Docker（Linux）—— systemd --user drop-in
 
@@ -178,24 +193,32 @@ Docker 原生機制。`daemon.json`：
 ```json
 {
   "registry-mirrors": [
-    "https://docker.m.daocloud.io",
-    "https://docker.mirrors.ustc.edu.cn",
-    "https://docker.nju.edu.cn",
-    "https://mirror.iscas.ac.cn",
-    "https://mirror.baidubce.com"
+    "https://docker.m.daocloud.io"
   ]
 }
 ```
 
-順序很重要：Docker 會依序嘗試 mirror，失敗時 fallback 到 `docker.io`。把 DaoCloud 放第一，因為它最完整；學術 mirror 放後面當 fallback。
+順序很重要：Docker 會依序嘗試 mirror，失敗時 fallback 到 `docker.io`。但**死掉的項目不是免費的** —— 每一個都要吃一次 timeout，而回 `403`/`502` 的 mirror 會產生 containerd 呈現為 `failed to resolve reference` 的錯誤，讀起來就像「這個 image 不存在」。清單要短、要有實測依據，不要放願望清單。`docker-net mirrors` 一秒內就能重新量一次。
 
 **關鍵限制**：`registry-mirrors` 只會鏡像 `docker.io` (Docker Hub)。對 `gcr.io` / `ghcr.io` / `quay.io` / `registry.k8s.io` / `mcr.microsoft.com` / `nvcr.io` **完全沒用**。那些需要 [策略 B](#strategy-b-prefix-substitution-kubesre)。
 
-**Mirror 端點壽命**：mirror 提供者可能下線、限速或被封鎖。目前狀態筆記（截至 2026 年）：
+**Mirror 端點壽命**：mirror 提供者可能下線、限速或被封鎖 —— 而且受管清單是**無聲腐爛**的，在你真的去 pull 之前不會有任何東西報錯。2026-07 從中國住宅網路實測（`curl https://<host>/v2/`）：
 
-- `docker.m.daocloud.io` —— 多數使用者的首選。已知問題追蹤於 [DaoCloud/public-image-mirror#2328](https://github.com/DaoCloud/public-image-mirror/issues/2328)（大型 image 拉取偶爾會卡住）；解法是重試或換下一個 mirror。
-- `docker.mirrors.ustc.edu.cn`、`docker.nju.edu.cn`、`mirror.iscas.ac.cn` —— 學術 mirror；通常可靠，有時較慢。
-- `mirror.baidubce.com` —— 百度雲；可靠但有限速。
+| Mirror | 結果 | 處置 |
+|---|---|---|
+| `docker.m.daocloud.io` | `401`，47 ms | **保留** —— 唯一活著的 |
+| `docker.mirrors.ustc.edu.cn` | `Could not resolve host` | 移除 —— 網域已經沒有 DNS 紀錄 |
+| `docker.nju.edu.cn` | `403` | 移除 —— 校園網限定 |
+| `mirror.iscas.ac.cn` | `502` | 移除 |
+| `mirror.baidubce.com` | `SSL_ERROR_SYSCALL` | 移除 —— 只有百度雲內網連得到 |
+
+DaoCloud 仍有大型 pull 卡住的已知問題（[DaoCloud/public-image-mirror#2328](https://github.com/DaoCloud/public-image-mirror/issues/2328)），而且對沒快取或被限流的 image 會回 `403 Forbidden`。過去它後面跟著四個死掉的項目，等於根本沒有 fallback 可掉 —— 這就是 GFW 下 pull 感覺「時好時壞」的來源。「加更多 mirror」的正確替代品是 daemon proxy 與 [`docker-net pull`](docker-net.md#docker-net-pull--the-fallback-ladder)，不是更長的清單 —— 少一個 pull-through cache 同時也少一個 `tag→digest` 的信任面。
+
+隨時重新量測：
+
+```bash
+docker-net mirrors
+```
 
 **為供應鏈安全已移除 (removed for supply-chain safety，2026-07)**：`dockerhub.azk8s.cn`（已棄用的 Azure-China 鏡像）與 `dockerproxy.com`（第三方、ToS 反覆變更）已從受管清單移除。pull-through 鏡像負責解析 `tag→digest`，而 Docker Content Trust 預設關閉，因此一個失效／第三方的鏡像域名一旦註冊過期並被攻擊者重新註冊，就會變成惡意的 pull-through cache，可對 `latest` 之類的 tag 供應被竄改的 image。若要重新加入任何鏡像，請優先選擇高信譽營運方；敏感 image 請以 digest 拉取（`repo@sha256:…`）或啟用 Content Trust。見 mirrors.md 的「安全性與信任模型 (Security and trust model)」一節。
 
@@ -210,8 +233,10 @@ docker info | grep -A10 'Registry Mirrors'
 - **無根 Docker（Linux，repo 預設）** —— `~/.config/docker/daemon.json`。**由 chezmoi 管理**，透過 [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl)，需 `useChineseMirror=true` + Linux OS 才會啟用。apply 後執行：
 
   ```bash
-  systemctl --user daemon-reload && systemctl --user restart docker
+  systemctl --user reload docker      # SIGHUP —— 執行中的 container 不會被殺
   ```
+
+  `registry-mirrors` 屬於 Docker 可以用 SIGHUP 重載的設定集合，所以 **reload 就夠了**，container 會繼續跑（在 Engine 29.6.2 rootless、8 個 container 執行中實測：daemon 的 PID 與啟動時間都沒變）。只有不可重載的 key 才需要完整 `restart` —— 主要是 `proxies`。chezmoi 兩者都不會自動做。
 
   chezmoi 刻意不自動重啟（會殺掉執行中的容器；對隱式 apply 不安全）。
 
