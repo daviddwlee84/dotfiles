@@ -194,7 +194,7 @@ marimo_py_sandbox = [
 # Previewers — three families this repo wires explicitly, via yazi plugins
 # auto-installed by `ya pkg install` on chezmoi apply (lockfile:
 # dot_config/yazi/package.toml; installer:
-# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl).
+# .chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl).
 # NOTE: images / PDF / video / SVG / standard archives are handled by yazi's
 # BUILT-IN previewers (not wired here); those shell out to chafa/poppler/7zip/
 # resvg — plus ffmpeg/imagemagick when installMediaTools — installed by the

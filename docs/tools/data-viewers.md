@@ -43,7 +43,7 @@ Three pieces make it work in this repo:
 | Piece | Path | Role |
 |---|---|---|
 | Lockfile (SSOT) | `dot_config/yazi/package.toml` | pins `wylie102/duckdb` (rev + hash) |
-| Init | `dot_config/yazi/init.lua` | **required** `require("duckdb"):setup({ mode = "standard" })` |
+| Init | `dot_config/yazi/init.lua` | **required** `require("duckdb"):setup({ mode = "standard" })`, wrapped in `pcall` so a missing plugin warns instead of blocking yazi startup |
 | Wiring | `dot_config/yazi/yazi.toml` `[plugin]` | `prepend_previewers` + `prepend_preloaders` (`run = "duckdb"`) |
 
 The `setup()` call in `init.lua` is mandatory — without it the `run = "duckdb"` rules never activate.
@@ -97,7 +97,7 @@ that the preview fallback above also relies on.
 
 | Surface | Path |
 |---|---|
-| Plugin lockfile + installer | `dot_config/yazi/package.toml`, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl` |
+| Plugin lockfile + installer | `dot_config/yazi/package.toml`, `.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl` |
 | Plugin init | `dot_config/yazi/init.lua` |
 | Previewers + preloaders | `dot_config/yazi/yazi.toml` `[plugin]` |
 | Keybindings | `dot_config/yazi/keymap.toml` |
@@ -107,6 +107,16 @@ that the preview fallback above also relies on.
 
 ## Gotchas
 
+- **No plugins at all? Check for `ya`, not duckdb.** If yazi dies at startup with
+  `Failed to load plugin from ".../duckdb.yazi/main.lua"`, the usual cause is that `ya` (yazi's CLI
+  companion, shipped alongside `yazi` in every release asset) was never installed — so
+  `~/.config/yazi/plugins/` was never created and `piper.yazi` is missing too. `ya --version` is the
+  one-command diagnosis; `ya pkg install` is the fix. `init.lua` now wraps the `require` in `pcall`,
+  so yazi starts anyway and warns instead of refusing to launch. See
+  [pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md).
+- **`ya.err` needs `YAZI_LOG`.** Plugin errors only reach `~/.local/state/yazi/yazi.log` when the env
+  var is set — `YAZI_LOG=debug yazi`. Without it the log file doesn't even exist, which makes plugin
+  problems look like they leave no trace.
 - **`.xlsx` first preview needs internet.** duckdb.yazi reads Excel via DuckDB's `spatial` extension,
   which it `INSTALL`s on first use — the first `.xlsx` preview on a fresh machine downloads it (cached
   in `~/.duckdb` afterwards). CSV/TSV/Parquet/DB previews use built-ins and need no network.

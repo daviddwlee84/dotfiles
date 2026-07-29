@@ -2285,12 +2285,21 @@
         msg: "direnv installation failed (likely network timeout) - skipping"
 
 # --- yazi ---
-- name: Check if yazi is installed
+# Probe BOTH binaries. Upstream ships `yazi` (the TUI) and `ya` (its CLI
+# companion) as a pair in every release asset, and `ya` is what materializes
+# ~/.config/yazi/plugins/ via `ya pkg install` (run-script 45). A yazi-only
+# install is silently plugin-less: run-script 45 hits its `command -v ya` guard
+# and exits 0, so duckdb.yazi/piper.yazi never land and every plugin previewer
+# is dead. Checking `yazi` alone cannot detect that.
+# See pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md.
+- name: Check if yazi and its `ya` CLI companion are installed
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: yazi --version
+  ansible.builtin.shell: command -v yazi && command -v ya
   register: yazi_check
   changed_when: false
   failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Install yazi from GitHub releases (Debian/Ubuntu)
   # Upstream ships musl `.deb` assets for x86_64 and aarch64; use those over
@@ -2341,12 +2350,14 @@
 # --- yazi (user-level fallback) ---
 # Gate broadened to RedHat per pitfalls/centos7-noroot.md — yazi ships
 # `-unknown-linux-musl.zip` and works on glibc 2.17.
-- name: Re-check if yazi is installed
+- name: Re-check if yazi and its `ya` CLI companion are installed
   when: ansible_facts["os_family"] in ["Debian", "RedHat"]
-  ansible.builtin.shell: command -v yazi
+  ansible.builtin.shell: command -v yazi && command -v ya
   register: yazi_recheck
   changed_when: false
   failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Install yazi from GitHub releases (user-level, no sudo)
   # Prefer the musl .zip asset over unknown-linux-gnu.zip. See sudo-path
@@ -2378,13 +2389,16 @@
       retries: 3
       delay: 5
 
-    - name: Extract and install yazi (user)
+    - name: Extract and install yazi + ya (user)
+      # BOTH binaries, always. Copying only `yazi` leaves the host permanently
+      # plugin-less with no error anywhere — see the probe comment above.
       ansible.builtin.shell: |
         cd /tmp
         rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
         python3 -m zipfile -e yazi.zip .
         cp /tmp/yazi-{{ target_architecture }}-unknown-linux-musl/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
-        chmod 755 {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
+        cp /tmp/yazi-{{ target_architecture }}-unknown-linux-musl/ya {{ ansible_facts['env']['HOME'] }}/.local/bin/ya
+        chmod 755 {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/ya
       args:
         executable: /bin/bash
       changed_when: true

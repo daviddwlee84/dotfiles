@@ -89,12 +89,14 @@ prepend_previewers = [
 
 `ya pkg` is Yazi's plugin manager (`ya` is the CLI companion shipped with yazi). It clones a plugin, copies it into `~/.config/yazi/plugins/`, and locks its version in `~/.config/yazi/package.toml`.
 
-In this repo the lockfile is **chezmoi-managed** (`dot_config/yazi/package.toml`) and the plugins are materialized by a hash-gated run-script:
+> **`ya` must actually be installed.** It ships in the same release archive as the `yazi` binary, but an install that copies out only `yazi` leaves you with no `ya`, no `~/.config/yazi/plugins/`, and therefore no Office previews at all — surfacing much later as a startup crash blaming whichever plugin `init.lua` requires first. Diagnose with `ya --version`. See [pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md).
+
+In this repo the lockfile is **chezmoi-managed** (`dot_config/yazi/package.toml`) and the plugins are materialized by a self-healing run-script:
 
 | Piece | Path | Role |
 |---|---|---|
 | Lockfile (SSOT) | `dot_config/yazi/package.toml` | pins `yazi-rs/plugins:piper` (rev + hash) |
-| Installer | `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl` | runs `ya pkg install` when the lockfile changes |
+| Installer | `.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl` | runs `ya pkg install` when a plugin is missing or the lockfile changed |
 | Previewer wiring | `dot_config/yazi/yazi.toml` `[plugin]` | maps Office extensions → `piper -- view-office …` |
 
 `ya pkg install` **rewrites** `package.toml` (normalizes it and drops comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift. It is install-only by design (like the rest of the repo) — bump plugin versions with `ya pkg upgrade` (`just upgrade-yazi-plugins`), then copy the regenerated `~/.config/yazi/package.toml` back into the source.
@@ -115,7 +117,7 @@ cp ~/.config/yazi/package.toml "$(chezmoi source-path ~/.config/yazi/package.tom
 | doxx / LibreOffice install | `dot_ansible/roles/devtools/tasks/main.yml` |
 | markitdown install | `dot_ansible/roles/python_uv_tools/defaults/main.yml` |
 | yazi previewers | `dot_config/yazi/yazi.toml` |
-| yazi plugin lockfile + installer | `dot_config/yazi/package.toml`, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl` |
+| yazi plugin lockfile + installer | `dot_config/yazi/package.toml`, `.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl` |
 | Upgrades | `scripts/upgrade_tools.sh` (`just upgrade-yazi-plugins`) |
 
 ## Gotchas

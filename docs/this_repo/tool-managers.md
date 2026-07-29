@@ -881,12 +881,14 @@ noRoot path if the tool is broadly useful.
 
 Yazi's built-in plugin manager. `ya` (the yazi CLI companion) clones a plugin, copies it into `~/.config/yazi/plugins/`, and pins its revision in `~/.config/yazi/package.toml`.
 
-In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by a hash-gated run-script, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever the lockfile changes. `ya pkg install` **rewrites** `package.toml` (normalizes it and strips comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift (never add comments to it).
+> **`ya` and `yazi` are a matched pair.** Every upstream release asset ships both binaries; installing only `yazi` yields a host that can never acquire a plugin, and yazi then refuses to start at all (`Failed to load plugin from …/duckdb.yazi/main.lua`). The `devtools` role installs and probes for both. See [pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md).
+
+In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by `.chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever a declared plugin is missing from `~/.config/yazi/plugins/` **or** the lockfile hash changed. (It is deliberately `run_after_`, not `run_onchange_`: the plugins live outside chezmoi's tree, so a content hash cannot detect them going missing.) `ya pkg install` **rewrites** `package.toml` (normalizes it and strips comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift (never add comments to it).
 
 | Plugin | Purpose |
 |---|---|
 | `yazi-rs/plugins:piper` (`piper.yazi`) | "pipe any shell command as a previewer" — backs the Office-document previewers in `dot_config/yazi/yazi.toml` (`piper -- view-office --preview …`) and the feather/sqlite preview fallbacks. See [office-viewers.md](../tools/office-viewers.md). |
-| `wylie102/duckdb` (`duckdb.yazi`) | DuckDB-powered table previewer for data files (csv/tsv/parquet/xlsx/db/duckdb) — `run = "duckdb"` in `dot_config/yazi/yazi.toml` + required `require("duckdb"):setup{}` in `dot_config/yazi/init.lua`. Uses the `duckdb` CLI. See [data-viewers.md](../tools/data-viewers.md). |
+| `wylie102/duckdb` (`duckdb.yazi`) | DuckDB-powered table previewer for data files (csv/tsv/parquet/xlsx/db/duckdb) — `run = "duckdb"` in `dot_config/yazi/yazi.toml` + required (`pcall`-guarded) `require("duckdb"):setup{}` in `dot_config/yazi/init.lua`. Uses the `duckdb` CLI. See [data-viewers.md](../tools/data-viewers.md). |
 
 **Add a plugin:** `ya pkg add <owner>/<repo>:<plugin>`, then copy `~/.config/yazi/package.toml` back into the source. **Upgrade:** `ya pkg upgrade` → `just upgrade-yazi-plugins` (install-only by design; apply never bumps revs). Requires a recent yazi (`ya pkg` replaced the older `ya pack`).
 
@@ -1276,7 +1278,7 @@ Is the tool a coding agent CLI (vendor-distributed, ships its own installer)?
 Is it a Yazi plugin?
 ├── Yes → ya pkg (Yazi's plugin manager; § 15). Lockfile
 │         dot_config/yazi/package.toml (chezmoi-managed), materialized by
-│         run_onchange_after_45_yazi_plugins. `ya pkg add owner/repo:plugin`,
+│         run_after_45_yazi_plugins. `ya pkg add owner/repo:plugin`,
 │         copy package.toml back; upgrade via `ya pkg upgrade` (just upgrade-yazi-plugins)
 └── No → continue
 
