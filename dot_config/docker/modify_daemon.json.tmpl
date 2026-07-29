@@ -6,9 +6,18 @@
 # (e.g. `data-root`, `dns`, `experimental`, `features`) a user or installer
 # wrote to this file.
 #
-# Post-apply reminder: daemon.json changes only take effect after
-#   systemctl --user daemon-reload && systemctl --user restart docker
-# chezmoi does not auto-restart the daemon (would kill running containers).
+# Key ownership -- this file is shared, and each writer touches ONLY its own key:
+#   registry-mirrors  <- this script (declarative, same on every host)
+#   proxies           <- `docker-net on` / `docker-net off` at RUNTIME. Never
+#                        written here on purpose: the local proxy port moves
+#                        (Verge 7897, mihomo 7890, ...) so a value baked in at
+#                        apply time goes stale fast. See docs/tools/docker-net.md.
+#
+# Post-apply reminder -- the two keys do NOT cost the same to activate:
+#   registry-mirrors  IS SIGHUP-reloadable: `systemctl --user reload docker`
+#                     picks it up WITHOUT killing running containers.
+#   proxies           is NOT: it needs `systemctl --user restart docker`.
+# chezmoi does not do either automatically.
 #
 # On macOS this file is meaningless (Docker Desktop and OrbStack do not read
 # it); the script below short-circuits before any template branching so no
@@ -19,6 +28,8 @@
 # docs/tools/containers.md#migration-note-pre-pivot-rootful-installs for the
 # recipe. For the full who-reads-what map across Docker / OrbStack / Desktop /
 # Podman, see docs/tools/container-config-map.md.
+#
+# `docker-net doctor` checks all of the above against the LIVE daemon.
 
 set -eu
 
@@ -31,21 +42,32 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 {{ if and (eq .chezmoi.os "linux") .useChineseMirror -}}
-# Curated Docker Hub pull-through mirrors (5), high-reputation operators only.
-# Trust note: a pull-through mirror resolves tag->digest, and Docker Content
-# Trust is OFF by default, so a compromised/hijacked mirror can serve a
-# malicious image for a tag like `latest`. For sensitive images pull by digest
-# (repo@sha256:...) or enable Content Trust. Deliberately EXCLUDED:
-# dockerhub.azk8s.cn (deprecated Azure-China) and dockerproxy.com (third-party,
-# ToS-churned) -- dead/third-party domains risk lapsing and being re-registered
-# into a malicious pull-through cache. See
-# docs/tools/mirrors.md#security-and-trust-model.
+# ONE curated Docker Hub pull-through mirror. Deliberately short.
+#
+# Security: a pull-through mirror resolves tag->digest, and Docker Content Trust
+# is OFF by default, so whoever answers decides which image `latest` maps to.
+# Every extra entry is another host that can do that, so the list is kept to the
+# minimum that actually works. For sensitive images pull by digest
+# (repo@sha256:...) or enable Content Trust.
+#
+# Reliability: Docker tries mirrors IN ORDER, and a dead entry costs a timeout
+# (or worse, an error containerd surfaces as `failed to resolve reference`,
+# which reads like "image does not exist"). Four of the five entries this list
+# used to carry were measured dead on 2026-07 and removed:
+#   docker.mirrors.ustc.edu.cn  domain has no DNS record at all
+#   docker.nju.edu.cn           403, campus network only
+#   mirror.iscas.ac.cn          502
+#   mirror.baidubce.com         TLS reset, reachable only inside Baidu Cloud
+# Also still excluded on supply-chain grounds: dockerhub.azk8s.cn (deprecated
+# Azure-China) and dockerproxy.com (third-party, ToS-churned) -- a lapsed domain
+# can be re-registered into a malicious pull-through cache.
+#
+# Anything that is NOT Docker Hub (ghcr.io / gcr.io / quay.io / registry.k8s.io)
+# is not mirrored by this mechanism at all; that is what the daemon proxy and
+# `docker-net pull` are for. Re-measure with `docker-net mirrors`.
+# See docs/tools/mirrors.md#security-and-trust-model.
 printf '%s' "$input" | jq '.["registry-mirrors"] = [
-  "https://docker.m.daocloud.io",
-  "https://docker.mirrors.ustc.edu.cn",
-  "https://docker.nju.edu.cn",
-  "https://mirror.iscas.ac.cn",
-  "https://mirror.baidubce.com"
+  "https://docker.m.daocloud.io"
 ]'
 {{- else -}}
 printf '%s' "$input" | jq 'del(.["registry-mirrors"]) | if . == {} then empty else . end'

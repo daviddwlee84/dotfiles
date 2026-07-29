@@ -1161,6 +1161,7 @@ list.
 | **sevenzip** (7-Zip; `7zz` / `7z`) | brew (`sevenzip`) | apt (`p7zip-full`) | devtools — yazi archive + dmg listing. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **shellcheck / shfmt** | brew | apt or release | devtools |
 | **sidecar** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
+| **skopeo** | brew | apt (`universe`) | devtools — client-side registry copy; rung 3 of `docker-net pull`. See [docker-net.md](../tools/docker-net.md) |
 | **smartmontools** (`smartctl`) | n/a | apt/yum | homelab_tools |
 | **specify-cli** | `uv tool install` from git | same | coding_agents |
 | **specstory** | brew tap `specstoryai/tap` → GitHub release | GitHub release tarball | coding_agents |

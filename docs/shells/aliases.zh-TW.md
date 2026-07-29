@@ -548,6 +548,19 @@
 | `proxy-test` | function | `dot_config/zsh/tools/50_networking.zsh` | 以 `curl https://www.google.com/generate_204` 測試已偵測 proxy 是否可出網（HTTP，不是 ICMP ping） |
 | `proxy-refresh` | function | `dot_config/zsh/tools/50_networking.zsh` | 清除快取的偵測結果、重新探測、印出狀態（在切換 proxy 後使用） |
 
+### Docker registry 出口（`docker-net`）
+
+> `docker pull` 是在 **daemon** 裡執行的，所以你 shell 的 proxy 環境變數和 `~/.docker/config.json` 的 `proxies.default` 都影響不到它 —— 後者只在 `docker run` / `docker build` 時注入到 container 裡。`docker-net` 管的是 daemon 這一層：用和 `proxy-status` 同一個 `__net_detect_proxy` 解析本機 proxy、寫入 `daemon.json` 的 `proxies` key（Engine ≥ 23），並為 mirror 沒有的 image 提供逐次 pull 的降級階梯。完整指南：[docs/tools/docker-net.md](../tools/docker-net.md)。mirror 策略與四種安裝變體：[docs/tools/containers.md](../tools/containers.md)。macOS：除了 `on`/`off` 之外都能用 —— 那兩個會拒絕，因為 Docker Desktop / OrbStack 把 daemon 跑在 VM 裡（`127.0.0.1` 是 VM 的 loopback 不是你 Mac 的），proxy 要在它們的 UI 設。
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `docker-net status` | function | `dot_config/shell/51_docker_net.sh` | 一屏現況：安裝形態、daemon proxy、生效中的 mirror、偵測到的本機 proxy、TUN 攔截、死設定警告 |
+| `docker-net doctor` | function | `dot_config/shell/51_docker_net.sh` | 九段診斷。`--deep` 會額外從 **daemon 那一側**探測 ghcr/gcr/quay/registry.k8s.io（不會下載任何東西） |
+| `docker-net on` | function | `dot_config/shell/51_docker_net.sh` | 用偵測到的 proxy 寫入 `daemon.json` 的 `proxies` 並重啟 daemon（會先確認 —— 重啟會殺掉執行中的 container） |
+| `docker-net off` | function | `dot_config/shell/51_docker_net.sh` | 移除該區塊並重啟 |
+| `docker-net mirrors` | function | `dot_config/shell/51_docker_net.sh` | 只測 mirror 健康度 —— 分類出 DNS 消失 / 403 / 502 / TLS reset / timeout |
+| `docker-net pull` | function | `dot_config/shell/51_docker_net.sh` | 以降級階梯拉取：一般 pull → 明確指定 mirror 前綴再 retag → `skopeo copy` 走 shell 的 proxy（不必重啟 daemon） |
+
 ### Web reader
 
 > 在終端機中將網頁渲染為 markdown。所有函式都使用 `try_direct_then_proxy`，因此非 GFW'd 的 URL 不會付出 proxy 開銷。依函式名稱挑選擷取器 (extractor)。完整指南：[docs/tools/web-reader.md](../tools/web-reader.md)。

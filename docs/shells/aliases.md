@@ -580,6 +580,19 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `proxy-test` | function | `dot_config/shell/50_networking.sh` | Test detected proxy egress with `curl https://www.google.com/generate_204` (HTTP, not ICMP ping) |
 | `proxy-refresh` | function | `dot_config/shell/50_networking.sh` | Clear cached detection, re-probe, print status (use after toggling your proxy) |
 
+### Docker registry egress (`docker-net`)
+
+> `docker pull` runs in the **daemon**, so neither your shell's proxy env nor `~/.docker/config.json`'s `proxies.default` affects it — that block only reaches containers at `docker run` / `docker build` time. `docker-net` covers the daemon layer: it resolves the local proxy through the same `__net_detect_proxy` as `proxy-status`, writes `daemon.json`'s `proxies` key (Engine ≥ 23), and provides a per-pull fallback ladder for images no mirror carries. Full guide: [docs/tools/docker-net.md](../tools/docker-net.md). macOS: every verb works except `on`/`off`, which refuse because Docker Desktop / OrbStack run the daemon in a VM (proxy is a UI setting). Mirror strategy and the four install variants: [docs/tools/containers.md](../tools/containers.md).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `docker-net status` | function | `dot_config/shell/51_docker_net.sh` | One screen: install shape, daemon proxy, mirrors in effect, detected local proxy, TUN interception, stale-config warnings |
+| `docker-net doctor` | function | `dot_config/shell/51_docker_net.sh` | Nine-section diagnosis. `--deep` also probes ghcr/gcr/quay/registry.k8s.io from the **daemon's** side (nothing is downloaded) |
+| `docker-net on` | function | `dot_config/shell/51_docker_net.sh` | Write `daemon.json` `proxies` from the detected proxy and restart the daemon (confirms first — a restart kills running containers) |
+| `docker-net off` | function | `dot_config/shell/51_docker_net.sh` | Remove that block and restart |
+| `docker-net mirrors` | function | `dot_config/shell/51_docker_net.sh` | Mirror health only — classifies DNS-gone / 403 / 502 / TLS-reset / timeout |
+| `docker-net pull` | function | `dot_config/shell/51_docker_net.sh` | Pull via a fallback ladder: plain pull → explicit mirror prefix + retag → `skopeo copy` through the shell's proxy (no daemon restart) |
+
 ### Web reader
 
 > Render web pages as markdown in the terminal. All functions use `try_direct_then_proxy` so non-GFW'd URLs pay zero proxy overhead. Pick the extractor by function name. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md).

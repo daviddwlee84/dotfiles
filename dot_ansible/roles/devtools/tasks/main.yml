@@ -92,6 +92,14 @@
       - htop
       - duckdb
       - rclone
+      # skopeo — registry client that does the network itself instead of asking
+      # the Docker daemon to. That matters under the GFW: `docker pull` runs in
+      # the daemon, which ignores the shell's proxy env, so an image no mirror
+      # carries is unreachable until you restart the daemon with a proxy.
+      # `skopeo copy docker://REF docker-daemon:REF` honours HTTPS_PROXY and
+      # writes straight into the daemon — no restart. It is rung 3 of
+      # `docker-net pull`; see docs/tools/docker-net.md.
+      - skopeo
       # mosh — mobile shell; roaming UDP-based SSH replacement that survives
       # IP changes / sleep / high latency. mosh-server listens on UDP
       # 60000-61000, which cloud hosts must open inbound.
@@ -2160,6 +2168,28 @@
 # --- thefuck ---
 # NOTE: thefuck is now installed via uv tool (python_uv_tools role)
 # This avoids conda/virtualenv Python path conflicts
+
+# --- skopeo ---
+# Client-side registry transfer. `docker pull` is executed by the DAEMON, which
+# neither reads the shell's proxy env nor ~/.docker/config.json's
+# `proxies.default` — so under the GFW an image that no registry-mirror carries
+# (anything on ghcr.io / gcr.io / quay.io, or a Hub image the mirror rate-limits)
+# cannot be fetched without restarting the daemon behind a proxy, which kills
+# every running container.
+#
+# skopeo does the network itself, honours HTTPS_PROXY, and its `docker-daemon:`
+# transport hands the result straight to the daemon — no restart, no
+# intermediate tar. This is rung 3 of `docker-net pull`
+# (dot_config/shell/51_docker_net.sh). Ubuntu 24.04 universe ships 1.13.3;
+# macOS gets it from the brew block above. See docs/tools/docker-net.md for how
+# it compares to crane / regctl / nerdctl.
+- name: Install skopeo (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: skopeo
+    state: present
 
 # --- mosh ---
 # mosh (mobile shell) — roaming UDP-based SSH replacement; survives IP
