@@ -289,10 +289,10 @@ pre-commit-update:
 lint-shell:
     @if command -v shellcheck >/dev/null 2>&1; then \
         shellcheck --shell=bash --severity=warning \
-            dot_config/shell/*.sh dot_config/bash/*.bash scripts/*.sh; \
+            dot_config/shell/*.sh dot_config/bash/*.bash scripts/*.sh scripts/lib/*.sh; \
     else \
         uvx --quiet --from shellcheck-py shellcheck --shell=bash --severity=warning \
-            dot_config/shell/*.sh dot_config/bash/*.bash scripts/*.sh; \
+            dot_config/shell/*.sh dot_config/bash/*.bash scripts/*.sh scripts/lib/*.sh; \
     fi
 
 # Uninstall pre-commit hooks

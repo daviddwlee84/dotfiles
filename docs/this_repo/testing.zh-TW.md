@@ -14,8 +14,8 @@
 | 工具 | 角色 | 範圍 |
 |------|------|-------|
 | [**bats-core**](https://github.com/bats-core/bats-core) | 行為 / 單元測試 (unit test) | `tests/unit/`、`tests/smoke/` |
-| [**shellcheck**](https://www.shellcheck.net/) | 靜態分析 (static analysis)（bug、不良引號 (quoting)） | `scripts/*.sh` 上的 pre-commit |
-| [**shfmt**](https://github.com/mvdan/sh) | 格式化工具 (formatter)（一致性檢查） | `scripts/*.sh` 上的 pre-commit |
+| [**shellcheck**](https://www.shellcheck.net/) | 靜態分析 (static analysis)（bug、不良引號 (quoting)） | `scripts/*.sh` + `scripts/lib/*.sh` 上的 pre-commit |
+| [**shfmt**](https://github.com/mvdan/sh) | 格式化工具 (formatter)（一致性檢查） | `scripts/*.sh` 上的 pre-commit（不含 `scripts/lib/` —— 見 [Shell 日誌輸出](shell-logging.zh-TW.md)） |
 
 用 `just check-all` 跑全部。只跑快速的 unit 套件用 `just bats`。下方[「本 repo 如何組織測試」](#how-this-repo-structures-tests)有說明 `tests/` 目錄樹。
 

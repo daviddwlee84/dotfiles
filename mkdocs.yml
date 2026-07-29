@@ -407,6 +407,7 @@ nav:
       - "Tool managers (who installs what)": this_repo/tool-managers.md
       - uv bootstrap & per-machine upgrade dispatch: this_repo/uv-bootstrap.md
       - Testing: this_repo/testing.md
+      - Shell logging (log_shared.sh): this_repo/shell-logging.md
       - Sudo session: this_repo/sudo-session.md
       - Vim mode (catalog + opt-out): this_repo/vim-mode.md
       - Fleet apply: this_repo/fleet-apply.md

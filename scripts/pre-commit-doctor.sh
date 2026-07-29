@@ -28,24 +28,16 @@
 set -u
 
 # ----------------------------------------------------------------------------
-# Logging (match scripts/upgrade_tools.sh style)
+# Shared console logging — info/success/warn/error/hr + colour detection.
+# Sourced (not inlined): this script only ever runs from the repo checkout,
+# unlike the run_*.sh.tmpl consumers that must `include` the same file.
+# `success` now prints [SUCCESS] rather than the [OK] this script used before
+# the helpers were centralised.
 # ----------------------------------------------------------------------------
-if [[ -t 1 ]]; then
-  _C_RED=$'\033[0;31m'
-  _C_GRN=$'\033[0;32m'
-  _C_YLW=$'\033[1;33m'
-  _C_BLU=$'\033[0;34m'
-  _C_DIM=$'\033[2m'
-  _C_RST=$'\033[0m'
-else
-  _C_RED='' _C_GRN='' _C_YLW='' _C_BLU='' _C_DIM='' _C_RST=''
-fi
-
-info() { printf '%s\n' "${_C_BLU}[INFO]${_C_RST} $*"; }
-success() { printf '%s\n' "${_C_GRN}[OK]${_C_RST} $*"; }
-warn() { printf '%s\n' "${_C_YLW}[WARN]${_C_RST} $*"; }
-error() { printf '%s\n' "${_C_RED}[ERROR]${_C_RST} $*" >&2; }
-hr() { printf '%s\n' "${_C_DIM}────────────────────────────────────────────${_C_RST}"; }
+_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/log_shared.sh
+# shellcheck disable=SC1091
+source "$_REPO_ROOT/scripts/lib/log_shared.sh"
 
 # ----------------------------------------------------------------------------
 # Args

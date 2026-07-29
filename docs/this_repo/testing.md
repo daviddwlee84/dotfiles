@@ -9,8 +9,8 @@ How this repo tests shell code, the landscape of shell-testing tools, and when t
 | Tool | Role | Scope |
 |------|------|-------|
 | [**bats-core**](https://github.com/bats-core/bats-core) | Behaviour / unit tests | `tests/unit/`, `tests/smoke/` |
-| [**shellcheck**](https://www.shellcheck.net/) | Static analysis (bugs, bad quoting) | Pre-commit on `scripts/*.sh` (severity=warning) + `dot_config/{shell,bash}/` (severity=error); `just lint-shell` for broad warning sweep |
-| [**shfmt**](https://github.com/mvdan/sh) | Formatter (consistency check) | Pre-commit on `scripts/*.sh` |
+| [**shellcheck**](https://www.shellcheck.net/) | Static analysis (bugs, bad quoting) | Pre-commit on `scripts/*.sh` + `scripts/lib/*.sh` (severity=warning) + `dot_config/{shell,bash}/` (severity=error); `just lint-shell` for broad warning sweep |
+| [**shfmt**](https://github.com/mvdan/sh) | Formatter (consistency check) | Pre-commit on `scripts/*.sh` (not `scripts/lib/` — see [Shell logging](shell-logging.md#maintaining-it)) |
 
 Run everything with `just check-all`. Run just the fast unit suite with `just bats`. See [the repo tests/ tree](#how-this-repo-structures-tests) below.
 

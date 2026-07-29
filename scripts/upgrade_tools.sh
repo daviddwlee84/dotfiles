@@ -27,30 +27,20 @@ set -u
 # NOTE: we deliberately do not `set -e`. Each command is guarded by _run /
 # run_category so we can continue past individual failures.
 
-# ----------------------------------------------------------------------------
-# Colors + loggers (match the style used in run_onchange_after_*.sh.tmpl)
-# ----------------------------------------------------------------------------
-if [[ -t 1 ]]; then
-  _C_RED='\033[0;31m'
-  _C_GRN='\033[0;32m'
-  _C_YLW='\033[1;33m'
-  _C_BLU='\033[0;34m'
-  _C_DIM='\033[2m'
-  _C_RST='\033[0m'
-else
-  _C_RED='' _C_GRN='' _C_YLW='' _C_BLU='' _C_DIM='' _C_RST=''
-fi
+_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-info() { printf '%b\n' "${_C_BLU}[INFO]${_C_RST} $*"; }
-success() { printf '%b\n' "${_C_GRN}[SUCCESS]${_C_RST} $*"; }
-warn() { printf '%b\n' "${_C_YLW}[WARN]${_C_RST} $*"; }
-error() { printf '%b\n' "${_C_RED}[ERROR]${_C_RST} $*" >&2; }
-hr() { printf '%b\n' "${_C_DIM}────────────────────────────────────────────${_C_RST}"; }
+# ----------------------------------------------------------------------------
+# Shared console logging — info/success/warn/error/hr + colour detection.
+# Sourced (not inlined): this script only ever runs from the repo checkout,
+# unlike the run_*.sh.tmpl consumers that must `include` the same file.
+# ----------------------------------------------------------------------------
+# shellcheck source=lib/log_shared.sh
+# shellcheck disable=SC1091
+source "$_REPO_ROOT/scripts/lib/log_shared.sh"
 
 # ----------------------------------------------------------------------------
 # Source shared sudo helper (same file used by run_*.sh.tmpl via `include`)
 # ----------------------------------------------------------------------------
-_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/sudo_shared.sh
 if [[ -f "$_REPO_ROOT/scripts/lib/sudo_shared.sh" ]]; then
   # shellcheck disable=SC1091

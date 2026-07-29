@@ -112,7 +112,10 @@ repos:
 
   # shellcheck - static analysis for bash scripts.
   # Two scopes, two severities:
-  #   1. scripts/*.sh — strict (severity=warning), always green.
+  #   1. scripts/*.sh + scripts/lib/*.sh — strict (severity=warning), always
+  #      green. lib/ is in scope because sudo_shared.sh and log_shared.sh are
+  #      inlined into run-scripts, where a defect only surfaces during a real
+  #      `chezmoi apply` on a fresh machine.
   #   2. dot_config/{shell,bash}/ — relaxed (severity=error), only blocks
   #      on actual bugs while we gradually clean up the 40-odd preexisting
   #      warnings. Drop to severity=warning once `just lint-shell` is clean.
@@ -123,7 +126,7 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck (scripts/)
-        files: '^scripts/[^/]+\.sh$'
+        files: '^scripts/(lib/)?[^/]+\.sh$'
         args: [--shell=bash, --severity=warning]
       - id: shellcheck
         alias: shellcheck-shared

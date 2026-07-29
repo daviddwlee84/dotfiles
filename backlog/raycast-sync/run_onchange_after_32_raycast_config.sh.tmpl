@@ -22,11 +22,17 @@ exit 0
 
 set -eu
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
-info()    { echo -e "${BLUE}[raycast-sync]${NC} $1"; }
-warn()    { echo -e "${YELLOW}[raycast-sync]${NC} $1"; }
-error()   { echo -e "${RED}[raycast-sync]${NC} $1" >&2; }
-success() { echo -e "${GREEN}[raycast-sync]${NC} $1"; }
+# --- Shared console logging — info/warn/success/error/die + colour detection.
+# Inlined (not sourced): run-scripts render to a temp path with no route back
+# to the source tree. LOG_PREFIX replaces the [INFO]/[WARN] tags with this
+# script's own label (colour still varies by severity). LOG_STREAM=stdout keeps
+# stderr clean for fleet-apply's local-host drift classifier — that moves this
+# script's `error` from stderr to stdout, which is what every other
+# run_onchange_after_* script already does.
+LOG_PREFIX='[raycast-sync]'
+LOG_STREAM=stdout
+{{ include "scripts/lib/log_shared.sh" }}
+# --- end logging helper
 
 SRC_DIR="{{ .chezmoi.sourceDir }}/raycast"
 SCRIPT="{{ .chezmoi.sourceDir }}/scripts/raycast_sync.py"
