@@ -140,10 +140,11 @@ nvidia-smi --query-compute-apps=pid,used_memory --format=csv
 
 **沒有 iGPU fallback。** 若 NVIDIA 那一套無法拉起 X，這台機器就完全沒有畫面。這正是「就地升級驅動」在這裡特別危險的原因：從升級到重開機之間，Xorg 握著約 94 個已刪除的 mapping（`libglxserver_nvidia.so.<舊>`、`libEGL_nvidia.so.<舊>`…），而**任何** X 重啟 —— 登出、切換使用者、`systemctl restart gdm3`、suspend —— 回來時都會用新的函式庫去配舊的模組，直接黑畫面。
 
-### amdgpu 目前被 blacklist —— 而那多半是個誤判
+### amdgpu 從來沒壞過 —— blacklist 已移除
 
-這台機器上有 `/etc/modprobe.d/blacklist-amdgpu.conf`，是 2026-07-25 因為一個
-`-22` probe 失敗而加的。後來查明那是**開在 recovery mode 造成的假象**，不是驅動的 bug：
+2026-07-25 因為一個 `-22` probe 失敗，這台機器曾加過
+`/etc/modprobe.d/blacklist-amdgpu.conf`。後來查明那是**開在 recovery mode
+造成的假象**，不是驅動的 bug：
 
 ```
 amdgpu 0000:0c:00.0: probe with driver amdgpu failed with error -22
@@ -151,34 +152,40 @@ $ cat /proc/cmdline
 … ro recovery nomodeset dis_ucode_ldr        # <- nomodeset 才是原因
 ```
 
-在**正常** cmdline 下、同一個 kernel，amdgpu 完整初始化 —— 十個 IP block 全部偵測到、
-VBIOS 讀取成功、2048M VRAM ready。詳見
-[`pitfalls/recovery-mode-resume-keeps-nomodeset-in-cmdline.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/recovery-mode-resume-keeps-nomodeset-in-cmdline.md)。
-那幾行看起來很嚇人的 ATPX / vga_switcheroo 訊息，在健康的開機一樣會出現。
+2026-07-29 拆掉 blacklist、在正常 cmdline 下手動載入模組，一次定讞：
 
-**除非下面那個 57 分鐘開機真的重演，否則應該把 blacklist 拿掉**：
-
-```bash
-sudo rm /etc/modprobe.d/blacklist-amdgpu.conf
-sudo update-initramfs -u -k all
 ```
+$ sudo modprobe amdgpu
+[drm] Initialized amdgpu 3.64.0 for 0000:0c:00.0 on minor 0
+… ring comp_1.3.1 / kiq_0.2.1.0 / sdma0 / vcn_dec_0 / vcn_enc_0.0 / jpeg_dec
+amdgpu 0000:0c:00.0: [drm] Cannot find any crtc or sizes   # 預期：沒接螢幕
+```
+
+零錯誤、兩顆 GPU 都列舉出來、nvidia 不受影響。那幾行看起來很嚇人的
+ATPX / vga_switcheroo 訊息，在健康的開機一樣會出現。詳見
+[`pitfalls/recovery-mode-resume-keeps-nomodeset-in-cmdline.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/recovery-mode-resume-keeps-nomodeset-in-cmdline.md)。
+
+> **載入 GPU 驅動會重啟 X session。** 執行中的 Xorg 會透過 udev 接手新的 DRM
+> 裝置，約 10 秒後 gdm 直接重建整個 session —— 所有圖形程式都會死。當成測試手段，
+> 它只有「牆鐘時間」比重開機短，中斷程度並沒有比較輕。
 
 ### 57 分鐘的那次開機仍未解釋
 
 另外有一次在正常 cmdline 下的開機，從 17:17:53 跑到 18:14:38 都沒進到可用的桌面。
-已確立的事實：
+amdgpu 現在已被**排除**。已確立的事實：
 
-- amdgpu 在 17:17:55 乾淨初始化 —— **不是**原因。
+- amdgpu 在 17:17:55 乾淨初始化，而且今天也能隨時正常載入。
 - `dbus-daemon … Failed to activate service 'org.freedesktop.Notifications':
   timed out (service_start_timeout=120000ms)`，從 17:54 起每約 2 分 10 秒重試一次。
 - 那串 `amdgpu … [drm] *ERROR* Not enough memory for command submission!` 的時間戳是
   **18:14:38**，也就是那次開機的**最後一秒**（強制重開的當下），不是開機過程中。
-- GDM 起的是 `gdm-wayland-session`，而先前跑了 12 天的 session 是 X11。
-  `nvidia_drm modeset=1` 有設，`/etc/gdm3/custom.conf` 也沒有 `WaylandEnable=false`，
-  所以在 kernel + 驅動雙雙跳版之後，沒有任何東西阻止 GDM 選擇 Wayland。
+- 那次 GDM 起的是 `gdm-wayland-session`，而在它之前跑了 12 天的 session、
+  以及之後每一次 session，全都是 X11。`nvidia_drm modeset=1` 有設，
+  `/etc/gdm3/custom.conf` 也沒有 `WaylandEnable=false`，所以在 kernel + 驅動
+  雙雙跳版之後，沒有任何東西阻止 GDM 選擇 Wayland。
 
-X11 → Wayland 的翻轉是**最強的相關性，但不是證據**。若長時間開機重演，
-請**先改 session 類型**，不要動 GPU 驅動：
+X11 → Wayland 的翻轉是唯一存活的假說。若長時間開機重演，**請釘住 session 類型**，
+不要動 GPU 驅動：
 
 ```bash
 # /etc/gdm3/custom.conf
@@ -196,8 +203,8 @@ Xorg 112、gnome-remote-desktop 260、gnome-shell 24，其餘都是個位數。�
 真正的理由是**隔離**：訓練 OOM 不再把桌面一起拖走、桌面合成不再搶 SM 時間，
 以及最關鍵的一點 —— **可以重啟 X 而不碰 GPU**，這會徹底消除上面那個黑畫面陷阱。
 
-前置條件：移除 amdgpu 的 blacklist、用正常 cmdline 開機，然後把線接到主機板輸出、
-並在 BIOS 設定主要顯示裝置。
+現在障礙已排除：amdgpu 正常運作，`card0`/`card1` 都列舉得到。剩下的步驟是把線接到
+主機板輸出、並在 BIOS 設定主要顯示裝置；目前內顯的所有輸出都是 `disconnected`。
 
 ## 相關
 
