@@ -10,6 +10,8 @@
 #   1. Existing herdr workspaces  → Enter = `herdr workspace focus <id>`
 #   2. zoxide frecency dirs        → Enter = `herdr workspace create --cwd <dir>`
 #
+# Actions: Enter = open/focus · Ctrl+D = close workspace · Alt+Y = copy its dir
+#
 # TSV columns: 0 = kind (ws|dir), 1 = ref (workspace_id|path), 2 = display.
 
 [metadata]
@@ -30,7 +32,13 @@ command = '''
 kind='{split:\t:0}'; ref='{split:\t:1}'
 case "$kind" in
   ws)
-    printf '\033[1mworkspace %s\033[0m\n\n' "$ref"
+    printf '\033[1mworkspace %s\033[0m\n' "$ref"
+    # herdr has NO workspace-level cwd field, so the dir is derived (lowest tab's
+    # pane cwd). Shown here so Alt+Y tells you what it is about to copy, and so
+    # Enter tells you which project you are focusing.
+    dir=$(~/.config/herdr/space-root.sh "$ref" 2>/dev/null || true)
+    [ -n "$dir" ] && printf 'dir: %s\n' "$dir"
+    printf '\n'
     herdr workspace get "$ref" 2>/dev/null | jq . 2>/dev/null \
       || herdr workspace get "$ref" 2>/dev/null
     ;;
@@ -48,6 +56,7 @@ input_header = "herdr Workspaces / Dirs"
 [keybindings]
 enter = "actions:open"
 ctrl-d = ["actions:close_ws", "reload_source"]
+alt-y = "actions:copy_dir"
 
 [actions.open]
 description = "Focus the workspace, or open a new workspace at the directory"
@@ -73,3 +82,38 @@ kind='{split:\t:0}'; ref='{split:\t:1}'
 [ "$kind" = "ws" ] && [ -n "$ref" ] && herdr workspace close "$ref" >/dev/null 2>&1
 '''
 mode = "fork"
+
+# Alt+Y — copy the selected row's DIRECTORY to the clipboard.
+#
+# This is the repo's stand-in for a right-click "Copy dir" on a sidebar workspace
+# row: herdr's context menus are a fixed enum compiled into the binary (no config
+# table, no plugin manifest field, no "menu" anywhere in `herdr api schema`), so
+# there is nothing to extend. Upstream requests #1511/#1671/#1776/#1830 were all
+# closed NOT_PLANNED; discussions #1609/#1672/#1722 are still open. See
+# docs/tools/herdr.md.
+#
+# It is strictly MORE capable than the right-click would be: it works on ANY
+# workspace in the list, not just the one you happen to have focused, and it
+# covers the zoxide `dir` rows too.
+#
+# Alt+ per the repo convention (tmux's prefix is Ctrl+b, so ctrl-* chords may not
+# reach tv). `execute` so tv exits after copying — this channel runs inside a
+# herdr `type = "pane"` command pane, which only closes when its command exits.
+[actions.copy_dir]
+description = "Copy the workspace's root dir (or the directory row's path) to the clipboard"
+command = '''
+kind='{split:\t:0}'; ref='{split:\t:1}'
+[ -z "$ref" ] && exit 0
+case "$kind" in
+  ws)
+    # Reuse pane-copy.sh: it accepts a bare workspace id and already resolves
+    # `x` by absolute-path fallback for the no-interactive-PATH case.
+    ~/.config/herdr/pane-copy.sh dir "$ref" >/dev/null 2>&1
+    ;;
+  dir)
+    if command -v x >/dev/null 2>&1; then xbin=x; else xbin="$HOME/.dotfiles/bin/x"; fi
+    printf '%s' "$ref" | "$xbin" copy >/dev/null 2>&1
+    ;;
+esac
+'''
+mode = "execute"

@@ -2,7 +2,7 @@
 # ~/.config/herdr/pane-copy.sh
 # Source: dot_config/herdr/executable_pane-copy.sh (managed by chezmoi)
 #
-# Copy distilled facts about a herdr pane to the system clipboard. Three targets:
+# Copy distilled facts about a herdr pane to the system clipboard. Five targets:
 #
 #   process  the foreground processes running in the pane (cmdline + pid + cwd)
 #   coord    the pane's coordinate in herdr's Session > Workspace > Tab > Pane
@@ -11,6 +11,12 @@
 #            --session flag on the pane/tab/workspace subcommands)
 #   content  the pane's terminal content — visible screen (--source visible) or
 #            the full retained scrollback (--source recent, the default)
+#   dir      the WORKSPACE ("space") root directory — what the sidebar row you
+#            would right-click represents: the cwd of the space's OLDEST tab.
+#            Derived by space-root.sh (herdr has no workspace-level cwd field);
+#            read the caveat there about the sidebar label drifting from it.
+#   cwd      the pane's LIVE working directory — the `abspath`/`pwd` answer,
+#            which drifts away from `dir` the moment you cd.
 #
 # The pane defaults to the CURRENT focused pane (`herdr pane current`); pass a
 # pane id to target another. herdr's keybind context passes $HERDR_ACTIVE_PANE_ID
@@ -26,6 +32,8 @@
 #   pane-copy.sh process [PANE_ID]
 #   pane-copy.sh coord   [PANE_ID]
 #   pane-copy.sh content [PANE_ID] [--source visible|recent]
+#   pane-copy.sh dir     [PANE_ID|WORKSPACE_ID]
+#   pane-copy.sh cwd     [PANE_ID]
 #
 # Consumers: the prefix+P/L/V/B keybinds (.chezmoitemplates/herdr/config.toml) and
 # the copy-pane-* quick actions (dot_config/herdr/plugins/config/
@@ -33,7 +41,7 @@
 set -eu
 
 usage() {
-    printf 'usage: %s process|coord|content [PANE_ID] [--source visible|recent]\n' "$0" >&2
+    printf 'usage: %s process|coord|content|dir|cwd [PANE_ID] [--source visible|recent]\n' "$0" >&2
     exit 64
 }
 
@@ -133,6 +141,26 @@ case "$action" in
             || { echo "pane-copy: failed to read content of $pane" >&2; exit 1; }
         copy "$body"
         echo "copied $source content for $pane"
+        ;;
+    dir)
+        # WORKSPACE ("space") root dir — the sidebar row's directory, NOT the
+        # pane's live cwd. Derivation is shared with prefix+C's new-tab helper
+        # and the herdr-sesh tv channel; it lives in space-root.sh, which also
+        # accepts a bare workspace id. Resolved beside this script rather than
+        # via PATH (a command-pane may run us without the interactive PATH).
+        here=$(CDPATH='' cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd -P)
+        root=$("$here/space-root.sh" "$pane") || exit 1
+        copy "$root"
+        echo "copied space dir: $root"
+        ;;
+    cwd)
+        # The pane's LIVE cwd — same answer `abspath` would give inside it.
+        # foreground_cwd tracks the running process; cwd is the shell's start dir.
+        dir=$(herdr pane get "$pane" 2>/dev/null \
+            | jq -r '.result.pane | (.foreground_cwd // .cwd // "")')
+        [ -n "$dir" ] || { echo "pane-copy: could not resolve cwd for $pane" >&2; exit 1; }
+        copy "$dir"
+        echo "copied pane cwd: $dir"
         ;;
     *) usage ;;
 esac

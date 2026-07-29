@@ -131,6 +131,8 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + D` | copy focused pane's **coordinate** (session>space>tab>pane) | command pane |
 | `prefix + V` | copy focused pane's **content** (visible screen) | command pane |
 | `prefix + S` | copy focused pane's **content** (full scrollback) | command pane |
+| `prefix + d` | copy the **workspace ("space") root dir** — the right-click "Copy dir" herdr doesn't have ([details](#copy-to-clipboard)) | command pane |
+| `prefix + ctrl + d` | copy the focused pane's **live cwd** (the `pwd`/`abspath` answer) | command pane |
 | `` prefix + p `` | **copy a file path** from the pane — two-tier fzf (paths that exist under the pane cwd on top), copies the resolved absolute path (`x copy`) | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + E` | **run any command** in the pane's cwd — fzf-pick from history or type it; the popup closes itself when the command exits ([details](#run-any-command)) | command **popup** |
@@ -198,15 +200,15 @@ herdr plugin install cloudmanic/herdr-plus   # manual fallback / what the role r
 
 Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → the same path under `~/.config/`. The shipped `chezmoi.toml` mirrors this repo's tmuxinator `chezmoi` session (editor/git/shell tabs). Bind `prefix+O` → Projects and `prefix+y` → Quick Actions (already in the config).
 
-**Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the four **copy-pane** actions (see [Copy focused-pane facts](#copy-focused-pane-facts-to-the-clipboard-prefixpdvs)) plus the plugin's five **starter** examples (GitHub / Google / Search Google / Open Repo / Reveal Working Dir), adapted for Linux — macOS `open` → the repo's cross-platform [`x open`](../shells/aliases.md), and the repo-select points at `daviddwlee84/*`. Because this managed dir is non-empty, herdr-plus does **not** auto-seed those examples itself (it only seeds into an *empty* dir), which is why they're vendored here; delete any TOML you don't want. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
+**Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the six **copy** actions (see [Copy pane + space facts](#copy-to-clipboard)) plus the plugin's five **starter** examples (GitHub / Google / Search Google / Open Repo / Reveal Working Dir), adapted for Linux — macOS `open` → the repo's cross-platform [`x open`](../shells/aliases.md), and the repo-select points at `daviddwlee84/*`. Because this managed dir is non-empty, herdr-plus does **not** auto-seed those examples itself (it only seeds into an *empty* dir), which is why they're vendored here; delete any TOML you don't want. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
 
 > **Quick Actions are for one-off, non-interactive commands** (the shipped examples all `open <url>`). herdr-plus runs a chosen action via `sh -c` with no PTY and no interactive stdin, so an interactive TUI misbehaves — btop exits immediately, nvtop can't receive F10. For a TUI you want the lazygit-style *floating command pane* (`[[keys.command]] type="pane"`) instead — that's why **btop** (`prefix+M`) and **nvtop** (`prefix+N`) are keybinds, not Quick Actions.
 
-## Television integration
+## Television integration {#television-integration}
 
 Most `tv` channels (`tools`, `fleet-hosts`, `mlflow`, `kill-process`, `ssh-config`) have **non-tmux-coupled actions**, so they run unchanged in a herdr command pane — just bind a key to `tv <channel>`. Only the channels whose actions call `tmux …` need herdr-aware variants. Three ship here:
 
-- `herdr-sesh` (`dot_config/television/cable/herdr-sesh.toml`) — lists herdr sessions/workspaces + zoxide dirs; Enter dispatches `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd` instead of `sesh connect` / `tmux switch-client`.
+- `herdr-sesh` (`dot_config/television/cable/herdr-sesh.toml`) — lists herdr sessions/workspaces + zoxide dirs; Enter dispatches `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd` instead of `sesh connect` / `tmux switch-client`. `Ctrl+D` closes the selected workspace; **`Alt+Y` copies its directory** (works on workspace *and* zoxide-dir rows — see [`dir` vs `cwd`](#space-dir)). The preview shows that derived dir above the raw `workspace get` JSON, so you can see what `Alt+Y` will hand you.
 - `herdr-agent-panes` (`dot_config/television/cable/herdr-agent-panes.toml`) — same source as `agent-panes`, but switch/kill use `herdr pane focus` / `herdr pane close`.
 - `herdr-review` (`dot_config/television/cable/herdr-review.toml`) — the **review-pending inbox**: lists only panes carrying the ⭐ flag (a non-empty `tokens.review`). Enter focuses the pane's workspace/tab and **keeps** the flag; `Alt+C` focuses **and** clears it ("mark read"). Bound to `prefix+i`. See the **Review-pending flag** section below.
 
@@ -355,9 +357,9 @@ Behaviour:
 
 > **Why `Alt+Enter` had to exist.** Plain Enter cannot express *"run exactly what I typed"* while fzf still has a match — type `ls -la` with `ls -la /tmp` in history and Enter takes the history entry, which makes the picker feel like it can only replay old commands. `--expect=alt-enter` adds the escape hatch. Note that fzf's line layout is **not fixed**: with `--print-query --expect`, a no-match Enter prints only the query (one line), while an accepted match prints query / key / selection. The helper therefore reads the key from line 2 (empty or absent ⇒ plain Enter) and only trusts line 3 on exit code 0.
 
-## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
+## Copy pane + space facts to the clipboard {#copy-to-clipboard}
 
-Four one-keypress "grab this pane onto the clipboard" ops, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH). The pane defaults to the **current focused pane** (`herdr pane current`); the keybinds pass `$HERDR_ACTIVE_PANE_ID`, the Quick Actions pass `$HERDR_PLUS_PANE_ID`, and either falls through to the current-pane lookup when empty.
+Six one-keypress "grab this onto the clipboard" ops, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH). The pane defaults to the **current focused pane** (`herdr pane current`); the keybinds pass `$HERDR_ACTIVE_PANE_ID`, the Quick Actions pass `$HERDR_PLUS_PANE_ID`, and either falls through to the current-pane lookup when empty.
 
 | Op | Key | Quick Action | What lands on the clipboard |
 |---|---|---|---|
@@ -365,10 +367,33 @@ Four one-keypress "grab this pane onto the clipboard" ops, all driven by one hel
 | `coord` | `prefix+D` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
 | `content` (visible) | `prefix+V` | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
 | `content` (scrollback) | `prefix+S` | *Copy pane: content (scrollback)* | the pane's full retained scrollback (`--source recent`) |
+| `dir` | `prefix+d` | *Copy space: dir* | the **workspace ("space") root directory** — see below |
+| `cwd` | `prefix+ctrl+d` | *Copy pane: cwd* | the focused pane's **live** working directory (what `pwd` / [`abspath`](../shells/aliases.md) returns) |
 
 The **coordinate** answers "which `session > space > tab > pane` is this?" in a form you can feed back to the CLI. herdr has **no `--session` flag** on the `pane`/`tab`/`workspace` subcommands — a session is targeted only via `HERDR_SOCKET_PATH` — so the block includes the `socket=` line as the session selector (the session *name* is resolved by matching that socket against `herdr session list --json`).
 
-Both surfaces share the same helper: the `[[keys.command]]` binds in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) and the four `copy-pane-*.toml` **Quick Actions** under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` (fuzzy-launched via `prefix+y`). `P/D/V/S` are uppercase (`prefix+shift+<letter>`) chosen to dodge herdr's reserved `shift+H/J/K/L` (swap-pane) and this repo's `shift+B` (new_worktree) / `shift+R` (reload) — confirm no collision with `herdr server reload-config` (empty `diagnostics`).
+Both surfaces share the same helper: the `[[keys.command]]` binds in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) and the `copy-*.toml` **Quick Actions** under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` (fuzzy-launched via `prefix+y`). `P/D/V/S` are uppercase (`prefix+shift+<letter>`) chosen to dodge herdr's reserved `shift+H/J/K/L` (swap-pane) and this repo's `shift+B` (new_worktree) / `shift+R` (reload); lowercase `d` was the only free mnemonic letter left for the dir ops, with `ctrl+d` keeping the pair adjacent. Confirm no collision with `herdr server reload-config` (empty `diagnostics`).
+
+### `dir` vs `cwd`, and why the right-click menu can't do this {#space-dir}
+
+`dir` is the answer to *"what directory is this space about?"* — the thing you'd want from a right-click **Copy dir** on a sidebar workspace row. Three ways to reach it:
+
+| Surface | How | Scope |
+|---|---|---|
+| `prefix+d` | keybind | the **focused** workspace |
+| `prefix+y` → *Copy space: dir* | herdr-plus Quick Action | the **focused** workspace |
+| `prefix+T` → **`Alt+Y`** | [`herdr-sesh`](#television-integration) tv channel | **any** workspace in the list — strictly more than right-click could give |
+
+**herdr's context menus cannot be extended.** They are a fixed enum compiled into the binary — the whole inventory is one packed string blob (`Rename` · `Close` · `New worktree` · `Open worktree...` · `Close group` · `Expand` · `Delete worktree checkout...` for spaces; `New tab` · `Rename pane` · `Split right` · `Split down` · `Close pane` · `Swap with focused pane` · `Clear pane name` for panes). Verified on 0.7.5 from three directions: `config.toml` has no menu table (only `[[keys.command]]` and `ui.right_click_passthrough_modifier`, which governs whether right-click reaches the *inner app*); the plugin manifest's `[[actions]]` carries `contexts = ["workspace"]` that **looks** like menu placement but is inert; and `herdr api schema --json` contains no occurrence of "menu" at all, so nothing can inject one at runtime either.
+
+> **Upstream status (re-check on herdr upgrades).** Requested four times — [#1511](https://github.com/ogulcancelik/herdr/issues/1511) (user-defined menu entries), [#1671](https://github.com/ogulcancelik/herdr/issues/1671), [#1776](https://github.com/ogulcancelik/herdr/issues/1776), [#1830](https://github.com/ogulcancelik/herdr/issues/1830) — **all closed `NOT_PLANNED`**, three of them auto-closed by `kangal-bot` for being feature requests on a bug-only tracker. #1776 is where a maintainer-facing report states plainly that `contexts` *"currently only surfaces in the `plugin action list` API response."* The redirected discussions ([#1609](https://github.com/ogulcancelik/herdr/discussions/1609), [#1672](https://github.com/ogulcancelik/herdr/discussions/1672), [#1722](https://github.com/ogulcancelik/herdr/discussions/1722)) are all still open and unanswered.
+
+**How the space dir is derived — and its one caveat.** herdr exposes **no workspace-level cwd anywhere**: `herdr workspace get` and `herdr api snapshot` both return the same `label` / `number` / `tab_count` / `pane_count` object. So it is computed, by [`~/.config/herdr/space-root.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_space-root.sh) — the SSOT shared by `pane-copy.sh dir`, the `prefix+C` new-tab helper, and the tv channel's preview + `Alt+Y`:
+
+- **Space root = the cwd of the workspace's *oldest surviving* tab.** `.number` on a tab is a monotonic **creation counter**, not the display index — a space can hold tabs numbered `10/13/14/15` shown as `1/2/3/4` — so `sort_by(.number)[0]` means "oldest", which is the right notion of "the tab this space started as".
+- **Caveat: the sidebar label is pinned at creation and never re-derived**, so once you `cd` inside that oldest tab the label and the derived dir drift apart, and nothing in the API can recover the original path. Observed live: a space labelled `2026-05-14-grafana-provisioning-with-docker-otel-lgtm` whose oldest tab sits in `…/grafana/dashboards/Jingle.AI`. `dir` reports the latter — the true current directory, not the stale name.
+
+`cwd` exists because the two genuinely diverge in normal use: a space rooted at `2026-07-24-unify-ashare-sdk` was observed with panes sitting in three unrelated `Documents/Program/*` trees. `dir` is the project; `cwd` is where *this pane* actually is.
 
 ## Open a URL from the pane (`prefix+u`)
 

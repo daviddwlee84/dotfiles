@@ -136,6 +136,8 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + D` | 複製聚焦 pane 的 **座標**（session>space>tab>pane） | command pane |
 | `prefix + V` | 複製聚焦 pane 的 **內容**（可見畫面） | command pane |
 | `prefix + S` | 複製聚焦 pane 的 **內容**（完整 scrollback） | command pane |
+| `prefix + d` | 複製 **workspace（space）根目錄**——herdr 沒有的那個右鍵「Copy dir」（[詳情](#copy-to-clipboard)） | command pane |
+| `prefix + ctrl + d` | 複製聚焦 pane 的**即時 cwd**（`pwd`/`abspath` 的答案） | command pane |
 | `` prefix + p `` | **複製檔案路徑** ——兩層 fzf（cwd 下存在的路徑在上），複製解析後的絕對路徑（`x copy`） | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
@@ -203,15 +205,15 @@ herdr plugin install cloudmanic/herdr-plus   # 手動 fallback / role 實際跑�
 
 Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → `~/.config/` 下的同一路徑。內建的 `chezmoi.toml` 對應本 repo 的 tmuxinator `chezmoi` session（editor/git/shell tab）。把 `prefix+O` 綁到 Projects、`prefix+y` 綁到 Quick Actions（設定裡已備好）。
 
-**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨四個 **copy-pane** action（見 [複製聚焦 pane 的資訊](#複製聚焦-pane-的資訊到剪貼簿prefixpdvs)）,外加 plugin 的五個**起手式**範例（GitHub / Google / Search Google / Open Repo / Reveal Working Dir）,已為 Linux 調整——macOS `open` → 本 repo 的跨平台 [`x open`](../shells/aliases.md),repo 選單指向 `daviddwlee84/*`。因為這個受管目錄非空,herdr-plus **不會** 自己 seed 那些範例（它只在*空*目錄時 seed）,所以在此 vendored;不要的 TOML 刪掉即可。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
+**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨六個 **copy** action（見 [複製 pane 與 space 的資訊](#copy-to-clipboard)）,外加 plugin 的五個**起手式**範例（GitHub / Google / Search Google / Open Repo / Reveal Working Dir）,已為 Linux 調整——macOS `open` → 本 repo 的跨平台 [`x open`](../shells/aliases.md),repo 選單指向 `daviddwlee84/*`。因為這個受管目錄非空,herdr-plus **不會** 自己 seed 那些範例（它只在*空*目錄時 seed）,所以在此 vendored;不要的 TOML 刪掉即可。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
 
 > **Quick Actions 是給一次性、非互動式指令用的**（內建範例全是 `open <url>`）。herdr-plus 用 `sh -c` 跑選中的 action,沒有 PTY、沒有互動 stdin,所以互動式 TUI 會出問題——btop 立刻退出、nvtop 收不到 F10。要跑 TUI 就用 lazygit 那種*浮動 command pane*（`[[keys.command]] type="pane"`）——這就是為何 **btop**（`prefix+M`）與 **nvtop**（`prefix+N`）是快捷鍵而非 Quick Action。
 
-## Television 整合
+## Television 整合 {#television-integration}
 
 大多數 `tv` channel（`tools`、`fleet-hosts`、`mlflow`、`kill-process`、`ssh-config`）的 action **不與 tmux 耦合**，所以在 herdr command pane 裡原樣就能跑——綁一個鍵到 `tv <channel>` 即可。只有那些 action 會呼叫 `tmux …` 的 channel 才需要 herdr-aware 變體。這裡出貨三個：
 
-- `herdr-sesh`（`dot_config/television/cable/herdr-sesh.toml`）—— 列出 herdr session/workspace + zoxide 目錄；Enter 會分派 `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd`，而不是 `sesh connect` / `tmux switch-client`。
+- `herdr-sesh`（`dot_config/television/cable/herdr-sesh.toml`）—— 列出 herdr session/workspace + zoxide 目錄；Enter 會分派 `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd`，而不是 `sesh connect` / `tmux switch-client`。`Ctrl+D` 關閉選中的 workspace;**`Alt+Y` 複製它的目錄**（workspace 列與 zoxide 目錄列都適用——見 [`dir` 與 `cwd` 的差別](#space-dir)）。preview 會把推導出的目錄顯示在 `workspace get` 原始 JSON 之上,讓你先看清楚 `Alt+Y` 會給你什麼。
 - `herdr-agent-panes`（`dot_config/television/cable/herdr-agent-panes.toml`）—— 與 `agent-panes` 同來源，但切換/kill 改用 `herdr pane focus` / `herdr pane close`。
 - `herdr-review`（`dot_config/television/cable/herdr-review.toml`）—— **待 review 收件匣**：只列出帶 ⭐ 旗標的 pane（`tokens.review` 非空）。Enter 會 focus 該 pane 的 workspace/tab 並**保留**旗標;`Alt+C` 則 focus **並**清除旗標（「mark read」）。綁在 `prefix+i`。見下方 **待 review 旗標** 一節。
 
@@ -360,9 +362,9 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 > **為什麼非要有 `Alt+Enter`。** 只要 fzf 還有 match，單純的 Enter 就無法表達「**執行我字面打的那串**」—— 打 `ls -la` 而歷史裡有 `ls -la /tmp`，Enter 會選走歷史那筆，於是整個 picker 感覺起來只能重播舊指令。`--expect=alt-enter` 就是那個逃生口。要注意 fzf 的輸出行數**不是固定的**：在 `--print-query --expect` 下，沒有 match 的 Enter 只會印出 query（一行），而選中時才印出 query / key / selection 三行。所以腳本是從第 2 行讀 key（空的或不存在 ⇒ 純 Enter），而且只在 exit code 0 時才相信第 3 行。
 
-## 複製聚焦 pane 的資訊到剪貼簿（`prefix+P/D/V/S`）
+## 複製 pane 與 space 的資訊到剪貼簿 {#copy-to-clipboard}
 
-四個一鍵「把這個 pane 抓到剪貼簿」的操作,全由同一支腳本驅動（`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)）。它把一個 herdr CLI 呼叫萃取成人類可讀的文字,再導入本 repo 自己的 [`x copy`](../shells/aliases.md)（自動選 pbcopy / wl-copy / xclip / xsel / OSC 52;`x` 以絕對路徑 fallback 解析,因為 command-pane 可能在沒有互動式 PATH 的情況下執行）。pane 預設為**目前聚焦的 pane**（`herdr pane current`）；keybind 傳入 `$HERDR_ACTIVE_PANE_ID`,Quick Actions 傳入 `$HERDR_PLUS_PANE_ID`,兩者為空時都會 fallback 到目前 pane 的查詢。
+六個一鍵「把這個抓到剪貼簿」的操作,全由同一支腳本驅動（`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)）。它把一個 herdr CLI 呼叫萃取成人類可讀的文字,再導入本 repo 自己的 [`x copy`](../shells/aliases.md)（自動選 pbcopy / wl-copy / xclip / xsel / OSC 52;`x` 以絕對路徑 fallback 解析,因為 command-pane 可能在沒有互動式 PATH 的情況下執行）。pane 預設為**目前聚焦的 pane**（`herdr pane current`）；keybind 傳入 `$HERDR_ACTIVE_PANE_ID`,Quick Actions 傳入 `$HERDR_PLUS_PANE_ID`,兩者為空時都會 fallback 到目前 pane 的查詢。
 
 | 操作 | 按鍵 | Quick Action | 進剪貼簿的內容 |
 |---|---|---|---|
@@ -370,10 +372,33 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 | `coord` | `prefix+D` | *Copy pane: coordinate* | 可直接貼回 CLI 的 `session` / `workspace` / `tab` / `pane` id 區塊 + `socket` 路徑 + 一行 `# herdr pane get <pane>` |
 | `content`（可見） | `prefix+V` | *Copy pane: content (visible)* | pane 目前螢幕上的文字（`herdr pane read --source visible`） |
 | `content`（scrollback） | `prefix+S` | *Copy pane: content (scrollback)* | pane 完整保留的 scrollback（`--source recent`） |
+| `dir` | `prefix+d` | *Copy space: dir* | **workspace（space）的根目錄**——見下方 |
+| `cwd` | `prefix+ctrl+d` | *Copy pane: cwd* | 聚焦 pane 的**即時**工作目錄（等同 `pwd` / [`abspath`](../shells/aliases.md) 的答案） |
 
 **座標**回答「這是哪個 `session > space > tab > pane`?」,並以可餵回 CLI 的形式呈現。herdr 在 `pane`/`tab`/`workspace` 子命令上**沒有 `--session` 旗標**——session 只能經由 `HERDR_SOCKET_PATH` 指定——所以區塊裡納入 `socket=` 那行作為 session 選擇器（session *名稱* 則是把該 socket 對 `herdr session list --json` 比對而得）。
 
-兩個介面共用同一支腳本:[`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 的 `[[keys.command]]` 綁定,以及 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` 下的四個 `copy-pane-*.toml` **Quick Actions**（用 `prefix+y` 模糊啟動）。`P/D/V/S` 是大寫（`prefix+shift+<letter>`）,刻意避開 herdr 保留的 `shift+H/J/K/L`（swap-pane）與本 repo 的 `shift+B`（new_worktree）/ `shift+R`（reload）——用 `herdr server reload-config`（`diagnostics` 為空）確認無衝突。
+兩個介面共用同一支腳本:[`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 的 `[[keys.command]]` 綁定,以及 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` 下的 `copy-*.toml` **Quick Actions**（用 `prefix+y` 模糊啟動）。`P/D/V/S` 是大寫（`prefix+shift+<letter>`）,刻意避開 herdr 保留的 `shift+H/J/K/L`（swap-pane）與本 repo 的 `shift+B`（new_worktree）/ `shift+R`（reload）；小寫 `d` 是唯一還空著、又有記憶點的字母,`ctrl+d` 則讓這一對緊鄰。用 `herdr server reload-config`（`diagnostics` 為空）確認無衝突。
+
+### `dir` 與 `cwd` 的差別,以及為什麼右鍵選單做不到 {#space-dir}
+
+`dir` 回答的是*「這個 space 是關於哪個目錄?」*——也就是你會想從 sidebar workspace 列右鍵 **Copy dir** 拿到的東西。三個入口:
+
+| 介面 | 方式 | 範圍 |
+|---|---|---|
+| `prefix+d` | keybind | **聚焦中**的 workspace |
+| `prefix+y` → *Copy space: dir* | herdr-plus Quick Action | **聚焦中**的 workspace |
+| `prefix+T` → **`Alt+Y`** | [`herdr-sesh`](#television-integration) tv channel | 清單裡的**任一** workspace——嚴格來說比右鍵能給的還多 |
+
+**herdr 的 context menu 無法擴充。** 它是編進 binary 的固定 enum——整份清單就是一段打包字串（space:`Rename` · `Close` · `New worktree` · `Open worktree...` · `Close group` · `Expand` · `Delete worktree checkout...`;pane:`New tab` · `Rename pane` · `Split right` · `Split down` · `Close pane` · `Swap with focused pane` · `Clear pane name`）。在 0.7.5 上從三個方向驗證過:`config.toml` 沒有任何 menu 表（只有 `[[keys.command]]` 與 `ui.right_click_passthrough_modifier`,後者管的是右鍵要不要傳給*內層 app*）;plugin manifest 的 `[[actions]]` 帶有 `contexts = ["workspace"]`,**看起來**像選單放置位置但其實是死的;而 `herdr api schema --json` 裡完全沒有 "menu" 這個字,所以執行期也無法注入。
+
+> **上游狀態（herdr 升級時重新確認）。** 被提過四次——[#1511](https://github.com/ogulcancelik/herdr/issues/1511)（使用者自訂選單項目）、[#1671](https://github.com/ogulcancelik/herdr/issues/1671)、[#1776](https://github.com/ogulcancelik/herdr/issues/1776)、[#1830](https://github.com/ogulcancelik/herdr/issues/1830)——**全部以 `NOT_PLANNED` 關閉**,其中三個是被 `kangal-bot` 以「feature request 不該開在只收 bug 的 tracker」自動關掉的。#1776 裡明白寫著 `contexts`「目前只會出現在 `plugin action list` 的 API 回應裡」。被導去的討論串（[#1609](https://github.com/ogulcancelik/herdr/discussions/1609)、[#1672](https://github.com/ogulcancelik/herdr/discussions/1672)、[#1722](https://github.com/ogulcancelik/herdr/discussions/1722)）到現在都還開著、也沒有維護者回應。
+
+**space 目錄怎麼推導出來的——以及唯一的但書。** herdr **在任何地方都沒有暴露 workspace 層級的 cwd**:`herdr workspace get` 與 `herdr api snapshot` 回傳的都是同一個只有 `label` / `number` / `tab_count` / `pane_count` 的物件。所以它是算出來的,由 [`~/.config/herdr/space-root.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_space-root.sh) 負責——這是 `pane-copy.sh dir`、`prefix+C` 開新 tab 的 helper,以及 tv channel 的 preview + `Alt+Y` 共用的單一真實來源:
+
+- **space 根目錄 = 該 workspace *現存最舊* tab 的 cwd。** tab 的 `.number` 是單調遞增的**建立計數器**,不是顯示索引——一個 space 可能持有編號 `10/13/14/15` 但顯示為 `1/2/3/4` 的 tab——所以 `sort_by(.number)[0]` 代表「最舊」,這才是「這個 space 當初從哪個 tab 開始」的正確概念。
+- **但書:sidebar 的 label 在建立時就固定了,之後不會重算**,所以一旦你在那個最舊的 tab 裡 `cd`,label 與推導出的目錄就會分岔,而且 API 裡沒有任何東西能還原原始路徑。實測遇過:一個標示為 `2026-05-14-grafana-provisioning-with-docker-otel-lgtm` 的 space,其最舊 tab 其實位於 `…/grafana/dashboards/Jingle.AI`。`dir` 回報的是後者——真正的當前目錄,而不是那個過時的名字。
+
+`cwd` 之所以存在,是因為兩者在日常使用中真的會分岔:實測有個根目錄為 `2026-07-24-unify-ashare-sdk` 的 space,底下的 pane 分散在三個毫不相干的 `Documents/Program/*` 樹裡。`dir` 是專案,`cwd` 是*這個 pane* 實際待著的地方。
 
 ## 從 pane 開啟 URL（`prefix+u`）
 

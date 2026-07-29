@@ -1,0 +1,7 @@
+# herdr-plus Quick Action — copy the focused pane's LIVE working directory.
+# Managed by chezmoi. The `abspath` answer for the pane you are in; diverges from
+# "Copy space: dir" as soon as you cd inside the tab.
+# Also bound to prefix+ctrl+d. See docs/tools/herdr.md.
+name = "Copy pane: cwd"
+description = "The focused pane's live working directory (what pwd/abspath returns)"
+command = "~/.config/herdr/pane-copy.sh cwd \"$HERDR_PLUS_PANE_ID\""

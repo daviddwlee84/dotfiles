@@ -183,9 +183,9 @@ description = "run a command in the pane cwd (popup)"
 # herdr's native new-tab (prefix+c) and the mouse "+" button follow new_cwd,
 # which on herdr >=0.7.x means the FOCUSED pane's live cwd (issue #912 made
 # `follow` treat new tabs like splits). This binding instead opens a new tab at
-# the workspace ROOT dir — the lowest-numbered tab's pane cwd, i.e. what herdr
-# uses for the space label. No new_cwd value does this; the helper derives it
-# (herdr workspace get has no cwd field). prefix+c stays = follow-focused-pane.
+# the workspace ROOT dir — the cwd of the space's OLDEST surviving tab. No
+# new_cwd value does this; the helper derives it (herdr workspace get has no cwd
+# field, and neither does `herdr api snapshot`). prefix+c stays = follow-focused-pane.
 # Only affects THIS key; the mouse "+" button can't be intercepted.
 [[keys.command]]
 key = "prefix+C"
@@ -278,6 +278,39 @@ key = "prefix+S"
 type = "pane"
 command = "~/.config/herdr/pane-copy.sh content \"$HERDR_ACTIVE_PANE_ID\" --source recent"
 description = "copy pane content (full scrollback)"
+
+# --- Copy a DIRECTORY to the clipboard (prefix+d / prefix+ctrl+d) ---
+# The `abspath` analog for herdr's own units. Two ops, because they answer
+# different questions and drift apart the moment you cd inside a tab:
+#   prefix+d       the WORKSPACE ("space") root dir — the directory the sidebar
+#                  row represents, i.e. what a right-click "Copy dir" would give
+#   prefix+ctrl+d  the focused pane's LIVE cwd — what `pwd`/`abspath` returns
+#
+# NOTE this is a WORKAROUND, not the natural home. The natural home is herdr's
+# workspace right-click menu (Rename / Close / New worktree / Open worktree...),
+# which is a FIXED enum compiled into the binary: no config table, no plugin
+# manifest field, and `herdr api schema --json` contains no "menu" at all. The
+# plugin `contexts = ["workspace"]` field looks like menu placement but is inert
+# — upstream confirms it "only surfaces in the plugin action list API response"
+# (ogulcancelik/herdr#1776). Requested four times (#1511, #1671, #1776, #1830),
+# all closed NOT_PLANNED, redirected to discussions #1609/#1672/#1722 which are
+# still open and unanswered. Re-check on herdr upgrades. See docs/tools/herdr.md.
+#
+# Key choice: lowercase `d` was the only free mnemonic letter — `prefix+D` is
+# copy-pane-coordinate above and `prefix+shift+d` is herdr's close_workspace.
+# `prefix+ctrl+d` keeps the pair adjacent; ctrl+letter is herdr's documented
+# reliable-modifier tier, and the repo already uses prefix+ctrl+1..9.
+[[keys.command]]
+key = "prefix+d"
+type = "pane"
+command = "~/.config/herdr/pane-copy.sh dir \"$HERDR_ACTIVE_PANE_ID\""
+description = "copy the workspace (space) root dir"
+
+[[keys.command]]
+key = "prefix+ctrl+d"
+type = "pane"
+command = "~/.config/herdr/pane-copy.sh cwd \"$HERDR_ACTIVE_PANE_ID\""
+description = "copy the focused pane's live cwd"
 
 # Copy a file PATH from the pane (extrakto-style, herdr side). Extracts path-like
 # tokens; two-tier: paths that EXIST under the pane cwd (copied as resolved
