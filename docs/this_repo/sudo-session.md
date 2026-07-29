@@ -34,12 +34,30 @@ All three run-scripts use these:
 
 | Function | Purpose |
 |---|---|
-| `sudo_session_init [label]` | Idempotent: if state valid re-exports env vars; else prompts once on `/dev/tty`, validates, writes files, spawns watchdog. Returns non-zero when neither passwordless nor TTY-interactive. Call this BEFORE any sudo. |
-| `sudo_run <cmd ...>` | Thin wrapper: `sudo -S -p '' -- "$@" <sudo.pass` — pipes cached password, never puts it in argv. Falls back to plain `sudo` when passwordless. Use for bootstrap's `apt-get` calls. |
-| `sudo_session_skip_reason` | Branch helper. Prints `"cached"` / `"passwordless"` / `"non-interactive"` / `""`. Used by ansible + brew scripts to pick between `-e @file`, `""` flags, or manual-instruction fallback. |
+| `sudo_session_init [label]` | Idempotent: if state valid re-exports env vars; else prompts once on `/dev/tty`, validates, writes files, spawns watchdog. Returns non-zero when neither passwordless nor TTY-interactive. Returns 0 immediately when already root. Call this BEFORE any sudo. |
+| `sudo_run <cmd ...>` | Thin wrapper: `sudo -S -p '' -- "$@" <sudo.pass` — pipes cached password, never puts it in argv. Falls back to plain `sudo` when passwordless, and to running the command directly when root. Use for bootstrap's `apt-get` calls. |
+| `sudo_session_skip_reason` | Branch helper. Prints `"cached"` / `"passwordless"` / `"non-interactive"` / `""`. Used by ansible + brew scripts to pick between `-e @file`, `""` flags, or manual-instruction fallback. Root reports `"passwordless"`. |
 | `sudo_session_warm_cache` | Refreshes the current TTY's sudo timestamp with the cached password. Call before tools like `brew bundle` whose cask pkg installers invoke `sudo` internally and rely on timestamp caching rather than accepting a piped password. |
 
 **Exports on success**: `CHEZMOI_SUDO_STATE_DIR`, `CHEZMOI_SUDO_PASS_FILE`, `CHEZMOI_ANSIBLE_BECOME_FILE`, `CHEZMOI_SUDO_KEEPALIVE_PID`.
+
+## Already root
+
+Every entry point short-circuits on `id -u` = 0: no prompt, no state dir, no
+watchdog, and `sudo_run` execs the command directly instead of through `sudo`.
+
+This is not just an optimisation. Root-without-`sudo` is the norm on containers,
+slim images, Alpine and rescue shells — and there, probing with `sudo -n -l`
+returns "command not found", which the rest of the helper would otherwise read
+as *"sudo needs a password"*. The visible symptom was a password prompt on a box
+that has no sudo, followed by two false diagnostics: `sudo -S` exiting 127 was
+reported as **"sudo password rejected"**, and the ansible runner's fallback then
+printed **"Non-interactive mode without passwordless sudo and no /dev/tty
+access"** on a machine that plainly had a TTY.
+
+`sudo_session_skip_reason` deliberately reuses the existing `"passwordless"`
+label rather than adding a `"root"` one — every consumer already branches on it
+correctly, and a new value would fall through their `case` statements unhandled.
 
 ## Non-interactive password injection (`CHEZMOI_SUDO_PASSWORD_FILE`)
 

@@ -46,10 +46,21 @@
 #                               a branch: "cached" | "passwordless" |
 #                               "non-interactive" | "" (empty = not probed yet).
 #                               Safe to call before OR after sudo_session_init.
+#                               Running as root reports "passwordless".
 #   sudo_session_abort          Signal handler target — kill watchdog, wipe state.
 #   sudo_run <cmd...>           `sudo -S` wrapper that pipes the cached password
 #                               from the state file; no password ever in argv.
-#                               Falls back to plain `sudo` when passwordless.
+#                               Falls back to plain `sudo` when passwordless,
+#                               and to running the command directly when root.
+#
+# Already root:
+#   Every entry point short-circuits — no prompt, no state dir, no watchdog,
+#   and sudo_run execs the command directly rather than through `sudo`. This
+#   matters because root-without-sudo is common (containers, slim images,
+#   Alpine, rescue shells): without the short-circuit, sudo_session_init would
+#   prompt for a password, `sudo -S` would exit 127 "command not found", and
+#   the caller would print a factually wrong "password rejected" — or, in the
+#   ansible runner, "no /dev/tty access" on a box that plainly has a TTY.
 #   sudo_session_warm_cache     Best-effort: refresh the CURRENT TTY's sudo
 #                               timestamp using the cached password (for callers
 #                               like `brew bundle` whose cask pkg installers
@@ -163,6 +174,16 @@ sudo_session_abort() {
     return 0
 }
 
+# Returns 0 when we are already root, in which case there is nothing to
+# escalate — and quite possibly nothing to escalate *with*: minimal images
+# (Alpine, distroless-ish containers, rescue shells) routinely ship no `sudo`
+# binary at all. Probing with `sudo -n -l` there yields "command not found",
+# which the rest of this file would otherwise misread as "sudo needs a
+# password".
+_sudo_is_root() {
+    [[ "$(id -u)" -eq 0 ]]
+}
+
 # Returns 0 iff sudo is configured to *never* prompt this user (i.e. a
 # NOPASSWD: ALL entry in sudoers). A bare `sudo -n true` is NOT enough —
 # it also succeeds when the user has merely cached credentials from a
@@ -179,6 +200,15 @@ _sudo_is_truly_passwordless() {
 sudo_session_init() {
     local label="${1:-chezmoi}"
     local dir
+
+    # Already root: nothing to escalate. Return before the state dir is even
+    # computed, so no password file and no watchdog are created. sudo_run
+    # degrades to exec'ing the command directly — see the "Already root" note
+    # in the header for why probing sudo here is actively harmful.
+    if _sudo_is_root; then
+        return 0
+    fi
+
     dir="$(_sudo_state_dir_path)"
 
     # Idempotent reuse: another run-script in the same flow set this up.
@@ -302,6 +332,13 @@ sudo_session_init() {
 }
 
 sudo_run() {
+    if _sudo_is_root; then
+        # Already root — run directly. Deliberately NOT `sudo "$@"`: minimal
+        # images frequently have no sudo binary, and even where one exists
+        # going through it buys nothing.
+        "$@"
+        return $?
+    fi
     if [[ -z "${CHEZMOI_SUDO_PASS_FILE:-}" ]]; then
         # Passwordless sudo or session not initialized — use sudo directly.
         sudo "$@"
@@ -333,8 +370,10 @@ sudo_session_skip_reason() {
     #   "cached"           sudo_session_init already prompted (or reused a
     #                      sibling script's prompt); the caller should pipe the
     #                      password via sudo_run / use $CHEZMOI_ANSIBLE_BECOME_FILE.
-    #   "passwordless"     sudo works without any password at all; the caller
-    #                      can invoke plain `sudo` and must not pre-auth.
+    #   "passwordless"     sudo works without any password at all — either a
+    #                      NOPASSWD: ALL sudoers entry, or we are already root.
+    #                      The caller must not pre-auth. Prefer `sudo_run` over
+    #                      a literal `sudo`, which may not exist when root.
     #   "non-interactive"  no cached password, no passwordless sudo, no TTY:
     #                      the caller must skip sudo-dependent steps entirely
     #                      and print a manual-command hint.
@@ -350,7 +389,7 @@ sudo_session_skip_reason() {
         printf 'cached\n'
         return 0
     fi
-    if _sudo_is_truly_passwordless; then
+    if _sudo_is_root || _sudo_is_truly_passwordless; then
         printf 'passwordless\n'
         return 0
     fi

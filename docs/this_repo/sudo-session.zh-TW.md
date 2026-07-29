@@ -39,12 +39,28 @@
 
 | 函式 | 用途 |
 |---|---|
-| `sudo_session_init [label]` | 冪等 (idempotent)：若狀態有效則重新 export 環境變數 (env var)；否則在 `/dev/tty` 上提示一次、驗證、寫入檔案、產生 watchdog。在既不是 passwordless 也不是 TTY 互動模式時回傳非零。在任何 sudo 之前先呼叫這個。 |
-| `sudo_run <cmd ...>` | 薄包裝 (wrapper)：`sudo -S -p '' -- "$@" <sudo.pass` — 透過管線送入快取的密碼，絕不放進 argv。Passwordless 時退回純 `sudo`。用於 bootstrap 的 `apt-get` 呼叫。 |
-| `sudo_session_skip_reason` | 分支輔助函式。印出 `"cached"` / `"passwordless"` / `"non-interactive"` / `""`。被 ansible + brew 腳本用來在 `-e @file`、`""` flag 或手動指引退回方案之間做選擇。 |
+| `sudo_session_init [label]` | 冪等 (idempotent)：若狀態有效則重新 export 環境變數 (env var)；否則在 `/dev/tty` 上提示一次、驗證、寫入檔案、產生 watchdog。在既不是 passwordless 也不是 TTY 互動模式時回傳非零。已經是 root 時立即回傳 0。在任何 sudo 之前先呼叫這個。 |
+| `sudo_run <cmd ...>` | 薄包裝 (wrapper)：`sudo -S -p '' -- "$@" <sudo.pass` — 透過管線送入快取的密碼，絕不放進 argv。Passwordless 時退回純 `sudo`；已是 root 時直接執行該命令。用於 bootstrap 的 `apt-get` 呼叫。 |
+| `sudo_session_skip_reason` | 分支輔助函式。印出 `"cached"` / `"passwordless"` / `"non-interactive"` / `""`。被 ansible + brew 腳本用來在 `-e @file`、`""` flag 或手動指引退回方案之間做選擇。root 回報 `"passwordless"`。 |
 | `sudo_session_warm_cache` | 用快取的密碼刷新目前 TTY 的 sudo 時間戳。在 `brew bundle` 這類其 cask pkg 安裝程式會內部呼叫 `sudo` 並依賴時間戳快取（而不是接受透過管線送入的密碼）的工具之前呼叫。 |
 
 **成功時的 export**：`CHEZMOI_SUDO_STATE_DIR`、`CHEZMOI_SUDO_PASS_FILE`、`CHEZMOI_ANSIBLE_BECOME_FILE`、`CHEZMOI_SUDO_KEEPALIVE_PID`。
+
+## 已經是 root
+
+每個進入點都會在 `id -u` = 0 時短路：不提示、不建狀態目錄、不產生 watchdog，
+而 `sudo_run` 直接執行命令而不經過 `sudo`。
+
+這不只是最佳化。root-without-`sudo` 在容器、精簡 image、Alpine 與救援 shell 上
+是常態 —— 而在那些環境裡，用 `sudo -n -l` 探測會得到「command not found」，
+helper 的其餘部分會把它誤讀成*「sudo 需要密碼」*。可見的症狀是：在一台根本沒有
+sudo 的機器上跳出密碼提示，接著吐出兩個錯誤的診斷 —— `sudo -S` 的 exit 127 被
+回報為 **「sudo password rejected」**，然後 ansible runner 的退回路徑印出
+**「Non-interactive mode without passwordless sudo and no /dev/tty access」**，
+但那台機器明明有 TTY。
+
+`sudo_session_skip_reason` 刻意沿用既有的 `"passwordless"` 標籤，而不是新增
+`"root"` —— 所有消費端已經正確處理前者，新值反而會在它們的 `case` 裡無人接手。
 
 ## 非互動式密碼注入 (`CHEZMOI_SUDO_PASSWORD_FILE`)
 
