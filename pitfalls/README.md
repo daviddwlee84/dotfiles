@@ -187,6 +187,7 @@ Pitfalls owned by this folder. Keep alphabetical.
 | [`zsh-tied-array-path-shadowing`](zsh-tied-array-path-shadowing.md) | `command not found` only inside one zsh function, works at prompt; `hash -r` / `rehash` doesn't help | fixed in `dot_config/zsh/tools/22_sesh.zsh` (rename local `path` → `target`) |
 | [`tmux-resurrect-agents`](tmux-resurrect-agents.md) | reattach restores layout but agent/TUI panes come back as bare shell | workaround documented (`@resurrect-processes` whitelist) |
 | [`yazi-tmux-popup-crash`](yazi-tmux-popup-crash.md) | `Terminal response timeout` from yazi → tmux server dies | workaround documented (use `new-window`, not `display-popup`) |
+| [`zsh-local-path-blanks-PATH`](zsh-local-path-blanks-PATH.md) | `command not found: tr` / `sed` / `wc` / `launchctl` for tools that are demonstrably on `$PATH`, inside ONE function only; identical code works under bash and fails under zsh; worse and silent — a `command -v` guard flips to false so a branch changes with no error at all | fixed — zsh ties the `path` array to `PATH`, so `local path` blanks PATH for the rest of the function (same for fpath/cdpath/manpath/status/argv). Renamed in `51_docker_net.sh` + `29_log_tools.sh`; bats now runs the affected paths under zsh and statically rejects zsh-special `local` names |
 
 ## Cross-referenced pitfalls (still in their original homes)
 

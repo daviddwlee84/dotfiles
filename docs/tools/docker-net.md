@@ -189,6 +189,19 @@ brew install skopeo
 docker-net pull ghcr.io/foo/bar:v1
 ```
 
+Real `doctor` output from a Mac behind the GFW shows why the direct-vs-proxy pair of rows matters:
+
+```
+Upstream registries (direct)
+  ✗ docker.io                  blackholed (timeout)                       10.01s
+  ✓ ghcr.io                    healthy                                    0.595s
+
+Upstream registries (via http://127.0.0.1:7897)
+  ✓ docker.io                  healthy                                    0.979s
+```
+
+Docker Hub is blackholed on that network while ghcr.io is not — so mirrors are load-bearing for Hub images and irrelevant for everything else, which is exactly the split this tool exists to make visible.
+
 `registry-mirrors` on macOS lives in OrbStack's own `~/.orbstack/config/docker.json` (or Docker Desktop's GUI JSON editor) — this repo's [`modify_daemon.json.tmpl`](../../dot_config/docker/modify_daemon.json.tmpl) is Linux-gated and does not touch them. `docker-net mirrors` still measures whatever the live daemon reports, so it is the right tool either way.
 
 ### Portability notes
@@ -197,6 +210,8 @@ Two macOS-specific traps this file is written around, both silent rather than lo
 
 - **`/bin/bash` is 3.2.57.** Apple froze it at the last GPLv2 release, so `mapfile`, `declare -A` and `${x^^}` are unavailable. The bash completion uses the repo's usual `COMPREPLY=( $(compgen …) )` form instead. A `tests/unit/docker_net.bats` case greps for bash-4 builtins so this cannot regress.
 - **BSD `mktemp` requires a template.** Bare `mktemp` is a usage error on macOS, which would have cost the probe its curl stderr — and with it the difference between "DNS gone", "TLS reset" and "timeout", all of which surface as HTTP `000`. Probes use `mktemp "${TMPDIR:-/tmp}/docker-net.XXXXXX"`.
+- **`docker info` never gives up on its own.** Measured on macOS with Docker Desktop installed but *stopped*: it hung past 120 s while printing a well-formed all-empty record, so every verb would have wedged forever and an empty record would have read as a live daemon. Every daemon call now goes through a timeout (with a polling fallback, since stock macOS has no coreutils `timeout`) and a live daemon must produce a non-empty `ServerVersion`. Checking for the socket file is **not** a substitute — Docker Desktop leaves `~/.docker/run/docker.sock` on disk after the daemon stops.
+- **Never `local path` in a zsh-sourced file.** zsh ties the `path` array to `PATH`, so the declaration blanks `PATH` for the rest of the function; `command -v` guards then silently flip to false and branches change with no error. This bit `docker-net on` on the first real macOS run and reproduces identically on Linux zsh — bash-only tests cannot see it. Full write-up: [pitfalls/zsh-local-path-blanks-PATH.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/zsh-local-path-blanks-PATH.md).
 
 ## Where the daemon lives: `127.0.0.1` is not always your loopback
 

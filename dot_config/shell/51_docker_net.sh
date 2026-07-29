@@ -37,7 +37,56 @@
 
 # --- small helpers -----------------------------------------------------------
 
+# NOTE ON VARIABLE NAMES: never declare `local path` in this file. zsh ties the
+# `path` array to `PATH`, so `local path` BLANKS PATH for the rest of the
+# function — every external command then fails with "command not found" and, far
+# worse, `_dnet_have docker` starts returning false, so `_dnet_shape` reports
+# `none` and guard clauses keyed on the shape silently stop firing. bash treats
+# `path` as an ordinary variable, so this is invisible to any bash-only test.
+# Same trap: fpath, cdpath, manpath, status, argv, options, signals, psvar.
+# See pitfalls/zsh-local-path-blanks-PATH.md.
+
+
 _dnet_have() { command -v "$1" >/dev/null 2>&1; }
+
+# Run a command with a wall-clock limit, printing its stdout. Returns 124 on
+# timeout, like coreutils `timeout`.
+#
+# Why this exists: `docker info` does NOT give up on its own when the daemon is
+# unreachable. Measured on macOS with Docker Desktop installed but stopped, it
+# hung past 120 s while printing an all-empty record — so every docker-net verb
+# would wedge forever. The socket file is NO substitute for this check: Docker
+# Desktop leaves ~/.docker/run/docker.sock on disk after the daemon stops, so
+# `[ -S "$sock" ]` reports a live daemon that is not there.
+#
+# coreutils `timeout` is absent from a stock macOS, hence the polling fallback.
+_dnet_timeout() {
+  local secs="$1"; shift
+  if _dnet_have timeout;  then command timeout  "$secs" "$@"; return $?; fi
+  if _dnet_have gtimeout; then command gtimeout "$secs" "$@"; return $?; fi
+
+  local out pid rc i
+  out="$(command mktemp "${TMPDIR:-/tmp}/docker-net-to.XXXXXX" 2>/dev/null)" || return 1
+  "$@" >"$out" 2>/dev/null &
+  pid=$!
+  i=0
+  while [ "$i" -lt "$((secs * 10))" ]; do
+    kill -0 "$pid" 2>/dev/null || break
+    command sleep 0.1
+    i=$((i + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -TERM "$pid" 2>/dev/null
+    command sleep 0.2
+    kill -KILL "$pid" 2>/dev/null
+    command rm -f "$out"
+    return 124
+  fi
+  wait "$pid" 2>/dev/null; rc=$?
+  command cat "$out"
+  command rm -f "$out"
+  return "$rc"
+}
 
 _dnet_host_of() {
   # https://docker.m.daocloud.io/  ->  docker.m.daocloud.io
@@ -133,7 +182,7 @@ _dnet_info_load() {
   # fields marshal as HttpProxy/HttpsProxy (which is what `docker info --format
   # '{{json .}}' | jq` shows) but the template names are HTTPProxy/HTTPSProxy.
   # Getting this wrong fails the whole template, not just that one field.
-  raw="$(command docker info --format \
+  raw="$(_dnet_timeout 8 docker info --format \
     '{{.ServerVersion}}|{{.HTTPProxy}}|{{.HTTPSProxy}}|{{.NoProxy}}|{{range .SecurityOptions}}{{.}},{{end}}|{{range .RegistryConfig.Mirrors}}{{.}},{{end}}|{{.OperatingSystem}}' \
     2>/dev/null)" || return 1
   [ -n "$raw" ] || return 1
@@ -148,6 +197,10 @@ _dnet_info_load() {
   _DNET_SECOPTS="${r%%|*}";     r="${r#*|}"
   _DNET_MIRRORS_RAW="${r%%|*}"; r="${r#*|}"
   _DNET_OS="$r"
+  # A dead daemon still prints a well-formed all-empty record ("||||||"), so a
+  # non-empty $raw proves nothing. ServerVersion is the field only a live daemon
+  # can fill in.
+  [ -n "$_DNET_SRV" ] || return 1
   _DNET_INFO_OK=1
   return 0
 }
@@ -315,29 +368,32 @@ _dnet_report_probe() {
 # mihomo/clash in TUN mode intercepts at L3, so the daemon egresses through the
 # proxy with NO daemon.json `proxies` block at all. Without this check a user
 # cannot tell whether `docker-net on` changed anything.
-_dnet_tun_iface() {
-  if _dnet_have ip; then
-    command ip -o link show 2>/dev/null \
-      | command awk -F': ' '{print $2}' \
-      | command grep -Ex 'Meta|Mihomo|clash[0-9]*|utun[0-9]*|tun[0-9]+' \
-      | command head -n 1
-    return 0
-  fi
-  if _dnet_have ifconfig; then
-    command ifconfig -l 2>/dev/null | command tr ' ' '\n' \
-      | command grep -Ex 'utun[0-9]*' | command head -n 1
-    return 0
-  fi
-  return 1
-}
-
+# mihomo/clash in TUN mode intercepts at L3, so the daemon egresses through the
+# proxy with NO daemon.json `proxies` block at all. Without this check a user
+# cannot tell whether `docker-net on` changed anything.
+#
+# The interface is derived FROM the fake-ip route rather than from "the first
+# utun on the box": macOS always has utun0-3 (Private Relay, VPN, ...), so
+# picking the first match named a live-looking interface that carries no proxy
+# traffic. mihomo's default fake-ip range is 198.18.0.0/15 (RFC 2544).
 _dnet_fakeip_route() {
-  # mihomo's default fake-ip range is 198.18.0.0/15 (RFC 2544 benchmark space).
   if _dnet_have ip; then
     command ip route 2>/dev/null | command grep -E '^198\.(18|19)\.' | command head -n 1
   elif _dnet_have netstat; then
-    command netstat -rn 2>/dev/null | command grep -E '^198\.(18|19)' | command head -n 1
+    command netstat -rn 2>/dev/null | command grep -E '^198\.(18|19)[.0-9/]*[[:space:]]' | command head -n 1
   fi
+}
+
+_dnet_tun_iface() {
+  local route
+  route="$(_dnet_fakeip_route)"
+  [ -n "$route" ] || return 1
+  case "$route" in
+    # Linux: "198.18.0.0/30 dev Meta proto kernel scope link src 198.18.0.1"
+    *" dev "*) printf '%s' "${route#* dev }" | command awk '{print $1}' ;;
+    # BSD/macOS: "198.18.0.1  198.18.0.1  UH  utun7"
+    *)         printf '%s' "$route" | command awk '{print $NF}' ;;
+  esac
 }
 
 # --- writing daemon.json .proxies --------------------------------------------
@@ -410,30 +466,30 @@ _dnet_restart_daemon() {
 # best and a silent rewrite at worst).
 _dnet_edit_daemon_json() {
   local filter="$1"; shift
-  local path shape input out
+  local target shape input out
   shape="$(_dnet_shape)"
-  path="$(_dnet_daemon_json)" || {
+  target="$(_dnet_daemon_json)" || {
     printf 'docker-net: no daemon.json for a %s install\n' "$shape" >&2; return 1; }
   case "$shape" in
     desktop|orbstack)
       printf 'docker-net: %s does not read a daemon.json this tool can edit — use its settings UI\n' "$shape" >&2
       return 1 ;;
   esac
-  _dnet_have jq || { printf 'docker-net: jq is required to edit %s\n' "$path" >&2; return 1; }
+  _dnet_have jq || { printf 'docker-net: jq is required to edit %s\n' "$target" >&2; return 1; }
 
   input='{}'
-  [ -f "$path" ] && input="$(command cat "$path" 2>/dev/null)"
+  [ -f "$target" ] && input="$(command cat "$target" 2>/dev/null)"
   [ -n "$input" ] || input='{}'
   out="$(printf '%s' "$input" | command jq "$@" "$filter" 2>/dev/null)" || {
-    printf 'docker-net: %s is not valid JSON — fix it by hand first\n' "$path" >&2; return 1; }
+    printf 'docker-net: %s is not valid JSON — fix it by hand first\n' "$target" >&2; return 1; }
 
   if [ "$shape" = rootful ]; then
-    printf '%s\n' "$out" | command sudo tee "$path" >/dev/null || return 1
+    printf '%s\n' "$out" | command sudo tee "$target" >/dev/null || return 1
   else
-    command mkdir -p "$(command dirname "$path")" 2>/dev/null
-    printf '%s\n' "$out" > "$path.dnet.tmp" && command mv "$path.dnet.tmp" "$path" || return 1
+    command mkdir -p "$(command dirname "$target")" 2>/dev/null
+    printf '%s\n' "$out" > "$target.dnet.tmp" && command mv "$target.dnet.tmp" "$target" || return 1
   fi
-  printf '%s' "$path"
+  printf '%s' "$target"
 }
 
 # --- image reference parsing --------------------------------------------------
@@ -520,8 +576,15 @@ EOF
   esac
 
   tun="$(_dnet_tun_iface 2>/dev/null)"
-  if [ -n "$tun" ] && [ -n "$(_dnet_fakeip_route)" ]; then
-    _dnet_ok "transparent" "TUN '$tun' up with fake-ip route — daemon egress already proxied at L3"
+  if [ -n "$tun" ]; then
+    if [ "$locality" = vm ]; then
+      # The TUN is on this Mac; the daemon is behind a VM boundary. Whether the
+      # VM's egress also crosses it is not observable from out here, so do not
+      # claim it.
+      _dnet_skip "transparent" "TUN '$tun' carries the fake-ip route on this Mac — cannot see whether the VM's egress crosses it"
+    else
+      _dnet_ok "transparent" "TUN '$tun' up with fake-ip route — daemon egress already proxied at L3"
+    fi
   fi
 
   _dnet_stale_config_check
@@ -646,16 +709,16 @@ _dnet_doctor() {
   fi
 
   printf '\n%s\n' "Transparent proxy (TUN)"
-  local tun fakeip
+  local tun
   tun="$(_dnet_tun_iface 2>/dev/null)"
-  fakeip="$(_dnet_fakeip_route)"
-  if [ -n "$tun" ] && [ -n "$fakeip" ]; then
+  if [ -z "$tun" ]; then
+    _dnet_skip "none" "no fake-ip route — the daemon egresses however daemon.json says"
+  elif [ "$locality" = vm ]; then
+    _dnet_skip "$tun" "carries the fake-ip route on this host — but the daemon is behind a VM boundary"
+    _dnet_hint "whether the VM's egress crosses it is not observable from here"
+  else
     _dnet_ok "$tun" "up, fake-ip route present — daemon egress is proxied at L3"
     _dnet_hint "an explicit \`docker-net on\` is optional while this holds"
-  elif [ -n "$tun" ]; then
-    _dnet_skip "$tun" "interface exists but no fake-ip route — probably not intercepting"
-  else
-    _dnet_skip "none" "no TUN interface — the daemon egresses however daemon.json says"
   fi
 
   _dnet_mirrors_check
@@ -704,13 +767,17 @@ _dnet_doctor() {
 }
 
 _dnet_daemon_probe() {
-  local label="$1" ref="$2" out
+  local label="$1" ref="$2" out rc
   # `timeout` execs a real binary, so `command docker` (a shell builtin prefix)
   # cannot be passed to it — let timeout do its own PATH lookup.
-  if _dnet_have timeout; then
-    out="$(command timeout 30 docker pull "$ref" 2>&1)"
-  else
-    out="$(command docker pull "$ref" 2>&1)"
+  out="$(_dnet_timeout 30 docker pull "$ref" 2>&1)"; rc=$?
+  if [ "$rc" -eq 124 ]; then
+    _dnet_bad "$label" "the daemon wedged for 30s with no reply — egress is blocked, not refused"
+    return 0
+  fi
+  if [ -z "$out" ]; then
+    _dnet_note "$label" "docker pull exited $rc with no output — cannot classify"
+    return 0
   fi
   case "$out" in
     # A mirror (or registry) answered with an error status. The daemon's network
@@ -758,7 +825,7 @@ _dnet_on() {
   _dnet_prime_proxy
   _dnet_info_load || { printf 'docker-net: no reachable Docker daemon\n' >&2; return 1; }
 
-  local proxy shape path noproxy
+  local proxy shape target noproxy
   proxy="$(_dnet_resolve_proxy "${url:-${DOCKER_NET_PROXY:-auto}}")" || return 2
   if [ -z "$proxy" ]; then
     printf 'docker-net: no proxy detected and none given\n' >&2
@@ -800,10 +867,10 @@ _dnet_on() {
   _dnet_confirm_restart "$assume_yes" || return 1
 
   # shellcheck disable=SC2016 # $p/$n are jq --arg bindings, not shell variables.
-  path="$(_dnet_edit_daemon_json \
+  target="$(_dnet_edit_daemon_json \
     '.proxies = {"http-proxy": $p, "https-proxy": $p, "no-proxy": $n}' \
     --arg p "$proxy" --arg n "$noproxy")" || return 1
-  _dnet_ok "wrote" "$path"
+  _dnet_ok "wrote" "$target"
 
   _dnet_restart_daemon "$shape" || return 1
   # `proxies` is NOT in the SIGHUP-reloadable set, so this had to be a restart.
@@ -828,14 +895,14 @@ _dnet_off() {
 
   _dnet_report_init
   _dnet_info_load || { printf 'docker-net: no reachable Docker daemon\n' >&2; return 1; }
-  local shape path
+  local shape target
   shape="$(_dnet_shape)"
 
   printf '\ndocker-net off\n\n'
   _dnet_confirm_restart "$assume_yes" || return 1
 
-  path="$(_dnet_edit_daemon_json 'del(.proxies)')" || return 1
-  _dnet_ok "wrote" "$path"
+  target="$(_dnet_edit_daemon_json 'del(.proxies)')" || return 1
+  _dnet_ok "wrote" "$target"
 
   _dnet_restart_daemon "$shape" || return 1
   command sleep 1

@@ -331,3 +331,122 @@ STUB
   grep -q 'mktemp "\${TMPDIR:-/tmp}/docker-net' "$DNET_FILE"
   ! grep -qE 'mktemp( 2>|\)|$)' "$DNET_FILE"
 }
+
+# --- dead-daemon handling (found on a real macOS host) -----------------------
+
+@test "info_load: an all-empty record is a DEAD daemon, not a reachable one" {
+  # Measured on macOS with Docker Desktop installed but stopped: `docker info`
+  # prints a well-formed "||||||" and does not exit non-zero, so a non-empty
+  # $raw proves nothing. ServerVersion is what only a live daemon can fill in.
+  setup_path_stub
+  _make_docker_info_stub "$BATS_STUB_DIR" '||||||'
+  run bash --norc -c "source '$DNET_FILE'; _dnet_info_load"
+  [ "$status" -ne 0 ]
+}
+
+@test "status: a dead daemon says so instead of printing an empty report" {
+  setup_path_stub
+  _make_docker_info_stub "$BATS_STUB_DIR" '||||||'
+  run bash --norc -c "source '$DNET_FILE'; _dnet_status"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no reachable Docker daemon"* ]]
+}
+
+@test "timeout: a wedged docker info is abandoned, not waited on forever" {
+  # `docker info` does not give up on its own when the daemon is unreachable.
+  setup_path_stub
+  cat > "$BATS_STUB_DIR/docker" <<'STUB'
+#!/usr/bin/env bash
+sleep 60
+STUB
+  chmod +x "$BATS_STUB_DIR/docker"
+  start=$SECONDS
+  run bash --norc -c "source '$DNET_FILE'; _dnet_info_load"
+  elapsed=$(( SECONDS - start ))
+  [ "$status" -ne 0 ]
+  [ "$elapsed" -lt 20 ]
+}
+
+@test "timeout: the fallback path works without coreutils timeout" {
+  # Stock macOS has neither `timeout` nor `gtimeout`; the polling fallback is
+  # what runs there, so it needs its own coverage.
+  setup_path_stub
+  for t in timeout gtimeout; do
+    printf '#!/usr/bin/env bash\nexit 127\n' > "$BATS_STUB_DIR/$t"
+    chmod +x "$BATS_STUB_DIR/$t"
+  done
+  # Hide them from `command -v` by making _dnet_have fail: easiest is to shadow
+  # with a directory entry that is not executable.
+  rm -f "$BATS_STUB_DIR/timeout" "$BATS_STUB_DIR/gtimeout"
+  result="$(bash --norc -c "
+    source '$DNET_FILE'
+    _dnet_have() { case \"\$1\" in timeout|gtimeout) return 1 ;; *) command -v \"\$1\" >/dev/null 2>&1 ;; esac; }
+    _dnet_timeout 5 printf 'hello'
+  ")"
+  [ "$result" = "hello" ]
+}
+
+@test "timeout: the fallback path kills an overrunning command" {
+  start=$SECONDS
+  run bash --norc -c "
+    source '$DNET_FILE'
+    _dnet_have() { case \"\$1\" in timeout|gtimeout) return 1 ;; *) command -v \"\$1\" >/dev/null 2>&1 ;; esac; }
+    _dnet_timeout 2 sleep 30
+  "
+  elapsed=$(( SECONDS - start ))
+  [ "$status" -eq 124 ]
+  [ "$elapsed" -lt 10 ]
+}
+
+# --- zsh-specific breakage (found on a real macOS host, reproduces on Linux) --
+
+@test "on: refuses a VM-backed daemon under ZSH too, not just bash" {
+  # Regression guard for `local path`: zsh ties the `path` array to `PATH`, so a
+  # `local path` inside a function BLANKS PATH — every external command then
+  # fails and `_dnet_have docker` returns false, which made `_dnet_shape` report
+  # `none` and this very guard stop firing. bash treats `path` as an ordinary
+  # variable, so the bash-only version of this test passed throughout.
+  setup_path_stub
+  _make_docker_info_stub "$BATS_STUB_DIR" '28.5.1||||||Docker Desktop'
+  run zsh -f -c "source '$DNET_FILE'; _dnet_on http://127.0.0.1:7890"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"runs the daemon inside a VM"* ]]
+  [[ "$output" != *"command not found"* ]]
+}
+
+@test "no zsh-special name is used as a local anywhere in the file" {
+  # path/fpath/cdpath/manpath are tied to their scalar twins; status/argv/
+  # options/signals are reserved. Declaring any of them `local` has effects far
+  # away from the declaration.
+  # Parse the DECLARED NAMES only — `local action="${1:-status}"` mentions
+  # `status` in its default value and must not trip this.
+  names="$(grep -hoE '^[[:space:]]*local[[:space:]]+[^;#]*' "$DNET_FILE" \
+             | sed -E 's/^[[:space:]]*local[[:space:]]+//' \
+             | tr ' ' '\n' | sed -E 's/=.*//' | grep -v '^-' | grep -v '^$')"
+  bad="$(printf '%s\n' "$names" | grep -xE 'path|fpath|cdpath|manpath|status|argv|options|signals|psvar|mailpath' || true)"
+  [ -z "$bad" ]
+}
+
+@test "on/off keep PATH intact under zsh" {
+  setup_path_stub
+  _make_docker_info_stub "$BATS_STUB_DIR" '28.5.1||||||Docker Desktop'
+  # PATH must survive the call — print it from inside the dispatcher's frame.
+  result="$(zsh -f -c "
+    source '$DNET_FILE'
+    _dnet_probe_path() { local proxy shape target noproxy; printf '%s' \"\$PATH\"; }
+    _dnet_probe_path
+  ")"
+  [ -n "$result" ]
+}
+
+@test "daemon probe: a silent failure is reported, not printed as a blank line" {
+  setup_path_stub
+  cat > "$BATS_STUB_DIR/docker" <<'STUB'
+#!/usr/bin/env bash
+if [ "$1" = "info" ]; then printf '%s' '29.6.2||||||Ubuntu'; exit 0; fi
+exit 1
+STUB
+  chmod +x "$BATS_STUB_DIR/docker"
+  run bash --norc -c "source '$DNET_FILE'; _dnet_report_init; _dnet_daemon_probe docker.io foo:bar"
+  [[ "$output" == *"no output"* ]]
+}
