@@ -424,7 +424,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | `auditd` (Linux, gated `installAuditd`) | `auditd` + `audispd-plugins` (Debian) / `audit` (RedHat); rule files `00-baseline.rules`, `05-privileged.rules`, optional `10-execve.rules`, `99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`, `gitleaks` | macOS: brew (`gitleaks`) + uv (`pre-commit`) · Linux: gitleaks from GitHub release (system → `/usr/local/bin`; user fallback → `~/.local/bin`) + uv pre-commit. **Go is no longer here** — it moved to mise (`go = "latest"`, gated `installExtraRuntimes`). |
 | `bitwarden` (gated `installBitwarden`) | `@bitwarden/cli` + Bitwarden Desktop (when `bitwarden_install_desktop=true`) | CLI: `mise exec -- npm install -g @bitwarden/cli` (preferred) / system npm fallback · Desktop: macOS brew cask · Linux: snap → `.deb` fallback |
-| `input_method` (gated `installInputMethod`) | `mcbopomofo`, `squirrel` (macOS) · `ibus-rime` (Debian) | macOS: brew cask · Linux: apt |
+| `input_method` (gated `installInputMethod`) | `mcbopomofo`, `squirrel` (macOS) · `ibus-rime` (Debian) | macOS: brew cask · Linux: apt. Rime's `*.custom.yaml` is chezmoi-managed and shared with the Windows repo — see [input_methods](../input_methods/README.md). |
 | `atuin` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
 | `homebrew` | (see [§ 2 Homebrew](#2-homebrew-formulae--casks)) | — |
 

@@ -256,16 +256,70 @@ McBopomofo 官方手冊明確提到：
 - 對於詞庫與自訂詞本身不是唯一來源
 - 如果目標是低噪音、可審查、適合版本控制 (version control)，文字詞庫的優先級更高
 
-## 之後若要正式納入 chezmoi
+## 已納入 chezmoi 管理（2026-07-29）
 
-這一輪先不把輸入法資料正式納管進 repo，但如果下一輪要做，建議優先順序如下：
+Rime 的手寫設定現在由 chezmoi 管理，而且與 Windows repo
+（`daviddwlee84/dotfiles-windows`，小狼毫 / Weasel）共用同一份可攜設定。
+一樣由 `installInputMethod` 開關控制；關閉時完全不部署（見 `.chezmoiignore.tmpl`）。
 
-1. `squirrel.custom.yaml`
-2. 其他手寫的 Rime `*.custom.yaml`
-3. McBopomofo 的 `*.txt` 詞庫檔
-4. 最後才考慮是否要納入 McBopomofo 的 plist
+### 可攜：兩個 repo 共用，byte-identical
 
-不建議一開始就把整個 `~/Library/Rime/` 或 `~/Library/Application Support/McBopomofo/` 直接整包納入，因為會混入大量執行時資料。
+`.chezmoitemplates/rime/` 是唯一真相來源，兩個 repo 各存一份完全相同的副本：
+
+| 檔案 | 內容 |
+|---|---|
+| `default.custom.yaml` | `schema_list`（注音·臺灣正體、注音、朙月拼音、地球拼音、倉頡五代）與 `menu/page_size` |
+| `luna_pinyin.custom.yaml` | 朙月拼音固定輸出臺灣字形（`switches/@2/reset: 3`） |
+
+之所以能共用：Weasel 與 Squirrel 內建的方案集完全相同（都是 plum 的 `:preset`
+套件組 — `bopomofo`、`cangjie`、`luna-pinyin`、`terra-pinyin`、`stroke` 等），
+所以同一份 `schema_list` 在三個平台解析結果一致，不需要額外下載方案。
+
+各平台的 renderer 只有一行 `{{ template "rime/<檔名>" . }}`：
+
+- macOS（Squirrel）→ `private_Library/Rime/*.yaml.tmpl` → `~/Library/Rime/`
+- Linux（ibus-rime）→ `dot_config/ibus/rime/*.yaml.tmpl` → `~/.config/ibus/rime/`
+- Windows（Weasel）→ `AppData/Roaming/Rime/*.yaml.tmpl` → `%APPDATA%\Rime\`
+
+**修改流程**：改其中一個 repo 的 `.chezmoitemplates/rime/`，複製到另一個 repo，
+再 `diff` 兩份 — 那個 diff 就是 drift 檢查。
+
+### 不可攜：各平台自己一份
+
+| 檔案 | 平台 | 為什麼不能共用 |
+|---|---|---|
+| `private_Library/Rime/squirrel.custom.yaml` | macOS | `app_options` 以 bundle id 為 key |
+| `AppData/Roaming/Rime/weasel.custom.yaml` | Windows | `app_options` 以 EXE 檔名為 key；`style/` 是 Weasel 專屬 |
+
+一個具體差異：Weasel 支援 `global_ascii`（全域共用中／英狀態），Squirrel 不支援 —
+`rime/squirrel#201`、`#1054` 都是關閉未合併，本機安裝的 Squirrel 也找不到這個
+關鍵字（見上面「已知限制」）。所以 Windows 那份有這個設定、macOS 這份刻意沒有，
+這正是兩個檔案必須分開的實際理由。
+
+### 仍然不納管
+
+`build/`、`installation.yaml`、`user.yaml`、`*.userdb/`、`sync/` 全部維持不納管，
+理由同前一節。這點現在是結構性保證而不只是慣例：chezmoi 只管理它自己知道的那幾個
+`*.custom.yaml`，同目錄下的其他檔案不會被碰到。
+
+已驗證 Rime 不會回寫 `*.custom.yaml` — 切換狀態與最近使用方案是寫進 `user.yaml` 的
+`var/option/…` 與 `var/previously_selected_schema`（librime `src/rime/switcher.cc`
+的 `Switcher::SetActiveSchema`）。所以這些可以是一般 managed file，不需要像 herdr
+那樣用 `modify_` overlay。
+
+### 改完設定要重新部署
+
+- macOS：從輸入法選單選「重新部署」，或
+  `/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel --reload`
+- Linux：`touch ~/.config/ibus/rime/ && ibus restart`
+- Windows：`chezmoi apply` 會自動跑 `WeaselDeployer.exe /deploy`
+
+Unix 這邊刻意維持手動：Squirrel 的 `--reload` 不夠可靠，而 `ibus restart` 會打斷
+當前輸入狀態，都不適合塞進 `chezmoi apply`。
+
+### McBopomofo
+
+McBopomofo 的 `*.txt` 詞庫與 plist 仍未納管，維持前一節的備份建議即可。
 
 ## Linux Appendix
 

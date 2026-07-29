@@ -165,6 +165,23 @@ pyrightconfig.json
 .config/aerospace/**
 {{- end }}
 
+# Rime user config — only manage when installInputMethod=true, and only the tree
+# for this OS (macOS/Squirrel reads ~/Library/Rime, Linux/ibus-rime reads
+# ~/.config/ibus/rime). The portable bodies live in .chezmoitemplates/rime/ and
+# are byte-identical to dotfiles-windows'; only squirrel.custom.yaml is
+# macOS-specific. The runtime files Rime writes alongside them (user.yaml,
+# installation.yaml, build/, *.userdb/) stay unmanaged on purpose — see
+# docs/input_methods/README.md.
+{{- $installInputMethod := false }}{{ if hasKey . "installInputMethod" }}{{ $installInputMethod = .installInputMethod }}{{ end }}
+{{- if or (ne .chezmoi.os "darwin") (not $installInputMethod) }}
+Library/Rime
+Library/Rime/**
+{{- end }}
+{{- if or (ne .chezmoi.os "linux") (not $installInputMethod) }}
+.config/ibus
+.config/ibus/**
+{{- end }}
+
 # -----------------------------------------------------------------------------
 # Editor overlays (VSCode / Cursor / Antigravity)
 #

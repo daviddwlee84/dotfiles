@@ -1,0 +1,33 @@
+# Squirrel (鼠鬚管) — macOS-ONLY Rime config. Deployed to ~/Library/Rime.
+#
+# The counterpart of dotfiles-windows' AppData/Roaming/Rime/weasel.custom.yaml.
+# Neither file is shared: app_options is keyed by macOS bundle id here and by
+# Windows EXE name there. The portable engine-level config (schema_list, per-
+# schema patches) lives in .chezmoitemplates/rime/ and IS shared.
+#
+# Bundle ids below were read from each app's Info.plist on this machine, not
+# guessed. To add one:  osascript -e 'id of app "Foo"'
+#
+# NOTE: there is deliberately no `global_ascii` here. Squirrel has no such
+# option — rime/squirrel#201 and #1054 both attempted it and were closed
+# unmerged, and the installed Squirrel binary contains no such key. See
+# docs/input_methods/README.md for the full analysis. Windows/Weasel does
+# support it, so the two frontends differ here on purpose.
+patch:
+  # Terminals and editors start in 西文 (ASCII) on focus, so typing commands
+  # never needs a manual 中/英 switch first.
+  app_options:
+    com.apple.Terminal:
+      ascii_mode: true
+    org.alacritty:
+      ascii_mode: true
+    com.github.wez.wezterm:
+      ascii_mode: true
+    dev.warp.Warp-Stable:
+      ascii_mode: true
+    com.googlecode.iterm2:
+      ascii_mode: true
+    com.microsoft.VSCode:
+      ascii_mode: true
+    com.todesktop.230313mzl4w4u92:   # Cursor
+      ascii_mode: true

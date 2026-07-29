@@ -407,7 +407,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 | `auditd`(Linux,`installAuditd` 控管) | `auditd` + `audispd-plugins`(Debian)/ `audit`(RedHat);rule 檔 `00-baseline.rules`、`05-privileged.rules`、選用 `10-execve.rules`、`99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`、`gitleaks` | macOS:brew(`gitleaks`)+ uv(`pre-commit`) · Linux:gitleaks 來自 GitHub release(系統 → `/usr/local/bin`;使用者 fallback → `~/.local/bin`)+ uv pre-commit。**Go 已不在此** — 移到 mise(`go = "latest"`,gate 於 `installExtraRuntimes`)。 |
 | `bitwarden`(`installBitwarden` 控管) | `@bitwarden/cli` + Bitwarden Desktop(`bitwarden_install_desktop=true` 時) | CLI:`mise exec -- npm install -g @bitwarden/cli`(優先)/ 系統 npm fallback · Desktop:macOS brew cask · Linux:snap → `.deb` fallback |
-| `input_method`(`installInputMethod` 控管) | `mcbopomofo`、`squirrel`(macOS)· `ibus-rime`(Debian) | macOS:brew cask · Linux:apt |
+| `input_method`(`installInputMethod` 控管) | `mcbopomofo`、`squirrel`(macOS)· `ibus-rime`(Debian) | macOS:brew cask · Linux:apt。Rime 的 `*.custom.yaml` 由 chezmoi 納管並與 Windows repo 共用 — 見 [input_methods](../input_methods/README.zh-TW.md)。 |
 | `atuin` | (見 [§ 3.1 基礎/共用](#31-基礎--共用-cli)) | — |
 | `homebrew` | (見 [§ 2 Homebrew](#2-homebrew-formulae--casks)) | — |
 

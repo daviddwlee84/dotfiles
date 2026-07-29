@@ -1,0 +1,31 @@
+# Rime — SHARED, PLATFORM-PORTABLE config.
+#
+# This file is rendered verbatim into the Rime user folder on every platform:
+#   Windows (Weasel)   %APPDATA%\Rime\default.custom.yaml
+#   macOS   (Squirrel) ~/Library/Rime/default.custom.yaml
+#   Linux   (ibus)     ~/.config/ibus/rime/default.custom.yaml
+#
+# It is kept BYTE-IDENTICAL in both dotfiles repos:
+#   daviddwlee84/dotfiles          .chezmoitemplates/rime/default.custom.yaml
+#   daviddwlee84/dotfiles-windows  .chezmoitemplates/rime/default.custom.yaml
+# Edit one, copy it to the other, and `diff` them — that diff IS the drift check.
+#
+# Only engine-level keys belong here. Frontend style and per-app options are not
+# portable (Weasel keys app_options by EXE name, Squirrel by bundle id) and live
+# in weasel.custom.yaml / squirrel.custom.yaml instead.
+#
+# Every schema below ships bundled with both Weasel and Squirrel (plum's
+# `:preset` package set — see plum/preset-packages.conf), so nothing is
+# downloaded at deploy time.
+#
+# Rime never rewrites *.custom.yaml: switch state and the last-used schema go to
+# user.yaml under var/option/... (librime src/rime/switcher.cc). That is why
+# these can be plain managed files rather than a modify_ overlay.
+patch:
+  schema_list:
+    - schema: bopomofo_tw    # 注音·臺灣正體（大千式鍵盤，臺灣字形）
+    - schema: bopomofo       # 注音
+    - schema: luna_pinyin    # 朙月拼音
+    - schema: terra_pinyin   # 地球拼音（帶聲調）
+    - schema: cangjie5       # 倉頡五代
+  menu/page_size: 9

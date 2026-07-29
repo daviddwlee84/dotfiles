@@ -1,0 +1,14 @@
+# Rime — SHARED, PLATFORM-PORTABLE config (see default.custom.yaml header).
+#
+# 朙月拼音 defaults to 傳統漢字; pin it to 臺灣字形 instead.
+#
+# switches/@2 is the [zh_hant, zh_hans, zh_hant_hk, zh_hant_tw] option group in
+# rime-luna-pinyin/luna_pinyin.schema.yaml, so `reset: 3` selects 臺灣字形 —
+# exactly the patch rime-bopomofo applies to itself to derive bopomofo_tw from
+# bopomofo (`switches/@2/reset: 3` in bopomofo_tw.schema.yaml).
+#
+# The other schemas in schema_list need no patch: bopomofo_tw is already 臺灣字形,
+# bopomofo defaults to 傳統漢字, cangjie5 is traditional by construction, and
+# terra_pinyin's `simplification` switch defaults off.
+patch:
+  switches/@2/reset: 3
