@@ -94,6 +94,7 @@ plugins:
             Helpers in this repo: 本 repo 提供的 helper
             auditd role (opt-in): auditd role（可選）
             Wi-Fi latency spikes: Wi-Fi 延遲尖刺
+            "iOS terminals (iSH / a-Shell / SSH)": "iOS 終端機（iSH / a-Shell / SSH）"
             # Tools subsections
             "Shell & terminal": Shell 與終端機
             "Sessions & worktrees": Session 與 worktree
@@ -265,6 +266,7 @@ nav:
       - mDNS / Bonjour diagnostics: playbooks/mdns-diagnostics.md
       - Wi-Fi latency spikes: playbooks/wifi-latency-spikes.md
       - Random hard power-offs: playbooks/random-hard-poweroff.md
+      - iOS terminals (iSH / a-Shell / SSH): playbooks/ios-terminals.md
   - Tools:
       - tools/aicapture.md
       - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
