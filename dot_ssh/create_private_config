@@ -13,6 +13,34 @@ Host *
     ServerAliveInterval 60
     ServerAliveCountMax 3
 
+    # Connection multiplexing — reuse one TCP + auth handshake for every
+    # subsequent session to the same (host, port, user). The win scales with
+    # round-trip time and with how many short-lived SSH sessions a workflow
+    # opens: `fleet` fan-out, git over ssh, rsync loops, and any mobile /
+    # tethered / cross-continent link.
+    #
+    # ControlPath uses %C (a hash of host+port+user+local host) so no socket
+    # directory has to exist — sockets land as ~/.ssh/cm-<hash>. That also
+    # keeps the path short, which matters: a unix socket path over ~104 bytes
+    # is rejected on macOS.
+    #
+    # Gotchas worth knowing before debugging something weird:
+    # - Forwarding options (-A, -L, -R, -X) are taken from the FIRST connection
+    #   that opened the master. A later `ssh -L …` to the same host silently
+    #   rides the existing master without the forward. Use `-o ControlMaster=no`
+    #   for that one-off, or drop the master first.
+    # - `ssh -O check <host>` asks whether a master is live; `ssh -O exit <host>`
+    #   tears it down. Killing the master drops every session sharing it.
+    # - To opt a host out, set `ControlMaster no` in a ~/.ssh/config.d/ file:
+    #   `Include` is the first directive in this file and ssh takes the
+    #   first-obtained value for each keyword, so config.d always wins.
+    #
+    # Not set: Compression. It costs CPU and only pays off on genuinely slow
+    # links; SSH's own default (off) is right for the common case.
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%C
+    ControlPersist 10m
+
     # SSH agent selection is handled automatically at the shell level by
     # ~/.config/zsh/tools/94_ssh_agent.zsh (Bitwarden → existing → ssh-agent).
     # Only uncomment an IdentityAgent below if you need config-level pinning
