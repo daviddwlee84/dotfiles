@@ -69,8 +69,15 @@ repos:
         # PEM blocks themselves. Exclude the redactor file to avoid a
         # self-referential false positive.
         exclude: ^scripts/redact_secrets\.py$
+      # 8 MB, not the 2 MB default. The binding constraint here is SpecStory
+      # agent transcripts, which are plain markdown and grow with session
+      # length — this repo already carries several over 2 MB, and a long
+      # session produced a 6.2 MB one. The cap still exists to catch the
+      # thing it was really for: a video, dataset, or vendored binary landing
+      # in a dotfiles repo by accident. Raise it again only for another
+      # generated-text class, never to let a binary through.
       - id: check-added-large-files
-        args: ['--maxkb=2048']
+        args: ['--maxkb=8192']
       - id: check-merge-conflict
       - id: end-of-file-fixer
         exclude: ^\.specstory/
