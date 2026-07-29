@@ -26,9 +26,27 @@
       can install uv, or install it manually from https://astral.sh/uv.
 
 - name: Install pre-commit via uv (pinned Python 3.13, all OSes)
+  # `failed_when: false` is deliberate. `uv tool install --python 3.13` asks uv
+  # to fetch a managed CPython from python-build-standalone, which does not
+  # publish a build for every architecture (i686 Linux has none at all). Without
+  # a guard this task is the one place in the role that hard-fails the whole
+  # play on such a host — and pre-commit is a developer convenience, not a
+  # prerequisite for anything else here. Warn and carry on instead.
   ansible.builtin.command: uv tool install pre-commit --python 3.13
   register: precommit_install
-  changed_when: "'already installed' not in (precommit_install.stdout | default('') ~ precommit_install.stderr | default(''))"
+  changed_when: >-
+    precommit_install.rc == 0 and 'already installed' not in
+    (precommit_install.stdout | default('') ~ precommit_install.stderr | default(''))
+  failed_when: false
+
+- name: Warn if pre-commit install failed
+  when: precommit_install.rc != 0
+  ansible.builtin.debug:
+    msg: >-
+      pre-commit install failed (rc={{ precommit_install.rc }}) — continuing.
+      Usually means uv could not provision Python 3.13 for this architecture.
+      Install manually with `uv tool install pre-commit` (system Python) or see
+      docs/tools/pre-commit.md.
 
 - name: Install gitleaks (macOS)
   # Go is managed by mise (dot_config/mise/config.toml.tmpl, gated on

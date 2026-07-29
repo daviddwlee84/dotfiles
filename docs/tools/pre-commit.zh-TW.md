@@ -75,6 +75,18 @@ uv tool install --force pre-commit --python 3.13
 
 之後，`pre-commit` 會在**你能控制**的 Python 下執行，獨立於 Homebrew／系統升級。新的 hook 環境會由那個 3.13 來引導，意思是它們也會使用 3.13（除非某個 hook 透過 `language_version:` 覆寫）。
 
+### ansible task 刻意設計成不致命
+
+上面的第 1 步是最脆弱的一環：`--python 3.13` 要求 uv 去抓一份 [python-build-standalone](https://github.com/astral-sh/python-build-standalone) 的 managed CPython，而它並非每個架構都有發佈（32-bit x86 Linux 完全沒有）。因此該 ansible task 帶了 `failed_when: false` 加上一個後續的警告 task —— `pre-commit` 是開發便利工具，不該在 uv 無法提供直譯器的機器上讓整個 `chezmoi apply` 中止。
+
+若你在 ansible 輸出看到 `pre-commit install failed (rc=…) — continuing`，改用系統 Python 安裝：
+
+```bash
+uv tool install pre-commit          # 不加 --python 鎖定
+```
+
+justfile 與 doctor 這兩個進入點**沒有**這層保護 —— 在那裡是你主動指名要 pre-commit，失敗就該吵。
+
 ### 為何鎖定 3.13（而非 Homebrew Python）
 
 Homebrew 的 `python@3.14` 過去曾搭載 (bundle) 一份 `libexpat`，其 ABI 與 macOS 系統的 `/usr/lib/libexpat.1.dylib` 不一致，導致 `pre-commit` 為建構 hook 倉庫所發出的每次 `virtualenv` 呼叫都失敗（症狀：載入 `pyexpat` 時 `Symbol not found: _XML_SetAllocTrackerActivationThreshold`）。鎖定 CPython 3.13 可以閃過整類由 brew Python 升級造成的破壞——同時讓 hook 快取鍵 (cache key)（pre-commit 會從 bootstrap Python 版本推導）在不同機器與隊友之間保持穩定。

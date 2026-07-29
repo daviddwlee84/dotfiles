@@ -70,6 +70,18 @@ What `uv tool install --force pre-commit --python 3.13` actually does:
 
 After that, `pre-commit` runs under a Python **you control**, independent of Homebrew/system upgrades. New hook environments will be bootstrapped by that 3.13, which means they'll use 3.13 too (unless a hook declares `language_version:` overrides).
 
+### The ansible task is non-fatal on purpose
+
+Step 1 above is the fragile one: `--python 3.13` asks uv to fetch a managed CPython from [python-build-standalone](https://github.com/astral-sh/python-build-standalone), which does not publish a build for every architecture (32-bit x86 Linux has none at all). The ansible task therefore carries `failed_when: false` plus a follow-up warning task, because `pre-commit` is a developer convenience and must not abort an entire `chezmoi apply` on a host where uv cannot provision the interpreter.
+
+If you see `pre-commit install failed (rc=…) — continuing` in the ansible output, install it against the system Python instead:
+
+```bash
+uv tool install pre-commit          # no --python pin
+```
+
+The justfile and doctor entry points are *not* guarded this way — there you asked for pre-commit specifically, so a failure should be loud.
+
 ### Why pinned 3.13 (not Homebrew Python)
 
 Homebrew's `python@3.14` has historically shipped with a bundled `libexpat` whose ABI disagreed with the system `/usr/lib/libexpat.1.dylib` on macOS, breaking every `virtualenv` call that `pre-commit` issues to build hook repos (symptom: `Symbol not found: _XML_SetAllocTrackerActivationThreshold` on import of `pyexpat`). Pinning to CPython 3.13 side-steps that whole class of brew-python-upgrade breakage — and it makes the hook cache key (which pre-commit derives from the bootstrap Python version) stable across machines and teammates.
