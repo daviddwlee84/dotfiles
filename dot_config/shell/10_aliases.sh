@@ -313,6 +313,28 @@ function reyee-update-completion {
 	fi
 }
 
+function tsnet-update-completion {
+	command -v tsnet >/dev/null 2>&1 || {
+		echo "tsnet-update-completion: tsnet not installed" >&2
+		return 1
+	}
+	if [ -n "$ZSH_VERSION" ]; then
+		local _tmp
+		_tmp=$(mktemp)
+		if tsnet --tyro-write-completion zsh "$_tmp" >/dev/null 2>&1; then
+			mkdir -p "${HOME}/.zfunc"
+			{ echo "#compdef tsnet"; tail -n +2 "$_tmp"; } >"${HOME}/.zfunc/_tsnet" &&
+				echo "tsnet completion cache updated (zsh: ~/.zfunc/_tsnet)"
+		fi
+		rm -f "$_tmp"
+	elif [ -n "$BASH_VERSION" ]; then
+		local _bashdir="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions"
+		mkdir -p "$_bashdir" &&
+			tsnet --tyro-write-completion bash "$_bashdir/tsnet" >/dev/null 2>&1 &&
+			echo "tsnet completion cache updated (bash: $_bashdir/tsnet)"
+	fi
+}
+
 # --- Ghostty terminfo install on remote SSH host ---------------------------
 # Fixes character-rendering issues when SSH'ing into a fresh host from
 # Ghostty/cmux/tmux. Usage: ghostty-ssh-terminfo <ssh-host>

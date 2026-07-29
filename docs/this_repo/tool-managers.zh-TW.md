@@ -197,6 +197,7 @@ ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew
 | `obsidian`、`google-drive`、`grammarly-desktop`、`super-productivity` | 永遠 |
 | `spotify`、`anki` | 永遠 |
 | `tailscale-app` | 永遠 |
+| `tailscale` (Linux) | `installTailscale` |
 | `dbeaver-community` | 永遠 |
 | `superset` | 僅 arm64 |
 
@@ -1068,8 +1069,9 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask(arm64) | n/a | Brewfile.darwin |
-| **tailscale**(CLI) | 由 `tailscale-app` cask 的 wrapper 提供(`/usr/local/bin/tailscale` → app;無 formula) | (Linux:repo 外的系統 pkg) | Brewfile.darwin |
+| **tailscale**(CLI) | 由 `tailscale-app` cask 的 wrapper 提供(`/usr/local/bin/tailscale` → app;無 formula) | apt/yum 走 `pkgs.tailscale.com`(`networking_tools` role,`tailscale` tag,由 `installTailscale` 控制) | Brewfile.darwin / networking_tools |
 | **tailscale-app** | brew cask(pkg 同時安裝 `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
+| **tsnet** | chezmoi(`dot_dotfiles/bin/executable_tsnet`,uv PEP-723 script) | 同左 | 自製 — tailnet → ssh config、tailnet-HTTPS serve |
 | **tailspin**(`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |

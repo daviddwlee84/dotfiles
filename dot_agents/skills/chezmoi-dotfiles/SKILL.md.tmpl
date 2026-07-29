@@ -83,7 +83,10 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 - **Networking** — nmap, mtr, httpie, gping, trippy.
 {{- end }}
 {{- if dig "installTunnelTools" false . }}
-- **Tunnels** — ngrok, cloudflared.
+- **Tunnels** — ngrok, cloudflared (expose localhost to the **public** internet).
+{{- end }}
+{{- if dig "installTailscale" false . }}
+- **Tailscale** — WireGuard mesh VPN (tailnet-only, the opposite of the tunnel tools). Helper CLI: `tsnet`. Picker: `tv tailnet`. See `docs/tools/tsnet.md`, `docs/tools/Tailscale.md`.
 {{- end }}
 {{- if dig "installBitwarden" false . }}
 - **Bitwarden** — `bw` CLI (+ SSH agent integration). See `docs/tools` Bitwarden notes.
@@ -103,31 +106,43 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 {{- if dig "installAuditd" false . }}
 - **auditd** — Linux audit framework + baseline rules (see `tv audit-events`).
 {{- end }}
+{{- if dig "installWakeOnLan" false . }}
+- **Wake-on-LAN** — passive side (this host can be woken). Sender CLI: `wake`. See `docs/sysadmin/wake-on-lan.md`.
+{{- end }}
+{{- if dig "agentSounds" false . }}
+- **Agent sounds** — audio notifications on agent Stop/Notification hooks. See `docs/tools/agent-sounds.md`.
+{{- end }}
 {{- if dig "enableVimMode" true . }}
 - **Vim mode** — shell modal editing + tmux vim nav (NOT Neovim/editors — those are always vim).
 {{- end }}
 
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 
-Each works from any cwd. Run with `--help`, or read `docs/tools/<name>.md`. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.
+Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, but not all (`x` → `clipboard.md`, `view-ebook` → `yazi-previews.md`, `fleet` → `this_repo/fleet-apply.md`); grep `docs/` if the obvious path 404s. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.
 
 - **`fleet`** — cross-host ops over your machines: `fleet chezmoi apply`, `fleet hosts`, `fleet tmux`, `fleet info`, `fleet pueue`, `fleet exec`. See `docs/this_repo/fleet-apply.md`, `docs/tools/fleet-exec.md`, `docs/tools/fleet-hosts.md`.
 - **`mlf`** — MLflow umbrella CLI + TUI dashboard (needs Python uv tools). Picker twin: `tv mlflow`.
 - **`pqsum`** — pueue queue summary (text / AI / JSON). See `docs/tools/pueue.md`.
 - **`x`** — clipboard/file copy-paste-open with cross-platform fallbacks.
-- **`view-office`** — open/preview Office docs (.docx/.xlsx/.pptx + legacy .doc/.xls/.ppt) in the terminal; also powers the yazi Office previewer. See `docs/tools/office-viewers.md`.
+- **`view-office`** / **`view-ebook`** — open/preview Office docs (.docx/.xlsx/.pptx + legacy .doc/.xls/.ppt) and ebooks (epub/mobi/azw3, calibre-backed) in the terminal; also power the yazi previewers. See `docs/tools/office-viewers.md`, `docs/tools/yazi-previews.md`.
 - **`mi-router`** / **`reyee`** / **`sms`** — read-only router CLIs (Xiaomi MiWiFi / Ruijie Reyee / Huawei HiLink SMS). See `docs/tools/{mi-router,reyee,sms}.md`.
 - **`mi-dhcp-bind`** — opt-in **write** companion to `mi-router`: set/remove MiWiFi static DHCP reservations (`bind --self` autodetects this host). See `docs/tools/mi-dhcp-bind.md`.
 - **`ping-monitor`** — record ping over time, flag latency spikes. See `docs/tools/ping-monitor.md`.
 - **`wake`** — Wake-on-LAN sender: `wake <host>` powers a box on by magic packet (hosts in `~/.config/wake/hosts.toml`). Passive side = `installWakeOnLan` ansible role. See `docs/sysadmin/wake-on-lan.md`.
+- **`tsnet`** — Tailscale helper: `tsnet list` (tailnet devices, `--tsv`/`--json`), `tsnet ssh-config <machine>` (idempotent managed block in `~/.ssh/config.d/20-tailscale`; detects the legacy no-`Include` case and shadowing `Host` blocks, both of which make ssh config silently inert), `tsnet serve <port>` (preflight → `tailscale serve --bg --https=443` → verify, for services that hard-require an `https://` origin), `tsnet doctor`. `--host H` drives any of it on a remote box over ssh. Picker twin: `tv tailnet`. See `docs/tools/tsnet.md`.
+- **`agent-warmup`** — drive a real interactive agent TUI at a scheduled time to move the quota window (launchd/systemd/pueue). See `docs/tools/agent-warmup.md`.
+- **`crash-blackbox`** — flight recorder for hard power-offs / unclean shutdowns. See `docs/tools/crash-blackbox.md`.
+- **`nvidia-driver-drift-check`** — flag kernel-module vs userspace driver drift. See `docs/sysadmin/gpu-driver.md`.
 - **`yth`** — search your YouTube watch history (title/channel/description + captions; Takeout import + optional cookie sync). Picker twin: `tv yth`. See `docs/tools/yth.md`.
 - **`appsrc`** — detect how an installed app / CLI was installed & managed (cask / App Store / direct-download / apt / snap / flatpak / AppImage / cargo/npm/pipx/uv/mise/go/gem / manual): `appsrc which <cmd-or-app>` (live), `appsrc size <app>` (footprint + associated cache/data/containers), `appsrc tui` (interactive dashboard — sort by size, filter), bare `appsrc` / `appsrc scan` (cached inventory, `--json`/`--tsv`/`--size`/`--sort`). Picker twins: `tv appsrc` (by source) / `tv appsrc-size` (by footprint). See `docs/tools/appsrc.md`.
 - **`dotcfg`** — reconfigure dotfiles prompts (above).
 - **`sesh-preview`** — preview helper for the sesh picker.
 
+**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with three pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`). See `docs/tools/herdr.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
+
 ## Television (`tv`) — fuzzy pickers with custom channels
 
-There are ~40 **custom** channels (system state, fleet, services, infra, agents…)
+There are ~50 **custom** channels (system state, fleet, services, infra, agents…)
 that you won't discover otherwise. Browse them:
 
 ```bash
@@ -137,15 +152,18 @@ tv <channel>            # open one, e.g. tv fleet-hosts | tv mlflow | tv pueue
 ls "$(chezmoi source-path)/dot_config/television/cable/"   # the channel definitions
 ```
 
-Handy ones: `fleet-hosts`, `mlflow`, `pueue`, `ports`, `kill-process`, `services`,
-`sessions`, `keybindings`, `aliases`, `git-ops`, `mac-apps`/`linux-apps`. Full
-reference: `docs/tools/tv.md`.
+Handy ones: `fleet-hosts`, `tailnet`, `ssh-config`, `mlflow`, `pueue`, `ports`,
+`kill-process`, `services`, `sessions`, `keybindings`, `aliases`, `git-ops`,
+`mac-apps`/`linux-apps`, the agent trio (`agent-panes`, `agent-sessions`,
+`agent-wakeup`) and the `herdr-*` family. Full reference: `docs/tools/tv.md`.
 
 ## Keybindings & keymaps
 
 - **`bindings`** (shell function) or **`tv keybindings`** — interactive reference.
-- **tmux**: `prefix + Space` (or `prefix + e`) opens the action menu;
-  `prefix + T` = sesh picker, `prefix + U` = tools. Deep ref: `docs/tools/tmux/keybindings.md`.
+- **tmux**: `prefix + Space` opens the action menu. There is **no `prefix + e`** —
+  that alias was removed, and `prefix + E` is "break every pane into its own
+  window", so do not guess it. `prefix + T` = sesh picker, `prefix + U` = tools.
+  Deep ref: `docs/tools/tmux/keybindings.md`.
 - **shell ZLE widgets**: `Alt+S` sesh sessions, `Alt+T` tools, `Ctrl+R` history (atuin).
 - Master reference: `docs/shells/keybindings.md` (also deployed to `~/.config/docs/shells/keybindings.md`).
 

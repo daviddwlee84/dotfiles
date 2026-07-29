@@ -414,6 +414,26 @@ PROMPTS: tuple[Prompt, ...] = (
            default=False,
            prompt_text="Install tunnel tools (ngrok, cloudflared — expose localhost, SSH tunnels)",
            comment="是否安裝 tunnel 工具 (ngrok, cloudflared) — expose localhost / SSH reverse tunnel"),
+    Prompt("installTailscale", "bool", "System & apps",
+           "Tailscale mesh VPN",
+           "WireGuard mesh VPN. Deliberately separate from installTunnelTools "
+           "(ngrok/cloudflared expose localhost to the PUBLIC internet; "
+           "`tailscale serve` is the opposite — tailnet-only) and from "
+           "installNetworkingTools (a read-only diagnostics bundle; joining a "
+           "mesh and reconfiguring DNS should not be a side effect of wanting "
+           "nmap). Linux only: official apt/yum repo. macOS gets it from the "
+           "`tailscale-app` cask under installBrewApps, so this is a no-op there. "
+           "Install-only — `tailscale up` stays manual. Pairs with the `tsnet` "
+           "CLI and the `tv tailnet` channel.",
+           default=False,
+           prompt_text="Install Tailscale (mesh VPN; Linux apt/yum repo — macOS uses the cask)",
+           comment=("是否安裝 Tailscale (WireGuard mesh VPN)。\n"
+                    "  Linux: 走官方 apt/yum repo (pkgs.tailscale.com)，install-only，\n"
+                    "         不會自動 `tailscale up`（需要互動登入）。\n"
+                    "  macOS: 由 installBrewApps 的 `tailscale-app` cask 提供，這裡是 no-op。\n"
+                    "  搭配 in-house CLI `tsnet`（ssh-config / serve）與 `tv tailnet` channel。\n"
+                    "詳見 docs/tools/Tailscale.md 與 docs/tools/tsnet.md"),
+           ),
     # --- Preferences -----------------------------------------------------
     Prompt("useChineseMirror", "bool", "Preferences",
            "Use China (GFW) mirrors",

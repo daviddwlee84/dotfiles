@@ -71,6 +71,46 @@ without opening TV. Full details: [Agent pane discovery](agent-panes-discovery.m
 
 ---
 
+### `tailnet` channel
+
+Fuzzy-search Tailscale devices — MagicDNS name, tailnet IP, OS, online state, tags.
+Sourced from `tsnet list --tsv`; the preview pane is `tsnet describe`, which also
+reports whether `~/.ssh/config` already knows the device. See [tsnet.md](tsnet.md).
+
+No cache and no `watch`, unlike `lan-devices`: `tailscale status --json` is a
+local unix-socket call (~40 ms), so a cache would only go stale exactly when a
+device comes online.
+
+**Source cycling** (`Ctrl+S`):
+
+| Source | Description |
+|--------|-------------|
+| Online only | Devices currently up on the current tailnet (default) |
+| All | Including offline devices |
+| All tailnets | Also devices from other tailnets you are a member of |
+
+**Keybindings** (`Alt+` namespace avoids tmux/TV conflicts):
+
+| Key | Action |
+|-----|--------|
+| `Enter` | `ssh <magicdns-name>` |
+| `Alt+W` | `tsnet ssh-config` — write a managed `~/.ssh/config.d` block |
+| `Alt+Z` | `tsnet --host <device> doctor` — tailnet-HTTPS / serve readiness |
+| `Alt+T` | BatchMode SSH probe — does passwordless login actually work? |
+| `Alt+P` | `tailscale ping` — direct path vs DERP-relayed |
+| `Alt+Y` | Copy the MagicDNS FQDN (OSC 52 over SSH) |
+
+`Alt+W` and `Alt+Z` were the only two `Alt` letters unused across every channel in
+this repo, and are spent here on the two verbs that exist nowhere else. `Alt+T`
+and `Alt+Y` keep their established meanings on purpose — muscle memory across
+`fleet-hosts` / `ssh-config` / `tailnet` beats uniqueness, and each `tv` run is
+its own process so cross-channel reuse is never a conflict.
+
+**Every action keys off the FQDN column, not the name column.** Tailscale
+HostNames are *not* unique — `raspberrypi`, `localhost` and duplicated laptop
+names all recur on a real tailnet — so column 0 would hand ambiguous input to
+`tsnet`. Column 1 (MagicDNS name) is the only unique handle.
+
 ### `lan-devices` channel
 
 Fuzzy-search devices on the local subnet with open ports, MAC/vendor, hostname (rDNS + mDNS), ping RTT, and last-seen timestamp. Backed by `~/.config/television/lan-scan.sh`, which writes results incrementally to `~/.cache/tv/lan-devices.tsv` and per-host nmap detail to `~/.cache/tv/lan-ports/<ip>.txt`. The channel uses `watch = 2.0`, so rows stream into the picker as the background scan progresses (state column: `discovered` → `scanning` → `scanned`).

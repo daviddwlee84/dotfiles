@@ -23,3 +23,37 @@ sudo rm -rf /Applications/Tailscale.localized   # deletes only the idle App Stor
 ```
 
 Full detection + root cause: [`pitfalls/tailscale-another-copy-app-store-leftover.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/tailscale-another-copy-app-store-leftover.md).
+
+## How this repo installs it (Linux)
+
+Optional role, gated on **`installTailscale`** (its own prompt — deliberately not
+folded into `installNetworkingTools`, a read-only diagnostics bundle, nor into
+`installTunnelTools`, which is about exposing localhost to the *public* internet).
+
+`dot_ansible/roles/networking_tools`, tag `tailscale`: the official
+`pkgs.tailscale.com` apt repo via `deb822_repository` on Debian/Ubuntu/Raspbian,
+the yum repo on the RedHat family, guarded by a `tailscale version` probe so it is
+install-only. Derivatives whose codename is not an upstream suite (Mint, Pop!_OS)
+are skipped with a pointer at the official installer, which does that mapping
+itself.
+
+The apt cache refresh is **scoped to the Tailscale source only**
+(`-o Dir::Etc::sourcelist=sources.list.d/tailscale.sources`). An unscoped
+`apt-get update` re-fetches every third-party source on the box; one flaky sibling
+would then leave the just-added Tailscale repo unindexed. (The Steam block in
+`gui_apps_linux` already names tailscale as one of those flaky sources.)
+
+**Two steps ansible deliberately does not take** — both interactive and/or
+sudo-requiring, and both printed at the end of the run:
+
+```bash
+sudo tailscale up                      # browser login, joins the tailnet
+sudo tailscale set --operator=$USER    # lets `tsnet serve` run without sudo
+```
+
+## Driving it: the `tsnet` CLI
+
+[`tsnet`](tsnet.md) wraps the two workflows this repo needs — turning the tailnet
+device list into `~/.ssh/config` entries, and exposing a local service over
+tailnet HTTPS (`tailscale serve`) for anything that hard-requires an `https://`
+origin. Picker twin: `tv tailnet`. Start with `tsnet doctor`.

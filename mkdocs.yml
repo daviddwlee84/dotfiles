@@ -334,6 +334,7 @@ nav:
           - Networking: tools/networking.md
           - Services: tools/services.md
           - Tailscale: tools/Tailscale.md
+          - tsnet (tailnet ssh-config + serve): tools/tsnet.md
           - Tunnels (ngrok / cloudflared): tools/tunnels.md
           - Resilio Sync (P2P file sync): tools/resilio-sync.md
           - dotnet tools: tools/dotnet-tools.md

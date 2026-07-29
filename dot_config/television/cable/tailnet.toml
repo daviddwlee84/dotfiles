@@ -1,0 +1,135 @@
+# Tailnet devices channel for television (tv)
+#
+# Sourced from `tsnet list --tsv`. The parsing deliberately lives in Python, not
+# in awk here: `tailscale status --json` puts peers in a DICT keyed by nodekey
+# (not a list), every DNSName carries a trailing dot, more than one tailnet can
+# appear, and untagged nodes have NO `Tags` key at all. Re-implementing that in
+# awk would make a fourth fragile ssh/tailscale parser — the awk in
+# ssh-config.toml is already this repo's cautionary tale.
+#
+# No cache / `watch` either (unlike lan-devices.toml): that channel caches
+# because nmap takes ~30s, whereas `tailscale status --json` is a local
+# unix-socket call at ~40ms. A cache would only go stale exactly when a device
+# comes online.
+#
+# Usage:
+#   tv tailnet
+#
+# Keybindings (Alt+ namespace to avoid TV/tmux conflicts):
+#   Enter      SSH into the selected device (by MagicDNS name)
+#   Alt+W      Write a managed ~/.ssh/config.d block for it   (tsnet ssh-config)
+#   Alt+Z      tailnet-HTTPS / serve readiness for it         (tsnet doctor)
+#   Alt+T      BatchMode SSH probe — does passwordless login actually work?
+#   Alt+P      tailscale ping — direct path vs DERP-relayed
+#   Alt+Y      Copy the MagicDNS FQDN to the clipboard
+#   Ctrl+S     Cycle source: online only -> all -> all tailnets
+#   Ctrl+/     Toggle preview panel
+#
+# Alt+W and Alt+Z were the only two Alt letters unused across every channel in
+# this repo; they are spent here on the two verbs that exist nowhere else. The
+# rest keep their established letters (Alt+T probe, Alt+Y copy) on purpose —
+# muscle memory across fleet-hosts / ssh-config / tailnet is worth more than
+# uniqueness, and each `tv` run is its own process so cross-channel reuse is
+# never a conflict.
+#
+# Sister channels: `fleet-hosts` (chezmoi-managed machines from machines.toml),
+# `ssh-config` (whatever is already in ~/.ssh/config). This one is the tailnet,
+# which is a different population — it includes phones and other people's Macs.
+
+[metadata]
+name = "tailnet"
+description = "Tailscale devices: MagicDNS name, IP, OS, online state"
+requirements = ["tsnet", "tailscale", "ssh"]
+
+[source]
+# WIRE FORMAT — must match `tsnet list --tsv` exactly. Reordering these columns
+# breaks every {split:\t:N} below:
+#   0:name  1:fqdn  2:ip  3:os  4:online  5:tailnet  6:tags
+command = [
+  "tsnet list --tsv --online-only",
+  "tsnet list --tsv",
+  "tsnet list --tsv --all-tailnets",
+]
+display = "{split:\\t:0}  [{split:\\t:3}/{split:\\t:4}]  {split:\\t:1}"
+output = "{split:\\t:1}"
+
+[preview]
+# Column 1 (fqdn), NOT column 0 (HostName). HostNames are NOT unique on a real
+# tailnet — "raspberrypi", "localhost" and a duplicated laptop name all appear
+# more than once here, and `tsnet describe` correctly refuses an ambiguous
+# needle. The MagicDNS name is the only unique handle. Same for every action.
+command = "tsnet describe '{split:\\t:1}'"
+
+[ui]
+input_header = "Tailnet devices"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:connect"
+alt-w = "actions:ssh_config"
+alt-z = "actions:doctor"
+alt-t = "actions:probe"
+alt-p = "actions:ts_ping"
+alt-y = "actions:copy_fqdn"
+
+[actions.connect]
+description = "SSH into the selected tailnet device (by MagicDNS name)"
+command = "ssh '{split:\\t:1}'"
+mode = "execute"
+
+[actions.ssh_config]
+description = "Write a managed ~/.ssh/config.d block for this device"
+command = "tsnet ssh-config '{split:\\t:1}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.doctor]
+description = "tailnet-HTTPS / serve readiness for this device"
+command = "tsnet --host '{split:\\t:1}' doctor; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.probe]
+description = "Probe with BatchMode (no password prompt allowed)"
+command = """
+host='{split:\\t:1}'
+echo "# Probing $host with BatchMode=yes (ConnectTimeout=3)"
+echo "# Exit 0 = passwordless login works; non-zero = needs password / unreachable / key not authorized"
+echo
+ssh -o BatchMode=yes \\
+    -o ConnectTimeout=3 \\
+    -o StrictHostKeyChecking=accept-new \\
+    -o PreferredAuthentications=publickey,hostbased,gssapi-with-mic \\
+    "$host" true
+rc=$?
+echo
+case $rc in
+  0)   echo "[OK] passwordless login works for '$host'" ;;
+  255) echo "[FAIL] connection / auth error (exit 255) — needs password, key not authorized, or host unreachable" ;;
+  *)   echo "[FAIL] remote command failed (exit $rc) — auth probably OK but 'true' failed" ;;
+esac
+echo
+echo "[hint] Alt+W writes an ~/.ssh/config entry; ssh-setup-remote installs a key."
+echo
+echo '[Press Enter to exit]'
+read -r _
+"""
+mode = "execute"
+
+[actions.ts_ping]
+description = "tailscale ping — shows direct vs DERP-relayed path"
+command = "tailscale ping -c 5 '{split:\\t:1}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.copy_fqdn]
+description = "Copy the MagicDNS FQDN to clipboard (OSC 52 over SSH)"
+command = """
+d='{split:\\t:1}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

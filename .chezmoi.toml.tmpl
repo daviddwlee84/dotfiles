@@ -162,6 +162,13 @@ installNiri = false
 installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)" false }}
 # 是否安裝 tunnel 工具 (ngrok, cloudflared) — expose localhost / SSH reverse tunnel
 installTunnelTools = {{ promptBoolOnce . "installTunnelTools" "Install tunnel tools (ngrok, cloudflared — expose localhost, SSH tunnels)" false }}
+# 是否安裝 Tailscale (WireGuard mesh VPN)。
+#   Linux: 走官方 apt/yum repo (pkgs.tailscale.com)，install-only，
+#          不會自動 `tailscale up`（需要互動登入）。
+#   macOS: 由 installBrewApps 的 `tailscale-app` cask 提供，這裡是 no-op。
+#   搭配 in-house CLI `tsnet`（ssh-config / serve）與 `tv tailnet` channel。
+# 詳見 docs/tools/Tailscale.md 與 docs/tools/tsnet.md
+installTailscale = {{ promptBoolOnce . "installTailscale" "Install Tailscale (mesh VPN; Linux apt/yum repo — macOS uses the cask)" false }}
 # 是否在中國大陸 GFW 內，需要使用鏡像源
 useChineseMirror = {{ promptBoolOnce . "useChineseMirror" "Are you in China (behind GFW) and need to use mirrors" false }}
 # 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）

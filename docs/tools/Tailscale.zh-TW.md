@@ -28,3 +28,34 @@ sudo rm -rf /Applications/Tailscale.localized   # 只刪閒置的 App Store 那�
 ```
 
 完整偵測 + 根因: [`pitfalls/tailscale-another-copy-app-store-leftover.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/tailscale-another-copy-app-store-leftover.md)。
+
+## 本 repo 如何安裝 (Linux)
+
+可選 role，由 **`installTailscale`** 控制（獨立的 prompt——刻意不併進
+`installNetworkingTools`，那是唯讀的診斷工具包；也不併進 `installTunnelTools`，
+那是把 localhost 曝露到**公網**）。
+
+`dot_ansible/roles/networking_tools`，tag `tailscale`：Debian/Ubuntu/Raspbian 走官方
+`pkgs.tailscale.com` apt repo（`deb822_repository`），RedHat 家族走 yum repo，前面有
+`tailscale version` 探測所以是 install-only。衍生發行版若 codename 不是上游 suite
+（Mint、Pop!_OS）會直接跳過並指向官方安裝腳本，由它自己做對應。
+
+apt 快取更新**只針對 Tailscale 這個來源**
+（`-o Dir::Etc::sourcelist=sources.list.d/tailscale.sources`）。不設範圍的
+`apt-get update` 會重抓機器上每一個第三方來源，任一個不穩就會讓剛加好的 Tailscale
+repo 沒被索引到。（`gui_apps_linux` 的 Steam 區塊註解裡已經把 tailscale 列為那些
+不穩來源之一。）
+
+**ansible 刻意不做的兩步**——都需要互動或 sudo，會在跑完時印出來：
+
+```bash
+sudo tailscale up                      # 瀏覽器登入，加入 tailnet
+sudo tailscale set --operator=$USER    # 讓 `tsnet serve` 不必 sudo 就能跑
+```
+
+## 操作工具：`tsnet` CLI
+
+[`tsnet`](tsnet.md) 包起本 repo 需要的兩個流程——把 tailnet 裝置清單變成
+`~/.ssh/config` 條目，以及用 tailnet HTTPS（`tailscale serve`）曝露本機服務，
+給任何硬性要求 `https://` origin 的服務用。Picker 雙生：`tv tailnet`。
+從 `tsnet doctor` 開始。

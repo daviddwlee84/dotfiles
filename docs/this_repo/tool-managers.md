@@ -205,6 +205,7 @@ nothing, and kills `community.general.homebrew` on empty JSON with
 | `obsidian`, `google-drive`, `grammarly-desktop`, `super-productivity` | `installBrewApps` |
 | `spotify`, `anki` | `installBrewApps` |
 | `tailscale-app` | `installBrewApps` |
+| `tailscale` (Linux) | `installTailscale` |
 | `dbeaver-community` | `installBrewApps` |
 | `superset` | `installBrewApps` + arm64 |
 
@@ -1172,8 +1173,9 @@ list.
 | **switchaudio-osx** (`SwitchAudioSource`) | brew (gated `installMediaControl`) | n/a | media_control |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask (arm64) | n/a | Brewfile.darwin |
-| **tailscale** (CLI) | via the `tailscale-app` cask wrapper (`/usr/local/bin/tailscale` → app; no formula) | (Linux: system pkg outside repo) | Brewfile.darwin |
+| **tailscale** (CLI) | via the `tailscale-app` cask wrapper (`/usr/local/bin/tailscale` → app; no formula) | apt/yum from `pkgs.tailscale.com` (`networking_tools` role, `tailscale` tag, gated on `installTailscale`) | Brewfile.darwin / networking_tools |
 | **tailscale-app** | brew cask (pkg also installs the `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
+| **tsnet** | chezmoi (`dot_dotfiles/bin/executable_tsnet`, uv PEP-723 script) | same | in-house — tailnet → ssh config, tailnet-HTTPS serve |
 | **tailspin** (`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |

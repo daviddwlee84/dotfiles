@@ -278,6 +278,10 @@ TAGS="${TAGS},networking_tools"
 {{ if $installTunnelTools -}}
 TAGS="${TAGS},tunnel_tools"
 {{ end -}}
+{{ $installTailscale := false }}{{ if hasKey . "installTailscale" }}{{ $installTailscale = .installTailscale }}{{ end -}}
+{{ if and $installTailscale (ne .chezmoi.os "darwin") -}}
+TAGS="${TAGS},tailscale"
+{{ end -}}
 {{ $installIacTools := false }}{{ if hasKey . "installIacTools" }}{{ $installIacTools = .installIacTools }}{{ end -}}
 {{ if $installIacTools -}}
 TAGS="${TAGS},iac_tools"

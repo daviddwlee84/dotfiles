@@ -1034,3 +1034,191 @@
       ansible.builtin.file:
         path: /tmp/cloudflared.rpm
         state: absent
+
+# =============================================================================
+# Tailscale (WireGuard mesh VPN)
+# Tags: tailscale (gated by the installTailscale chezmoi flag)
+#
+# macOS is DELIBERATELY absent. The `tailscale-app` cask (Brewfile.darwin) ships
+# the GUI, the daemon (a system extension) AND the /usr/local/bin/tailscale
+# wrapper. Never add the `tailscale` brew FORMULA — it fights the cask over that
+# same path on every upgrade and ships a redundant tailscaled.
+# See docs/tools/Tailscale.md and
+# pitfalls/tailscale-another-copy-app-store-leftover.md.
+#
+# Install-only, per the repo's install-vs-upgrade split: `tailscale up` and
+# `tailscale set --operator=` both need an interactive login / sudo and stay
+# manual. The `tsnet` CLI's preflight prints the same two commands.
+# =============================================================================
+
+- name: Check if tailscale is installed
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  tags: [tailscale]
+  ansible.builtin.command: tailscale version
+  register: tailscale_check
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+# pkgs.tailscale.com is laid out per-distro, and the suite is the distro
+# codename — so a derivative whose codename is not an upstream suite (Mint's
+# "vanessa", Pop!_OS, …) would 404 on the key or index an empty repo. Rather
+# than guess a base, those fall through to the unsupported branch below with a
+# pointer at the official installer, which does the derivative mapping itself.
+- name: Resolve the Tailscale repo distro name
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  tags: [tailscale]
+  ansible.builtin.set_fact:
+    tailscale_distro: "{{ _ts_distro_map.get(ansible_facts['distribution'], '') }}"
+  vars:
+    _ts_distro_map:
+      Ubuntu: ubuntu
+      Debian: debian
+      Raspbian: raspbian
+      Fedora: fedora
+      CentOS: centos
+      Rocky: centos
+      AlmaLinux: centos
+      RedHat: rhel
+
+- name: Warn that this distribution has no first-party Tailscale repo
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - tailscale_check.rc | default(1) != 0
+    - tailscale_distro | default('') == ''
+  tags: [tailscale]
+  ansible.builtin.debug:
+    msg: >-
+      No first-party Tailscale repo for {{ ansible_facts['distribution'] }}
+      ({{ ansible_facts['distribution_release'] | default('?') }}) — skipping.
+      Install by hand: curl -fsSL https://tailscale.com/install.sh | sh
+
+- name: Install Tailscale (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tailscale_check.rc | default(1) != 0
+    - tailscale_distro | default('') != ''
+  tags: [tailscale]
+  block:
+    - name: Install Tailscale apt repo + package
+      become: true
+      tags: [sudo]
+      block:
+        - name: Download Tailscale signing key
+          ansible.builtin.get_url:
+            url: "https://pkgs.tailscale.com/stable/{{ tailscale_distro }}/{{ ansible_facts['distribution_release'] }}.noarmor.gpg"
+            dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+            mode: "0644"
+            timeout: 60
+
+        - name: Add Tailscale apt repository (deb822)
+          ansible.builtin.deb822_repository:
+            name: tailscale
+            types: deb
+            uris: "https://pkgs.tailscale.com/stable/{{ tailscale_distro }}"
+            suites: "{{ ansible_facts['distribution_release'] }}"
+            components: main
+            signed_by: /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+        # Refresh ONLY the Tailscale source — same reasoning as the Steam block
+        # in gui_apps_linux (whose comment already names tailscale as one of the
+        # third-party sources that makes an unscoped `apt-get update` flaky).
+        # A sibling source failing must not leave the just-added Tailscale repo
+        # unindexed. No ansible.builtin.apt equivalent can target one source.
+        - name: Refresh apt cache for the Tailscale source only
+          ansible.builtin.command:
+            cmd: >-
+              apt-get update
+              -o Dir::Etc::sourcelist=sources.list.d/tailscale.sources
+              -o Dir::Etc::sourceparts=-
+              -o APT::Get::List-Cleanup=0
+          changed_when: false
+
+        - name: Install tailscale
+          ansible.builtin.apt:
+            name: tailscale
+            state: present
+            update_cache: false
+  rescue:
+    - name: Remove Tailscale apt repository (install failed; avoid a broken source)
+      become: true
+      tags: [sudo]
+      ansible.builtin.deb822_repository:
+        name: tailscale
+        state: absent
+      ignore_errors: true
+
+    - name: Warn Tailscale install failed (Debian)
+      ansible.builtin.debug:
+        msg: >-
+          Tailscale install failed — skipping. Manual fallback:
+          curl -fsSL https://tailscale.com/install.sh | sh
+
+- name: Install Tailscale (RedHat)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - tailscale_check.rc | default(1) != 0
+    - tailscale_distro | default('') != ''
+  tags: [tailscale]
+  block:
+    - name: Add Tailscale yum repo + install
+      become: true
+      tags: [sudo]
+      block:
+        # Fedora's repo file is unversioned; the EL family (centos/rhel) nests
+        # under the major version.
+        - name: Add Tailscale yum repository
+          ansible.builtin.get_url:
+            url: >-
+              https://pkgs.tailscale.com/stable/{{ tailscale_distro }}/{{
+              '' if tailscale_distro == 'fedora'
+              else ansible_facts['distribution_major_version'] + '/'
+              }}tailscale.repo
+            dest: /etc/yum.repos.d/tailscale.repo
+            mode: "0644"
+            timeout: 60
+
+        - name: Install tailscale (RedHat)
+          ansible.builtin.package:
+            name: tailscale
+            state: present
+  rescue:
+    - name: Warn Tailscale install failed (RedHat)
+      ansible.builtin.debug:
+        msg: >-
+          Tailscale installation failed on RedHat — skipping. Manual fallback:
+          curl -fsSL https://tailscale.com/install.sh | sh
+
+# Re-probe rather than assuming success. The Debian/RedHat blocks both have a
+# `rescue:` that swallows a failed install (by design — a broken apt source must
+# not fail the whole play), so without this gate the "Tailscale installed"
+# message below prints even when the install just failed. Verified: a run whose
+# install died on `sudo: a password is required` still claimed success.
+- name: Re-check tailscale after the install attempt
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - tailscale_check.rc | default(1) != 0
+    - tailscale_distro | default('') != ''
+  tags: [tailscale]
+  ansible.builtin.command: tailscale version
+  register: tailscale_post
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+# The two steps ansible deliberately does NOT take. Printed with the exact
+# strings `tsnet doctor` prints, so a user who hits the preflight later
+# recognises them.
+- name: Tailscale post-install manual steps
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - tailscale_check.rc | default(1) != 0
+    - tailscale_distro | default('') != ''
+    - tailscale_post.rc | default(1) == 0
+  tags: [tailscale]
+  ansible.builtin.debug:
+    msg: |-
+      Tailscale installed. Two manual steps remain (interactive / need sudo):
+        sudo tailscale up                      # browser login, joins the tailnet
+        sudo tailscale set --operator=$USER    # lets `tsnet serve` run without sudo
+      Then: tsnet doctor

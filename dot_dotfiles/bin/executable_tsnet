@@ -1,0 +1,1829 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "tyro>=0.9",
+#   "rich>=13",
+#   "httpx>=0.27",
+# ]
+# ///
+"""Tailscale helper: tailnet device list -> ssh config, and tailnet-HTTPS serve.
+
+Two jobs that both exist because Tailscale's happy paths fail *silently*:
+
+  tsnet ssh-config   Write an idempotent managed block of `Host` entries into
+                     ~/.ssh/config.d/20-tailscale. Detects the case where
+                     ~/.ssh/config has no `Include` reaching that file (in which
+                     case writing there is a no-op ssh never reads) and the case
+                     where an earlier `Host` block shadows ours (ssh takes the
+                     FIRST-obtained value for every keyword).
+
+  tsnet serve        Expose a local service over tailnet HTTPS. Preflight ->
+                     `tailscale serve --bg` -> verify. The preflight exists
+                     because a service can answer 200 on /health, 401 on /mcp
+                     and 200 on /.well-known/... while being completely broken
+                     for any client that requires an https:// origin.
+
+`--host H` runs the tailscale side on a remote box over plain ssh (one batched
+round trip). Sister tools: `fleet` (chezmoi-managed machines), `tv tailnet`
+(picker over `tsnet list --tsv`).
+
+See docs/tools/tsnet.md and docs/tools/Tailscale.md.
+"""
+
+from __future__ import annotations
+
+import fnmatch
+import json
+import os
+import shlex
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Annotated, Any, Literal, Union
+
+import httpx
+import tyro
+from rich.console import Console
+from rich.table import Table
+
+APP = "tsnet"
+
+console = Console()
+err = Console(stderr=True, highlight=False)
+
+# ---------------------------------------------------------------- exit codes
+EX_OK = 0
+EX_FAIL = 1
+EX_NO_BINARY = 2
+EX_BACKEND = 3
+EX_UNREACHABLE = 4  # ssh-config target not reachable from ~/.ssh/config
+EX_MARKERS = 5  # managed-block markers malformed
+EX_CERTS = 6  # tailnet HTTPS certs disabled / node uncovered
+EX_OPERATOR = 7
+EX_NO_LISTENER = 8
+EX_PORT_TAKEN = 9
+EX_SHADOWED = 10  # --strict only
+
+BEGIN_PREFIX = "# BEGIN tsnet ssh-config"
+BEGIN_MARKER = f"{BEGIN_PREFIX} v1 — managed block; edits INSIDE are overwritten"
+END_MARKER = "# END tsnet ssh-config"
+
+DEFAULT_OUT = "~/.ssh/config.d/20-tailscale"
+ADMIN_DNS_URL = "https://login.tailscale.com/admin/dns"
+
+
+def die(msg: str, code: int = EX_FAIL) -> None:
+    err.print(f"[red]{APP}:[/red] {msg}")
+    sys.exit(code)
+
+
+def warn(msg: str) -> None:
+    err.print(f"[yellow]{APP}:[/yellow] {msg}")
+
+
+def note(msg: str) -> None:
+    err.print(f"[dim]{APP}: {msg}[/dim]")
+
+
+# ============================================================== tailscale I/O
+
+
+def find_tailscale(override: str | None) -> str | None:
+    """Locate the tailscale binary.
+
+    On macOS the CLI is a wrapper the `tailscale-app` cask's pkg drops at
+    /usr/local/bin; if PATH is minimal (cron, a GUI-launched process) fall back
+    to the app bundle. Never assume a `tailscale` brew formula exists -- this
+    repo deliberately does not install one (docs/tools/Tailscale.md).
+    """
+    for cand in (
+        override,
+        os.environ.get("TSNET_TAILSCALE_BIN"),
+        shutil.which("tailscale"),
+        "/usr/local/bin/tailscale",
+        "/Applications/Tailscale.app/Contents/MacOS/tailscale",
+    ):
+        if cand and Path(cand).exists() and os.access(cand, os.X_OK):
+            return cand
+    return None
+
+
+# One round trip for every read the preflight needs. Six separate `ssh host
+# tailscale ...` calls at ~300ms WAN RTT is a visibly sluggish preflight, and
+# the checks are useless individually anyway.
+#
+# The PATH prelude mirrors scripts/fleet/exec.py:_PATH_PRELUDE -- a remote
+# non-login shell frequently lacks the dir holding `tailscale` (linuxbrew,
+# /usr/local/bin, snap).
+#
+# Every sentinel is preceded by its own `echo` (a bare newline) because
+# `tailscale status --json` does NOT terminate its output with a newline: the
+# next sentinel lands glued to the final `}` , stops matching, and every section
+# after `status` silently vanishes. That failure mode is nasty precisely because
+# an absent serve section reads as "{} = port free".
+_REMOTE_PROBE = r"""
+PATH="$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:/snap/bin:$PATH"
+TS=$(command -v tailscale) || { echo "TSNET_NO_TAILSCALE"; exit 127; }
+echo; echo "---TSNET-PLATFORM---"; uname -s; id -un; id -u
+echo; echo "---TSNET-STATUS---";   "$TS" status --json 2>/dev/null
+echo; echo "---TSNET-SERVE---";    "$TS" serve status --json 2>/dev/null
+echo; echo "---TSNET-PREFS---";    "$TS" debug prefs 2>/dev/null
+echo; echo "---TSNET-LISTEN---";   (ss -ltnH 2>/dev/null || lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null) | head -200
+echo; echo "---TSNET-END---"
+"""
+
+
+class Runner:
+    """Runs tailscale locally or on a remote host over ssh."""
+
+    def __init__(
+        self,
+        host: str | None,
+        ssh_opts: list[str],
+        timeout: float,
+        tailscale_bin: str | None,
+    ):
+        self.host = host
+        self.ssh_opts = ssh_opts
+        self.timeout = timeout
+        self._probe: dict[str, str] | None = None
+        self.bin: str | None = None
+        if host is None:
+            self.bin = find_tailscale(tailscale_bin)
+            if self.bin is None:
+                die(
+                    "tailscale binary not found.\n"
+                    "       macOS: install the `tailscale-app` cask (NOT the `tailscale` formula).\n"
+                    "       Linux: enable installTailscale, or "
+                    "curl -fsSL https://tailscale.com/install.sh | sh\n"
+                    "       Override with --tailscale-bin / $TSNET_TAILSCALE_BIN.",
+                    EX_NO_BINARY,
+                )
+
+    @property
+    def where(self) -> str:
+        return self.host or "local"
+
+    # -------------------------------------------------------------- remote
+
+    def _ssh_argv(self) -> list[str]:
+        argv = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={int(self.timeout)}"]
+        for opt in self.ssh_opts:
+            argv += ["-o", opt]
+        argv.append(self.host or "")
+        return argv
+
+    def _run_probe(self) -> dict[str, str]:
+        if self._probe is not None:
+            return self._probe
+        argv = self._ssh_argv() + ["--", "sh", "-c", shlex.quote(_REMOTE_PROBE)]
+        try:
+            p = subprocess.run(
+                argv, capture_output=True, text=True, timeout=max(self.timeout * 3, 30)
+            )
+        except subprocess.TimeoutExpired:
+            die(f"ssh to {self.host} timed out after {self.timeout * 3:.0f}s", EX_FAIL)
+        if "TSNET_NO_TAILSCALE" in p.stdout:
+            die(f"tailscale is not installed on {self.host} (or not on its PATH)", EX_NO_BINARY)
+        if p.returncode != 0 and not p.stdout.strip():
+            die(f"ssh to {self.host} failed: {p.stderr.strip() or p.returncode}", EX_FAIL)
+
+        sections: dict[str, str] = {}
+        current = None
+        buf: list[str] = []
+        for line in p.stdout.splitlines():
+            if line.startswith("---TSNET-") and line.endswith("---"):
+                if current:
+                    sections[current] = "\n".join(buf)
+                current = line.strip("-").removeprefix("TSNET-").lower()
+                buf = []
+            elif current:
+                buf.append(line)
+        if current:
+            sections[current] = "\n".join(buf)
+        # The END sentinel proves the stream was not truncated. Without this
+        # guard a partial read degrades into "section missing" -> "{}" ->
+        # "port free", which is confidently wrong.
+        if "end" not in sections:
+            die(
+                f"probe output from {self.host} was truncated "
+                f"(no END sentinel; got sections: {', '.join(sections) or 'none'})",
+                EX_FAIL,
+            )
+        self._probe = sections
+        return sections
+
+    def _section(self, name: str) -> str | None:
+        """Raw text of one probe section. None means the section is missing."""
+        return self._run_probe().get(name)
+
+    # --------------------------------------------------------------- reads
+
+    def _local_json(self, args: list[str]) -> Any:
+        try:
+            p = subprocess.run(
+                [self.bin or "tailscale", *args],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+        except subprocess.TimeoutExpired:
+            die(f"`tailscale {' '.join(args)}` timed out", EX_FAIL)
+        if p.returncode != 0 and not p.stdout.strip():
+            die(f"`tailscale {' '.join(args)}` failed: {p.stderr.strip()}", EX_FAIL)
+        return _loads(p.stdout)
+
+    def status(self) -> dict[str, Any]:
+        if self.host:
+            data = _loads(self._section("status") or "")
+            if data is None:
+                die(
+                    f"could not read `tailscale status --json` on {self.host} "
+                    "(is tailscaled running there?)",
+                    EX_BACKEND,
+                )
+            return data
+        return self._local_json(["status", "--json"]) or {}
+
+    def serve_status(self) -> dict[str, Any] | None:
+        """Current serve config. None means UNREADABLE, {} means none configured.
+
+        The distinction is load-bearing: `serve status --json` prints `{}` and
+        exits 0 when nothing is configured (verified on 1.98.9), so collapsing
+        "could not read" into `{}` would report an occupied :443 as free.
+        """
+        if self.host:
+            raw = self._section("serve")
+            if raw is None:
+                return None
+            data = _loads(raw)
+            return {} if (data is None and not raw.strip()) else data
+        return self._local_json(["serve", "status", "--json"]) or {}
+
+    def prefs(self) -> dict[str, Any]:
+        if self.host:
+            return _loads(self._section("prefs") or "") or {}
+        return self._local_json(["debug", "prefs"]) or {}
+
+    def platform(self) -> tuple[str, str, int]:
+        """(uname -s, username, uid)."""
+        if self.host:
+            lines = [ln for ln in (self._section("platform") or "").splitlines() if ln.strip()]
+            lines += ["", "", "0"]
+            try:
+                uid = int(lines[2] or 0)
+            except ValueError:
+                uid = 0
+            return lines[0], lines[1], uid
+        import getpass
+
+        return os.uname().sysname, getpass.getuser(), os.geteuid()
+
+    def listeners(self) -> str:
+        if self.host:
+            return self._section("listen") or ""
+        cmd = (
+            ["lsof", "-nP", "-iTCP", "-sTCP:LISTEN"]
+            if sys.platform == "darwin"
+            else ["ss", "-ltnH"]
+        )
+        if not shutil.which(cmd[0]):
+            return ""
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout
+        except Exception:
+            return ""
+
+    def port_listening(self, port: int, target_host: str = "127.0.0.1") -> bool | None:
+        """True/False locally; None when it cannot be determined on a remote."""
+        if self.host:
+            text = self.listeners()
+            if not text.strip():
+                return None  # neither ss nor lsof on the remote -- unknown, not False
+            return f":{port}" in text
+        try:
+            with socket.create_connection((target_host, port), timeout=1.0):
+                return True
+        except OSError:
+            return False
+
+    # -------------------------------------------------------------- writes
+
+    def run_write(self, args: list[str]) -> subprocess.CompletedProcess:
+        """Run a mutating tailscale command. Never wrapped in sudo -- see doctor."""
+        if self.host:
+            remote = "PATH=\"$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:/snap/bin:$PATH\"; " + shlex.join(
+                ["tailscale", *args]
+            )
+            argv = self._ssh_argv() + ["--", "sh", "-c", shlex.quote(remote)]
+        else:
+            argv = [self.bin or "tailscale", *args]
+        return subprocess.run(argv, capture_output=True, text=True, timeout=60)
+
+    def display_cmd(self, args: list[str]) -> str:
+        base = shlex.join(["tailscale", *args])
+        return f"ssh {self.host} {shlex.quote(base)}" if self.host else base
+
+
+def _loads(text: str) -> Any:
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+# ================================================================== devices
+
+
+@dataclass
+class Device:
+    name: str  # HostName
+    fqdn: str  # DNSName, trailing dot stripped
+    ip: str  # first IPv4 from TailscaleIPs
+    ips: list[str]
+    os: str
+    online: bool
+    tailnet: str  # MagicDNS suffix this node lives under
+    tags: list[str]
+    is_self: bool
+    exit_node_option: bool
+
+    @property
+    def short(self) -> str:
+        """First DNS label -- the natural ssh alias (`david-ubuntu`)."""
+        return self.fqdn.split(".")[0] if self.fqdn else self.name
+
+
+def parse_devices(status: dict[str, Any]) -> tuple[list[Device], dict[str, Any]]:
+    """Normalise `tailscale status --json` into a flat device list.
+
+    Four shapes here bite anything written against a casual reading of the JSON,
+    and all four are live on this tailnet:
+      * `Peer` is a DICT keyed by nodekey, not a list.
+      * every `DNSName` carries a TRAILING DOT.
+      * nodes from more than one tailnet can appear (`.tail8cadff.ts.net`).
+      * untagged nodes have NO `Tags` key at all (not an empty list).
+    """
+    meta = {
+        "magic_dns_suffix": (status.get("MagicDNSSuffix") or "").strip("."),
+        "tailnet_name": (status.get("CurrentTailnet") or {}).get("Name") or "",
+        "magic_dns": bool((status.get("CurrentTailnet") or {}).get("MagicDNSEnabled")),
+        "cert_domains": status.get("CertDomains"),
+        "backend": status.get("BackendState") or "",
+        "health": status.get("Health") or [],
+    }
+
+    def mk(raw: dict[str, Any], is_self: bool) -> Device:
+        fqdn = (raw.get("DNSName") or "").rstrip(".")
+        ips = list(raw.get("TailscaleIPs") or [])
+        v4 = next((i for i in ips if ":" not in i), ips[0] if ips else "")
+        # The tailnet a node belongs to is everything after its first label.
+        suffix = ".".join(fqdn.split(".")[1:]) if "." in fqdn else meta["magic_dns_suffix"]
+        return Device(
+            name=raw.get("HostName") or fqdn.split(".")[0],
+            fqdn=fqdn,
+            ip=v4,
+            ips=ips,
+            os=raw.get("OS") or "?",
+            online=bool(raw.get("Online")),
+            tailnet=suffix,
+            tags=list(raw.get("Tags") or []),
+            is_self=is_self,
+            exit_node_option=bool(raw.get("ExitNodeOption")),
+        )
+
+    devices: list[Device] = []
+    if status.get("Self"):
+        devices.append(mk(status["Self"], True))
+    for raw in (status.get("Peer") or {}).values():
+        devices.append(mk(raw, False))
+    return devices, meta
+
+
+def filter_devices(
+    devices: list[Device],
+    meta: dict[str, Any],
+    *,
+    all_tailnets: bool = False,
+    online_only: bool = False,
+    os_filter: str | None = None,
+    include_self: bool = True,
+) -> list[Device]:
+    home = meta["magic_dns_suffix"]
+    out = []
+    for d in devices:
+        if not include_self and d.is_self:
+            continue
+        if not all_tailnets and home and d.tailnet != home:
+            continue
+        if online_only and not d.online:
+            continue
+        if os_filter and d.os.lower() != os_filter.lower():
+            continue
+        out.append(d)
+    # self first, then online, then by name -- stable and useful in a picker.
+    return sorted(out, key=lambda d: (not d.is_self, not d.online, d.name.lower()))
+
+
+def resolve_device(devices: list[Device], needle: str) -> Device | None:
+    n = needle.strip().rstrip(".").lower()
+    for match in (
+        lambda d: d.name.lower() == n,
+        lambda d: d.short.lower() == n,
+        lambda d: d.fqdn.lower() == n,
+        lambda d: n in [i.lower() for i in d.ips],
+        lambda d: d.name.lower().startswith(n) or d.short.lower().startswith(n),
+    ):
+        hits = [d for d in devices if match(d)]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            die(
+                f"'{needle}' is ambiguous: {', '.join(sorted(h.short for h in hits))}",
+                EX_FAIL,
+            )
+    return None
+
+
+# ========================================================= ssh config parsing
+#
+# NOTE -- this is the THIRD implementation of ssh `Include` resolution in this
+# repo, deliberately:
+#   1. dot_config/shell/96_ssh_setup.sh :: _ssh_cfg_py  -- surgical editor that
+#      splices one IdentityFile into a human-written block.
+#   2. dot_config/television/cable/ssh-config.toml       -- awk display lister.
+#   3. here -- owns a whole delimited region no human writes, and needs two
+#      things neither of the others can answer: every alias in PARSE ORDER
+#      (for shadow detection), and reachability of an ARBITRARY path that may
+#      not exist yet (`_ssh_cfg_py.configd_reachable` hardcodes ~/.ssh/config.d).
+# A shared module would have to live in scripts/, which is chezmoi-ignored and
+# therefore unreachable from 96_ssh_setup.sh on a fresh box. Kept honest by a
+# cross-implementation agreement test in tests/unit/tsnet_ssh_block.bats, not by
+# shared code. Unification is TODO.md P2/M.
+
+
+def ssh_cfg_root() -> Path:
+    return Path(os.environ.get("SSH_CFG_ROOT") or os.path.expanduser("~/.ssh/config"))
+
+
+def _expand_include(pattern: str, base_dir: Path) -> str:
+    p = os.path.expanduser(pattern)
+    if not os.path.isabs(p):
+        p = str(base_dir / p)
+    return p
+
+
+def iter_config(root: Path) -> list[tuple[Path, int, str]]:
+    """Yield (file, lineno, line) in TRUE ssh parse order.
+
+    ssh expands each `Include` inline at the point it is encountered, so a
+    file-after-file walk gives the wrong ordering -- and ordering is exactly
+    what shadow detection depends on (ssh takes the first-obtained value for
+    every keyword).
+    """
+    out: list[tuple[Path, int, str]] = []
+    seen: set[str] = set()
+    base_dir = root.parent
+
+    def walk(path: Path) -> None:
+        rp = os.path.realpath(path)
+        if rp in seen or not path.is_file():
+            return
+        seen.add(rp)
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            return
+        for i, line in enumerate(lines, 1):
+            out.append((path, i, line))
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            low = s.lower()
+            if low.startswith("include ") or low.startswith("include\t"):
+                for pat in s.split(None, 1)[1].split():
+                    import glob as _glob
+
+                    for f in sorted(_glob.glob(_expand_include(pat, base_dir))):
+                        walk(Path(f))
+
+    walk(root)
+    return out
+
+
+def include_patterns(root: Path) -> list[tuple[str, Path, int, str]]:
+    """Every `Include` pattern in the closure, expanded, with its origin + guard.
+
+    The guard matters: an `Include` that appears AFTER a `Host foo` line belongs
+    to that block, so ssh only reads it when connecting to `foo`. A drop-in
+    pulled in that way is invisible for every other host — the same silent
+    no-op this tool exists to catch, one level deeper. `Host *` is treated as
+    unconditional because it matches everything.
+
+    This is why dot_ssh/create_private_config puts `Include` as its very first
+    directive, and says so in its own comments.
+    """
+    pats: list[tuple[str, Path, int, str]] = []
+    base_dir = root.parent
+    guard = ""
+    for path, lineno, line in iter_config(root):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        head = s.split(None, 1)[0].lower()
+        if head == "host":
+            names = s.split()[1:]
+            guard = "" if "*" in names else f"Host {' '.join(names)}"
+            continue
+        if head == "match":
+            guard = s
+            continue
+        if head != "include":
+            continue
+        parts = s.split(None, 1)
+        if len(parts) < 2:
+            continue
+        for pat in parts[1].split():
+            pats.append((_expand_include(pat, base_dir), path, lineno, guard))
+    return pats
+
+
+def reachability(out_path: Path, root: Path) -> tuple[str, str]:
+    """Would ssh actually read `out_path` when it parses `root`?
+
+    Returns ("yes"|"conditional"|"no", detail).
+
+    Matches on the include PATTERN rather than on resolved files, because the
+    target may not exist yet. Deliberately stricter than a bare fnmatch: the
+    directory must match exactly and only the basename may glob, so a pattern
+    like `~/.ssh/conf*` (which globs to a directory, and which ssh would reject)
+    cannot produce a false "reachable".
+    """
+    target = os.path.realpath(str(out_path))
+    for f, _, _ in _closure_files(root):
+        if os.path.realpath(str(f)) == target:
+            return "yes", ""
+    tdir = os.path.realpath(os.path.dirname(str(out_path)))
+    tbase = os.path.basename(str(out_path))
+    conditional = ""
+    for pat, src, lineno, guard in include_patterns(root):
+        if os.path.realpath(os.path.dirname(pat)) != tdir:
+            continue
+        if not fnmatch.fnmatch(tbase, os.path.basename(pat)):
+            continue
+        if not guard:
+            return "yes", ""
+        conditional = conditional or f"only under `{guard}` ({src}:{lineno})"
+    if conditional:
+        return "conditional", conditional
+    return "no", ""
+
+
+def _closure_files(root: Path) -> list[tuple[Path, int, int]]:
+    """Unique files in the closure, in first-seen order."""
+    seen: dict[str, tuple[Path, int, int]] = {}
+    for path, lineno, _ in iter_config(root):
+        key = str(path)
+        if key not in seen:
+            seen[key] = (path, lineno, len(seen))
+    return list(seen.values())
+
+
+def host_aliases(root: Path, skip_managed: bool = True) -> list[tuple[str, Path, int, int]]:
+    """(alias, file, lineno, ordinal) for every non-wildcard Host alias.
+
+    Wildcard patterns are skipped (same rule as _ssh_cfg_py.block_matches):
+    `Host *` is a defaults block, not a competing definition.
+    """
+    out = []
+    ordinal = 0
+    in_managed = False
+    for path, lineno, line in iter_config(root):
+        s = line.strip()
+        if skip_managed:
+            if s.startswith(BEGIN_PREFIX):
+                in_managed = True
+                continue
+            if s.startswith(END_MARKER):
+                in_managed = False
+                continue
+            if in_managed:
+                continue
+        ordinal += 1
+        if not s or s.startswith("#"):
+            continue
+        parts = s.split()
+        if parts[0].lower() != "host":
+            continue
+        for pat in parts[1:]:
+            if any(c in pat for c in "*?!"):
+                continue
+            out.append((pat, path, lineno, ordinal))
+    return out
+
+
+def ssh_g(alias: str) -> dict[str, str]:
+    """Resolved config for `alias` per ssh itself. Empty dict on failure.
+
+    Honours $SSH_CFG_ROOT via `-F` so verification reads the same tree the rest
+    of this file walks. In production that variable is unset and ssh uses
+    ~/.ssh/config, which is the point.
+    """
+    argv = ["ssh"]
+    root = os.environ.get("SSH_CFG_ROOT")
+    if root:
+        argv += ["-F", root]
+    argv += ["-G", alias]
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return {}
+    if p.returncode != 0:
+        return {}
+    out: dict[str, str] = {}
+    for line in p.stdout.splitlines():
+        k, _, v = line.partition(" ")
+        out.setdefault(k.lower(), v)
+    return out
+
+
+def tildify(path: str) -> str:
+    home = os.path.expanduser("~")
+    ap = os.path.abspath(os.path.expanduser(path))
+    rel = os.path.relpath(ap, home)
+    return f"~/{rel}" if not rel.startswith("..") else path
+
+
+def write_atomic(path: Path, text: str, mode: int = 0o600) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+        os.chmod(tmp, mode)
+        os.replace(tmp, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+# ================================================== managed block rendering
+
+
+def render_block(entries: list[dict[str, Any]], meta: dict[str, Any]) -> str:
+    """Render the managed region. PURE -- this is what the bats tests target.
+
+    Deliberately carries NO timestamp: a generated-at line would make every
+    rerun a diff, which destroys the idempotency contract and would leave
+    permanent `chezmoi status` noise if the file were ever managed.
+    """
+    lines = [BEGIN_MARKER]
+    tn = meta.get("tailnet_name") or ""
+    suffix = meta.get("magic_dns_suffix") or ""
+    if tn or suffix:
+        lines.append(f"# tailnet: {tn} ({suffix})".replace(" ()", ""))
+    lines.append(f"# regenerate: {APP} ssh-config " + " ".join(e["alias"] for e in entries))
+    for e in sorted(entries, key=lambda x: x["alias"]):
+        lines.append("")
+        lines.append(f"Host {e['alias']}")
+        lines.append(f"    HostName {e['hostname']}")
+        for c in e.get("comments", []):
+            lines.append(f"    # {c}")
+        if e.get("user"):
+            lines.append(f"    User {e['user']}")
+        else:
+            lines.append("    # User: unset — ssh will use $USER. Pass --user to pin it.")
+        if e.get("port"):
+            lines.append(f"    Port {e['port']}")
+        if e.get("identity_file"):
+            lines.append(f"    IdentityFile {tildify(str(e['identity_file']))}")
+            if e.get("identities_only"):
+                lines.append("    IdentitiesOnly yes")
+        for raw in e.get("extra", []):
+            lines.append(f"    {raw}")
+    lines.append("")
+    lines.append(END_MARKER)
+    return "\n".join(lines) + "\n"
+
+
+def splice_block(existing: str, block: str) -> str:
+    """Replace the managed region, preserving everything outside byte-for-byte.
+
+    Malformed markers (unpaired, or more than one BEGIN) are a hard error at the
+    call site -- never guess which region is ours.
+    """
+    lines = existing.splitlines()
+    begins = [i for i, ln in enumerate(lines) if ln.strip().startswith(BEGIN_PREFIX)]
+    ends = [i for i, ln in enumerate(lines) if ln.strip().startswith(END_MARKER)]
+    if not begins and not ends:
+        head = existing.rstrip("\n")
+        return (head + "\n\n" if head else "") + block
+    if len(begins) != 1 or len(ends) != 1 or ends[0] < begins[0]:
+        raise ValueError(
+            f"malformed managed-block markers: {len(begins)} BEGIN, {len(ends)} END"
+        )
+    new = lines[: begins[0]] + block.rstrip("\n").splitlines() + lines[ends[0] + 1 :]
+    return "\n".join(new) + "\n"
+
+
+# ================================================================ user lookup
+
+
+def fleet_lookup(dev: Device, alias: str) -> dict[str, str]:
+    """Best-effort `user`/`identity_file` from ~/.config/fleet/machines.toml.
+
+    That file is the repo's existing SSOT for "who am I on that box". It covers
+    only a subset of the tailnet (which also holds phones and other people's
+    Macs), so this is a lookup, never a requirement.
+    """
+    path = Path(
+        os.environ.get("FLEET_CONFIG") or os.path.expanduser("~/.config/fleet/machines.toml")
+    )
+    if not path.is_file():
+        return {}
+    try:
+        data = tomllib.loads(path.read_text())
+    except Exception:
+        return {}
+    needles = {alias.lower(), dev.name.lower(), dev.short.lower(), dev.fqdn.lower()}
+    needles |= {i.lower() for i in dev.ips}
+    for h in data.get("hosts", []) or []:
+        cand = {
+            str(h.get(k, "")).lower()
+            for k in ("name", "ssh_alias", "hostname")
+            if h.get(k)
+        }
+        if cand & needles:
+            return {
+                k: str(h[k]) for k in ("user", "identity_file") if h.get(k)
+            }
+    return {}
+
+
+def resolve_hostname(dev: Device, style: str, magic_dns: bool) -> tuple[str, list[str]]:
+    """Pick HostName. Returns (value, comment lines).
+
+    Default is the MagicDNS FQDN: a 100.x CGNAT address is NOT stable across a
+    node's lifetime (reinstall / key expiry / logout+up reassigns it), and a
+    stale IP fails in the worst possible way -- it connects to whichever node
+    now holds that address and you get a host-key mismatch, not a clean error.
+    But the FQDN needs MagicDNS to actually resolve, so `auto` verifies that
+    before committing to it.
+    """
+    if style == "ip" or not dev.fqdn:
+        return (dev.ip, [f"MagicDNS name: {dev.fqdn}"] if dev.fqdn else [])
+    if style == "magicdns":
+        return (dev.fqdn, [f"tailscale IP: {dev.ip}"] if dev.ip else [])
+    if style == "short":
+        return (dev.short, [f"tailscale IP: {dev.ip}", f"MagicDNS name: {dev.fqdn}"])
+
+    # auto
+    if magic_dns and _resolves(dev.fqdn):
+        return (dev.fqdn, [f"tailscale IP: {dev.ip}"] if dev.ip else [])
+    if not dev.ip:
+        return (dev.fqdn, [])
+    why = "MagicDNS disabled on this tailnet" if not magic_dns else "getaddrinfo failed"
+    return (
+        dev.ip,
+        [
+            f"fallback: MagicDNS name {dev.fqdn} not used ({why})",
+            f"rerun {APP} ssh-config after fixing DNS to switch back",
+        ],
+    )
+
+
+def _resolves(name: str, timeout: float = 2.0) -> bool:
+    old = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(timeout)
+    try:
+        socket.getaddrinfo(name, None)
+        return True
+    except OSError:
+        return False
+    finally:
+        socket.setdefaulttimeout(old)
+
+
+def ask(prompt: str, default: bool = True, assume_yes: bool = False) -> bool:
+    """Interactive y/n.
+
+    Without a TTY this returns False unless --yes was passed, regardless of
+    `default`: the calls guarded by this can change how EXISTING ssh hosts
+    resolve, and a piped/cron invocation must never make that choice silently.
+    """
+    if assume_yes:
+        return True
+    if not sys.stdin.isatty():
+        return False
+    suffix = "[Y/n]" if default else "[y/N]"
+    try:
+        ans = input(f"{prompt} {suffix} ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    if not ans:
+        return default
+    return ans.startswith("y")
+
+
+# ================================================================ subcommands
+
+
+@dataclass
+class List_:
+    """List tailnet devices."""
+
+    all_tailnets: bool = False
+    """Include devices from other tailnets (default: only the current one)."""
+    online_only: bool = False
+    """Only currently-online devices."""
+    os_filter: str | None = None
+    """Filter by OS (linux / macOS / iOS / windows / android)."""
+    no_self: bool = False
+    """Exclude this machine."""
+    tsv: bool = False
+    """Tab-separated wire format for `tv tailnet`. See docs/tools/tsnet.md."""
+    json: bool = False
+    """Machine-readable output."""
+
+
+@dataclass
+class Describe:
+    """Show one device in detail (backs the `tv tailnet` preview pane)."""
+
+    machine: tyro.conf.Positional[str]
+    """HostName, MagicDNS name, or 100.x address."""
+    json: bool = False
+
+
+@dataclass
+class SshConfig:
+    """Write a managed ~/.ssh/config block for one or more tailnet machines."""
+
+    machine: tyro.conf.Positional[list[str]]
+    """HostName / MagicDNS name / 100.x address. Repeatable."""
+    out: str = DEFAULT_OUT
+    """Target file. Ignored when --inline."""
+    inline: bool = False
+    """Write the block into ~/.ssh/config itself instead of a config.d drop-in."""
+    alias: str | None = None
+    """Override the Host alias (only valid with exactly one machine)."""
+    alias_prefix: str = ""
+    """Prefix every alias, e.g. `ts-` to avoid shadowing an existing entry."""
+    user: str | None = None
+    """Remote username. See docs for the full resolution order."""
+    identity_file: str | None = None
+    identities_only: bool = False
+    port: int | None = None
+    hostname_style: Literal["auto", "magicdns", "ip", "short"] = "auto"
+    """auto = MagicDNS name if it resolves, else the tailscale IP."""
+    add_include: Literal["ask", "yes", "no"] = "ask"
+    """What to do when ~/.ssh/config has no Include reaching the target."""
+    include_position: Literal["top", "bottom"] = "top"
+    """top: config.d wins on conflicts (ssh takes the first value). bottom: additive."""
+    setup_remote: bool = False
+    """Hand off to `ssh-setup-remote` after writing (key creation + ssh-copy-id)."""
+    dry_run: bool = False
+    """Print what would be written; touch nothing."""
+    no_verify: bool = False
+    """Skip the post-write `ssh -G` check."""
+    strict: bool = False
+    """Exit non-zero when the written block is shadowed by an earlier Host."""
+    yes: bool = False
+    """Assume yes for every prompt."""
+    json: bool = False
+
+
+@dataclass
+class Serve:
+    """Expose a local HTTP service over tailnet HTTPS (preflight -> run -> verify)."""
+
+    port: tyro.conf.Positional[int]
+    """Local port the service is listening on."""
+    path: str = "/"
+    """Mount path. Anything but / uses `tailscale serve --set-path`."""
+    https_port: int = 443
+    target_host: str = "127.0.0.1"
+    off: bool = False
+    """Tear down the mapping instead of creating it."""
+    force: bool = False
+    """Replace an existing mapping on the same https port."""
+    allow_no_listener: bool = False
+    """Proceed even when nothing is listening on the target port."""
+    verify_timeout: float = 90.0
+    """Seconds to keep probing. First request triggers Let's Encrypt issuance."""
+    dry_run: bool = False
+    json: bool = False
+
+
+@dataclass
+class Doctor:
+    """Run the serve preflight only. Never mutates anything."""
+
+    port: int | None = None
+    """Also check that something is listening on this port."""
+    json: bool = False
+
+
+@dataclass
+class Status:
+    """Show the current serve / funnel configuration."""
+
+    json: bool = False
+
+
+# Pin the subcommand names: tyro derives them from the class name, which would
+# make `List_` render as `list_` (the trailing underscore only exists to dodge
+# the builtin).
+Cmd = Union[
+    Annotated[List_, tyro.conf.subcommand(name="list")],
+    Annotated[Describe, tyro.conf.subcommand(name="describe")],
+    Annotated[SshConfig, tyro.conf.subcommand(name="ssh-config")],
+    Annotated[Serve, tyro.conf.subcommand(name="serve")],
+    Annotated[Doctor, tyro.conf.subcommand(name="doctor")],
+    Annotated[Status, tyro.conf.subcommand(name="status")],
+]
+
+
+@dataclass
+class Args:
+    """Tailscale helper: tailnet devices -> ssh config, and tailnet-HTTPS serve."""
+
+    cmd: Cmd
+    host: str | None = None
+    """Run the tailscale side on a REMOTE machine over ssh (alias, user@host, or
+    MagicDNS name). Rejected for `ssh-config`, which writes YOUR local config."""
+    ssh_opt: list[str] = field(default_factory=list)
+    """Extra -o options for --host. Repeatable."""
+    timeout: float = 10.0
+    tailscale_bin: str | None = None
+    """Override the tailscale binary path (also $TSNET_TAILSCALE_BIN)."""
+
+
+# ==================================================================== list
+
+
+def cmd_list(r: Runner, c: List_) -> int:
+    devices, meta = parse_devices(r.status())
+    sel = filter_devices(
+        devices,
+        meta,
+        all_tailnets=c.all_tailnets,
+        online_only=c.online_only,
+        os_filter=c.os_filter,
+        include_self=not c.no_self,
+    )
+
+    if c.tsv:
+        # WIRE FORMAT -- consumed by dot_config/television/cable/tailnet.toml as
+        # {split:\t:N}. Reordering these columns breaks that channel.
+        # 0:name  1:fqdn  2:ip  3:os  4:online  5:tailnet  6:tags
+        for d in sel:
+            print(
+                "\t".join(
+                    [
+                        d.name,
+                        d.fqdn or "-",
+                        d.ip or "-",
+                        d.os,
+                        "up" if d.online else "down",
+                        d.tailnet or "-",
+                        ",".join(d.tags) if d.tags else "-",
+                    ]
+                )
+            )
+        return EX_OK
+
+    if c.json:
+        print(
+            json.dumps(
+                {
+                    "tailnet": meta,
+                    "devices": [
+                        {**vars(d), "short": d.short, "alias_suggestion": d.short}
+                        for d in sel
+                    ],
+                },
+                indent=2,
+                default=str,
+            )
+        )
+        return EX_OK
+
+    t = Table(title=f"Tailnet {meta['tailnet_name']} ({meta['magic_dns_suffix']})")
+    for col in ("name", "magicdns", "ip", "os", "state", "tailnet"):
+        t.add_column(col)
+    home = meta["magic_dns_suffix"]
+    for d in sel:
+        t.add_row(
+            f"[bold]{d.name}[/bold]" + (" [dim](self)[/dim]" if d.is_self else ""),
+            d.short,
+            d.ip or "-",
+            d.os,
+            "[green]up[/green]" if d.online else "[dim]down[/dim]",
+            d.tailnet if d.tailnet == home else f"[yellow]{d.tailnet}[/yellow]",
+        )
+    console.print(t)
+    if not c.all_tailnets and any(d.tailnet != home for d in devices):
+        note("other tailnets present — use --all-tailnets to include them")
+    return EX_OK
+
+
+def cmd_describe(r: Runner, c: Describe) -> int:
+    devices, meta = parse_devices(r.status())
+    d = resolve_device(devices, c.machine)
+    if d is None:
+        die(f"no tailnet device matches '{c.machine}'", EX_FAIL)
+    if c.json:
+        print(json.dumps({**vars(d), "short": d.short}, indent=2, default=str))
+        return EX_OK
+
+    t = Table(show_header=False, box=None, pad_edge=False)
+    t.add_column(style="bold cyan")
+    t.add_column()
+    t.add_row("HostName", d.name + ("  (this machine)" if d.is_self else ""))
+    t.add_row("MagicDNS", d.fqdn or "-")
+    t.add_row("Addresses", ", ".join(d.ips) or "-")
+    t.add_row("OS", d.os)
+    t.add_row("State", "[green]online[/green]" if d.online else "[dim]offline[/dim]")
+    t.add_row("Tailnet", d.tailnet or "-")
+    t.add_row("Tags", ", ".join(d.tags) or "-")
+    t.add_row("Exit node", "offers exit node" if d.exit_node_option else "no")
+    console.print(t)
+
+    alias = d.short
+    resolved = ssh_g(alias)
+    console.print()
+    if resolved.get("hostname", "").lower() in (d.fqdn.lower(), d.ip.lower()):
+        console.print(f"[green]ssh config[/green]  `ssh {alias}` -> {resolved['hostname']}")
+        if resolved.get("user"):
+            console.print(f"            user {resolved['user']}")
+    else:
+        console.print(f"[yellow]ssh config[/yellow]  no entry pointing at this device")
+        console.print(f"[dim]            {APP} ssh-config {alias}[/dim]")
+    return EX_OK
+
+
+# =============================================================== ssh-config
+
+
+def cmd_ssh_config(r: Runner, c: SshConfig) -> int:
+    devices, meta = parse_devices(r.status())
+    root = ssh_cfg_root()
+    out = root if c.inline else Path(os.path.expanduser(c.out))
+
+    if c.alias and len(c.machine) != 1:
+        die("--alias needs exactly one machine", EX_FAIL)
+
+    # ---- resolve every requested device into a config entry
+    entries: list[dict[str, Any]] = []
+    for needle in c.machine:
+        d = resolve_device(devices, needle)
+        if d is None:
+            die(
+                f"no tailnet device matches '{needle}' "
+                f"(try `{APP} list` — {len(devices)} devices known)",
+                EX_FAIL,
+            )
+        alias = c.alias or (c.alias_prefix + d.short)
+        hostname, comments = resolve_hostname(d, c.hostname_style, meta["magic_dns"])
+
+        # User resolution, first hit wins. Never guessed: tailscale genuinely
+        # does not know POSIX usernames (Self.UserID is a tailnet ACCOUNT id
+        # like `you@github`, using it would be actively wrong).
+        user = c.user
+        src = "--user"
+        if not user:
+            existing = ssh_g(alias)
+            # Only trust ssh -G if it resolved to a real block, not the Host *
+            # defaults (which report the local username for every unknown host).
+            if existing.get("hostname", "").lower() not in ("", alias.lower()):
+                if existing.get("user"):
+                    user, src = existing["user"], "existing ssh config"
+        if not user:
+            fl = fleet_lookup(d, alias)
+            if fl.get("user"):
+                user, src = fl["user"], "fleet machines.toml"
+        if not user and sys.stdin.isatty() and not c.json:
+            default_user = os.environ.get("USER") or ""
+            try:
+                typed = input(f"Remote username for {alias} [{default_user}]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                typed = ""
+                print()
+            user, src = (typed or default_user or None), "prompt"
+        if user:
+            note(f"{alias}: User {user} (from {src})")
+
+        ident = c.identity_file or fleet_lookup(d, alias).get("identity_file")
+        entries.append(
+            {
+                "alias": alias,
+                "hostname": hostname,
+                "comments": comments,
+                "user": user,
+                "identity_file": ident,
+                "identities_only": c.identities_only,
+                "port": c.port,
+                "device": d,
+            }
+        )
+
+    block = render_block(entries, meta)
+
+    if c.dry_run and not out.exists():
+        console.print(f"[dim]# would write {out}[/dim]")
+        console.print(block, end="")
+
+    # ---- reachability: would ssh ever read this file?
+    reach, why = ("yes", "") if c.inline else reachability(out, root)
+    if reach == "conditional":
+        warn(
+            f"{out} is only Included conditionally — {why}.\n"
+            "         ssh will NOT read it for any other host. Move that `Include` above\n"
+            f"         the first `Host` line in {root}, or rerun with --inline."
+        )
+    elif reach == "no":
+        rc = _handle_unreachable(out, root, c)
+        if rc != EX_OK:
+            return rc
+
+    if c.dry_run:
+        if out.exists():
+            console.print(f"[dim]# would update the managed block in {out}[/dim]")
+            console.print(block, end="")
+        return EX_OK
+
+    # ---- splice + write
+    existing = out.read_text() if out.is_file() else ""
+    try:
+        merged = splice_block(existing, block)
+    except ValueError as e:
+        die(
+            f"{out}: {e}\n"
+            "       Refusing to guess which region is managed. Fix the markers by hand\n"
+            f"       (exactly one `{BEGIN_PREFIX} …` and one `{END_MARKER}`), then rerun.",
+            EX_MARKERS,
+        )
+
+    if existing == merged:
+        console.print(f"[dim]unchanged:[/dim] {out}")
+    else:
+        write_atomic(out, merged)
+        console.print(f"[green]wrote:[/green] {out}")
+
+    # ---- shadow detection + verification
+    rc = EX_OK
+    shadowed = _report_shadows(entries, out, root)
+    if shadowed and c.strict:
+        rc = EX_SHADOWED
+    if not c.no_verify:
+        _verify_entries(entries)
+
+    if c.setup_remote or (
+        sys.stdin.isatty()
+        and not c.json
+        and len(entries) == 1
+        and ask(f"\nRun ssh-setup-remote {entries[0]['alias']} now?", default=False)
+    ):
+        _exec_ssh_setup_remote(entries[0]["alias"])
+    return rc
+
+
+def _handle_unreachable(out: Path, root: Path, c: SshConfig) -> int:
+    """The legacy no-`Include` case. Writing to config.d would be a silent no-op."""
+    files = _closure_files(root)
+    orphans = []
+    d = out.parent
+    if d.is_dir():
+        known = {os.path.realpath(str(f)) for f, _, _ in files}
+        orphans = sorted(
+            p.name for p in d.iterdir() if p.is_file() and os.path.realpath(str(p)) not in known
+        )
+
+    err.print(
+        f"[yellow]{APP}:[/yellow] {root} has no `Include` that reaches {out}\n"
+        f"       -> writing there would be a SILENT no-op (ssh would never read it).\n"
+        f"       Detected: {root} is {sum(1 for _ in root.read_text(errors='replace').splitlines()) if root.is_file() else 0} "
+        f"lines, {len(include_patterns(root))} Include directive(s)."
+    )
+    if orphans:
+        err.print(
+            f"       {out.parent}/ already holds {len(orphans)} unloaded file(s): "
+            f"{', '.join(orphans)}"
+        )
+
+    if c.add_include == "no":
+        err.print(f"       --add-include=no; nothing written.")
+        return EX_UNREACHABLE
+
+    # Adding the Include is NOT a no-op. ssh takes the first-obtained value for
+    # every keyword, so a top-inserted Include makes config.d/* win wherever the
+    # monolith and a drop-in both define the same alias. Show the deltas first,
+    # unconditionally -- silently changing how existing hosts resolve is exactly
+    # the class of failure this tool exists to prevent.
+    deltas = _include_deltas(out.parent, root, c.include_position)
+    if deltas:
+        err.print(
+            f"\n       Adding the Include at the {c.include_position.upper()} would change "
+            f"resolution for {len(deltas)} host(s):"
+        )
+        for alias, key, before, after, where in deltas:
+            err.print(f"         {alias:<20} {key}: {before} → {after}   ({where})")
+        if c.include_position == "top":
+            err.print(
+                "       Use --include-position=bottom to keep the existing config winning."
+            )
+    err.print()
+    err.print("       Options:")
+    err.print(f"         (a) add `Include {tildify(str(out.parent))}/*` to {root}")
+    err.print(f"         (b) rerun with --inline to append the block to {root} directly")
+    err.print("         (c) abort")
+
+    if c.add_include != "yes" and not ask(f"\nAdd the Include to {root}?", default=True, assume_yes=c.yes):
+        err.print("       aborted; nothing written.")
+        return EX_UNREACHABLE
+
+    if c.dry_run:
+        err.print(f"[dim]       # would add the Include to {root}[/dim]")
+        return EX_OK
+
+    _add_include(root, out.parent, c.include_position)
+    console.print(f"[green]wrote:[/green] {root}  (added Include)")
+    return EX_OK
+
+
+def _add_include(root: Path, configd: Path, position: str) -> None:
+    directive = [
+        f"# Load drop-in host configs from {tildify(str(configd))}/",
+        f"Include {tildify(str(configd))}/*",
+        "",
+    ]
+    lines = root.read_text(errors="replace").splitlines() if root.is_file() else []
+    if position == "bottom":
+        new = lines + [""] + directive
+    else:
+        k = 0
+        while k < len(lines) and (not lines[k].strip() or lines[k].lstrip().startswith("#")):
+            k += 1
+        new = lines[:k] + directive + lines[k:]
+    write_atomic(root, "\n".join(new) + "\n")
+
+
+def _include_deltas(
+    configd: Path, root: Path, position: str
+) -> list[tuple[str, str, str, str, str]]:
+    """How `ssh -G` answers would change if config.d/* became reachable.
+
+    `bottom` placement is strictly additive (the monolith is parsed first and
+    ssh keeps the first value), so only `top` can change anything.
+    """
+    if position != "top" or not configd.is_dir():
+        return []
+    current = {a for a, _, _, _ in host_aliases(root)}
+    deltas = []
+    for f in sorted(configd.iterdir()):
+        if not f.is_file():
+            continue
+        for alias, _, lineno, _ in host_aliases(f):
+            if alias not in current:
+                continue
+            before = ssh_g(alias)
+            after = _ssh_g_with(alias, root, configd)
+            for key in ("user", "hostname", "port", "identityfile"):
+                b, a = before.get(key, ""), after.get(key, "")
+                if b and a and b != a:
+                    deltas.append((alias, key, b, a, f"{f.name}:{lineno} would now win"))
+    return deltas
+
+
+def _ssh_g_with(alias: str, root: Path, configd: Path) -> dict[str, str]:
+    """`ssh -G alias` as it *would* resolve with the Include added at the top."""
+    fd, tmp = tempfile.mkstemp(suffix=".sshcfg")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(f"Include {configd}/*\n")
+            if root.is_file():
+                fh.write(root.read_text(errors="replace"))
+        p = subprocess.run(
+            ["ssh", "-F", tmp, "-G", alias], capture_output=True, text=True, timeout=10
+        )
+        out: dict[str, str] = {}
+        for line in p.stdout.splitlines():
+            k, _, v = line.partition(" ")
+            out.setdefault(k.lower(), v)
+        return out
+    except Exception:
+        return {}
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def _report_shadows(entries: list[dict], out: Path, root: Path) -> bool:
+    """ssh takes the FIRST-obtained value, so an earlier Host makes ours inert."""
+    aliases = host_aliases(root)
+    ours = {os.path.realpath(str(out))}
+    any_shadowed = False
+    for e in entries:
+        alias = e["alias"]
+        hits = [(f, ln, o) for a, f, ln, o in aliases if a == alias]
+        external = [(f, ln, o) for f, ln, o in hits if os.path.realpath(str(f)) not in ours]
+        if not external:
+            continue
+        our_ord = min(
+            (o for a, f, ln, o in aliases if a == alias and os.path.realpath(str(f)) in ours),
+            default=10**9,
+        )
+        earlier = [(f, ln) for f, ln, o in external if o < our_ord]
+        if earlier:
+            any_shadowed = True
+            f, ln = earlier[0]
+            warn(
+                f"`{alias}` is already defined at {f}:{ln}, which ssh parses BEFORE "
+                f"{out}.\n         Our block is inert. Fix: remove that block, or rerun "
+                f"with --alias-prefix ts-"
+            )
+        else:
+            f, ln = external[0][0], external[0][1]
+            note(f"`{alias}` also defined at {f}:{ln}; our block wins (parsed first)")
+    return any_shadowed
+
+
+def _verify_entries(entries: list[dict]) -> None:
+    """The single check that catches BOTH failure modes.
+
+    An ineffective `Include` and a shadowing earlier block both show up here as
+    `ssh -G` disagreeing with what we just wrote.
+    """
+    for e in entries:
+        got = ssh_g(e["alias"]).get("hostname", "")
+        if got.lower() == str(e["hostname"]).lower():
+            console.print(f"[green]verified:[/green] ssh {e['alias']} -> {got}")
+        else:
+            warn(
+                f"VERIFY FAILED for `{e['alias']}`: wrote HostName {e['hostname']} "
+                f"but `ssh -G {e['alias']}` reports {got or '(nothing)'}.\n"
+                "         The block is not taking effect — check the Include and the "
+                "shadow warnings above."
+            )
+
+
+def _exec_ssh_setup_remote(alias: str) -> None:
+    """Hand the TTY over to the repo's existing interactive key-setup helper.
+
+    It is a shell FUNCTION (dot_config/shell/96_ssh_setup.sh), not a binary, so
+    it has to be sourced. execvp rather than subprocess so the terminal is
+    handed over cleanly -- it runs ~10 `read -r` prompts and ssh-copy-id needs a
+    real tty. `bash -c` + explicit source rather than `$SHELL -lc` because it is
+    ~10x faster and does not depend on the user's rc files loading.
+    """
+    helper = Path(os.path.expanduser("~/.config/shell/96_ssh_setup.sh"))
+    if not helper.is_file():
+        note(f"ssh-setup-remote helper not found at {helper}; run it yourself:")
+        console.print(f"    ssh-setup-remote {alias}")
+        return
+    os.execvp(
+        "bash",
+        ["bash", "-c", f'source {shlex.quote(str(helper))}; ssh-setup-remote "$1"', "_", alias],
+    )
+
+
+# ============================================================ serve / doctor
+
+
+@dataclass
+class Check:
+    id: str
+    status: str  # ok | fail | warn | skip
+    detail: str
+    remediation: str = ""
+    exit_code: int = EX_FAIL
+
+
+def preflight(r: Runner, port: int | None, https_port: int, target_host: str) -> list[Check]:
+    checks: list[Check] = []
+    status = r.status()
+    _, meta = parse_devices(status)
+    uname, whoami, uid = r.platform()
+
+    checks.append(Check("binary", "ok", f"tailscale reachable ({r.where})"))
+
+    backend = meta["backend"]
+    checks.append(
+        Check(
+            "backend",
+            "ok" if backend == "Running" else "fail",
+            f"BackendState = {backend or '(unknown)'}",
+            "tailscale up      # log in / reconnect",
+            EX_BACKEND,
+        )
+    )
+
+    health = meta["health"] or []
+    checks.append(
+        Check(
+            "health",
+            "ok" if not health else "warn",
+            "no warnings" if not health else "; ".join(str(h) for h in health),
+        )
+    )
+
+    self_fqdn = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
+    certs = meta["cert_domains"]
+    if not certs:
+        checks.append(
+            Check(
+                "certs",
+                "fail",
+                "tailnet HTTPS certificates are DISABLED (.CertDomains = null)",
+                f"TAILNET-WIDE setting, CANNOT be automated — needs an Owner/Admin:\n"
+                f"  1. open {ADMIN_DNS_URL}\n"
+                f"  2. under 'HTTPS Certificates', click Enable\n"
+                f"  3. force issuance for this node:\n"
+                f"       tailscale cert {self_fqdn or '<node>'}\n"
+                f"  4. rerun: {APP} doctor",
+                EX_CERTS,
+            )
+        )
+    else:
+        checks.append(Check("certs", "ok", f"HTTPS enabled ({len(certs)} domain(s))"))
+        covered = self_fqdn in [str(c).rstrip(".") for c in certs]
+        checks.append(
+            Check(
+                "cert-covers-node",
+                "ok" if covered else "fail",
+                f"node {self_fqdn}" + ("" if covered else " is NOT in CertDomains"),
+                ""
+                if covered
+                else "Usual cause: the node is tagged (ACL-owned) and tagged nodes need an\n"
+                "  explicit grant. Check https://login.tailscale.com/admin/acls for\n"
+                "  nodeAttrs / tagOwners covering this node, or run it untagged.\n"
+                f"  CertDomains: {', '.join(str(c) for c in certs)}",
+                EX_CERTS,
+            )
+        )
+
+    # Operator only exists on Linux -- on macOS the CLI authenticates through
+    # the app's local API and there is no operator concept at all.
+    if uname != "Linux":
+        checks.append(Check("operator", "skip", f"not applicable on {uname}"))
+    elif uid == 0:
+        checks.append(Check("operator", "ok", "running as root"))
+    else:
+        # OperatorUser is `json:",omitempty"` in ipn.Prefs -- an ABSENT key is
+        # the unset state, not an empty string.
+        op = (r.prefs() or {}).get("OperatorUser")
+        ok = bool(op) and op == whoami
+        checks.append(
+            Check(
+                "operator",
+                "ok" if ok else "fail",
+                f"current user {whoami}; OperatorUser = {op or '(unset)'}",
+                ""
+                if ok
+                else "`tailscale serve` needs root or the configured operator on Linux.\n"
+                "  Run once (needs sudo — deliberately not automated):\n"
+                + (
+                    f"       ssh {r.host} 'sudo tailscale set --operator=$USER'"
+                    if r.host
+                    else "       sudo tailscale set --operator=$USER"
+                ),
+                EX_OPERATOR,
+            )
+        )
+
+    if port is not None:
+        live = r.port_listening(port, target_host)
+        if live is None:
+            checks.append(
+                Check("listener", "warn", f"cannot determine (no ss/lsof on {r.where})")
+            )
+        elif live:
+            checks.append(Check("listener", "ok", f"{target_host}:{port} is listening"))
+        else:
+            nearby = _nearby_listeners(r.listeners())
+            checks.append(
+                Check(
+                    "listener",
+                    "fail",
+                    f"nothing listening on {target_host}:{port}",
+                    "`tailscale serve` would create a config that 502s on every request.\n"
+                    "  Start the service first, then rerun."
+                    + (f"\n  Listeners found:\n{nearby}" if nearby else "")
+                    + "\n  Override with --allow-no-listener.",
+                    EX_NO_LISTENER,
+                )
+            )
+
+    serve_cfg = r.serve_status()
+    if serve_cfg is None:
+        # Unreadable is NOT the same as empty -- never let it read as "free".
+        checks.append(
+            Check(
+                "port-443-free",
+                "warn",
+                f"could not read the serve config on {r.where} — treating :{https_port} "
+                "as UNKNOWN, not free",
+                f"Check by hand:  {r.display_cmd(['serve', 'status'])}",
+            )
+        )
+        serve_cfg = {}
+    else:
+        web = serve_cfg.get("Web") or {}
+        key = f"{self_fqdn}:{https_port}"
+        existing = ((web.get(key) or {}).get("Handlers") or {}) if web else {}
+        if not existing:
+            checks.append(Check("port-443-free", "ok", f":{https_port} is free"))
+        else:
+            mapped = {p: (h or {}).get("Proxy", "") for p, h in existing.items()}
+            checks.append(
+                Check(
+                    "port-443-free",
+                    "warn",
+                    f":{https_port} already serves "
+                    + ", ".join(f"{p} -> {t}" for p, t in mapped.items()),
+                    "",
+                    EX_PORT_TAKEN,
+                )
+            )
+
+    if serve_cfg.get("AllowFunnel"):
+        checks.append(
+            Check(
+                "funnel-off",
+                "warn",
+                "Funnel is ENABLED — this node is reachable from the PUBLIC INTERNET",
+                "If this service has no auth of its own, stop now:\n"
+                f"       tailscale funnel --https={https_port} off",
+            )
+        )
+    else:
+        checks.append(Check("funnel-off", "ok", "funnel not enabled (tailnet-only)"))
+
+    return checks
+
+
+def _nearby_listeners(text: str) -> str:
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()][:5]
+    return "\n".join(f"             {ln.strip()}" for ln in lines)
+
+
+def print_checks(checks: list[Check], where: str) -> None:
+    glyph = {"ok": "[green]✓[/green]", "fail": "[red]✗[/red]",
+             "warn": "[yellow]![/yellow]", "skip": "[dim]-[/dim]"}
+    console.print(f"[bold]preflight[/bold] [dim]({where})[/dim]")
+    for c in checks:
+        console.print(f"  {glyph[c.status]} {c.id:<18} {c.detail}")
+    for c in checks:
+        if c.status in ("fail", "warn") and c.remediation:
+            console.print()
+            console.print(f"  [bold]{c.id}[/bold]")
+            for line in c.remediation.splitlines():
+                console.print(f"       {line}")
+
+
+def checks_json(checks: list[Check], url: str | None, code: int) -> str:
+    return json.dumps(
+        {
+            "ok": code == EX_OK,
+            "exit": code,
+            "url": url,
+            "checks": [vars(c) for c in checks],
+        },
+        indent=2,
+    )
+
+
+def cmd_doctor(r: Runner, c: Doctor) -> int:
+    checks = preflight(r, c.port, 443, "127.0.0.1")
+    failed = [x for x in checks if x.status == "fail"]
+    code = failed[0].exit_code if failed else EX_OK
+    if c.json:
+        print(checks_json(checks, None, code))
+        return code
+    print_checks(checks, r.where)
+    console.print()
+    if failed:
+        console.print(f"[red]not ready[/red] — {len(failed)} check(s) failed")
+    else:
+        console.print("[green]ready[/green] — tailnet HTTPS serve should work here")
+    return code
+
+
+def cmd_serve(r: Runner, c: Serve) -> int:
+    status = r.status()
+    self_fqdn = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
+    url = f"https://{self_fqdn}{c.path if c.path != '/' else '/'}"
+
+    if c.off:
+        argv = ["serve", f"--https={c.https_port}", "off"]
+        if c.dry_run:
+            console.print(r.display_cmd(argv))
+            return EX_OK
+        p = r.run_write(argv)
+        if p.returncode != 0:
+            die(f"teardown failed: {p.stderr.strip()}", EX_FAIL)
+        console.print(f"[green]removed:[/green] {url}")
+        return EX_OK
+
+    checks = preflight(r, c.port, c.https_port, c.target_host)
+    target = f"http://{c.target_host}:{c.port}"
+
+    # A mapping that already points at exactly our target is a no-op, not a
+    # conflict -- rerunning `tsnet serve` must be safe.
+    port_check = next((x for x in checks if x.id == "port-443-free"), None)
+    already_ours = bool(port_check and target in port_check.detail and c.path in port_check.detail)
+
+    hard = [x for x in checks if x.status == "fail"]
+    if hard and not (len(hard) == 1 and hard[0].id == "listener" and c.allow_no_listener):
+        code = hard[0].exit_code
+        if c.json:
+            print(checks_json(checks, None, code))
+            return code
+        print_checks(checks, r.where)
+        console.print()
+        console.print(
+            f"[red]aborted[/red] — {len(hard)} check(s) failed. "
+            "Nothing was changed."
+        )
+        return code
+
+    if already_ours:
+        if c.json:
+            print(checks_json(checks, url, EX_OK))
+        else:
+            print_checks(checks, r.where)
+            console.print()
+            console.print(f"[green]already serving:[/green] {url} -> {target}")
+        return EX_OK
+
+    if port_check and port_check.status == "warn" and not c.force:
+        if c.json:
+            print(checks_json(checks, None, EX_PORT_TAKEN))
+            return EX_PORT_TAKEN
+        print_checks(checks, r.where)
+        console.print()
+        console.print(f"  [bold]port-{c.https_port}[/bold]")
+        console.print(f"       wanted:   {url}  ->  {target}")
+        console.print("       Choose one:")
+        console.print(f"         {APP} serve {c.port} --force            # replace the mapping")
+        console.print(f"         {APP} serve {c.port} --path /something  # mount alongside")
+        console.print(f"         tailscale serve --https={c.https_port} off")
+        return EX_PORT_TAKEN
+
+    argv = ["serve", "--bg", f"--https={c.https_port}"]
+    if c.path != "/":
+        argv += ["--set-path", c.path]
+    argv.append(target)
+
+    if c.dry_run:
+        print_checks(checks, r.where)
+        console.print()
+        console.print(r.display_cmd(argv))
+        return EX_OK
+
+    if not c.json:
+        print_checks(checks, r.where)
+        console.print()
+    p = r.run_write(argv)
+    if p.returncode != 0:
+        die(f"`{r.display_cmd(argv)}` failed: {p.stderr.strip() or p.stdout.strip()}", EX_FAIL)
+
+    # Structural verification first: a mismatch here is a hard failure no matter
+    # what the HTTP probe later says.
+    r._probe = None
+    fresh = r.serve_status()
+    if fresh is None:
+        die(
+            f"serve command ran, but the config could not be re-read on {r.where} — "
+            f"cannot confirm it took.\n       {r.display_cmd(['serve', 'status'])}",
+            EX_FAIL,
+        )
+    handlers = ((fresh.get("Web") or {}).get(f"{self_fqdn}:{c.https_port}") or {}).get(
+        "Handlers"
+    ) or {}
+    got = (handlers.get(c.path) or {}).get("Proxy", "")
+    if got != target:
+        die(
+            f"serve config did not take: expected {c.path} -> {target}, got "
+            f"{got or '(nothing)'}\n       {r.display_cmd(['serve', 'status'])}",
+            EX_FAIL,
+        )
+
+    ok, detail = _probe_url(url, c.verify_timeout, quiet=c.json)
+    if c.json:
+        print(checks_json(checks, url if ok else None, EX_OK if ok else EX_FAIL))
+        return EX_OK if ok else EX_FAIL
+
+    if ok:
+        console.print(f"[green]ready:[/green] {url}   [dim]({detail})[/dim]")
+        console.print(
+            "       [dim]register this as the service base URL — it satisfies the\n"
+            "        https:// requirement that http://<lan-ip> silently fails[/dim]"
+        )
+        if r.host:
+            note("verified from THIS machine (that is the reachability that matters)")
+    else:
+        warn(f"serve config is in place but {url} did not respond: {detail}")
+        console.print(f"[dim]       retry: curl -I {url}[/dim]")
+    return EX_OK if ok else EX_FAIL
+
+
+def _probe_url(url: str, deadline_s: float, quiet: bool = False) -> tuple[bool, str]:
+    """Poll until the URL answers.
+
+    The FIRST request after enabling HTTPS triggers Let's Encrypt issuance and
+    can take 10-60s, so a single shot reports a false failure. Any status < 500
+    counts as reachable: an OAuth-protected endpoint correctly answers 401 on /,
+    and treating that as a failure would be exactly backwards.
+
+    Never retries `tailscale cert` -- issuance is rate-limited (~50/week/domain).
+    """
+    end = time.monotonic() + deadline_s
+    last = "no response"
+    attempt = 0
+    while time.monotonic() < end:
+        attempt += 1
+        try:
+            resp = httpx.get(url, timeout=10.0, follow_redirects=False, trust_env=False)
+            if resp.status_code < 500:
+                return True, f"HTTP {resp.status_code}"
+            last = f"HTTP {resp.status_code}"
+        except Exception as e:
+            last = type(e).__name__
+        if not quiet and attempt == 1:
+            note("waiting for the certificate (first request triggers issuance, 10-60s)…")
+        time.sleep(3)
+    return False, f"{last} after {deadline_s:.0f}s"
+
+
+def cmd_status(r: Runner, c: Status) -> int:
+    cfg = r.serve_status()
+    if cfg is None:
+        die(f"could not read the serve config on {r.where}", EX_FAIL)
+    if c.json:
+        print(json.dumps(cfg, indent=2))
+        return EX_OK
+    if not cfg:
+        console.print(f"[dim]no serve config on {r.where}[/dim]")
+        return EX_OK
+    t = Table(title=f"serve config ({r.where})")
+    for col in ("endpoint", "path", "target"):
+        t.add_column(col)
+    for endpoint, spec in (cfg.get("Web") or {}).items():
+        for path, handler in (spec.get("Handlers") or {}).items():
+            t.add_row(endpoint, path, (handler or {}).get("Proxy", "?"))
+    console.print(t)
+    if cfg.get("AllowFunnel"):
+        warn("Funnel is ENABLED — reachable from the public internet")
+    return EX_OK
+
+
+# ======================================================================= main
+
+
+def main() -> None:
+    args = tyro.cli(Args, config=(tyro.conf.OmitSubcommandPrefixes,))
+    cmd = args.cmd
+
+    if args.host and isinstance(cmd, SshConfig):
+        die(
+            "--host is not valid for `ssh-config` — that subcommand writes YOUR local\n"
+            "       ~/.ssh/config. Run it here; use --user to set the remote username.",
+            EX_FAIL,
+        )
+
+    r = Runner(args.host, args.ssh_opt, args.timeout, args.tailscale_bin)
+
+    if isinstance(cmd, List_):
+        sys.exit(cmd_list(r, cmd))
+    if isinstance(cmd, Describe):
+        sys.exit(cmd_describe(r, cmd))
+    if isinstance(cmd, SshConfig):
+        sys.exit(cmd_ssh_config(r, cmd))
+    if isinstance(cmd, Serve):
+        sys.exit(cmd_serve(r, cmd))
+    if isinstance(cmd, Doctor):
+        sys.exit(cmd_doctor(r, cmd))
+    if isinstance(cmd, Status):
+        sys.exit(cmd_status(r, cmd))
+
+
+if __name__ == "__main__":
+    main()

@@ -4,6 +4,14 @@ Expose a local port or service to the internet — useful for webhook testing, s
 
 Optional role (`installTunnelTools`). Enable at `chezmoi init --force` or set `installTunnelTools = true` in `~/.config/chezmoi/chezmoi.toml`.
 
+> **Not covered here: Tailscale.** Both tools on this page expose a local port to
+> the **public internet**. `tailscale serve` is the categorical opposite —
+> tailnet-only, reachable by your own devices and nobody else — which is why it
+> lives under its own `installTailscale` flag and its own docs
+> ([Tailscale.md](Tailscale.md), [tsnet.md](tsnet.md)) rather than in this bundle.
+> The tool on this page that *is* Tailscale's analogue is `tailscale funnel`, and
+> the `tsnet` CLI deliberately does not implement it.
+
 ## Tools
 
 | Tool | Purpose | Account required? | Free tier |
