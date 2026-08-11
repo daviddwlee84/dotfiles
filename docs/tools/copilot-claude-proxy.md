@@ -1,7 +1,8 @@
 # Copilot → Claude Code proxy
 
-Back [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with the
-**Claude models from a GitHub Copilot subscription**, via a local
+Back [Claude Code](https://code.claude.com/docs/en/overview) with the models
+served by a **GitHub Copilot subscription** (Claude when entitled; otherwise a
+role-aware OpenAI fallback), via a local
 reverse-engineered proxy — the maintained fork
 [`caozhiyuan/copilot-api`](https://github.com/caozhiyuan/copilot-api)
 (npm `@jeffreycao/copilot-api`). The original
@@ -35,6 +36,8 @@ Both packages share the same token file
 
 ```sh
 copilot-proxy auth      # one-time: GitHub device login (stores a ghu_ token)
+copilot-proxy start
+copilot-model --auto    # Claude if served; otherwise Sol/Terra/Luna by role
 
 claude-copilot          # one-off session on the proxy (auto-starts it; no file writes)
 claude-copilot-once     # pin THIS project, run one session, then auto-unpin (proxy must be up)
@@ -47,21 +50,17 @@ copilot-here off        # unpin — back to the real Anthropic backend
 
 ```
 Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
-                                          │ native /v1/messages passthrough
-                                          │ Authorization: Bearer <copilot token>
+                                          │ Claude: native Messages path
+                                          │ GPT: Anthropic → Responses translation
                                           ▼
                                    api.githubcopilot.com  (your Copilot sub)
 ```
 
 - Claude Code speaks only the **Anthropic Messages API** (`/v1/messages`).
-- The fork prefers Copilot's **native Anthropic-style `/v1/messages`
-  endpoint** when available (Enterprise plans:
-  `api.enterprise.githubcopilot.com/v1/messages`) and only falls back to
-  translating through the OpenAI-compatible `/chat/completions`. Native
-  passthrough is what fixes **extended-thinking blocks**, **WebSearch**
-  (routed through a Responses-capable GPT model, default `gpt-5-mini`), and
-  the **infinite tool-retry loops** the original's Anthropic→OpenAI→Anthropic
-  translation caused.
+- The fork uses Copilot's native Anthropic path for Claude ids and translates
+  Claude Code requests to the **Responses API** for GPT ids. Version `2.1.0`
+  forwards Claude Code's `output_config.effort` to `reasoning.effort`, preserves
+  reasoning state, and handles the GPT-5.6 request shape.
 - The original (`copilot-api@0.7.0`) always translates through
   `/chat/completions` — thinking blocks are dropped and WebSearch doesn't work.
 - Claude Code is pointed at the proxy via `ANTHROPIC_BASE_URL` — injected either
@@ -112,7 +111,7 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
 | `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
-| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@1.13.14` | package spec to install (pin / upgrade; `copilot-api@0.7.0` = old original). Changing it re-installs. |
+| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@2.1.0` | package spec to install (pin / upgrade; `copilot-api@0.7.0` = old original). Changing it re-installs. `2.1.0` is required for Claude Code effort passthrough to GPT-5.6. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = install the package with the proxy env stripped, skipping the 45s stall on a host where bun cannot resolve through the proxy |
@@ -169,10 +168,10 @@ the two indistinguishable causes of a `400 model_not_supported`:
 | no | **yes** | stale cache | `copilot-proxy restart` |
 | no | no | org policy disables Anthropic | a restart will not help |
 
-It also validates the *pinned* model (`copilot-model -c`'s effective value, honoring
-a `copilot-here` project pin) against the served list — including the `[1m]`
-aliases, which `copilot-model -l` does not show. A pin that isn't served means
-every single request 400s.
+It validates the main model **and** the Fable/Opus/Sonnet/Haiku aliases against
+the served list, including `[1m]` aliases. A stale background-role id can make
+workflows fail with 400 even while ordinary chat succeeds. No Claude entitlement
+is a warning rather than a failure when the computed OpenAI profile is usable.
 
 Upstream reachability probes both `api.enterprise.githubcopilot.com` and
 `api.githubcopilot.com`, directly *and* through the macOS system proxy when one is
@@ -219,8 +218,8 @@ leave a sticky pin behind.
 - **Prior-pin safe:** if `copilot-here` is already `on` here, the existing pin is
   left in place on exit (nothing is unpinned that you didn't ask for). If that
   pin has gone **stale** — it differs from what `copilot-here on` would write
-  now, e.g. an older `claude-opus-4-8[1m]` after the default moved to
-  `claude-opus-5[1m]`, or a pin written before a key was added — it prints the
+  now, e.g. an unavailable Claude id after the account moved to the OpenAI
+  fallback, or a pin written before the Fable key was added — it prints the
   drift and asks whether to refresh it in place (`copilot-here on`) or keep it.
   The answer defaults to **keep** (and keeps automatically on a non-interactive
   stdin). Drift is computed by diffing the live file against the exact env block
@@ -270,27 +269,49 @@ committed `.claude/settings.json`:
 - otherwise → writes the global state file
   `~/.local/state/copilot-proxy/model`, which `claude-copilot`, `copilot-run`
   and the next `copilot-here on` pick up. (`$COPILOT_CLAUDE_MODEL` overrides
-  the state file; final fallback is `claude-opus-5[1m]`.)
+  the state file; final fallback is `gpt-5.6-sol[1m]`.)
 
 Behavior:
 
 - Fuzzy id: `copilot-model opus-4-8` resolves to `claude-opus-4-8`; dotted
   input is normalized (`opus-4.8` works too).
-- A `[1m]` suffix (`copilot-model 'opus-4-8[1m]'`) is stripped for validation
-  and re-appended — it's a Claude Code-only 1M-context hint, see the model-id
-  section below.
-- Validated against the live proxy `/v1/models` (falls back to a static Claude
-  list if the proxy is down); typos and ambiguous prefixes are rejected.
-- `--auto` / `-a`: pick the best **served** id — Claude (known prefs + `[1m]`
-  when applicable) → `*codex*` → non-mini `gpt-5*` → any `gpt-*` → Gemini.
-  Use after a Claude-less geo day left you pinned on Gemini, or when Anthropic
-  is filtered out and you want Codex instead. Does **not** run automatically
-  from `doctor` (only hints).
-- No argument → `fzf` picker. `-c` prints the current model and which layer it
-  came from.
-- Writes both `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_OPUS_MODEL` —
+- `[1m]` is a Claude Code-only context hint. The helper now derives it from
+  live `/v1/models` `max_context_window_tokens` metadata for every provider;
+  manual explicit suffixes remain usable while offline.
+- Validated against the live proxy `/v1/models` (a static discovery list remains
+  available for manual picking while offline); typos and ambiguous prefixes are
+  rejected. `--auto` never writes from that offline list.
+- `--auto` / `-a` requires a live catalog. It prefers Claude
+  (`Fable > Opus > Sonnet > Haiku`), then ranks OpenAI by capability:
+  `Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex > Luna > mini`, then Gemini.
+  Luna deliberately follows older flagships because it is the lightweight tier.
+  The Sol/Terra/Luna intent follows OpenAI's
+  [current model guidance](https://developers.openai.com/api/docs/guides/latest-model).
+- No argument → `fzf` picker. `-c` prints the main model, source layer, and
+  the complete role profile.
+- A local pin writes the complete role set. For an OpenAI profile:
+  Main/Fable/Opus = Sol, Sonnet = Terra, Haiku/background = Luna. Missing tiers
+  fall back to the selected main, never an unserved hard-coded id.
+- The global state file stays a backward-compatible one-line main id; wrappers
+  derive the live role profile when they inject env. Changes take effect on the
+  next `claude` launch and do **not** require restarting the proxy.
+
+Recommended sequence:
+
+```sh
+copilot-proxy start
+copilot-model --auto        # save the main model / refresh a live project pin
+copilot-model -c            # inspect main + Fable/Opus/Sonnet/Haiku
+copilot-here on             # sticky project, or use claude-copilot-once
+```
+
+`claude-copilot-once` temporarily writes the same full profile and restores the
+previous local state. An existing `copilot-here` pin still outranks shell env;
+refresh it with `copilot-model --auto` or `copilot-here on`.
+
+The role variables are read at Claude Code startup, so
   **the change only takes effect on the next `claude` launch** (env is read at
-  startup). Switching model does **not** require restarting the proxy.
+  startup).
 
 ## Injected env (what both layers set)
 
@@ -299,11 +320,12 @@ Behavior:
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:4141",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-5[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-terra[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-luna[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-luna[1m]",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
@@ -326,6 +348,24 @@ inject the fork-README quota savers:
 
 `copilot-here off` removes these keys regardless of the current
 `COPILOT_PROXY_QUIET` value.
+
+## Claude Code feature compatibility through the proxy
+
+The important split is **local orchestration vs Anthropic cloud services**:
+
+| Feature | Through Copilot + GPT | Notes |
+|---|---|---|
+| CLI, tools, hooks, skills, memory, plugins, MCP, checkpoints, sandboxing | Yes | These are local Claude Code features; model behavior can still differ because GPT receives translated Claude prompts/tool schemas. |
+| Subagents and dynamic workflows | Yes | Do not set `CLAUDE_CODE_SUBAGENT_MODEL` globally here, so workflow scripts/frontmatter retain normal routing. [Workflow docs](https://code.claude.com/docs/en/workflows) |
+| `ultracode` | Yes on `2.1.0` | Ultracode is xhigh effort plus dynamic workflows, not a separate model. The upgraded fork forwards the requested effort to GPT-5.6. |
+| Thinking/reasoning | Translated | GPT uses Responses reasoning rather than Anthropic-native thinking semantics. Persisted reasoning support is proxy-dependent. |
+| Web search, fast/auto mode, MCP tool search | Provider-dependent | The base-URL gateway and Copilot endpoint decide availability; non-first-party tool search may require an extra bridge/plugin. |
+| Ultrareview, Remote Control, Chrome, cloud Code Review, routines, web/mobile/Slack sessions | No | These require Claude.ai authentication/cloud services; a local API gateway cannot supply the subscription identity. `ultrareview` is unrelated to `ultracode`. |
+
+See Claude Code's [feature availability](https://code.claude.com/docs/en/feature-availability),
+[model configuration](https://code.claude.com/docs/en/model-config),
+[gateway protocol](https://code.claude.com/docs/en/llm-gateway-protocol), and
+[Ultrareview](https://code.claude.com/docs/en/ultrareview) references.
 
 ## Gotchas (these cost real debugging time)
 
@@ -354,8 +394,11 @@ another orphan (five, in the wild) and none ever bound the port.
 
 The runner now installs the pinned package **once** into
 `~/.local/share/copilot-api/pkg` and execs that binary, so a warm start does no
-network at all. The install itself is bounded and killed on timeout, and falls back
-to a proxy-stripped retry. Note the registry here is npmmirror (a domestic mirror,
+network at all. The install itself is bounded and killed on timeout, falls back to
+a proxy-stripped retry, and finally uses npm's CA stack if Bun reports
+`UNKNOWN_CERTIFICATE_VERIFICATION_ERROR`. TLS verification stays enabled; this
+works around the observed Bun-vs-Node CA-store difference rather than disabling
+certificate checks. Note the registry here is npmmirror (a domestic mirror,
 set in `~/.bunfig.toml` for GFW speed) — routing it through the proxy buys nothing
 and is exactly what breaks bun.
 
@@ -411,13 +454,15 @@ reducing Claude Code's chatter instead — that's exactly what
 Copilot quota). If you really want request throttling, fall back to the
 original: `COPILOT_API_PKG=copilot-api@0.7.0`.
 
-### Fork wart: `context_management` can 400
+### Context management is translated, not Anthropic-native
 
-Newer Claude Code context-editing may inject `context_management`, which
-Copilot's native `/v1/messages` endpoint rejects with a 400
-([caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305),
-version-dependent). Real Claude Code runs didn't trigger it in testing, but if
-you see unexplained 400s on long sessions, check that issue first.
+Older fork releases could forward Claude Code's `context_management` field to
+an endpoint that rejected it with 400
+([caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)). The
+`2.1.0` GPT-5.6 path suppresses that incompatible field and relies on Responses
+reasoning/context handling instead. This avoids the 400, but Anthropic's exact
+context-editing and prompt-cache semantics are not reproduced; long-session
+behavior remains a compatibility surface to watch.
 
 ### Do not use Claude Code's `/model` picker
 
@@ -445,12 +490,9 @@ fails to match its built-in model table, so it:
   — so HUD/statusline context can read >100% and compaction triggers on the
   wrong budget.
 
-The fix is the id shape the helpers now inject by default:
-**`claude-opus-5[1m]`** — hyphenated so Claude Code recognizes the family
-(correct display name, no retirement warning), plus the `[1m]` suffix so it
-sizes context to 1M. Claude Code strips `[1m]` before sending, so the proxy
-sees a valid id (a *literal* `...[1m]` in a raw API call is rejected —
-`copilot-model` handles the stripping when validating).
+The helpers use hyphenated ids and derive `[1m]` from each live model's context
+metadata. That applies to GPT ids too (`gpt-5.6-sol[1m]`, for example). Claude
+Code strips the suffix before sending; a raw API client must use the plain id.
 
 ### The token gotcha: `gho_` vs `ghu_`
 
@@ -461,23 +503,14 @@ There are two different GitHub tokens, and they are **not** interchangeable:
 | OpenCode's stored auth | `gho_` | **fails (404)** |
 | `copilot-proxy auth` (device login) | `ghu_` | **works** |
 
-OpenCode's `gho_` token (OAuth App) works only when used *directly* as a Bearer
-against `api.githubcopilot.com`; it cannot complete copilot-api's classic
-token-exchange step. **Let `copilot-proxy auth` mint its own `ghu_` token — do not
-reuse OpenCode's.** Token is stored at `~/.local/share/copilot-api/github_token`.
+## Available models and role discovery
 
-## Available Claude model ids
-
-Verified via `/v1/models` + `/v1/messages` (2026-07): `claude-opus-4-5`,
-`claude-opus-4-6`, `claude-opus-4-7`, `claude-opus-4-8`, `claude-opus-5`,
-`claude-sonnet-4-5`, `claude-sonnet-4-6`, `claude-sonnet-5`, `claude-haiku-4-5`. The fork accepts
-both hyphenated and legacy dotted (`claude-opus-4.8`) forms at request time,
-but **use hyphenated ids in Claude Code** — dotted ids break its model
-detection (see Gotchas). Context windows from `/v1/models` capabilities:
-opus-5, opus-4-8 and sonnet-5 are **1M** (`max_prompt_tokens: 936000`), haiku-4-5 is
-200k — append `[1m]` to the 1M models so Claude Code knows. Non-Claude models
-(gpt-5.5, gemini-3.1-pro-preview, …) are also served — see `copilot-model -l`
-or `GET /v1/models`.
+Treat `GET /v1/models` as live truth: GitHub can change the catalog by account,
+organization policy, rollout and egress. Current Claude Code recognizes Fable,
+Opus, Sonnet and Haiku roles; `copilot-model --auto` maps only ids actually in
+that catalog. Use `copilot-model -l` for raw served ids and `copilot-model -c`
+for the effective role mapping. Do not copy a dated Anthropic id or manually
+guess which models have 1M context.
 
 ## Useful commands
 

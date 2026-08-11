@@ -235,8 +235,9 @@ metadata 的對應關係：`capabilities.limits.max_context_window_tokens` → `
 `system_message` 在 `/v1/models` 裡沒有對應欄位，而每個 Copilot chat model 都吃得下
 system message，所以固定寫 `true`。
 
-模型依 `_copilot_pick_best_model` 同一套排序輸出（Claude > Codex > GPT > Gemini，家族內
-opus > sonnet > haiku，同分時版本新的在前），並依 `.vendor` 分組加註解。註解用的是
+模型依 `_copilot_pick_best_model` 同一套排序輸出（Claude 優先；否則依能力排
+Sol > Terra > 舊旗艦 > Luna > mini，再才是 Gemini；Claude 家族內
+Fable > Opus > Sonnet > Haiku，同分時版本新的在前），並依 `.vendor` 分組加註解。註解用的是
 `/v1/models` 給的原始 vendor 字串，所以 `gpt-5.4` 會落在 `# --- OpenAI ---` 而
 `gpt-5-mini` 落在 `# --- Azure OpenAI ---` —— 那真的是目錄裡寫的，純外觀問題。
 

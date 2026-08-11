@@ -85,7 +85,7 @@ teardown() {
   run bash -c "cd '$TMP'; export XDG_STATE_HOME='$TMP/state'; unset COPILOT_CLAUDE_MODEL
     source '$SHELL_LIB'; _copilot_effective_model"
   [ "$status" -eq 0 ]
-  [[ "$output" == "claude-opus-4-8[1m]|built-in default" ]]
+  [[ "$output" == "gpt-5.6-sol[1m]|built-in default" ]]
 }
 
 @test "effective_model: \$COPILOT_CLAUDE_MODEL outranks the state file" {
@@ -127,7 +127,7 @@ JSON
 # on the box. Hence the scope-stripped test inside the helper, and these cases.
 
 @test "pkg_name: strips the version but keeps the @scope" {
-  run bash -c "COPILOT_API_PKG='@jeffreycao/copilot-api@1.13.14' \
+  run bash -c "COPILOT_API_PKG='@jeffreycao/copilot-api@2.1.0' \
     bash -c \"source '$SHELL_LIB'; _copilot_pkg_name\""
   [ "$status" -eq 0 ]
   [ "$output" = "@jeffreycao/copilot-api" ]
@@ -156,13 +156,13 @@ JSON
   mkdir -p "$prefix/node_modules/.bin"
   printf '#!/bin/sh\n' > "$prefix/node_modules/.bin/copilot-api"
   chmod +x "$prefix/node_modules/.bin/copilot-api"
-  printf '@jeffreycao/copilot-api@1.13.14\n' > "$prefix/.installed-spec"
+  printf '@jeffreycao/copilot-api@2.1.0\n' > "$prefix/.installed-spec"
 
   run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@9.9.9'
     source '$SHELL_LIB'; _copilot_pkg_ready"
   [ "$status" -ne 0 ]
 
-  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@1.13.14'
+  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@2.1.0'
     source '$SHELL_LIB'; _copilot_pkg_ready"
   [ "$status" -eq 0 ]
 }
@@ -170,10 +170,32 @@ JSON
 @test "pkg_ready: false when the stamp exists but the binary does not" {
   local prefix="$TMP/data/copilot-api/pkg"
   mkdir -p "$prefix"
-  printf '@jeffreycao/copilot-api@1.13.14\n' > "$prefix/.installed-spec"
-  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@1.13.14'
+  printf '@jeffreycao/copilot-api@2.1.0\n' > "$prefix/.installed-spec"
+  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@2.1.0'
     source '$SHELL_LIB'; _copilot_pkg_ready"
   [ "$status" -ne 0 ]
+}
+
+@test "pkg install: npm CA-stack fallback rescues two failed Bun attempts" {
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/bun" <<'SH'
+#!/bin/sh
+exit 1
+SH
+  cat > "$TMP/bin/npm" <<'SH'
+#!/bin/sh
+mkdir -p node_modules/.bin
+printf '#!/bin/sh\n' > node_modules/.bin/copilot-api
+chmod +x node_modules/.bin/copilot-api
+printf '%s\n' npm > npm-fallback-used
+SH
+  chmod +x "$TMP/bin/bun" "$TMP/bin/npm"
+
+  run bash -c "export PATH='$TMP/bin:/usr/bin:/bin' XDG_DATA_HOME='$TMP/data'
+    source '$SHELL_LIB'; _copilot_ensure_pkg >/dev/null"
+  [ "$status" -eq 0 ]
+  [ -f "$TMP/data/copilot-api/pkg/npm-fallback-used" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.1.0" ]
 }
 
 @test "effective_model: a settings.local.json WITHOUT our base_url is not a pin" {
@@ -186,4 +208,91 @@ JSON
     source '$SHELL_LIB'; _copilot_effective_model"
   [ "$status" -eq 0 ]
   [[ "$output" == claude-sonnet-5\|state\ file:* ]]
+}
+
+# --- model ranking / Claude Code role profiles ---------------------------------
+
+@test "pick_best_model: Claude Fable outranks Opus and OpenAI" {
+  run bash -c "printf '%s\n' gpt-5.6-sol claude-opus-5 claude-fable-5 \
+    | { source '$SHELL_LIB'; _copilot_pick_best_model; }"
+  [ "$status" -eq 0 ]
+  [ "$output" = "claude-fable-5" ]
+}
+
+@test "pick_best_model: Sol is the strongest OpenAI fallback" {
+  run bash -c "printf '%s\n' gpt-5.3-codex gpt-5.6-luna gpt-5.5 gpt-5.6-terra gpt-5.6-sol \
+    | { source '$SHELL_LIB'; _copilot_pick_best_model; }"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "pick_best_model: old flagships outrank lightweight Luna" {
+  run bash -c "printf '%s\n' gpt-5.6-luna gpt-5.4-mini gpt-5.3-codex gpt-5.4 gpt-5.5 \
+    | { source '$SHELL_LIB'; _copilot_pick_best_model; }"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.5" ]
+}
+
+@test "model_for_claude: context metadata controls the [1m] hint" {
+  local catalog='{"data":[{"id":"gpt-large","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-small","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    printf '%s|%s' \"\$(_copilot_model_for_claude gpt-large \"\$CATALOG\")\" \
+      \"\$(_copilot_model_for_claude gpt-small \"\$CATALOG\")\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-large[1m]|gpt-small" ]
+}
+
+@test "model profile: OpenAI maps quality balanced and fast roles" {
+  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    _copilot_model_profile_json gpt-5.6-sol \"\$CATALOG\" | jq -c ."
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"main":"gpt-5.6-sol[1m]","fable":"gpt-5.6-sol[1m]","opus":"gpt-5.6-sol[1m]","sonnet":"gpt-5.6-terra[1m]","haiku":"gpt-5.6-luna"}' ]
+}
+
+@test "model profile: missing OpenAI role tiers fall back to the selected main" {
+  local catalog='{"data":[{"id":"gpt-5.5","capabilities":{"limits":{"max_context_window_tokens":1050000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    _copilot_model_profile_json gpt-5.5 \"\$CATALOG\" | jq -r '[.main,.fable,.opus,.sonnet,.haiku] | unique | join(\"|\")'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.5[1m]" ]
+}
+
+@test "model profile: native Claude roles use their strongest served families" {
+  local catalog='{"data":[{"id":"claude-fable-5","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"claude-opus-5","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"claude-sonnet-5","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"claude-haiku-4-5","capabilities":{"limits":{"max_context_window_tokens":200000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    _copilot_model_profile_json claude-fable-5 \"\$CATALOG\" | jq -c ."
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"main":"claude-fable-5[1m]","fable":"claude-fable-5[1m]","opus":"claude-opus-5[1m]","sonnet":"claude-sonnet-5[1m]","haiku":"claude-haiku-4-5"}' ]
+}
+
+@test "env profile: Fable is managed and legacy small-fast follows Haiku" {
+  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    _copilot_env_json_for_model gpt-5.6-sol \"\$CATALOG\" \
+      | jq -r '[.ANTHROPIC_DEFAULT_FABLE_MODEL,.ANTHROPIC_DEFAULT_OPUS_MODEL,.ANTHROPIC_DEFAULT_SONNET_MODEL,.ANTHROPIC_DEFAULT_HAIKU_MODEL,.ANTHROPIC_SMALL_FAST_MODEL] | join(\"|\")'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna" ]
+}
+
+@test "copilot-model --auto: refuses an offline static fallback" {
+  run bash -c "cd '$TMP'; export XDG_STATE_HOME='$TMP/state'; source '$SHELL_LIB'
+    _copilot_model_catalog() { return 1; }
+    copilot-model --auto"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"needs a reachable proxy and live /v1/models catalog"* ]]
+  [ ! -f "$TMP/state/copilot-proxy/model" ]
+}
+
+@test "copilot-model --auto: refreshes every role in an active local pin" {
+  mkdir -p "$TMP/proj/.claude"
+  printf '%s\n' '{"env":{"ANTHROPIC_BASE_URL":"http://localhost:4141","ANTHROPIC_MODEL":"stale","ANTHROPIC_DEFAULT_SONNET_MODEL":"stale"},"permissions":{"defaultMode":"auto"}}' \
+    > "$TMP/proj/.claude/settings.local.json"
+  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
+  run env CATALOG="$catalog" bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    _copilot_model_catalog() { printf '%s' \"\$CATALOG\"; }
+    copilot-model --auto >/dev/null 2>&1
+    jq -r '[.env.ANTHROPIC_MODEL,.env.ANTHROPIC_DEFAULT_FABLE_MODEL,.env.ANTHROPIC_DEFAULT_OPUS_MODEL,.env.ANTHROPIC_DEFAULT_SONNET_MODEL,.env.ANTHROPIC_DEFAULT_HAIKU_MODEL,.env.ANTHROPIC_SMALL_FAST_MODEL,.permissions.defaultMode] | join(\"|\")' .claude/settings.local.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna|auto" ]
 }

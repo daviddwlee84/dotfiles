@@ -29,7 +29,8 @@
 #                                committed .claude/settings.json)
 #   copilot-model [<id>|-l|-c|--auto] - switch the pinned model (edits settings.local.json
 #                                when copilot-here is on, else the global state file;
-#                                --auto = Claude > Codex > GPT > Gemini from served list)
+#                                --auto = Claude, else capability-ranked OpenAI,
+#                                then Gemini; -c also shows the role profile)
 #
 # Settings-layer design (why settings.local.json / env vars, and NOT the
 # committed .claude/settings.json nor ~/.claude/settings.json):
@@ -56,6 +57,8 @@
 #
 # Env (set in ~/.shellrc.adhoc or ~/.config/{zsh/secrets.zsh,bash/secrets.sh}):
 #   COPILOT_PROXY_PORT   default: 4141        - port the proxy listens on
+#   COPILOT_PROXY_START_TIMEOUT default: 45   - seconds allowed for the startup
+#                                               model-catalog fetch
 #   COPILOT_HTTP_PROXY   default: auto        - Node→GitHub /models egress:
 #                          auto   = if proxy-status finds Clash/Verge/mihomo (or
 #                                   macOS System Proxy), start with --proxy-env
@@ -64,7 +67,7 @@
 #                          always = same, but warn when no local proxy is found
 #                          never  = never pass --proxy-env (non-GFW machines)
 #                          http://127.0.0.1:PORT = force that URL
-#   COPILOT_API_PKG      default: @jeffreycao/copilot-api@1.13.14
+#   COPILOT_API_PKG      default: @jeffreycao/copilot-api@2.1.0
 #                                             - package spec to install (pin/
 #                                               upgrade; copilot-api@0.7.0 = old
 #                                               original). Changing it re-installs.
@@ -78,7 +81,7 @@
 # --- shared constants / helpers -------------------------------------------------
 
 _copilot_port() { printf '%s' "${COPILOT_PROXY_PORT:-4141}"; }
-_copilot_pkg()  { printf '%s' "${COPILOT_API_PKG:-@jeffreycao/copilot-api@1.13.14}"; }
+_copilot_pkg()  { printf '%s' "${COPILOT_API_PKG:-@jeffreycao/copilot-api@2.1.0}"; }
 
 # CLI flavor from the package spec: the ORIGINAL bare `copilot-api` takes
 # --rate-limit/--wait and has `check-usage`; the fork (and anything else)
@@ -133,29 +136,42 @@ _copilot_pkg_ready() {
   [ "$(command head -n 1 "$stamp" 2>/dev/null)" = "$(_copilot_pkg)" ]
 }
 
-# One `bun add` attempt in $1. $2 = "noproxy" strips the proxy env, anything else
-# honours it. $3 = seconds budget, enforced by polling — `timeout(1)` is not in
-# macOS base, and this file is sourced by both shells. Returns 124 on expiry.
+# One package-install attempt in $1. $2 = "noproxy" strips the proxy env,
+# "npm" uses npm without proxy env (a useful fallback when Bun rejects a TUN /
+# MITM certificate chain), and anything else runs Bun with the ambient env.
+# $3 = seconds budget, enforced by polling — `timeout(1)` is not in macOS base,
+# and this file is sourced by both shells. Returns 124 on expiry.
 #
 # The kill on expiry is the load-bearing part: a stalled `bun add` left running
 # keeps bun's global install-cache lock, and THAT is what made every subsequent
 # start hang too. Never let one escape.
 _copilot_pkg_install_try() {
-  local dir="$1" mode="$2" budget="$3" pkg pid i=0
+  local dir="$1" mode="$2" budget="$3" pkg pid i=0 log
   pkg="$(_copilot_pkg)"
+  log="${TMPDIR:-/tmp}/copilot-pkg-install-$$.log"
   if [ "$mode" = "noproxy" ]; then
     ( cd "$dir" 2>/dev/null && command env \
         -u ALL_PROXY -u all_proxy -u HTTP_PROXY -u http_proxy \
         -u HTTPS_PROXY -u https_proxy \
-        bun add "$pkg" --no-summary >/dev/null 2>&1 ) &
+        bun add "$pkg" --no-summary >"$log" 2>&1 ) &
+  elif [ "$mode" = "npm" ]; then
+    ( cd "$dir" 2>/dev/null && command env \
+        -u ALL_PROXY -u all_proxy -u HTTP_PROXY -u http_proxy \
+        -u HTTPS_PROXY -u https_proxy \
+        npm install --no-audit --no-fund --save-exact "$pkg" >"$log" 2>&1 ) &
   else
-    ( cd "$dir" 2>/dev/null && command bun add "$pkg" --no-summary >/dev/null 2>&1 ) &
+    ( cd "$dir" 2>/dev/null && command bun add "$pkg" --no-summary >"$log" 2>&1 ) &
   fi
   pid=$!
   while [ "$i" -lt "$budget" ]; do
     if ! kill -0 "$pid" 2>/dev/null; then
       wait "$pid" 2>/dev/null
-      return $?
+      local rc=$?
+      if [ "$rc" -ne 0 ] && [ -s "$log" ]; then
+        command tail -n 3 "$log" >&2
+      fi
+      command rm -f -- "$log"
+      return "$rc"
     fi
     sleep 1
     i=$((i + 1))
@@ -166,8 +182,10 @@ _copilot_pkg_install_try() {
   # is the one actually holding the cache lock.
   { kill -9 "$pid" 2>/dev/null
     command pkill -9 -f "bun add.*$(_copilot_pkg_name)" 2>/dev/null
+    command pkill -9 -f "npm install.*$(_copilot_pkg_name)" 2>/dev/null
     wait "$pid" 2>/dev/null
   } 2>/dev/null
+  command rm -f -- "$log"
   return 124
 }
 
@@ -201,8 +219,19 @@ _copilot_ensure_pkg() {
       command rm -rf -- "${BUN_INSTALL:-$HOME/.bun}/install/cache/.tmp" 2>/dev/null
     fi
     if ! _copilot_pkg_install_try "$prefix" noproxy 90; then
-      printf '%s\n' "copilot-proxy: could not install $spec — run 'copilot-proxy doctor'." >&2
-      return 1
+      # Bun and Node do not always use the same CA store. A Clash/TUN node that
+      # produces UNKNOWN_CERTIFICATE_VERIFICATION_ERROR in Bun can still be
+      # installed safely by npm with normal TLS verification enabled.
+      if command -v npm >/dev/null 2>&1; then
+        printf '%s\n' "copilot-proxy: Bun install failed — retrying with npm's CA stack ..." >&2
+        if ! _copilot_pkg_install_try "$prefix" npm 90; then
+          printf '%s\n' "copilot-proxy: could not install $spec — run 'copilot-proxy doctor'." >&2
+          return 1
+        fi
+      else
+        printf '%s\n' "copilot-proxy: could not install $spec — run 'copilot-proxy doctor'." >&2
+        return 1
+      fi
     fi
   fi
 
@@ -302,18 +331,17 @@ _copilot_model_state() {
 #   - HYPHENATED ids (claude-opus-4-8), not dotted (claude-opus-4.8): Claude
 #     Code only recognizes hyphenated family names — dotted ids fall back to
 #     a legacy "[Opus 4] retired" label AND a 200k context assumption.
-#   - "[1m]" suffix: Copilot serves opus-5 / opus-4-8 / sonnet-5 with a 1M context
-#     window; the suffix makes Claude Code strip it, send the context-1m
-#     beta header, and size HUD/compaction to 1M (otherwise it assumes 200k
-#     and shows >100% context). Claude Code-only: raw API clients must send
-#     the plain id — the proxy rejects a literal "...[1m]" model.
+#   - "[1m]" suffix: Claude Code uses it to size HUD/compaction for a 1M context
+#     window. _copilot_model_for_claude derives it from live /v1/models metadata
+#     for every provider, rather than guessing from a hard-coded Claude list.
+#     Claude Code-only: raw API clients must send the plain id.
 _copilot_default_model() {
   if [ -n "${COPILOT_CLAUDE_MODEL:-}" ]; then
     printf '%s' "$COPILOT_CLAUDE_MODEL"
   elif [ -f "$(_copilot_model_state)" ]; then
     command head -n 1 "$(_copilot_model_state)"
   else
-    printf '%s' "claude-opus-5[1m]"
+    printf '%s' "gpt-5.6-sol[1m]"
   fi
 }
 
@@ -605,9 +633,11 @@ copilot-proxy() {
       fi
       srv_pid=$!
       printf '%s\n' "$srv_pid" >"$pidf"
-      # Wait up to ~20s for it to answer.
-      local i=0
-      while [ "$i" -lt 20 ]; do
+      # Catalog startup can exceed 20s on a slow Clash/TUN hop even though the
+      # process is healthy. Keep checking the child so true crashes still fail
+      # immediately; only the network-bound model refresh gets a wider budget.
+      local i=0 start_timeout="${COPILOT_PROXY_START_TIMEOUT:-45}"
+      while [ "$i" -lt "$start_timeout" ]; do
         if _copilot_alive; then
           if _copilot_shim_enabled; then
             _copilot_shim_start && printf '%s\n' "copilot-proxy: throttle shim up → $(_copilot_shim_base) (→ $(_copilot_base))"
@@ -656,9 +686,13 @@ copilot-proxy() {
       ;;
     status)
       if _copilot_alive; then
+        local status_json status_count status_claude
+        status_json="$(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null || true)"
+        status_count="$(printf '%s' "$status_json" | jq -r '.data | length' 2>/dev/null || printf '?')"
+        status_claude="$(printf '%s' "$status_json" | jq -r '[.data[]?.id | select(startswith("claude-"))] | join(" ")' 2>/dev/null)"
+        [ -n "$status_claude" ] || status_claude='none'
         printf '%s\n' "copilot-proxy: RUNNING on $(_copilot_base)"
-        printf '%s\n' "  models: $(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null \
-          | command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command grep -i claude | command tr '\n' ' ')"
+        printf '%s\n' "  models: $status_count served; Claude: $status_claude"
         if _copilot_shim_enabled; then
           if _copilot_shim_alive; then
             printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)  → clients use this"
@@ -760,7 +794,8 @@ copilot-proxy() {
       fi
 
       printf '\n%s\n' "Models"
-      local _served _n _claude _model _src _pin
+      local _served _n _claude _model _src _pin _profile _profile_catalog
+      local _role_rows _role _role_model _role_bad
       local _http_proxy _up_direct _up_via _dir_n _dir_c _via_n _via_c
       _http_proxy="$(_copilot_resolve_http_proxy)"
       if [ -n "$_http_proxy" ]; then
@@ -776,7 +811,7 @@ copilot-proxy() {
         if [ "$_claude" -gt 0 ]; then
           _ok "claude models" "$_claude ids available"
         else
-          _bad "claude models" "0 of $_n — the proxy is serving no Anthropic models"
+          _note "claude models" "0 of $_n — Anthropic unavailable; role-aware OpenAI fallback will be used"
         fi
 
         # A/B: true-direct vs via local Clash/Verge. GitHub geo-filters the
@@ -825,8 +860,50 @@ copilot-proxy() {
         else
           _bad "pinned model" "$_model  ($_src)"
           _hint "not in the served list → every request returns 400 model_not_supported"
-          _hint "copilot-model --auto   # Claude > Codex > GPT > Gemini from served list"
+          _hint "copilot-model --auto   # Claude; else capability-ranked OpenAI, then Gemini"
           _hint "copilot-model -l       # list served ids"
+        fi
+
+        # Validate the aliases Claude Code may use for background/subagent work,
+        # not just ANTHROPIC_MODEL. One stale Sonnet/Haiku id is enough to make
+        # selected features fail with 400 while ordinary chat still succeeds.
+        if [ -f ".claude/settings.local.json" ] \
+           && [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' ".claude/settings.local.json" 2>/dev/null)" ]; then
+          _profile="$(jq '{
+            main: (.env.ANTHROPIC_MODEL // ""),
+            fable: (.env.ANTHROPIC_DEFAULT_FABLE_MODEL // ""),
+            opus: (.env.ANTHROPIC_DEFAULT_OPUS_MODEL // ""),
+            sonnet: (.env.ANTHROPIC_DEFAULT_SONNET_MODEL // ""),
+            haiku: (.env.ANTHROPIC_DEFAULT_HAIKU_MODEL // "")
+          }' ".claude/settings.local.json" 2>/dev/null)"
+        else
+          _profile_catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+          _profile="$(_copilot_model_profile_json "$_model" "$_profile_catalog" 2>/dev/null || true)"
+        fi
+        _role_bad=''
+        if [ -n "$_profile" ]; then
+          _role_rows="$(printf '%s' "$_profile" | jq -r '
+            ["fable",.fable], ["opus",.opus], ["sonnet",.sonnet], ["haiku",.haiku]
+            | @tsv' 2>/dev/null)"
+          while IFS="$(printf '\t')" read -r _role _role_model; do
+            [ -n "$_role" ] || continue
+            if [ -z "$_role_model" ]; then
+              _bad "role $_role" "unset — Claude Code may choose its native default and get model_not_supported"
+              _role_bad=1
+            elif ! printf '%s\n' "$_served" | command grep -qxF "$_role_model"; then
+              _bad "role $_role" "$_role_model is not served"
+              _role_bad=1
+            fi
+          done <<EOF
+$_role_rows
+EOF
+          if [ -z "$_role_bad" ]; then
+            _ok "model roles" "$(printf '%s' "$_profile" | jq -r '"fable=\(.fable), opus=\(.opus), sonnet=\(.sonnet), haiku=\(.haiku)"')"
+          else
+            _hint "copilot-model --auto   # rewrite main + every Claude Code role alias"
+          fi
+        else
+          _bad "model roles" "could not compute the effective role profile"
         fi
       else
         _bad "served" "could not fetch $(_copilot_base)/v1/models"
@@ -951,7 +1028,11 @@ copilot-proxy() {
       # One-time device login → stores a ghu_ token copilot-api can exchange.
       _copilot_ensure_pkg || return 1
       printf '%s\n' "copilot-proxy: launching copilot-api device login ..."
-      "$(_copilot_pkg_bin)" auth
+      if [ "$(_copilot_pkg_flavor)" = "original" ]; then
+        "$(_copilot_pkg_bin)" auth
+      else
+        "$(_copilot_pkg_bin)" auth --provider copilot
+      fi
       ;;
     reinstall)
       # Force a clean re-install of the pinned spec (normally only needed if the
@@ -1052,13 +1133,23 @@ copilot-run() {
     printf '%s\n' "Usage: copilot-run <cmd> [args...]   (injects ANTHROPIC_* proxy env)" >&2
     return 1
   fi
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "copilot-run: jq is required to build the model role profile" >&2
+    return 1
+  fi
   if ! _copilot_alive; then
     copilot-proxy start || return 1
   fi
   # If the shim is enabled but not up (e.g. toggled on after the proxy started),
   # bring it up now so ANTHROPIC_BASE_URL below resolves to it.
   if _copilot_shim_enabled && ! _copilot_shim_alive; then _copilot_shim_start; fi
-  local model; model="$(_copilot_default_model)"
+  local profile model fable opus sonnet haiku
+  profile="$(_copilot_model_profile_json "$(_copilot_default_model)")" || return 1
+  model="$(printf '%s' "$profile" | jq -r '.main')"
+  fable="$(printf '%s' "$profile" | jq -r '.fable')"
+  opus="$(printf '%s' "$profile" | jq -r '.opus')"
+  sonnet="$(printf '%s' "$profile" | jq -r '.sonnet')"
+  haiku="$(printf '%s' "$profile" | jq -r '.haiku')"
   # Opt-in quota savers (COPILOT_PROXY_QUIET=1): prepended as NAME=VALUE args
   # to `env`. Off by default — they degrade the Claude Code UX a little.
   if [ "${COPILOT_PROXY_QUIET:-0}" = "1" ]; then
@@ -1075,10 +1166,11 @@ copilot-run() {
     ANTHROPIC_BASE_URL="$(_copilot_client_base)" \
     ANTHROPIC_AUTH_TOKEN="dummy" \
     ANTHROPIC_MODEL="$model" \
-    ANTHROPIC_DEFAULT_OPUS_MODEL="$model" \
-    ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5[1m]" \
-    ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5" \
-    ANTHROPIC_SMALL_FAST_MODEL="claude-haiku-4-5" \
+    ANTHROPIC_DEFAULT_FABLE_MODEL="$fable" \
+    ANTHROPIC_DEFAULT_OPUS_MODEL="$opus" \
+    ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet" \
+    ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku" \
+    ANTHROPIC_SMALL_FAST_MODEL="$haiku" \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1" \
     "$@"
 }
@@ -1176,7 +1268,7 @@ claude-copilot() {
 # Env keys we own in .claude/settings.local.json (kept in one place so `off`
 # removes exactly what `on` added — including the COPILOT_PROXY_QUIET extras,
 # regardless of the knob's value at `off` time).
-_copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION","CLAUDE_CODE_ENABLE_AWAY_SUMMARY","DISABLE_NON_ESSENTIAL_MODEL_CALLS"]'
+_copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_FABLE_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION","CLAUDE_CODE_ENABLE_AWAY_SUMMARY","DISABLE_NON_ESSENTIAL_MODEL_CALLS"]'
 
 # The EXACT env object `copilot-here on` would write right now, as JSON.
 #
@@ -1189,19 +1281,26 @@ _copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODE
 # would still have changed it. Add a key here and BOTH sides follow.
 #
 # Needs jq; every caller already requires it.
-_copilot_env_json() {
+_copilot_env_json_for_model() {
+  local selected="$1" catalog="${2:-}" profile
+  if [ "$#" -ge 2 ]; then
+    profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
+  else
+    profile="$(_copilot_model_profile_json "$selected")" || return 1
+  fi
   jq -n \
     --arg base_url "$(_copilot_pinned_base)" \
-    --arg model "$(_copilot_default_model)" \
+    --argjson profile "$profile" \
     --arg quiet "${COPILOT_PROXY_QUIET:-0}" '
     {
       ANTHROPIC_BASE_URL: $base_url,
       ANTHROPIC_AUTH_TOKEN: "dummy",
-      ANTHROPIC_MODEL: $model,
-      ANTHROPIC_DEFAULT_OPUS_MODEL: $model,
-      ANTHROPIC_DEFAULT_SONNET_MODEL: "claude-sonnet-5[1m]",
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4-5",
-      ANTHROPIC_SMALL_FAST_MODEL: "claude-haiku-4-5",
+      ANTHROPIC_MODEL: $profile.main,
+      ANTHROPIC_DEFAULT_FABLE_MODEL: $profile.fable,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: $profile.opus,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: $profile.sonnet,
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: $profile.haiku,
+      ANTHROPIC_SMALL_FAST_MODEL: $profile.haiku,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
     } + (if $quiet == "1" then {
       CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
@@ -1209,6 +1308,10 @@ _copilot_env_json() {
       CLAUDE_CODE_ENABLE_AWAY_SUMMARY: "0",
       DISABLE_NON_ESSENTIAL_MODEL_CALLS: "1"
     } else {} end)'
+}
+
+_copilot_env_json() {
+  _copilot_env_json_for_model "$(_copilot_default_model)"
 }
 
 # Pin THIS project to the Copilot proxy via ./.claude/settings.local.json —
@@ -1232,9 +1335,11 @@ copilot-here() {
       local base='{}'
       [ -f "$settings" ] && base="$(command cat "$settings")"
       [ -n "$base" ] || base='{}'
-      local model; model="$(_copilot_default_model)"
+      local model want_env
+      want_env="$(_copilot_env_json)" || return 1
+      model="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_MODEL')"
       local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
-      if printf '%s' "$base" | jq --argjson want "$(_copilot_env_json)" \
+      if printf '%s' "$base" | jq --argjson want "$want_env" \
           '.env = ((.env // {}) + $want)' >"$tmp"; then
         command mv -- "$tmp" "$settings"
       else
@@ -1447,49 +1552,176 @@ _copilot_here_drift() {
 
 # --- model switcher -------------------------------------------------------------
 
-# Pick the best served model for Claude Code / copilot-run.
-# Preference (first match wins): Claude (known ids, else any claude-*) →
-# *codex* → non-mini gpt-5* → any gpt-* → non-flash gemini → any gemini → last resort.
-# Appends [1m] for Claude ids known to expose a 1M window to Claude Code.
-# Reads newline-separated raw proxy ids on stdin; prints one id (may include [1m]).
+# The live model catalog is the SSOT for ids, aliases and context limits. Keep
+# this separate from _copilot_served_models: doctor wants ids + aliases, while
+# role selection wants each raw id's capability metadata.
+_copilot_model_catalog() {
+  command curl -fsS --max-time 5 "$(_copilot_base)/v1/models" 2>/dev/null
+}
+
+_copilot_catalog_ids() {
+  if command -v jq >/dev/null 2>&1; then
+    jq -r '.data[]?.id // empty' 2>/dev/null | command sort -u
+  else
+    command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command sort -u
+  fi
+}
+
+_copilot_strip_context_hint() {
+  printf '%s' "${1%\[1m\]}"
+}
+
+# Convert a raw proxy id to the spelling Claude Code should receive. A live
+# max_context_window_tokens >= 1M earns [1m]; if the proxy is down, preserve an
+# explicitly stored suffix but do not invent one. Raw API clients never use this.
+_copilot_model_for_claude() {
+  local requested="${1:-}" catalog="${2:-}" raw had_hint=0 context=''
+  [ -n "$requested" ] || return 1
+  case "$requested" in *"[1m]") had_hint=1 ;; esac
+  raw="$(_copilot_strip_context_hint "$requested")"
+  if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
+  if [ -n "$catalog" ] && command -v jq >/dev/null 2>&1; then
+    context="$(printf '%s' "$catalog" | jq -r --arg id "$raw" '
+      first(.data[]? | select(.id == $id) | .capabilities.limits.max_context_window_tokens) // empty
+    ' 2>/dev/null)"
+    case "$context" in
+      ''|*[!0-9]*) printf '%s' "$raw" ;;
+      *) if [ "$context" -ge 1000000 ]; then printf '%s[1m]' "$raw"; else printf '%s' "$raw"; fi ;;
+    esac
+  elif [ "$had_hint" -eq 1 ]; then
+    printf '%s[1m]' "$raw"
+  else
+    printf '%s' "$raw"
+  fi
+}
+
+_copilot_first_served() {
+  local models="$1" candidate
+  shift
+  for candidate in "$@"; do
+    if printf '%s\n' "$models" | command grep -qxF "$candidate"; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Pick the best raw served id for the main Claude Code model. Claude stays the
+# first choice when entitled. Without Claude, rank OpenAI by capability tier,
+# deliberately placing lightweight Luna behind the older flagship/coding tiers.
+# Reads newline-separated raw ids on stdin and prints one raw id.
 _copilot_pick_best_model() {
   local models preferred c
-  models="$(command cat)"
+  models="$(command cat | command sed 's/\[1m\]$//' | command sort -u)"
   [ -n "$models" ] || return 1
 
   for preferred in \
+    claude-fable-5 \
     claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 \
     claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 \
     claude-opus-4-5 claude-haiku-4-5
   do
     if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
-      case "$preferred" in
-        claude-opus-5|claude-opus-4-8|claude-sonnet-5) printf '%s[1m]' "$preferred" ;;
-        *) printf '%s' "$preferred" ;;
-      esac
+      printf '%s' "$preferred"
       return 0
     fi
   done
-  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort -V | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
-  # Codex family first when Anthropic is geo-/policy-filtered out of the catalog.
-  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort -V | command tail -1)"
-  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  for preferred in \
+    gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-5.6-luna gpt-5.4-mini gpt-5-mini
+  do
+    if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
+      printf '%s' "$preferred"
+      return 0
+    fi
+  done
 
-  c="$(printf '%s\n' "$models" | command grep -E '^gpt-5' | command grep -vE 'mini|nano' \
-        | command sort -V | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command grep -viE 'mini|nano|luna' \
+        | command sort | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command sort -V | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command sort | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
   c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command grep -viE 'flash' \
-        | command sort -V | command tail -1)"
+        | command sort | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort -V | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
-  printf '%s\n' "$models" | command sort -V | command tail -1
+  printf '%s\n' "$models" | command sort | command tail -1
+}
+
+# Build the full Claude Code role profile for one selected main model. Native
+# Claude profiles use the strongest served model in each Claude family. OpenAI
+# profiles map quality/balanced/fast roles to Sol/Terra/Luna, with every role
+# falling back to the selected main rather than an unserved hard-coded id.
+_copilot_model_profile_json() {
+  command -v jq >/dev/null 2>&1 || return 1
+  local selected="${1:-$(_copilot_default_model)}" catalog="${2:-}" models raw main
+  local fable_raw opus_raw sonnet_raw haiku_raw
+  if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
+  if [ -n "$catalog" ]; then models="$(printf '%s' "$catalog" | _copilot_catalog_ids)"; else models=''; fi
+  raw="$(_copilot_strip_context_hint "$selected")"
+  main="$(_copilot_model_for_claude "$selected" "$catalog")"
+
+  case "$raw" in
+    claude-*)
+      fable_raw="$(_copilot_first_served "$models" claude-fable-5 2>/dev/null || true)"
+      [ -n "$fable_raw" ] || fable_raw="$(printf '%s\n' "$models" | command grep '^claude-fable-' | command sort | command tail -1)"
+      [ -n "$fable_raw" ] || fable_raw="$raw"
+
+      opus_raw="$(_copilot_first_served "$models" \
+        claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
+        2>/dev/null || true)"
+      [ -n "$opus_raw" ] || opus_raw="$(printf '%s\n' "$models" | command grep '^claude-opus-' | command sort | command tail -1)"
+      [ -n "$opus_raw" ] || opus_raw="$raw"
+
+      sonnet_raw="$(_copilot_first_served "$models" \
+        claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 2>/dev/null || true)"
+      [ -n "$sonnet_raw" ] || sonnet_raw="$(printf '%s\n' "$models" | command grep '^claude-sonnet-' | command sort | command tail -1)"
+      [ -n "$sonnet_raw" ] || sonnet_raw="$raw"
+
+      haiku_raw="$(_copilot_first_served "$models" claude-haiku-4-5 2>/dev/null || true)"
+      [ -n "$haiku_raw" ] || haiku_raw="$(printf '%s\n' "$models" | command grep '^claude-haiku-' | command sort | command tail -1)"
+      [ -n "$haiku_raw" ] || haiku_raw="$raw"
+      ;;
+    gpt-*|*codex*)
+      fable_raw="$raw"; opus_raw="$raw"
+      sonnet_raw="$(_copilot_first_served "$models" gpt-5.6-terra 2>/dev/null || true)"
+      [ -n "$sonnet_raw" ] || sonnet_raw="$raw"
+      haiku_raw="$(_copilot_first_served "$models" \
+        gpt-5.6-luna gpt-5.4-mini gpt-5-mini 2>/dev/null || true)"
+      [ -n "$haiku_raw" ] || haiku_raw="$raw"
+      ;;
+    *)
+      fable_raw="$raw"; opus_raw="$raw"; sonnet_raw="$raw"; haiku_raw="$raw"
+      ;;
+  esac
+
+  jq -n \
+    --arg main "$main" \
+    --arg fable "$(_copilot_model_for_claude "$fable_raw" "$catalog")" \
+    --arg opus "$(_copilot_model_for_claude "$opus_raw" "$catalog")" \
+    --arg sonnet "$(_copilot_model_for_claude "$sonnet_raw" "$catalog")" \
+    --arg haiku "$(_copilot_model_for_claude "$haiku_raw" "$catalog")" \
+    '{main:$main, fable:$fable, opus:$opus, sonnet:$sonnet, haiku:$haiku}'
+}
+
+_copilot_print_model_profile() {
+  local profile="$1"
+  printf '%s' "$profile" | jq -r '
+    "  main   : \(.main)",
+    "  fable  : \(.fable)",
+    "  opus   : \(.opus)",
+    "  sonnet : \(.sonnet)",
+    "  haiku  : \(.haiku)"
+  '
 }
 
 # Switch which Copilot model is pinned. Claude Code's own /model picker sends
@@ -1505,7 +1737,7 @@ _copilot_pick_best_model() {
 # Example:
 #   copilot-model opus-5           # fuzzy → claude-opus-5 (the default; opus-4-8 etc. work too)
 #   copilot-model 'opus-5[1m]'     # same + 1M-context hint for Claude Code
-#   copilot-model --auto           # Claude > Codex > GPT > Gemini from live served list
+#   copilot-model --auto           # Claude; else Sol > Terra > older flagships > Luna
 #   copilot-model -l               # list available (live from proxy)
 #   copilot-model -c               # print current (+ where it came from)
 copilot-model() {
@@ -1526,15 +1758,20 @@ copilot-model() {
     target="local"
   fi
 
-  # List available model ids (live proxy, else a static Claude fallback).
+  # One catalog fetch feeds list/validation/context metadata/profile mapping.
+  local catalog=''
+
+  # List available model ids (live proxy, else a static manual-pick fallback).
   _copilot_model_list() {
-    local json
-    if json="$(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null)"; then
-      printf '%s\n' "$json" | command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command sort
+    if [ -n "$catalog" ]; then
+      printf '%s' "$catalog" | _copilot_catalog_ids
     else
       printf '%s\n' \
+        claude-fable-5 \
         claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
-        claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 claude-haiku-4-5
+        claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 claude-haiku-4-5 \
+        gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5 gpt-5.4 gpt-5.3-codex \
+        gpt-5.4-mini gpt-5-mini
       printf '%s\n' "copilot-model: proxy not reachable — showing fallback list" >&2
     fi
   }
@@ -1550,17 +1787,32 @@ copilot-model() {
 
   local arg="${1:-}"
   case "$arg" in
-    -l|--list) _copilot_model_list; return 0 ;;
+    -l|--list)
+      catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+      _copilot_model_list
+      return 0 ;;
     -c|--current)
       if [ "$target" = "local" ]; then
-        printf '%s  (project: %s)\n' "$(_copilot_model_current)" "$settings"
+        local current_profile
+        printf 'model profile (project: %s)\n' "$settings"
+        current_profile="$(jq -n --argjson env "$(jq '.env // {}' "$settings")" '{
+          main: ($env.ANTHROPIC_MODEL // "(unset)"),
+          fable: ($env.ANTHROPIC_DEFAULT_FABLE_MODEL // $env.ANTHROPIC_MODEL // "(unset)"),
+          opus: ($env.ANTHROPIC_DEFAULT_OPUS_MODEL // $env.ANTHROPIC_MODEL // "(unset)"),
+          sonnet: ($env.ANTHROPIC_DEFAULT_SONNET_MODEL // $env.ANTHROPIC_MODEL // "(unset)"),
+          haiku: ($env.ANTHROPIC_DEFAULT_HAIKU_MODEL // $env.ANTHROPIC_MODEL // "(unset)")
+        }')"
+        _copilot_print_model_profile "$current_profile"
       else
-        printf '%s  (global: %s)\n' "$(_copilot_model_current)" "$statef"
+        catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+        printf 'model profile (global main: %s)\n' "$statef"
+        _copilot_print_model_profile "$(_copilot_model_profile_json "$(_copilot_model_current)" "$catalog")"
       fi
       return 0 ;;
     -h|--help)
       printf '%s\n' "Usage: copilot-model [<model-id>|-l|-c|--auto]"
-      printf '%s\n' "  --auto  pick best from live served list: Claude > Codex > GPT > Gemini"
+      printf '%s\n' "  --auto  pick best from live served list: Claude; else capability-ranked OpenAI"
+      printf '%s\n' "          (Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex > Luna > mini)"
       printf '%s\n' "  Writes ./.claude/settings.local.json when copilot-here is on,"
       printf '%s\n' "  else the global state file used by claude-copilot / copilot-run."
       return 0 ;;
@@ -1570,26 +1822,28 @@ copilot-model() {
     printf '%s\n' "copilot-model: jq is required" >&2; return 1
   fi
 
+  catalog="$(_copilot_model_catalog 2>/dev/null || true)"
   local models want resolved
   models="$(_copilot_model_list 2>/dev/null)"
 
-  # --auto: Claude > Codex > GPT > Gemini from the live served catalog.
+  # --auto requires the live catalog. Never silently choose a static Claude id
+  # while the proxy is down: that recreates the stale model_not_supported pin.
   # Use when a sticky pin (e.g. gemini from a Claude-less geo day) is stale, or
   # when Anthropic is filtered out and you want the best Codex/GPT instead.
   if [ "$arg" = "--auto" ] || [ "$arg" = "-a" ]; then
-    if [ -z "$models" ]; then
-      printf '%s\n' "copilot-model: --auto needs a reachable proxy (or static fallback list empty)" >&2
+    if [ -z "$catalog" ] || [ -z "$models" ]; then
+      printf '%s\n' "copilot-model: --auto needs a reachable proxy and live /v1/models catalog" >&2
       return 1
     fi
     resolved="$(printf '%s\n' "$models" | _copilot_pick_best_model)" || {
       printf '%s\n' "copilot-model: --auto could not pick a model" >&2
       return 1
     }
+    resolved="$(_copilot_model_for_claude "$resolved" "$catalog")"
     case "$resolved" in
       claude-*) printf '%s\n' "copilot-model: --auto → $resolved  (Claude preferred)" >&2 ;;
-      *codex*|*Codex*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude; best Codex)" >&2 ;;
-      gpt-*|o[0-9]*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/Codex; best GPT)" >&2 ;;
-      gemini-*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/Codex/GPT; best Gemini)" >&2 ;;
+      gpt-*|*codex*|o[0-9]*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude; capability-ranked OpenAI)" >&2 ;;
+      gemini-*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/OpenAI; best Gemini)" >&2 ;;
       *) printf '%s\n' "copilot-model: --auto → $resolved" >&2 ;;
     esac
     # $resolved already set — fall through to the write path below
@@ -1603,7 +1857,7 @@ copilot-model() {
     want="$(printf '%s\n' "$models" | command fzf --prompt="model> " --height=40% --reverse \
       --header="current: $cur  |  tip: copilot-model --auto")" || { printf '%s\n' "cancelled"; return 0; }
     [ -n "$want" ] || { printf '%s\n' "cancelled"; return 0; }
-    resolved="$want"
+    resolved="$(_copilot_model_for_claude "$want" "$catalog")"
   else
     # "[1m]" is a Claude Code-only 1M-context hint, not a real proxy id:
     # strip it for validation, re-append on the resolved id.
@@ -1633,7 +1887,11 @@ copilot-model() {
         return 1
       fi
     fi
-    resolved="$resolved$suffix"
+    if [ -n "$suffix" ]; then
+      resolved="$resolved$suffix"
+    else
+      resolved="$(_copilot_model_for_claude "$resolved" "$catalog")"
+    fi
   fi
 
   # --auto already set $resolved above; the empty/fuzzy branches set it too.
@@ -1644,18 +1902,29 @@ copilot-model() {
   fi
 
   local old; old="$(_copilot_model_current)"
-  if [ "$old" = "$resolved" ]; then
+  if [ "$old" = "$resolved" ] && [ "$target" = "state" ]; then
     printf '%s\n' "copilot-model: already using $resolved (no change)"
     return 0
   fi
 
   if [ "$target" = "local" ]; then
-    local tmp; tmp="$(mktemp "${TMPDIR:-/tmp}/copilot-model.XXXXXX")" || return 1
-    if jq --arg m "$resolved" \
-         '.env.ANTHROPIC_MODEL = $m | .env.ANTHROPIC_DEFAULT_OPUS_MODEL = $m' \
+    local tmp profile; tmp="$(mktemp "${TMPDIR:-/tmp}/copilot-model.XXXXXX")" || return 1
+    profile="$(_copilot_model_profile_json "$resolved" "$catalog")" || { command rm -f -- "$tmp"; return 1; }
+    if jq --argjson p "$profile" '
+         .env.ANTHROPIC_MODEL = $p.main
+         | .env.ANTHROPIC_DEFAULT_FABLE_MODEL = $p.fable
+         | .env.ANTHROPIC_DEFAULT_OPUS_MODEL = $p.opus
+         | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = $p.sonnet
+         | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL = $p.haiku
+         | .env.ANTHROPIC_SMALL_FAST_MODEL = $p.haiku' \
          "$settings" >"$tmp"; then
       command mv -- "$tmp" "$settings"
-      printf '%s\n' "copilot-model: $old -> $resolved  (project: $settings)"
+      if [ "$old" = "$resolved" ]; then
+        printf '%s\n' "copilot-model: refreshed role profile for $resolved  (project: $settings)"
+      else
+        printf '%s\n' "copilot-model: $old -> $resolved  (project: $settings)"
+      fi
+      _copilot_print_model_profile "$profile"
       printf '%s\n' "  ⟳ restart Claude Code to apply (exit, then: claude -c)"
     else
       command rm -f -- "$tmp"
@@ -1666,6 +1935,7 @@ copilot-model() {
     command mkdir -p "$(command dirname "$statef")"
     printf '%s\n' "$resolved" >"$statef"
     printf '%s\n' "copilot-model: $old -> $resolved  (global: $statef)"
+    _copilot_print_model_profile "$(_copilot_model_profile_json "$resolved" "$catalog")"
     printf '%s\n' "  applies to the next claude-copilot / copilot-run / copilot-here on"
   fi
 }

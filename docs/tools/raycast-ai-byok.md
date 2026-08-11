@@ -258,8 +258,9 @@ supported) → `abilities.reasoning_effort`. `system_message` has no counterpart
 `/v1/models`, and every Copilot chat model accepts one, so it is a constant
 `true`.
 
-Models are emitted in the same ranking `_copilot_pick_best_model` uses (Claude >
-Codex > GPT > Gemini, with opus > sonnet > haiku inside a family, ties broken
+Models are emitted in the same ranking `_copilot_pick_best_model` uses (Claude
+first; otherwise capability-ranked OpenAI — Sol > Terra > older flagships > Luna
+> mini — then Gemini, with Fable > Opus > Sonnet > Haiku for Claude; ties broken
 newest-version-first) and grouped by `.vendor` with comment headings. Those
 headings use the raw vendor string from `/v1/models`, so `gpt-5.4` lands under
 `# --- OpenAI ---` while `gpt-5-mini` lands under `# --- Azure OpenAI ---` —

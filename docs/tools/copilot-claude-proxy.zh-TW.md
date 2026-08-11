@@ -5,12 +5,13 @@
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文
     （如 `embedding`、`tokenizer`）。代碼、API 名、CLI flag、套件名、檔名一律不翻。
 
-用 **GitHub Copilot** 訂閱裡的 Claude 模型來驅動
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code)，透過本機的逆向工程
-(reverse-engineered) 代理 (proxy)
-[`ericc-ch/copilot-api`](https://github.com/ericc-ch/copilot-api)。
+用 **GitHub Copilot** 訂閱目前 served 的模型來驅動
+[Claude Code](https://code.claude.com/docs/en/overview)：帳號有 Claude entitlement 時優先
+用 Claude，沒有時改用有角色分層的 OpenAI fallback。本機代理使用持續維護的
+[`caozhiyuan/copilot-api`](https://github.com/caozhiyuan/copilot-api)
+fork（npm `@jeffreycao/copilot-api`）。
 
-- **Shell helpers**：`~/.config/shell/43_copilot_proxy.sh`（`copilot-proxy`、`claude-copilot`、`copilot-run`、`copilot-here`、`copilot-model`）
+- **Shell helpers**：`~/.config/shell/43_copilot_proxy.sh`（`copilot-proxy`、`claude-copilot`、`claude-copilot-once`、`copilot-run`、`copilot-here`、`copilot-model`）
 - **執行器 (runner)**：`@jeffreycao/copilot-api`（已釘選 pinned），**只安裝一次**到
   `~/.local/share/copilot-api/pkg`，之後直接執行該處的 binary。刻意**不**在啟動時用
   `bunx`：bunx 每次啟動都會重新解析套件，而 bun 透過 socks `ALL_PROXY` 解析相依會永遠卡住
@@ -23,13 +24,16 @@
     用 Copilot 訂閱去驅動非 GitHub 的 agent 是不被允許的，且 copilot-api 是逆向工程/非官方
     的。copilot-api 自己的 README 就警告它可能觸發 GitHub 的 **濫用偵測 (abuse detection)**，
     導致 **Copilot 存取被暫時停權 (temporary suspension)**。Claude Code 很吃 token（頻繁的背景
-    請求、大 context），務必搭配速率限制 (rate limit) 使用。風險自負；建議用個人帳號而非公司席位
+    請求、大 context），而 fork 本身沒有 rate limiter；可選擇性設
+    `COPILOT_PROXY_QUIET=1` 減少背景呼叫。風險自負；建議用個人帳號而非公司席位
     (corporate seat)。
 
 ## 快速開始
 
 ```sh
 copilot-proxy auth      # 一次性：GitHub 裝置登入 (device login)（儲存 ghu_ token）
+copilot-proxy start
+copilot-model --auto    # 有 Claude 就用 Claude，否則按 Sol/Terra/Luna 角色配置
 
 claude-copilot          # 一次性 session 走代理（自動啟動代理；不寫任何檔案）
 claude-copilot-once     # 釘住「這個專案」跑一次 session，結束自動解除（代理需已啟動）
@@ -42,15 +46,16 @@ copilot-here off        # 取消釘選 —— 回到真正的 Anthropic 後端
 
 ```
 Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
-                                          │ 在 Anthropic <-> Copilot 之間轉譯
-                                          │ Authorization: Bearer <copilot token>
+                                          │ Claude：native Messages path
+                                          │ GPT：Anthropic → Responses 轉譯
                                           ▼
                                    api.githubcopilot.com  （你的 Copilot 訂閱）
 ```
 
 - Claude Code 只講 **Anthropic Messages API**（`/v1/messages`）。
-- Copilot 的 chat 端點是 **OpenAI 相容 (compatible)** 的（`/chat/completions`）。
-- copilot-api 在兩者之間轉譯並注入 Copilot 的認證 (auth)。
+- fork 對 Claude id 使用 Copilot native Anthropic path；對 GPT id 把 Claude Code
+  request 轉成 **Responses API**。`2.1.0` 會把 `output_config.effort` 正確轉成
+  `reasoning.effort`，並支援 GPT-5.6 request shape 與 reasoning state。
 - Claude Code 透過 `ANTHROPIC_BASE_URL` 被指向代理 —— 注入方式有兩種：
   per-process 環境變數（`claude-copilot`），或 gitignore 掉的
   `./.claude/settings.local.json`（`copilot-here on`）。見「設定分層設計」。
@@ -59,8 +64,8 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
 
 Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 `./.claude/settings.json`（project，會 commit）→ `./.claude/settings.local.json`
-（local，gitignored）→ CLI flags —— 且 **shell 環境變數蓋過所有 settings 檔的
-`env` 區塊**（[官方文件](https://code.claude.com/docs/en/settings)）。
+（local，gitignored）→ CLI flags。實測中 `settings.local.json` 的 `env` 可以蓋過繼承的
+shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆蓋它。
 
 其中兩層已有其他工具負責，必須保持乾淨：
 
@@ -74,6 +79,7 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 | 啟用 | 機制 | 範圍 | 停用 |
 |---|---|---|---|
 | `claude-copilot` / `copilot-run` | per-process 環境變數 | 單一 session | 下次直接跑 `claude` 即可 |
+| `claude-copilot-once` | 暫時 `settings.local.json` pin | 單一 session | session 結束自動還原 |
 | `copilot-here on` | `./.claude/settings.local.json`（gitignored） | 這個專案、持續生效 | `copilot-here off` |
 
 ```
@@ -90,9 +96,10 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 | 環境變數 | 預設 | 意義 |
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | 代理監聽的 port |
-| `COPILOT_PROXY_RATE` | `15` | `--rate-limit` 秒數（節流；請溫和） |
 | `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto`（本機 Clash/Verge/mihomo 有在聽就帶 `--proxy-env`）、`never`（直連）、`always`（一定要偵測到 proxy）、或明確 URL |
-| `COPILOT_API_PKG` | `copilot-api@0.7.0` | 要安裝的套件規格（釘選/升級）。改了會自動重裝。 |
+| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@2.1.0` | 要安裝的套件規格（釘選/升級）。`2.1.0` 才會把 Claude Code effort 傳到 GPT-5.6。 |
+| `COPILOT_PROXY_RATE` | `15` | 僅舊版 `copilot-api@0.7.0` 使用；fork 沒有 rate limiter |
+| `COPILOT_PROXY_QUIET` | `0` | `1` 減少背景模型呼叫，但會犧牲部分 UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = 安裝時把 proxy 環境變數拿掉，跳過「bun 無法透過 proxy 解析」那 45 秒的卡頓 |
 
 這些設在 `~/.shellrc.adhoc`（或 per-shell secrets 檔案）。在 `copilot-proxy auth`
@@ -136,9 +143,9 @@ socks proxy 解析相依會卡住），而且正占著 bun 的全域快取鎖。
 | 沒有 | **有** | 快取過期 (stale cache) | `copilot-proxy restart` |
 | 沒有 | 沒有 | 組織政策停用 Anthropic | 重啟**沒有用** |
 
-它同時會拿**釘選的**模型（`copilot-model -c` 的實際生效值，會尊重 `copilot-here` 的專案
-釘選）去比對已提供的清單 —— 包含 `copilot-model -l` **不會**顯示的 `[1m]` 別名。釘選了一個
-沒被提供的 id，代表每一個請求都會 400。
+它會同時驗證 main 與 Fable/Opus/Sonnet/Haiku aliases，包括 `[1m]` alias。某個過期的
+background role id，會造成普通對話成功、workflow 卻 400。沒有 Claude entitlement 在可用的
+OpenAI profile 存在時是 warning，不是整體失敗。
 
 上游連線會同時探測 `api.enterprise.githubcopilot.com` 與 `api.githubcopilot.com`，直連
 **以及**（若有設定）走 macOS 系統代理，所以 Clash/mihomo 規則黑洞掉其中一個 host 時會立刻
@@ -177,8 +184,8 @@ token：憑證是透過 `curl -K -`（stdin）傳入，而非 argv，因為 argv
   代理沒回應時它只印出 `copilot-proxy start` 提示並回傳非零。
 - **不動既有 pin：** 如果這個專案的 `copilot-here` 本來就是 `on`，結束時會原樣保留
   （不會去解除你沒要求解除的 pin）。如果那個 pin **過期了** —— 跟現在 `copilot-here on`
-  會寫入的內容不一致，例如預設值已經移到 `claude-opus-5[1m]` 而 pin 還停在
-  `claude-opus-4-8[1m]`，或是 pin 建立時某個 key 還不存在 —— 它會印出差異，並詢問要
+  會寫入的內容不一致，例如帳號已改走 OpenAI fallback、pin 還停在不可用的 Claude id，
+  或是 pin 建立時還沒有 Fable key —— 它會印出差異，並詢問要
   就地更新（`copilot-here on`）還是保留。預設答案是**保留**（stdin 非互動時自動保留）。
   差異的計算方式是拿現檔去 diff `copilot-here on` 會合併的那份 env 區塊
   （`_copilot_env_json`，兩邊共用的唯一來源），所以它精確等於「`on` 會改動的 key」——
@@ -220,23 +227,40 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 - 目前專案的 `copilot-here` 是 ON → 編輯 `./.claude/settings.local.json`。
 - 否則 → 寫入全域狀態檔 `~/.local/state/copilot-proxy/model`，由
   `claude-copilot`、`copilot-run` 與下一次 `copilot-here on` 讀取。
-  （`$COPILOT_CLAUDE_MODEL` 可覆寫狀態檔；最終預設是 `claude-opus-5[1m]`。）
+  （`$COPILOT_CLAUDE_MODEL` 可覆寫狀態檔；最終預設是 `gpt-5.6-sol[1m]`。）
 
 行為：
 
 - 模糊 id：`copilot-model opus-4-8` 會解析成 `claude-opus-4-8`；點號寫法也會被
   正規化（`opus-4.8` 一樣可用）。
-- `[1m]` 後綴（`copilot-model 'opus-4-8[1m]'`）驗證時會被剝掉、之後再接回去 ——
-  它是只給 Claude Code 看的 1M context 提示，詳見下方模型 id 章節。
-- 會對照即時的代理 `/v1/models` 驗證（代理未啟動時退回靜態 Claude 清單）；打錯字與不明確的
-  前綴會被拒絕。
-- `--auto` / `-a`：從**目前 served** 清單挑最佳 —— Claude（含適用的 `[1m]`）→
-  `*codex*` → 非 mini 的 `gpt-5*` → 其他 `gpt-*` → Gemini。適合 Claude 被
-  geo-filter 那天 pin 到 Gemini 之後要自動升回，或 Anthropic 不可用時改用 Codex。
-  `doctor` **不會**自動改 pin，只會提示跑 `--auto`。
-- 無參數 → `fzf` 選單。`-c` 印出目前模型以及它來自哪一層。
-- 同時寫入 `ANTHROPIC_MODEL` 與 `ANTHROPIC_DEFAULT_OPUS_MODEL` ——
-  **變更只在下次 `claude` 啟動時生效**（env 在啟動時讀取）。切換模型 **不需要** 重啟代理。
+- `[1m]` 是只給 Claude Code 看的 context 提示。helper 會依 live `/v1/models`
+  的 `max_context_window_tokens` 對每個 provider 自動決定，不再靠模型名寫死。
+- 會對照即時的代理 `/v1/models` 驗證（離線時仍提供靜態 discovery 清單供手動選擇）；
+  打錯字與不明確的前綴會被拒絕，`--auto` 絕不從離線清單寫入 pin。
+- `--auto` / `-a` 必須讀到 live catalog。先選 Claude
+  (`Fable > Opus > Sonnet > Haiku`)；沒有 Claude 時依能力排序：
+  `Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex > Luna > mini`，再才是 Gemini。
+  Luna 雖然是 5.6 世代，但定位是輕量快速，所以排在舊旗艦後面。
+  Sol/Terra/Luna 的角色意圖依照 OpenAI 的
+  [current model guidance](https://developers.openai.com/api/docs/guides/latest-model)。
+- OpenAI 角色 profile：Main/Fable/Opus = Sol，Sonnet = Terra，Haiku/background = Luna。
+  某層沒有 served 模型時退回 main，不會寫入不存在的硬編碼 id。
+- 無參數 → `fzf` 選單。`-c` 印出 main 來源與 Fable/Opus/Sonnet/Haiku 完整對映。
+- global state 仍是向後相容的單行 main id；wrapper 在啟動時依 live catalog 產生角色
+  profile。Local pin 會寫入完整角色組。切換後只需重開 Claude Code，不用重啟 proxy。
+
+建議順序：
+
+```sh
+copilot-proxy start
+copilot-model --auto        # 儲存 main／更新目前 project pin
+copilot-model -c            # 檢查完整角色組
+copilot-here on             # 黏著本專案，或改用 claude-copilot-once
+```
+
+`claude-copilot-once` 會暫時寫入同一組 profile，session 後還原。已存在的
+`copilot-here` pin 仍會蓋過 shell env；用 `copilot-model --auto` 或 `copilot-here on`
+更新它。
 
 ## 注入的 env（兩層設定的內容相同）
 
@@ -245,11 +269,12 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:4141",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-5[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-terra[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-luna[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-luna[1m]",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
@@ -258,6 +283,24 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 `ANTHROPIC_AUTH_TOKEN` 會被代理忽略，但必須設定。
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 可減少背景流量（有助於速率限制）。
 **不要** 把這段貼進會 commit 的 `.claude/settings.json` —— 改用 `copilot-here on`。
+
+## Claude Code 功能相容性
+
+關鍵分界是**本機編排 (local orchestration)** 與 **Anthropic cloud service**：
+
+| 功能 | 透過 Copilot + GPT | 說明 |
+|---|---|---|
+| CLI、tools、hooks、skills、memory、plugins、MCP、checkpoints、sandboxing | 可以 | 這些是本機 Claude Code 功能；GPT 收到的是經過轉譯的 Claude prompt/tool schema，行為可能不完全一樣。 |
+| subagents、dynamic workflows | 可以 | 不強制 `CLAUDE_CODE_SUBAGENT_MODEL`，保留 workflow/frontmatter 的 routing。[Workflow 文件](https://code.claude.com/docs/en/workflows) |
+| `ultracode` | `2.1.0` 可以 | Ultracode 是 xhigh effort + dynamic workflows，不是單獨模型；2.1.0 會把 effort 傳到 GPT-5.6。 |
+| thinking/reasoning | 轉譯後可用 | GPT 使用 Responses reasoning，不是 Anthropic-native thinking semantics。 |
+| Web Search、fast/auto mode、MCP tool search | 依 provider | 由 base-URL gateway 與 Copilot endpoint 能力決定；non-first-party tool search 可能需要額外 bridge/plugin。 |
+| Ultrareview、Remote Control、Chrome、cloud Code Review、routines、web/mobile/Slack session | 不可以 | 這些需要 Claude.ai auth/cloud identity；local API gateway 無法取代。`ultrareview` 和 `ultracode` 無關。 |
+
+官方參考：[feature availability](https://code.claude.com/docs/en/feature-availability)、
+[model configuration](https://code.claude.com/docs/en/model-config)、
+[gateway protocol](https://code.claude.com/docs/en/llm-gateway-protocol)、
+[Ultrareview](https://code.claude.com/docs/en/ultrareview)。
 
 ## 陷阱 (gotchas)（這些都花了實際 debug 時間）
 
@@ -285,8 +328,10 @@ Resolving dependencies
 於是每重試一次就多留一個孤兒（實際上疊了 5 個），而且沒有任何一個綁上 port。
 
 現在 runner 會把釘選的套件**只安裝一次**到 `~/.local/share/copilot-api/pkg` 並直接執行該
-binary，所以熱啟動完全不碰網路。安裝本身有 timeout 且逾時會被殺掉，並會退回「拿掉 proxy」
-的重試。注意這裡的 registry 是 npmmirror（國內鏡像，為了 GFW 速度設在 `~/.bunfig.toml`）
+binary，所以熱啟動完全不碰網路。安裝本身有 timeout 且逾時會被殺掉，先退回「拿掉 proxy」
+的重試；若 Bun 明確回 `UNKNOWN_CERTIFICATE_VERIFICATION_ERROR`，最後再改用 npm 的 CA stack。
+TLS 驗證仍保持開啟，這是在繞過已觀察到的 Bun/Node CA-store 差異，不是關閉憑證檢查。
+注意這裡的 registry 是 npmmirror（國內鏡像，為了 GFW 速度設在 `~/.bunfig.toml`）
 —— 把它繞進 proxy 一點好處也沒有，而那正是弄壞 bun 的原因。
 
 完整事後檢討與可 grep 的原始症狀：
@@ -332,13 +377,12 @@ Claude Code 的背景雜訊 —— 那正是 `COPILOT_PROXY_QUIET=1` 注入的�
 我們優先保 UX 而不是 Copilot quota）。真的需要請求節流的話，退回原始套件：
 `COPILOT_API_PKG=copilot-api@0.7.0`。
 
-### fork 的小毛病：`context_management` 可能 400
+### Context management 是轉譯，不是 Anthropic-native
 
-較新的 Claude Code context-editing 可能會塞入 `context_management`，而 Copilot 原生的
-`/v1/messages` endpoint 會以 400 拒絕
-（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)，與版本有關）。
-實際測試中真實的 Claude Code 執行沒有觸發到，但如果你在長 session 看到無法解釋的 400，
-先去看那個 issue。
+舊 fork 可能把 Claude Code 的 `context_management` 原樣送到會回 400 的 endpoint
+（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)）。`2.1.0` 的
+GPT-5.6 path 會壓掉這個不相容欄位，改依 Responses reasoning/context handling。這避開 400，
+但不會完整重現 Anthropic 的 context editing 與 prompt-cache semantics；長 session 仍需觀察。
 
 ### 不要使用 Claude Code 內建的 `/model` 選單
 
@@ -363,10 +407,8 @@ API Error: 400 {"error":{"message":"The requested model is not supported.",
   sonnet-5（`/v1/models` 裡的 `max_context_window_tokens: 1000000`）—— 所以 HUD/statusline
   的 context 可能顯示超過 100%，compaction 也會用錯誤的預算觸發。
 
-正確做法就是目前 helper 預設注入的 id 形狀：**`claude-opus-5[1m]`** —— 連字號讓 Claude Code
-認得這個 family（顯示名稱正確、沒有退役警告），`[1m]` 後綴讓它把 context 算成 1M。
-Claude Code 送出前會把 `[1m]` 剝掉，所以代理收到的是合法 id（在原生 API 呼叫裡放**字面上**
-的 `...[1m]` 會被拒絕 —— `copilot-model` 驗證時會自行處理剝除）。
+helper 會使用連字號 id，並依每個 live model 的 context metadata 自動加 `[1m]`；GPT id 也適用，
+例如 `gpt-5.6-sol[1m]`。Claude Code 送出前會剝掉 suffix；raw API client 必須使用 plain id。
 
 ### Token 陷阱：`gho_` vs `ghu_`
 
@@ -382,16 +424,12 @@ OpenCode 的 `gho_` token（OAuth App）只有在 *直接* 當 Bearer 打 `api.g
 `ghu_` token —— 不要重用 OpenCode 的。** Token 儲存在
 `~/.local/share/copilot-api/github_token`。
 
-## 可用的 Claude 模型 id
+## 可用模型與角色 discovery
 
-經 `/v1/models` + `/v1/messages` 驗證（2026-07）：`claude-opus-4-5`、`claude-opus-4-6`、
-`claude-opus-4-7`、`claude-opus-4-8`、`claude-opus-5`、`claude-sonnet-4-5`、
-`claude-sonnet-4-6`、`claude-sonnet-5`、`claude-haiku-4-5`。fork 在請求時連字號與舊的點號
-形式（`claude-opus-4.8`）都收，但**在 Claude Code 裡請用連字號 id** —— 點號會破壞它的
-模型辨識（見陷阱章節）。`/v1/models` capabilities 回報的 context window：opus-5、opus-4-8
-與 sonnet-5 是 **1M**（`max_prompt_tokens: 936000`），haiku-4-5 是 200k —— 對 1M 的模型
-請補上 `[1m]` 後綴讓 Claude Code 知道。非 Claude 模型（gpt-5.5、gemini-3.1-pro-preview…）
-也有提供 —— 見 `copilot-model -l` 或 `GET /v1/models`。
+以 `GET /v1/models` 為 live truth：GitHub 會依帳號、組織政策、rollout 與 egress 改變 catalog。
+Claude Code 現在有 Fable、Opus、Sonnet、Haiku 角色；`copilot-model --auto` 只會映射 catalog
+裡實際存在的 id。`copilot-model -l` 顯示 raw served ids，`copilot-model -c` 顯示生效中的
+角色 profile。不要複製帶日期的 Anthropic id，也不要手猜哪些模型有 1M context。
 
 ## 實用指令
 
