@@ -34,7 +34,52 @@ teardown() {
   return 0
 }
 
+write_fake_codex() {
+  mkdir -p "$TMP/bin" "$TMP/proj"
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'printf "key=<%s>\n" "$GITHUB_COPILOT_API_KEY"' \
+    'i=0' \
+    'for arg do printf "arg[%s]=<%s>\n" "$i" "$arg"; i=$((i + 1)); done' \
+    > "$TMP/bin/codex"
+  chmod +x "$TMP/bin/codex"
+}
+
 # --- _copilot_norm_models -------------------------------------------------------
+
+@test "probe failure kind: curl timeout is distinct from TLS and network" {
+  run bash -c "source '$SHELL_LIB'; printf '%s|%s|%s' \
+    \"\$(_copilot_probe_failure_kind 28 'operation timed out')\" \
+    \"\$(_copilot_probe_failure_kind 60 'SSL certificate problem')\" \
+    \"\$(_copilot_probe_failure_kind 7 'failed to connect')\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "timeout|tls|network" ]
+}
+
+@test "optional HTTP probe: any non-000 HTTP response counts as reachable" {
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/curl" <<'SH'
+#!/bin/sh
+printf '\n403|0.125'
+SH
+  chmod +x "$TMP/bin/curl"
+  run bash -c "PATH='$TMP/bin:/usr/bin:/bin'; source '$SHELL_LIB'; _copilot_optional_http_probe https://example.invalid"
+  [ "$status" -eq 0 ]
+  [ "$output" = "reached|403|0.125|" ]
+}
+
+@test "optional HTTP probe: certificate failures stay distinguishable" {
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/curl" <<'SH'
+#!/bin/sh
+printf '%s\n' 'curl: (60) SSL certificate problem: unable to get local issuer certificate' '000|0.250'
+exit 60
+SH
+  chmod +x "$TMP/bin/curl"
+  run bash -c "PATH='$TMP/bin:/usr/bin:/bin'; source '$SHELL_LIB'; _copilot_optional_http_probe https://example.invalid"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "failed|tls|0.250|"* ]]
+}
 
 @test "norm_models: dotted, hyphenated and [1m] spellings fold to one key" {
   run bash -c "printf '%s\n' 'claude-opus-4.8' 'claude-opus-4-8' 'claude-opus-4-8[1m]' \
@@ -217,6 +262,78 @@ SH
     | { source '$SHELL_LIB'; _copilot_pick_best_model; }"
   [ "$status" -eq 0 ]
   [ "$output" = "claude-fable-5" ]
+}
+
+@test "codex picker: OpenAI Sol outranks Claude and Gemini" {
+  run bash -c "printf '%s\n' claude-fable-5 gemini-3.1-pro-preview gpt-5.6-terra gpt-5.6-sol \
+    | { source '$SHELL_LIB'; _copilot_codex_pick_best_model; }"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "codex picker: Claude is the fallback before Gemini" {
+  run bash -c "printf '%s\n' gemini-3.1-pro-preview claude-sonnet-5 claude-opus-5 \
+    | { source '$SHELL_LIB'; _copilot_codex_pick_best_model; }"
+  [ "$status" -eq 0 ]
+  [ "$output" = "claude-opus-5" ]
+}
+
+@test "codex picker: non-flash Gemini beats flash when no OpenAI or Claude" {
+  run bash -c "printf '%s\n' gemini-3.6-flash gemini-3.1-pro-preview \
+    | { source '$SHELL_LIB'; _copilot_codex_pick_best_model; }"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gemini-3.1-pro-preview" ]
+}
+
+@test "specstory codex command: project config preserves configured flags" {
+  mkdir -p "$TMP/proj/.specstory/cli" "$TMP/home/.specstory/cli"
+  printf '%s\n' "codex_cmd = 'codex --sandbox danger-full-access -c model_reasoning_effort=\"high\"'" \
+    > "$TMP/home/.specstory/cli/config.toml"
+  printf '%s\n' 'codex_cmd = "codex --ask-for-approval never"' \
+    > "$TMP/proj/.specstory/cli/config.toml"
+  run bash -c "cd '$TMP/proj'; export HOME='$TMP/home'; source '$SHELL_LIB'; _copilot_specstory_codex_cmd"
+  [ "$status" -eq 0 ]
+  [ "$output" = "codex --ask-for-approval never" ]
+}
+
+@test "codex launcher: auto selects Sol, injects live limits, and writes no config" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  write_fake_codex
+  local catalog='{"data":[{"id":"claude-opus-5"},{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":920000}}}]}'
+  run env TEST_CATALOG="$catalog" bash -c "
+    cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_shim_enabled() { return 0; }
+    _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+    _copilot_client_base() { printf '%s' 'http://localhost:4141/v1'; }
+    codex-copilot --no-specstory exec --skip-git-repo-check 'two words'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"codex-copilot: --auto -> gpt-5.6-sol"* ]]
+  [ "$(printf '%s\n' "$output" | grep -c '=<\-m>$')" -eq 1 ]
+  [[ "$output" == *"=<gpt-5.6-sol>"* ]]
+  [[ "$output" == *"=<model_context_window=1050000>"* ]]
+  [[ "$output" == *"=<model_auto_compact_token_limit=920000>"* ]]
+  [[ "$output" == *"=<features.remote_compaction_v2=true>"* ]]
+  [[ "$output" == *"=<two words>"* ]]
+  [ ! -e "$TMP/proj/.codex" ]
+}
+
+@test "codex launcher: explicit model is preserved without an auto override" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  write_fake_codex
+  local catalog='{"data":[{"id":"gpt-5.6-sol"},{"id":"claude-opus-5"}]}'
+  run env TEST_CATALOG="$catalog" bash -c "
+    cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_shim_enabled() { return 0; }
+    _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+    _copilot_client_base() { printf '%s' 'http://localhost:4141/v1'; }
+    codex-copilot --no-specstory -m claude-opus-5 exec 'two words'"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"--auto ->"* ]]
+  [ "$(printf '%s\n' "$output" | grep -c '=<\-m>$')" -eq 1 ]
+  [[ "$output" == *"=<claude-opus-5>"* ]]
+  [[ "$output" == *"=<two words>"* ]]
 }
 
 @test "pick_best_model: Sol is the strongest OpenAI fallback" {

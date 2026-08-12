@@ -1,4 +1,4 @@
-# Copilot → Claude Code 代理 (proxy)
+# Copilot agent gateway（Claude Code + Codex）
 
 !!! note "Terminology rule (zh-TW pages)"
     技術名詞首次出現以「中文 (English original)」格式呈現，例：依賴注入
@@ -11,7 +11,9 @@
 [`caozhiyuan/copilot-api`](https://github.com/caozhiyuan/copilot-api)
 fork（npm `@jeffreycao/copilot-api`）。
 
-- **Shell helpers**：`~/.config/shell/43_copilot_proxy.sh`（`copilot-proxy`、`claude-copilot`、`claude-copilot-once`、`copilot-run`、`copilot-here`、`copilot-model`）
+- **Shell helpers**：`~/.config/shell/43_copilot_proxy.sh`（`copilot-proxy`、
+  `claude-copilot`、`codex-copilot`、`copilot-run`、`copilot-here`、
+  `copilot-model`）
 - **執行器 (runner)**：`@jeffreycao/copilot-api`（已釘選 pinned），**只安裝一次**到
   `~/.local/share/copilot-api/pkg`，之後直接執行該處的 binary。刻意**不**在啟動時用
   `bunx`：bunx 每次啟動都會重新解析套件，而 bun 透過 socks `ALL_PROXY` 解析相依會永遠卡住
@@ -37,6 +39,8 @@ copilot-model --auto    # 有 Claude 就用 Claude，否則按 Sol/Terra/Luna �
 
 claude-copilot          # 一次性 session 走代理（自動啟動代理；不寫任何檔案）
 claude-copilot-once     # 釘住「這個專案」跑一次 session，結束自動解除（代理需已啟動）
+codex-copilot           # 一次性 Codex session；auto 優先選 OpenAI
+codex-copilot-once      # 完全相同的 alias；兩者都不寫 Codex config
 
 copilot-here on         # 或者：釘選「這個專案」—— 之後直接跑 `claude` 就走代理
 copilot-here off        # 取消釘選 —— 回到真正的 Anthropic 後端
@@ -50,6 +54,9 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
                                           │ GPT：Anthropic → Responses 轉譯
                                           ▼
                                    api.githubcopilot.com  （你的 Copilot 訂閱）
+
+Codex ──OpenAI /v1/responses──────────▶ 同一個 localhost gateway
+        （provider/model 只透過本次啟動的 `-c` / `-m` 覆寫）
 ```
 
 - Claude Code 只講 **Anthropic Messages API**（`/v1/messages`）。
@@ -124,7 +131,7 @@ proxy 的重試；兩種嘗試都有 timeout 並會被殺掉，所以卡死的�
 
 檢查順序：前置工具（`bun`/`curl`/`jq`）→ **套件 (package)** → token 檔案 → 代理與
 throttle shim 是否存活 → 安裝殘留（stale installer）→ **模型**→ 上游連線 →
-本機代理 / VPN → live probe。
+本機代理 / VPN → **Codex Apps** → live inference probe。
 
 **套件 (package)** 這一段報告釘選的 spec 是否已安裝在 prefix 裡、binary 在哪。顯示
 「未安裝」不算失敗 —— 下一次 `start` 會自動裝一次。
@@ -151,6 +158,13 @@ OpenAI profile 存在時是 warning，不是整體失敗。
 **以及**（若有設定）走 macOS 系統代理，所以 Clash/mihomo 規則黑洞掉其中一個 host 時會立刻
 顯現。未帶認證的 `400`/`401` 算「連得到」—— 只有連線/讀取失敗才算故障。`doctor` 絕不會印出你的
 token：憑證是透過 `curl -K -`（stdin）傳入，而非 argv，因為 argv 可被 `ps` 讀到。
+
+使用 `--live` 時，Codex Apps 段落還會對
+`https://chatgpt.com/backend-api/wham/apps` 分別做 direct 與 detected HTTP
+proxy probe。這個 GET 不消耗 model inference quota，可把 `codex_apps` 啟動中斷與
+localhost Copilot 路由拆開診斷。任何真實 HTTP status（包含 auth rejection）都代表
+網路可達；timeout 與 TLS certificate failure 會分開顯示。`codex_apps` 是遠端
+ChatGPT MCP，不是只供 Apple Silicon Codex Desktop 使用的 bridge。
 
 ### `claude-copilot [--no-specstory] [claude args...]` —— 一次性 session
 
@@ -204,6 +218,65 @@ token：憑證是透過 `curl -K -`（stdin）傳入，而非 argv，因為 argv
 copilot-run specstory run claude    # 等同 claude-copilot 做的事
 copilot-run claude --resume         # 裸 claude，不經 specstory
 ```
+
+### `codex-copilot [--no-specstory] [codex args...]` —— 一次性 Codex session
+
+`codex-copilot` 與 `codex-copilot-once` 是完全相同、零持久化的 launcher。
+它們會視需要啟動 gateway/shim，並用 CLI `-c` overrides 把自訂的
+`copilot_api` Responses provider 傳給 Codex；不會編輯 `~/.codex/config.toml`
+或 `.codex/config.toml`，所以 plain `codex` 仍走原本 provider。
+
+這是與 Claude Code `copilot-model --auto` 分開的 picker：後者保持
+Claude-first，只有這個 Codex launcher 是 OpenAI-first。
+
+- 呼叫者明確傳入 `-m` / `--model` 時永遠優先。否則從即時 raw catalog
+  依序選 OpenAI/Codex（`Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex >
+  Luna > mini`），再退到 Claude、Gemini、其他 chat model；embedding 與 disabled
+  model 會排除。
+- launcher 也會把所選 model 的即時 context/prompt limit 傳給 Codex。Gateway
+  `2.1.0` 目前會在 Codex-UA merged catalog 漏掉 native Responses models；明確
+  `-m` 仍可正常工作，但 Codex 可能顯示 fallback-metadata warning。
+- Claude/Gemini fallback 經 Responses Lite 轉譯；基本 tools、compaction、
+  multi-agent orchestration 可用，但這條路不支援 Responses `tool_search`，因此
+  auto 會把 native Responses OpenAI models 排在 Anthropic 前。
+- Launcher 會啟用 gateway-backed remote compaction，並排除依賴不可用
+  `tool_search` 的 `mcp__codex_apps__sites` namespace；使用者後續傳入的 `-c`
+  仍可在單次呼叫覆寫這兩項。
+- 有安裝 SpecStory 時預設執行 `specstory run codex`，並保留實際生效的
+  `codex_cmd`（project config > user config > 裸 `codex`），再附加 provider、
+  model 與使用者參數。`--no-specstory` 直接跑 Codex。
+
+Codex 刻意不提供 `copilot-here` 對應物。官方 Codex config 允許 trusted project
+使用 `.codex/config.toml`，但 project scope 會忽略 `model_provider`、
+`model_providers`、provider auth 等 host-owned metadata。因此顯式 launcher 才能在
+不改 user-wide default 的前提下，提供 project/session 邊界。參考
+[configuration reference](https://developers.openai.com/codex/config-reference) 與
+[configuration basics](https://developers.openai.com/codex/config-basic)。
+
+#### 實驗性 direct provider（正式 helper 不使用）
+
+以下設定會跳過 localhost；只有帳號 credential 能直接驗證到相符 Copilot endpoint
+時才可用：
+
+```toml
+[model_providers.copilot-enterprise]
+name = "GitHub Copilot Enterprise"
+base_url = "https://api.enterprise.githubcopilot.com"
+wire_api = "responses"
+http_headers = { "Copilot-Integration-Id" = "vscode-chat", "Editor-Version" = "vscode/1.99.0", "Editor-Plugin-Version" = "copilot-chat/0.0.1", "User-Agent" = "GithubCopilot/1.0" }
+
+[model_providers.copilot-enterprise.auth]
+command = "gh"
+args = ["auth", "token", "--hostname", "github.com"]
+timeout_ms = 5000
+refresh_interval_ms = 300000
+```
+
+這只是範例，不是受管設定。在本次 EMU/Enterprise 帳號實測，裸
+`gh auth token` 對 enterprise API 回 `421 Misdirected Request`，而 Copilot token
+exchange 回 `403`；`copilot-proxy auth` 保存的 token 經正常短效 Copilot token
+exchange 則可用。Endpoint 也由 exchange 結果決定，hard-code personal/enterprise
+host 不具可攜性。因此正式 helper 沿用已認證的 localhost gateway。
 
 ### `copilot-here [on|off|status]` —— 專案級持續開關
 
@@ -453,7 +526,7 @@ copilot-proxy logs 60                # tail 代理的 log
   —— 同一個 proxy 接進 Raycast 的 Quick AI / AI Chat / AI Commands（`copilot-raycast`），
   以及那個分辨「真的能用」與「`/v1/models` 只是宣稱有」的零額度探針
 - [copilot-api](https://github.com/ericc-ch/copilot-api) —— 代理本體
-- [`bunx` CLI aliases](../shells/aliases.md#copilot--claude-code-代理-proxy)
+- [Copilot agent gateway 指令](../shells/aliases.md#copilot-agent-gateway)
 - [Claude Code 設定優先序](https://code.claude.com/docs/en/settings) —— 為什麼
   `settings.local.json` / 環境變數才是正確的注入層
 - [Agent overlays](agent-overlays.md) —— 本設計刻意避開的

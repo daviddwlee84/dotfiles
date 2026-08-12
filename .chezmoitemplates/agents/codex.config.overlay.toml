@@ -8,6 +8,19 @@ shell_snapshot = true
 steer = true
 multi_agent = true
 
+[tui]
+# Stock Codex only supports built-in status items (no Claude-style command
+# renderer). Keep this provider-neutral: five-hour/weekly limits can still be
+# ChatGPT-account counters when a one-off launcher routes inference elsewhere.
+status_line = [
+  "model-with-reasoning",
+  "fast-mode",
+  "git-branch",
+  "context-remaining",
+  "task-progress",
+  "current-dir",
+]
+
 [tui.keymap.editor]
 insert_newline = ["ctrl-j", "shift-enter", "alt-enter"]
 

@@ -1,9 +1,9 @@
-# 43_copilot_proxy.sh - GitHub Copilot -> Anthropic/OpenAI proxy for Claude Code
+# 43_copilot_proxy.sh - GitHub Copilot agent gateway for Claude Code and Codex
 #   (shared bash + zsh).
 #
 # Runs the maintained copilot-api fork (caozhiyuan/copilot-api, npm
-# @jeffreycao/copilot-api) so a GitHub Copilot subscription can back Claude Code
-# (and any OpenAI/Anthropic-compatible client). The original ericc-ch/copilot-api
+# @jeffreycao/copilot-api) so a GitHub Copilot subscription can back Claude Code,
+# Codex, and any OpenAI/Anthropic-compatible client. The original ericc-ch/copilot-api
 # is unmaintained (its issue #233 points at the fork) but still works via
 # COPILOT_API_PKG=copilot-api@0.7.0 — flags differ per package, see
 # _copilot_pkg_flavor. Both packages share the same token file, so switching
@@ -24,6 +24,8 @@
 #                                (specstory-wrapped when available; zero file writes)
 #   claude-copilot-once [args...] - one-shot session via the copilot-here pin
 #                                (settings.local.json; auto-reverted, even on Ctrl-C)
+#   codex-copilot [args...]    - one-off Codex session on the Responses gateway
+#   codex-copilot-once [args...] - identical zero-persistence spelling
 #   copilot-here [on|off|status] - sticky per-project toggle via the gitignored
 #                                ./.claude/settings.local.json (never touches the
 #                                committed .claude/settings.json)
@@ -400,6 +402,51 @@ _copilot_probe() {
   fi
   case "$out" in 000*) return 1 ;; esac
   printf '%s' "$out"
+}
+
+# Classify curl failures without treating an HTTP rejection as a transport
+# failure. Kept separate so the optional codex_apps route can explain timeout,
+# certificate and generic network failures without conflating them with the
+# localhost model gateway.
+_copilot_probe_failure_kind() {
+  local rc="${1:-1}" msg
+  msg="$(printf '%s' "${2:-}" | command tr 'A-Z' 'a-z')"
+  case "$rc" in
+    28) printf '%s' timeout; return 0 ;;
+    35|51|53|58|59|60|64|66|77|80|82|83|90|91) printf '%s' tls; return 0 ;;
+  esac
+  case "$msg" in
+    *timed\ out*|*timeout*) printf '%s' timeout ;;
+    *certificate*|*ssl*|*tls*) printf '%s' tls ;;
+    *) printf '%s' network ;;
+  esac
+}
+
+# Probe an optional HTTP endpoint and always emit a structured result:
+#   reached|HTTP_CODE|SECONDS|
+#   failed|timeout|SECONDS|short curl error
+#   failed|tls|SECONDS|short curl error
+#   failed|network|SECONDS|short curl error
+# Any non-000 HTTP status is reachability success; auth/handshake rejection is
+# expected for the unauthenticated codex_apps endpoint probe.
+_copilot_optional_http_probe() {
+  local url="$1" via="${2:-}" out rc metrics code elapsed err kind
+  if [ -n "$via" ]; then
+    out="$(command curl -o /dev/null -sS -w '\n%{http_code}|%{time_total}' \
+      --max-time 12 -x "$via" "$url" 2>&1)"; rc=$?
+  else
+    out="$(command curl -o /dev/null -sS -w '\n%{http_code}|%{time_total}' \
+      --max-time 12 --noproxy '*' "$url" 2>&1)"; rc=$?
+  fi
+  metrics="$(printf '%s\n' "$out" | command tail -n 1)"
+  code="${metrics%%|*}"; elapsed="${metrics##*|}"
+  if [ "$rc" -eq 0 ] && [ -n "$code" ] && [ "$code" != 000 ]; then
+    printf 'reached|%s|%s|' "$code" "$elapsed"
+    return 0
+  fi
+  err="$(printf '%s\n' "$out" | command sed '$d' | command tr '\n|' ' /' | command cut -c1-120)"
+  kind="$(_copilot_probe_failure_kind "$rc" "$err")"
+  printf 'failed|%s|%s|%s' "$kind" "${elapsed:-0}" "$err"
 }
 
 # Model ids GitHub serves for this account RIGHT NOW.
@@ -969,6 +1016,49 @@ EOF
         _skip "env proxy" "HTTPS_PROXY unset in this shell (copilot-proxy start auto-injects it when a local proxy is detected)"
       fi
 
+      printf '\n%s\n' "Codex Apps (ChatGPT MCP)"
+      _skip "route" "https://chatgpt.com/backend-api/wham/apps — independent of localhost inference and Codex Desktop"
+      if [ "$_live" -ne 1 ]; then
+        _skip "skipped" "pass --live to probe the optional Apps/Connectors MCP route (no inference quota)"
+      else
+        local _apps_url _apps_direct _apps_via _as _av _at _ae
+        local _direct_apps_ok=0 _via_apps_ok=0
+        _apps_url='https://chatgpt.com/backend-api/wham/apps'
+        _apps_direct="$(_copilot_optional_http_probe "$_apps_url")"
+        IFS='|' read -r _as _av _at _ae <<EOF
+$_apps_direct
+EOF
+        if [ "$_as" = reached ]; then
+          _direct_apps_ok=1
+          _ok "apps direct" "HTTP $_av in ${_at}s (HTTP rejection still proves reachability)"
+        else
+          _note "apps direct" "$_av failure after ${_at}s${_ae:+ — $_ae}"
+        fi
+
+        if [ -n "$_http_proxy" ]; then
+          _apps_via="$(_copilot_optional_http_probe "$_apps_url" "$_http_proxy")"
+          IFS='|' read -r _as _av _at _ae <<EOF
+$_apps_via
+EOF
+          if [ "$_as" = reached ]; then
+            _via_apps_ok=1
+            _ok "apps via proxy" "HTTP $_av in ${_at}s ($_http_proxy)"
+          elif [ "$_direct_apps_ok" -eq 1 ]; then
+            _skip "apps via proxy" "$_av failure; direct route already works"
+          else
+            _note "apps via proxy" "$_av failure after ${_at}s${_ae:+ — $_ae}"
+          fi
+        fi
+
+        if [ "$_direct_apps_ok" -eq 0 ] && [ "$_via_apps_ok" -eq 1 ]; then
+          _note "apps routing" "ChatGPT Apps works only through the explicit HTTP proxy"
+          _hint "launch Codex with HTTP_PROXY=$_http_proxy HTTPS_PROXY=$_http_proxy (and NO_PROXY=localhost,127.0.0.1,::1)"
+        elif [ "$_direct_apps_ok" -eq 0 ] && [ "$_via_apps_ok" -eq 0 ]; then
+          _hint "this affects Apps/Connectors only; /status can still show localhost model inference working"
+          _hint "timeout → inspect Clash/TUN rules; tls → inspect certificate interception / custom CA"
+        fi
+      fi
+
       printf '\n%s\n' "Live probe"
       if [ "$_live" -ne 1 ]; then
         _skip "skipped" "pass --live to send one real request (consumes 1 quota unit)"
@@ -1105,7 +1195,8 @@ EOF
     -h|--help|help)
       printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|doctor [--live]|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth|reinstall]"
       printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, Claude catalog (direct vs via"
-      printf '%s\n' "                        Clash), upstream reachability. --live costs 1 quota unit."
+      printf '%s\n' "                        Clash), upstream reachability and Codex Apps."
+      printf '%s\n' "                        --live probes Apps and costs 1 inference quota unit."
       printf '%s\n' "  COPILOT_HTTP_PROXY    auto|always|never|http://127.0.0.1:PORT  (default auto)"
       printf '%s\n' "                        auto attaches --proxy-env when proxy-status finds a local proxy."
       printf '%s\n' "  reinstall             wipe + re-install the pinned package (a version bump"
@@ -1174,6 +1265,181 @@ copilot-run() {
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1" \
     "$@"
 }
+
+# Pick the best model for Codex from the raw gateway catalog. This is
+# deliberately NOT _copilot_pick_best_model: Claude Code prefers native Claude
+# when entitled, while Codex should stay on a native Responses-capable OpenAI
+# model as long as one is served. Claude/Gemini remain useful last-resort
+# Responses Lite fallbacks.
+_copilot_codex_pick_best_model() {
+  local models preferred c
+  models="$(command cat | command sed 's/\[1m\]$//' | command sort -u)"
+  [ -n "$models" ] || return 1
+
+  for preferred in \
+    gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-5.6-luna gpt-5.4-mini gpt-5-mini
+  do
+    if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
+      printf '%s' "$preferred"
+      return 0
+    fi
+  done
+  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command grep -viE 'mini|nano|luna' \
+        | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  for preferred in \
+    claude-fable-5 \
+    claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 \
+    claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 \
+    claude-opus-4-5 claude-haiku-4-5
+  do
+    if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
+      printf '%s' "$preferred"
+      return 0
+    fi
+  done
+  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command grep -viE 'flash' \
+        | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  printf '%s\n' "$models" | command sort | command tail -1
+}
+
+# Effective SpecStory Codex command, matching SpecStory's own precedence.
+# `specstory run ... -c` replaces this command wholesale, so callers must append
+# to this value rather than fall back to a bare `codex` and silently lose the
+# configured reasoning / sandbox flags.
+_copilot_specstory_codex_cmd() {
+  local f cmd=''
+  for f in ".specstory/cli/config.toml" "$HOME/.specstory/cli/config.toml"; do
+    [ -f "$f" ] || continue
+    cmd="$(command sed -n \
+      -e "s/^[[:space:]]*codex_cmd[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+      -e "s/^[[:space:]]*codex_cmd[[:space:]]*=[[:space:]]*'\([^']*\)'.*/\1/p" \
+      "$f" 2>/dev/null | command head -n 1)"
+    if [ -n "$cmd" ]; then break; fi
+  done
+  printf '%s' "${cmd:-codex}"
+}
+
+# One-off Codex session backed by the local Copilot gateway. Provider settings
+# are CLI overrides only: plain `codex`, ~/.codex/config.toml and project config
+# remain untouched. The alias-like sibling below exists for Claude wrapper
+# muscle memory; both names have identical zero-persistence semantics.
+codex-copilot() {
+  local ss="auto" arg explicit_model=0 model='' catalog='' models=''
+  case "${1:-}" in
+    --no-specstory) ss="never"; shift ;;
+    --specstory)    shift ;;
+    -h|--help)
+      printf '%s\n' "Usage: codex-copilot [--no-specstory] [codex args...]"
+      printf '%s\n' "  One-off Codex session on the local Copilot Responses gateway."
+      printf '%s\n' "  Auto model: OpenAI/Codex > Claude > Gemini > other served chat models."
+      printf '%s\n' "  Alias: codex-copilot-once"
+      return 0 ;;
+  esac
+
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "codex-copilot: jq is required for live model selection" >&2
+    return 1
+  fi
+  if ! _copilot_alive; then copilot-proxy start || return 1; fi
+  if _copilot_shim_enabled && ! _copilot_shim_alive; then _copilot_shim_start || return 1; fi
+
+  catalog="$(_copilot_model_catalog)" || {
+    printf '%s\n' "codex-copilot: could not read the live gateway model catalog" >&2
+    return 1
+  }
+  for arg in "$@"; do
+    case "$arg" in -m|--model|-m=*|--model=*) explicit_model=1 ;; esac
+  done
+  if [ "$explicit_model" -eq 0 ]; then
+    models="$(printf '%s' "$catalog" | jq -r '
+      .data[]?
+      | select((.policy.state // "enabled") != "disabled")
+      | select(.model_picker_enabled != false)
+      | select((.capabilities.type // "chat") != "embeddings")
+      | .id // empty' 2>/dev/null | command sort -u)"
+    model="$(printf '%s\n' "$models" | _copilot_codex_pick_best_model)" || {
+      printf '%s\n' "codex-copilot: no usable chat model in the live gateway catalog" >&2
+      return 1
+    }
+    set -- -m "$model" "$@"
+    case "$model" in
+      claude-*|gemini-*)
+        printf '%s\n' "codex-copilot: --auto -> $model (Responses Lite; tool_search unavailable)" >&2 ;;
+      *) printf '%s\n' "codex-copilot: --auto -> $model" >&2 ;;
+    esac
+  fi
+
+  # Keep these overrides per-process/per-invocation. `name = OpenAI` is an
+  # upstream gateway requirement; the dummy key only satisfies Codex's provider
+  # auth contract and is ignored by our unauthenticated localhost listener.
+  local base cmd context='' compact=''
+  base="$(_copilot_client_base)"
+  cmd="$(_copilot_specstory_codex_cmd)"
+  if [ -n "$model" ]; then
+    context="$(printf '%s' "$catalog" | jq -r --arg id "$model" '
+      first(.data[]? | select(.id == $id) | .capabilities.limits.max_context_window_tokens) // empty' 2>/dev/null)"
+    compact="$(printf '%s' "$catalog" | jq -r --arg id "$model" '
+      first(.data[]? | select(.id == $id) | .capabilities.limits.max_prompt_tokens) // empty' 2>/dev/null)"
+  fi
+  # Prepend discovered metadata; any explicit user `-c` remains later in argv
+  # and therefore retains normal Codex CLI precedence.
+  if [ -n "$compact" ]; then set -- -c "model_auto_compact_token_limit=$compact" "$@"; fi
+  if [ -n "$context" ]; then set -- -c "model_context_window=$context" "$@"; fi
+
+  local provider_args=""
+  # Build a shell-safe command fragment for SpecStory; direct execution below
+  # uses the original argv and does not round-trip through a string.
+  for arg in \
+    -c 'model_provider="copilot_api"' \
+    -c 'model_providers.copilot_api.name="OpenAI"' \
+    -c "model_providers.copilot_api.base_url=\"$base\"" \
+    -c 'model_providers.copilot_api.env_key="GITHUB_COPILOT_API_KEY"' \
+    -c 'model_providers.copilot_api.requires_openai_auth=true' \
+    -c 'model_providers.copilot_api.supports_websockets=false' \
+    -c 'model_providers.copilot_api.wire_api="responses"' \
+    -c 'model_providers.copilot_api.request_max_retries=3' \
+    -c 'model_providers.copilot_api.stream_max_retries=1' \
+    -c 'model_providers.copilot_api.stream_idle_timeout_ms=300000' \
+    -c 'features.remote_compaction_v2=true' \
+    -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]'
+  do provider_args="$provider_args $(_copilot_shquote "$arg")"; done
+  for arg in "$@"; do provider_args="$provider_args $(_copilot_shquote "$arg")"; done
+
+  if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
+    command env GITHUB_COPILOT_API_KEY=dummy specstory run codex -c "$cmd$provider_args"
+  else
+    command env GITHUB_COPILOT_API_KEY=dummy codex \
+      -c 'model_provider="copilot_api"' \
+      -c 'model_providers.copilot_api.name="OpenAI"' \
+      -c "model_providers.copilot_api.base_url=\"$base\"" \
+      -c 'model_providers.copilot_api.env_key="GITHUB_COPILOT_API_KEY"' \
+      -c 'model_providers.copilot_api.requires_openai_auth=true' \
+      -c 'model_providers.copilot_api.supports_websockets=false' \
+      -c 'model_providers.copilot_api.wire_api="responses"' \
+      -c 'model_providers.copilot_api.request_max_retries=3' \
+      -c 'model_providers.copilot_api.stream_max_retries=1' \
+      -c 'model_providers.copilot_api.stream_idle_timeout_ms=300000' \
+      -c 'features.remote_compaction_v2=true' \
+      -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]' \
+      "$@"
+  fi
+}
+
+codex-copilot-once() { codex-copilot "$@"; }
 
 # --- specstory `-c` passthrough (why the base command must come from config) ----
 #

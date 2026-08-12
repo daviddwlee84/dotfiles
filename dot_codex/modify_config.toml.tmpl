@@ -43,7 +43,7 @@
 set -eu
 
 overlay=$(cat <<'TOML'
-{{ template "agents/codex.config.overlay.toml" . }}
+{{ include (joinPath .chezmoi.sourceDir ".chezmoitemplates/agents/codex.config.overlay.toml") }}
 TOML
 )
 

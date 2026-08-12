@@ -101,7 +101,6 @@ TUI 覆寫中刻意 NOT 包含的：
 
 ```toml
 personality = "pragmatic"
-model = "gpt-5.4"
 model_reasoning_effort = "xhigh"
 
 [features]
@@ -110,6 +109,19 @@ unified_exec = true
 shell_snapshot = true
 steer = true
 multi_agent = true
+
+[tui]
+status_line = [
+  "model-with-reasoning",
+  "fast-mode",
+  "git-branch",
+  "context-remaining",
+  "task-progress",
+  "current-dir",
+]
+
+[tui.keymap.editor]
+insert_newline = ["ctrl-j", "shift-enter", "alt-enter"]
 
 [plugins."github@openai-curated"]
 enabled = true
@@ -121,8 +133,13 @@ enabled = true
 enabled = true
 ```
 
-- 頂層的模型與 reasoning 偏好。
+- 頂層的 personality 與 reasoning 偏好；`model` 刻意不釘選，保留 live user choice。
 - `[features]` — 啟用此使用者一律想開啟的實驗性 flag。
+- `[tui].status_line` — 使用 Codex 原生 footer 顯示 model/reasoning、fast mode、
+  branch、剩餘 context、task progress 與目錄。Copilot launcher 是 per-process
+  換 provider，所以刻意不顯示可能仍屬於 ChatGPT account 的 quota 欄位。詳見
+  [Codex status line](codex-status-line.zh-TW.md)。
+- `[tui.keymap.editor]` — 保留 TUI 多行輸入的 `Ctrl+J`、`Shift+Enter`、`Alt+Enter`。
 - `[plugins."<id>".enabled]` — 精選的外掛集；使用者自行安裝的外掛會以自己的 `[plugins."..."]` 區塊出現，並在深層合併中被保留。
 
 這個覆寫層刻意**不**持久化 `[model_providers.openai]` 覆寫。Codex CLI 允許用一次性的 `-c` 傳入這些 knob，但會拒絕在 `config.toml` 中覆寫 `openai` 這類保留的 built-in provider ID。modify 腳本會移除早期實驗留下的 `[model_providers.openai]` stale table，同時保留 `[model_providers.openai-gfw]` 這類自訂 provider ID。

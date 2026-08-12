@@ -652,14 +652,15 @@
 
 ---
 
-## Copilot → Claude Code 代理 (proxy)
+## Copilot agent gateway
 
-> 用 **GitHub Copilot** served 的模型驅動 Claude Code，透過只安裝一次、版本釘選的 [copilot-api 維護 fork](https://github.com/caozhiyuan/copilot-api)。有 Claude entitlement 時優先 Claude，否則建立 Sol/Terra/Luna 角色 profile。完整指南、**ToS / rate-limit 風險**與設定分層：[docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md)。首次需執行 `copilot-proxy auth`；各啟用方式都可還原，且不碰 committed project settings 或 chezmoi-managed user settings。
+> 用 **GitHub Copilot** served 的模型驅動 Claude Code 與 Codex，透過只安裝一次、版本釘選的 [copilot-api 維護 fork](https://github.com/caozhiyuan/copilot-api)。Claude Code 有 entitlement 時優先 Claude，否則建立 Sol/Terra/Luna 角色 profile；Codex 優先 native Responses OpenAI model。完整指南、**ToS / rate-limit 風險**與設定分層：[docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md)。首次需執行 `copilot-proxy auth`；launcher 不碰 committed project settings 或 chezmoi-managed user settings。
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `copilot-proxy [start\|stop\|restart\|status\|doctor [--live]\|logs [N]\|whoami\|auth]` | function | `dot_config/shell/43_copilot_proxy.sh` | 管理釘選的 proxy（`@jeffreycao/copilot-api@2.1.0`）。`doctor` 區分 stale catalog、geo/policy filter 與網路故障，並驗證 main + Fable/Opus/Sonnet/Haiku；OpenAI profile 可用時，沒有 Claude entitlement 只算 warning。`--live` 會花一個 quota unit。 |
+| `copilot-proxy [start\|stop\|restart\|status\|doctor [--live]\|logs [N]\|whoami\|auth]` | function | `dot_config/shell/43_copilot_proxy.sh` | 管理釘選 proxy。`doctor` 區分 stale catalog、geo/policy filter 與網路故障，驗證 main + Claude roles，並獨立檢查遠端 ChatGPT `codex_apps` 路由。`--live` 的 inference probe 花一個 quota unit；Apps GET 不會。 |
 | `claude-copilot [--no-specstory] [args...]` | function | `dot_config/shell/43_copilot_proxy.sh` | 一次性走 proxy 的 Claude Code session，**零檔案寫入**：自動啟動 proxy，per-process 注入完整 role-aware `ANTHROPIC_*` env。既有 `copilot-here` local pin 會蓋過這層。specstory passthrough 會保留設定的 `claude_cmd`；下次直接跑 `claude` 即還原。 |
+| `codex-copilot [--no-specstory] [args...]` / `codex-copilot-once` | function | `dot_config/shell/43_copilot_proxy.sh` | 零持久化的 Codex launcher，走本機 Responses gateway。自動啟動 proxy/shim；明確 `-m` 優先，否則即時排序 OpenAI/Codex → Claude → Gemini。預設整合 SpecStory 並保留 project/user `codex_cmd`；兩個名稱都不改 Codex config。 |
 | `copilot-run <cmd...>` | function | `dot_config/shell/43_copilot_proxy.sh` | 泛用積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令（例如 `copilot-run specstory run claude`、`copilot-run claude --resume`） |
 | `copilot-here [on\|off\|status]` | function | `dot_config/shell/43_copilot_proxy.sh` | 專案級持續開關，透過 **gitignored** 的 `./.claude/settings.local.json`（覆蓋會 commit 的專案設定，所以 `plansDirectory` 完全不受影響）。`on` 用 jq 合併代理 env 區塊並確保 git 忽略該檔（`.git/info/exclude`）；`off` 只移除那些 key（保留其他內容，檔案清空才刪除）；`status` 顯示釘選狀態 + 模型，代理沒跑時警告。需要 `jq` |
 | `copilot-model [<id>\|-l\|-c\|--auto]` | function | `dot_config/shell/43_copilot_proxy.sh` | 切換 main 並產生完整 Claude Code role profile。`--auto` 要求 live `/v1/models`：Claude 優先，否則 Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex > Luna > mini > Gemini。OpenAI 映射 Main/Fable/Opus=Sol、Sonnet=Terra、Haiku/background=Luna；`[1m]` 由 context metadata 決定。Local pin 寫全部角色，global state 仍只存一行 main。`-c` 顯示完整 profile。 |

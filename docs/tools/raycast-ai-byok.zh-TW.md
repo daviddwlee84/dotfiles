@@ -506,7 +506,7 @@ plutil -extract raycastAI_modelRouterModelInfo raw -o - \
   proxy（認證、模型 id、throttle shim、ToS、陷阱）
 - [Copilot embeddings → 語意搜尋](copilot-embeddings.zh-TW.md) —— 同一個 proxy 的
   `/v1/embeddings` 端點
-- [`copilot-raycast` 的 alias 表](../shells/aliases.md#copilot--claude-code-代理-proxy)
+- [`copilot-raycast` 的 alias 表](../shells/aliases.md#copilot-agent-gateway)
   —— 一行版摘要與來源檔
 - [Raycast manual — Bring Your Own Keys](https://manual.raycast.com/ai/bring-your-own-keys)
   ——「processed through our servers」那句話的出處，也就是本文第一節那個坑

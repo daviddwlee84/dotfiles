@@ -170,6 +170,9 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   echo "$output" | yq -p toml -e '.model_reasoning_effort == "xhigh"' >/dev/null
   echo "$output" | yq -p toml -e '.features.hooks == true' >/dev/null
   echo "$output" | yq -p toml -e '.features.unified_exec == true' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.status_line | join("|") == "model-with-reasoning|fast-mode|git-branch|context-remaining|task-progress|current-dir"' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.status_line | contains(["five-hour-limit"]) | not' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.status_line | contains(["weekly-limit"]) | not' >/dev/null
   echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[0] == "ctrl-j"' >/dev/null
   echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[1] == "shift-enter"' >/dev/null
   echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[2] == "alt-enter"' >/dev/null
@@ -197,6 +200,7 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
   echo "$output" | yq -p toml -e '. | has("model") | not' >/dev/null
   echo "$output" | yq -p toml -e '.features.steer == true' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.status_line[0] == "model-with-reasoning"' >/dev/null
   echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[1] == "shift-enter"' >/dev/null
 }
 
@@ -432,7 +436,7 @@ mixed = [1, { a = 2 }]
   # `permissions.defaultMode` is enforced by overlay → live "acceptEdits" loses to overlay "auto".
   echo "$output" | jq -e '.permissions.defaultMode == "auto"' >/dev/null
   echo "$output" | jq -e '.skipDangerousModePermissionPrompt == true' >/dev/null
-  echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == true' >/dev/null
+  echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == false' >/dev/null
 }
 
 @test "claude modify_settings: idempotent when notify.sh already present" {
@@ -497,7 +501,7 @@ mixed = [1, { a = 2 }]
   [ "$status" -eq 0 ]
 
   # Overlay keys enforced.
-  echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == true' >/dev/null
+  echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == false' >/dev/null
   echo "$output" | jq -e '.extraKnownMarketplaces["claude-hud"].source.repo == "jarrodwatts/claude-hud"' >/dev/null
   # User's extras preserved (deep merge into objects).
   echo "$output" | jq -e '.enabledPlugins["user-custom@some-marketplace"] == true' >/dev/null

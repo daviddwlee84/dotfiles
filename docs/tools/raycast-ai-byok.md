@@ -558,7 +558,7 @@ plutil -extract raycastAI_modelRouterModelInfo raw -o - \
   at (auth, model ids, the throttle shim, ToS, gotchas)
 - [Copilot embeddings → semantic search](copilot-embeddings.md) — the same proxy's
   `/v1/embeddings` endpoint
-- [`copilot-raycast` in the alias reference](../shells/aliases.md#copilot--claude-code-proxy)
+- [`copilot-raycast` in the alias reference](../shells/aliases.md#copilot-agent-gateway)
   — the one-line summary and its source file
 - [Raycast manual — Bring Your Own Keys](https://manual.raycast.com/ai/bring-your-own-keys)
   — where "processed through our servers" comes from, i.e. the trap in the first

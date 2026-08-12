@@ -1,4 +1,4 @@
-# Copilot → Claude Code proxy
+# Copilot agent gateway (Claude Code + Codex)
 
 Back [Claude Code](https://code.claude.com/docs/en/overview) with the models
 served by a **GitHub Copilot subscription** (Claude when entitled; otherwise a
@@ -12,7 +12,9 @@ points at the fork) but still works via `COPILOT_API_PKG=copilot-api@0.7.0`.
 Both packages share the same token file
 (`~/.local/share/copilot-api/github_token`), so switching needs **no re-auth**.
 
-- **Shell helpers**: `~/.config/shell/43_copilot_proxy.sh` (`copilot-proxy`, `claude-copilot`, `claude-copilot-once`, `copilot-run`, `copilot-here`, `copilot-model`)
+- **Shell helpers**: `~/.config/shell/43_copilot_proxy.sh` (`copilot-proxy`,
+  `claude-copilot`, `codex-copilot`, `copilot-run`, `copilot-here`,
+  `copilot-model`)
 - **Runner**: `@jeffreycao/copilot-api` (pinned), installed **once** into
   `~/.local/share/copilot-api/pkg` and executed directly from there. Deliberately
   **not** `bunx` at launch: bunx re-resolves the package on every start, and bun
@@ -41,6 +43,8 @@ copilot-model --auto    # Claude if served; otherwise Sol/Terra/Luna by role
 
 claude-copilot          # one-off session on the proxy (auto-starts it; no file writes)
 claude-copilot-once     # pin THIS project, run one session, then auto-unpin (proxy must be up)
+codex-copilot           # one-off Codex session; auto-picks OpenAI first
+codex-copilot-once      # exact alias; neither name writes Codex config
 
 copilot-here on         # OR: pin THIS project — plain `claude` uses the proxy
 copilot-here off        # unpin — back to the real Anthropic backend
@@ -54,6 +58,9 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
                                           │ GPT: Anthropic → Responses translation
                                           ▼
                                    api.githubcopilot.com  (your Copilot sub)
+
+Codex ──OpenAI /v1/responses──────────▶ the same localhost gateway
+        (provider/model are one-invocation `-c` / `-m` overrides)
 ```
 
 - Claude Code speaks only the **Anthropic Messages API** (`/v1/messages`).
@@ -146,7 +153,7 @@ model) that costs one quota unit but is the only check that exercises streaming.
 
 Sections, in order: prerequisites (`bun`/`curl`/`jq`) → **package** → token file →
 proxy and throttle-shim liveness → stale installer → **models** → upstream
-reachability → local proxy/VPN → live probe.
+reachability → local proxy/VPN → **Codex Apps** → live inference probe.
 
 The **package** check reports whether the pinned spec is installed in the prefix
 and where its binary is. "Not installed" is a note, not a failure — the next
@@ -179,6 +186,14 @@ set, so a Clash/mihomo rule that black-holes one host shows up immediately. An
 unauthenticated `400`/`401` counts as reached — only a connect/read failure is a
 fault. `doctor` never prints your token: it passes credentials to `curl` via
 `-K -` (stdin), never argv, since argv is readable through `ps`.
+
+With `--live`, the Codex Apps section also probes
+`https://chatgpt.com/backend-api/wham/apps` directly and through the detected
+HTTP proxy. This GET consumes no model inference quota; it separates a
+`codex_apps` startup interruption from the localhost Copilot route. Any real
+HTTP status (including an auth rejection) proves network reachability, while
+timeouts and TLS certificate failures remain distinct. `codex_apps` is a
+remote ChatGPT MCP, not an Apple-Silicon-only Codex Desktop bridge.
 
 ### `claude-copilot [--no-specstory] [claude args...]` — one-off session
 
@@ -242,6 +257,72 @@ custom specstory invocation:
 copilot-run specstory run claude    # exactly what claude-copilot does
 copilot-run claude --resume         # raw claude, no specstory
 ```
+
+### `codex-copilot [--no-specstory] [codex args...]` — one-off Codex session
+
+`codex-copilot` and `codex-copilot-once` are identical, zero-persistence
+launchers. They start the gateway/shim when necessary and pass a custom
+`copilot_api` Responses provider to Codex as CLI `-c` overrides. They never edit
+`~/.codex/config.toml` or `.codex/config.toml`, so plain `codex` remains on its
+normal provider.
+
+This is a separate picker from Claude Code's `copilot-model --auto`: that path
+remains Claude-first, while only this Codex launcher is OpenAI-first.
+
+- If the caller supplies `-m` / `--model`, that value wins. Otherwise the live
+  raw gateway catalog is ranked as OpenAI/Codex first (`Sol > Terra > GPT-5.5 >
+  GPT-5.4 > GPT-5.3 Codex > Luna > mini`), then Claude, Gemini, and any remaining
+  chat model. Embedding and disabled models are excluded.
+- The selected model's live context and prompt limits are supplied to Codex.
+  This matters while gateway `2.1.0` omits native Responses models from its
+  Codex-UA merged catalog: explicit `-m` works, but Codex otherwise warns that it
+  is using fallback metadata.
+- Claude/Gemini fallback uses the gateway's Responses Lite translation. Basic
+  tools, compaction and multi-agent orchestration remain available, but Responses
+  `tool_search` is not supported on that path. Auto selection therefore keeps
+  native Responses OpenAI models ahead of Anthropic.
+- The launcher enables gateway-backed remote compaction and excludes the
+  `mcp__codex_apps__sites` namespace that depends on unavailable `tool_search`.
+  Explicit later `-c` arguments can still override either per invocation.
+- When SpecStory is installed, the launcher defaults to `specstory run codex`.
+  It preserves the effective `codex_cmd` (project config > user config > bare
+  `codex`) before appending provider/model/user arguments. Use
+  `--no-specstory` for raw Codex.
+
+Codex intentionally does not get a `copilot-here` equivalent. Official Codex
+configuration allows project `.codex/config.toml` for trusted project settings,
+but ignores `model_provider`, `model_providers`, provider auth and other
+host-owned metadata at project scope. An explicit launcher is therefore the
+project/session boundary without changing the user-wide default. See the
+[configuration reference](https://developers.openai.com/codex/config-reference)
+and [configuration basics](https://developers.openai.com/codex/config-basic).
+
+#### Experimental direct provider (not used by the helper)
+
+This skips localhost and is useful only when the account's GitHub credential can
+authenticate directly to the matching Copilot endpoint:
+
+```toml
+[model_providers.copilot-enterprise]
+name = "GitHub Copilot Enterprise"
+base_url = "https://api.enterprise.githubcopilot.com"
+wire_api = "responses"
+http_headers = { "Copilot-Integration-Id" = "vscode-chat", "Editor-Version" = "vscode/1.99.0", "Editor-Plugin-Version" = "copilot-chat/0.0.1", "User-Agent" = "GithubCopilot/1.0" }
+
+[model_providers.copilot-enterprise.auth]
+command = "gh"
+args = ["auth", "token", "--hostname", "github.com"]
+timeout_ms = 5000
+refresh_interval_ms = 300000
+```
+
+This is an example, not managed config. On the tested EMU/Enterprise account,
+the raw `gh auth token` produced `421 Misdirected Request` at the enterprise API
+and could not perform the Copilot token exchange (`403`). The token saved by
+`copilot-proxy auth`, followed by the normal short-lived Copilot token exchange,
+did work. Endpoint routing also comes from that exchange; hard-coding personal
+versus enterprise hosts is not portable. For those reasons the supported helper
+uses the already authenticated localhost gateway.
 
 ### `copilot-here [on|off|status]` — sticky per-project toggle
 
@@ -538,7 +619,7 @@ copilot-proxy logs 60                # tail the proxy log
 - [ericc-ch/copilot-api](https://github.com/ericc-ch/copilot-api) — the
   unmaintained original ([#233](https://github.com/ericc-ch/copilot-api/issues/233));
   still usable via `COPILOT_API_PKG=copilot-api@0.7.0`
-- [`bunx` CLI aliases](../shells/aliases.md#copilot--claude-code-proxy)
+- [Copilot agent gateway commands](../shells/aliases.md#copilot-agent-gateway)
 - [Claude Code settings precedence](https://code.claude.com/docs/en/settings) — why
   `settings.local.json` / env vars are the right injection layers
 - [Agent overlays](agent-overlays.md) — the chezmoi-managed `~/.claude/settings.json`
