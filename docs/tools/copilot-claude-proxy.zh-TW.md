@@ -233,9 +233,14 @@ Claude-first，只有這個 Codex launcher 是 OpenAI-first。
   依序選 OpenAI/Codex（`Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex >
   Luna > mini`），再退到 Claude、Gemini、其他 chat model；embedding 與 disabled
   model 會排除。
-- launcher 也會把所選 model 的即時 context/prompt limit 傳給 Codex。Gateway
-  `2.1.0` 目前會在 Codex-UA merged catalog 漏掉 native Responses models；明確
-  `-m` 仍可正常工作，但 Codex 可能顯示 fallback-metadata warning。
+- launcher 會把所選 model 的即時 context/prompt limit 傳給 Codex，並把
+  `model_catalog_json` 指向 `codex debug models --bundled` 產生的版本化快取。
+  Codex 的全域 `~/.codex/models_cache.json` 不會依 provider 分區；gateway refresh
+  可能把 first-party entries 換成較小的 adapter subset，讓 `gpt-5.6-sol` 這類
+  bundled model 出現 fallback-metadata warning。快取位於
+  `$XDG_CACHE_HOME/copilot-proxy/codex-models/`（預設
+  `~/.cache/copilot-proxy/codex-models/`），Codex 版本改變時會自動重建；呼叫者
+  後續明確傳入的 `-c model_catalog_json=...` 仍優先。
 - Claude/Gemini fallback 經 Responses Lite 轉譯；基本 tools、compaction、
   multi-agent orchestration 可用，但這條路不支援 Responses `tool_search`，因此
   auto 會把 native Responses OpenAI models 排在 Anthropic 前。

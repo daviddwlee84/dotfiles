@@ -296,9 +296,36 @@ SH
   [ "$output" = "codex --ask-for-approval never" ]
 }
 
+@test "codex catalog: caches the bundled catalog by Codex version" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/codex" <<'SH'
+#!/bin/sh
+case "${1:-}" in
+  --version) printf '%s\n' 'codex-cli 9.9.9' ;;
+  debug)
+    printf '%s\n' '{"models":[{"slug":"gpt-test"}]}'
+    printf '%s\n' generated >> "$TEST_GENERATIONS"
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$TMP/bin/codex"
+
+  run env TEST_GENERATIONS="$TMP/generations" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\" XDG_CACHE_HOME='$TMP/cache'
+    source '$SHELL_LIB'
+    first=\"\$(_copilot_codex_catalog_file)\" || exit
+    second=\"\$(_copilot_codex_catalog_file)\" || exit
+    printf '%s|%s|%s' \"\$first\" \"\$second\" \"\$(wc -l < '$TMP/generations' | tr -d ' ')\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/cache/copilot-proxy/codex-models/codex-cli_9.9.9.json|$TMP/cache/copilot-proxy/codex-models/codex-cli_9.9.9.json|1" ]
+}
+
 @test "codex launcher: auto selects Sol, injects live limits, and writes no config" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   write_fake_codex
+  printf '%s\n' '{"models":[{"slug":"gpt-5.6-sol"}]}' > "$TMP/bundled-models.json"
   local catalog='{"data":[{"id":"claude-opus-5"},{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":920000}}}]}'
   run env TEST_CATALOG="$catalog" bash -c "
     cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
@@ -306,6 +333,7 @@ SH
     _copilot_shim_enabled() { return 0; }
     _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
     _copilot_client_base() { printf '%s' 'http://localhost:4141/v1'; }
+    _copilot_codex_catalog_file() { printf '%s' '$TMP/bundled-models.json'; }
     codex-copilot --no-specstory exec --skip-git-repo-check 'two words'"
   [ "$status" -eq 0 ]
   [[ "$output" == *"codex-copilot: --auto -> gpt-5.6-sol"* ]]
@@ -313,6 +341,7 @@ SH
   [[ "$output" == *"=<gpt-5.6-sol>"* ]]
   [[ "$output" == *"=<model_context_window=1050000>"* ]]
   [[ "$output" == *"=<model_auto_compact_token_limit=920000>"* ]]
+  [[ "$output" == *"=<model_catalog_json=\"$TMP/bundled-models.json\">"* ]]
   [[ "$output" == *"=<features.remote_compaction_v2=true>"* ]]
   [[ "$output" == *"=<two words>"* ]]
   [ ! -e "$TMP/proj/.codex" ]
@@ -321,6 +350,7 @@ SH
 @test "codex launcher: explicit model is preserved without an auto override" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   write_fake_codex
+  printf '%s\n' '{"models":[{"slug":"gpt-5.6-sol"}]}' > "$TMP/bundled-models.json"
   local catalog='{"data":[{"id":"gpt-5.6-sol"},{"id":"claude-opus-5"}]}'
   run env TEST_CATALOG="$catalog" bash -c "
     cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
@@ -328,12 +358,26 @@ SH
     _copilot_shim_enabled() { return 0; }
     _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
     _copilot_client_base() { printf '%s' 'http://localhost:4141/v1'; }
+    _copilot_codex_catalog_file() { printf '%s' '$TMP/bundled-models.json'; }
     codex-copilot --no-specstory -m claude-opus-5 exec 'two words'"
   [ "$status" -eq 0 ]
   [[ "$output" != *"--auto ->"* ]]
   [ "$(printf '%s\n' "$output" | grep -c '=<\-m>$')" -eq 1 ]
   [[ "$output" == *"=<claude-opus-5>"* ]]
+  [[ "$output" == *"=<model_catalog_json=\"$TMP/bundled-models.json\">"* ]]
   [[ "$output" == *"=<two words>"* ]]
+}
+
+@test "copilot-here on reports the shim URL it actually writes" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/proj"
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    _copilot_env_json() { printf '%s' '{\"ANTHROPIC_BASE_URL\":\"http://localhost:4142\",\"ANTHROPIC_MODEL\":\"gpt-test\"}'; }
+    _copilot_alive() { return 0; }
+    copilot-here on"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pins Claude Code to http://localhost:4142"* ]]
+  [ "$(jq -r '.env.ANTHROPIC_BASE_URL' "$TMP/proj/.claude/settings.local.json")" = "http://localhost:4142" ]
 }
 
 @test "pick_best_model: Sol is the strongest OpenAI fallback" {

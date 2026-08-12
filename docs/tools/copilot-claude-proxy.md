@@ -273,10 +273,15 @@ remains Claude-first, while only this Codex launcher is OpenAI-first.
   raw gateway catalog is ranked as OpenAI/Codex first (`Sol > Terra > GPT-5.5 >
   GPT-5.4 > GPT-5.3 Codex > Luna > mini`), then Claude, Gemini, and any remaining
   chat model. Embedding and disabled models are excluded.
-- The selected model's live context and prompt limits are supplied to Codex.
-  This matters while gateway `2.1.0` omits native Responses models from its
-  Codex-UA merged catalog: explicit `-m` works, but Codex otherwise warns that it
-  is using fallback metadata.
+- The launcher supplies the selected model's live context and prompt limits and
+  pins `model_catalog_json` to a versioned cache of `codex debug models
+  --bundled`. Codex's global `~/.codex/models_cache.json` is not provider-scoped;
+  a gateway refresh can otherwise replace first-party entries with the smaller
+  adapter subset and trigger fallback-metadata warnings for bundled models such
+  as `gpt-5.6-sol`. The cache lives under
+  `$XDG_CACHE_HOME/copilot-proxy/codex-models/` (default
+  `~/.cache/copilot-proxy/codex-models/`) and regenerates after a Codex version
+  change. Explicit later `-c model_catalog_json=...` still wins.
 - Claude/Gemini fallback uses the gateway's Responses Lite translation. Basic
   tools, compaction and multi-agent orchestration remain available, but Responses
   `tool_search` is not supported on that path. Auto selection therefore keeps

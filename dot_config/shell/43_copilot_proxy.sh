@@ -1333,6 +1333,42 @@ _copilot_specstory_codex_cmd() {
   printf '%s' "${cmd:-codex}"
 }
 
+# Codex stores one global models_cache.json without provider namespacing. A
+# custom Copilot gateway refresh can therefore replace the first-party metadata
+# catalog with the gateway's much smaller adapter subset, making a bundled model
+# such as gpt-5.6-sol fall back to generic metadata. Pin this launcher to the
+# catalog bundled with the installed Codex binary instead. The binary version is
+# part of the path, so upgrades regenerate automatically while repeat launches
+# avoid another `codex debug models --bundled` subprocess.
+_copilot_codex_catalog_file() {
+  command -v codex >/dev/null 2>&1 || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  local raw_version version cache_dir catalog_file tmp
+  raw_version="$(command codex --version 2>/dev/null)" || return 1
+  version="$(printf '%s' "$raw_version" | command sed 's/[^[:alnum:]._-]/_/g')"
+  [ -n "$version" ] || return 1
+
+  cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/copilot-proxy/codex-models"
+  catalog_file="$cache_dir/$version.json"
+  if [ -s "$catalog_file" ] \
+     && jq -e '.models | type == "array" and length > 0' "$catalog_file" >/dev/null 2>&1; then
+    printf '%s' "$catalog_file"
+    return 0
+  fi
+
+  command mkdir -p "$cache_dir" || return 1
+  tmp="$(command mktemp "$cache_dir/.catalog.XXXXXX")" || return 1
+  if command codex debug models --bundled >"$tmp" 2>/dev/null \
+     && jq -e '.models | type == "array" and length > 0' "$tmp" >/dev/null 2>&1; then
+    command mv -- "$tmp" "$catalog_file"
+    printf '%s' "$catalog_file"
+  else
+    command rm -f -- "$tmp"
+    return 1
+  fi
+}
+
 # One-off Codex session backed by the local Copilot gateway. Provider settings
 # are CLI overrides only: plain `codex`, ~/.codex/config.toml and project config
 # remain untouched. The alias-like sibling below exists for Claude wrapper
@@ -1400,7 +1436,13 @@ codex-copilot() {
   if [ -n "$compact" ]; then set -- -c "model_auto_compact_token_limit=$compact" "$@"; fi
   if [ -n "$context" ]; then set -- -c "model_context_window=$context" "$@"; fi
 
-  local provider_args=""
+  local bundled_catalog='' provider_args=""
+  if bundled_catalog="$(_copilot_codex_catalog_file)"; then
+    # Prepend so an explicit later user -c retains normal Codex precedence.
+    set -- -c "model_catalog_json=\"$bundled_catalog\"" "$@"
+  else
+    printf '%s\n' "codex-copilot: warning: could not build the bundled Codex model catalog; metadata may fall back" >&2
+  fi
   # Build a shell-safe command fragment for SpecStory; direct execution below
   # uses the original argv and does not round-trip through a string.
   for arg in \
@@ -1601,8 +1643,9 @@ copilot-here() {
       local base='{}'
       [ -f "$settings" ] && base="$(command cat "$settings")"
       [ -n "$base" ] || base='{}'
-      local model want_env
+      local base_url model want_env
       want_env="$(_copilot_env_json)" || return 1
+      base_url="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_BASE_URL')"
       model="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_MODEL')"
       local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
       if printf '%s' "$base" | jq --argjson want "$want_env" \
@@ -1628,7 +1671,7 @@ copilot-here() {
           printf '%s\n' "**/.claude/settings.local.json" >>"$exclude"
         fi
       fi
-      printf '%s\n' "copilot-here: ON — $settings pins Claude Code to $(_copilot_base) (model: $model)"
+      printf '%s\n' "copilot-here: ON — $settings pins Claude Code to $base_url (model: $model)"
       printf '%s\n' "  plain \`claude\` in this project now uses the proxy (restart any running session)"
       _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
       ;;
