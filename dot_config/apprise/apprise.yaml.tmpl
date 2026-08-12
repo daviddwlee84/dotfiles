@@ -3,6 +3,12 @@ version: 1
 # Include user's custom notification services
 # custom.yaml is created once by chezmoi and never overwritten
 # Edit it to add your own services (Discord, Slack, Telegram, etc.)
+#
+# custom.yaml MUST resolve to at least one service. apprise emits
+#   WARNING - Failed to load Apprise configuration from file://.../custom.yaml
+# for every include that yields zero services (that message means "empty", NOT
+# "malformed"), so a fully commented-out custom.yaml warns on every run. It
+# ships with a local-only syslog:// entry for exactly this reason.
 include:
   - custom.yaml
 

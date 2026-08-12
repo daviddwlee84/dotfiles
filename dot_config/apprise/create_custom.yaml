@@ -3,12 +3,26 @@
 # See example.yaml for configuration examples
 #
 # Documentation: https://github.com/caronc/apprise/wiki#notification-services
+#
+# KEEP AT LEAST ONE ACTIVE URL BELOW. apprise.yaml pulls this file in with
+# `include:`, and apprise logs
+#   WARNING - Failed to load Apprise configuration from file://.../custom.yaml
+# for ANY included config that resolves to zero services — an empty `urls: []`
+# is "zero services", so a purely commented-out file warns on every run. The
+# warning is hidden unless you run `apprise -vvv`, but it is noise that hides
+# real errors. The syslog entry below exists to keep this file non-empty; it is
+# local-only, needs no credentials, and never leaves the machine. Replace it
+# with your own services rather than deleting it outright.
 
 version: 1
 
 urls:
+  # Local-only breadcrumb: writes the notification to syslog/journald.
+  # Read it back with:  journalctl -t apprise -n 20
+  - syslog://:
+      tag: syslog
+
   # Add your notification services here
   # Example:
   # - discord://webhook_id/webhook_token:
   #     tag: chat
-  []

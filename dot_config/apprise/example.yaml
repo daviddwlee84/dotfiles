@@ -2,6 +2,12 @@
 # Copy this file to custom.yaml and customize with your notification services
 # custom.yaml is NOT tracked by chezmoi (safe for sensitive data)
 #
+# If you copy this file over custom.yaml, UNCOMMENT AT LEAST ONE URL (or keep
+# custom.yaml's local-only `syslog://` entry). apprise.yaml `include:`s
+# custom.yaml, and an include that yields zero services makes apprise log
+#   WARNING - Failed to load Apprise configuration from file://.../custom.yaml
+# on every run. `urls: []` counts as zero services.
+#
 # Documentation: https://appriseit.com/getting-started/configuration/
 # Supported services: https://github.com/caronc/apprise/wiki#notification-services
 
