@@ -50,6 +50,37 @@ herdr 的階層是 **Session → Workspace → Tab → Pane**——比 tmux（Se
 
 **從 CLI 子指令鎖定某個 session**：`workspace`/`tab`/`pane`/`agent` **沒有 `--session`/`--socket` flag**。唯一的槓桿是 **`HERDR_SOCKET_PATH`** 這個環境變數 (env var)——把它設成某 session 的 `socket_path`，所有子指令就會導向該 session。在 herdr pane 內部它已經被 export 成當前 session 的 socket，所以*在 herdr 內*跑的腳本天生就鎖定當前 session。`hvibe --session NAME` 正是靠這個機制運作（見下文）。
 
+## 用 `herdr-grep` 搜尋 pane 內容
+
+Herdr 能讀取單一 pane，但沒有原生的跨 pane grep。本 repo 部署 **`herdr-grep`**，把 `pane list → pane read → rg` 包成一個指令，並印出每筆命中的完整 Session / Workspace / Tab / Pane 座標：
+
+```console
+$ herdr-grep -F 'connection refused'
+[session=default workspace=w1 tab=w1:t2 pane=w1:p4] 183:connection refused while opening socket
+```
+
+```bash
+herdr-grep 'error|failed'                   # regex；當前/default session
+herdr-grep -F -i 'connection refused'       # 固定字串、不分大小寫
+herdr-grep --visible 'ready'                # 只搜尋目前可見畫面
+herdr-grep --source recent-unwrapped 'url'  # 搜尋保留歷史，不受硬換行切斷
+herdr-grep --session work 'panic'           # 一個正在執行的具名 session
+herdr-grep --all-sessions 'rate limit'      # 所有正在執行的本機 session
+herdr-grep --all-sessions --json 'panic'    # 結構化 matches + errors
+herdr-grep -F -- -leading-dash              # 保護以 `-` 開頭的 pattern
+```
+
+| 面向 | 行為 |
+|---|---|
+| 預設範圍 | 有 `HERDR_SOCKET_PATH`（Herdr 內部）時搜尋 ambient session，否則搜尋 `default`。`--session NAME` 從 `herdr session list --json` 解析權威 socket；`--all-sessions` 只掃描正在執行的 session。ambient socket 無法唯一對應到 registry 時回傳 2，不會誤標成其他 session。 |
+| 內容來源 | 預設 `recent`（完整保留的 scrollback）；`--visible` 只看目前畫面；終端硬換行切斷片語時使用 `--source recent-unwrapped`。 |
+| 輸出 | 人類可讀輸出在每一筆命中重複 `session/workspace/tab/pane`。`--json` 另含 socket、cwd、agent 狀態、byte-offset submatches、`complete` 與結構化 errors。行號是**相對於這次 capture**，不是永久 pane 座標。 |
+| Exit status | `0` = 有命中且掃描完整；`1` = 完整掃描但無命中；`2` = 用法錯誤／執行錯誤／**掃描不完整**。pane 在掃描途中消失時，成功的 matches 仍會保留、錯誤送到 stderr/JSON，並回傳 2。 |
+
+搜尋範圍受限於 live Herdr server 仍保留的內容：已關閉的 pane、早於 history limit 的輸出，以及 alternate screen 已丟棄的內容都無法找回。命令必須在能存取 Unix socket 的環境執行；遠端 server 請透過 SSH 執行已部署的 CLI，例如 `ssh server 'herdr-grep --all-sessions -F -- "connection refused"'`。**`herdr --remote` 是互動式 thin-client attach，不是 pane 子指令的 RPC 前綴。**
+
+`tv herdr-agent-panes` 與 `tv herdr-review` 仍只 fuzzy-search metadata（pane/session identifiers、狀態、cwd）。可見 pane 文字只是 preview，不在 Television 的 searchable source 中；要查 terminal content 請用 `herdr-grep`。
+
 ## cwd 與 workspace 命名模型
 
 herdr 追蹤 cwd 的方式跟 tmux 不同,會顛覆兩個常見預期（皆用 `herdr pane list` 驗證）:

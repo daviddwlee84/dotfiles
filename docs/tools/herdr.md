@@ -45,6 +45,37 @@ The important twist vs tmux: a single herdr **server hosts multiple named sessio
 
 **Targeting a session from the CLI subcommands**: there is **no `--session`/`--socket` flag** on `workspace`/`tab`/`pane`/`agent`. The only lever is the **`HERDR_SOCKET_PATH`** env var — set it to a session's `socket_path` and every subcommand routes there. Inside a herdr pane it is already exported to the current session's socket, so scripts run *inside* herdr target the current session for free. This is exactly how `hvibe --session NAME` works (see below).
 
+## Search pane content with `herdr-grep`
+
+Herdr can read one pane but has no native cross-pane grep. This repo deploys **`herdr-grep`**, which packages `pane list → pane read → rg` and prints the exact Session / Workspace / Tab / Pane containing each match:
+
+```console
+$ herdr-grep -F 'connection refused'
+[session=default workspace=w1 tab=w1:t2 pane=w1:p4] 183:connection refused while opening socket
+```
+
+```bash
+herdr-grep 'error|failed'                   # regex; current/default session
+herdr-grep -F -i 'connection refused'       # literal, case-insensitive
+herdr-grep --visible 'ready'                # current visible screens only
+herdr-grep --source recent-unwrapped 'url'  # retained history without hard wraps
+herdr-grep --session work 'panic'           # one running named session
+herdr-grep --all-sessions 'rate limit'      # every running local session
+herdr-grep --all-sessions --json 'panic'    # structured matches + errors
+herdr-grep -F -- -leading-dash              # protect a pattern beginning with `-`
+```
+
+| Aspect | Behavior |
+|---|---|
+| Default scope | The ambient session when `HERDR_SOCKET_PATH` is set (inside Herdr); otherwise `default`. `--session NAME` resolves the authoritative socket from `herdr session list --json`; `--all-sessions` scans running sessions only. An ambient socket that cannot be mapped uniquely returns 2 rather than being mislabeled. |
+| Content source | `recent` by default (full retained scrollback); `--visible` for the current screen; `--source recent-unwrapped` when terminal wrapping splits a phrase. |
+| Output | Human output repeats `session/workspace/tab/pane` on every matching line. `--json` adds socket, cwd, agent state, byte-offset submatches, `complete`, and structured errors. Line numbers are **relative to this capture**, not persistent pane coordinates. |
+| Exit status | `0` = match + complete scan; `1` = clean no-match; `2` = usage/error/**incomplete scan**. If a pane disappears mid-scan, good matches are preserved, the failure goes to stderr/JSON, and the command returns 2. |
+
+The search is bounded by what the live Herdr server still retains: closed panes, output older than the history limit, and alternate-screen content already discarded cannot be recovered. The command runs where the Unix socket is accessible. For a remote server, run the deployed CLI through SSH, for example `ssh server 'herdr-grep --all-sessions -F -- "connection refused"'`; **`herdr --remote` is an interactive thin-client attach, not an RPC prefix for pane subcommands**.
+
+`tv herdr-agent-panes` and `tv herdr-review` still fuzzy-search metadata only (pane/session identifiers, state, cwd). Their visible pane text is a preview and is not part of Television's searchable source; use `herdr-grep` when the query is terminal content.
+
 ## cwd & workspace-naming model
 
 herdr tracks cwd differently from tmux, which trips up two common expectations (all verified via `herdr pane list`):

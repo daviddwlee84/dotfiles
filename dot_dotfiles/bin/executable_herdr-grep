@@ -1,0 +1,654 @@
+#!/usr/bin/env python3
+"""Search Herdr pane contents and report the matching coordinates."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import asdict, dataclass
+from typing import Any, Sequence
+
+SOURCES = ("visible", "recent", "recent-unwrapped")
+
+
+class CommandLaunchError(RuntimeError):
+    """A subprocess could not be started with the requested argv or environment."""
+
+
+@dataclass(frozen=True)
+class SessionInfo:
+    name: str
+    running: bool
+    socket_path: str
+
+
+@dataclass(frozen=True)
+class SessionTarget:
+    name: str
+    socket_path: str | None
+    override_socket: bool
+
+
+@dataclass(frozen=True)
+class PaneRecord:
+    session: str
+    socket_path: str | None
+    workspace_id: str
+    tab_id: str
+    pane_id: str
+    agent_status: str | None
+    foreground_cwd: str | None
+    cwd: str | None
+
+
+@dataclass(frozen=True)
+class SubmatchRecord:
+    text: str
+    start_byte: int
+    end_byte: int
+
+
+@dataclass(frozen=True)
+class MatchRecord:
+    session: str
+    socket_path: str | None
+    workspace_id: str
+    tab_id: str
+    pane_id: str
+    agent_status: str | None
+    foreground_cwd: str | None
+    cwd: str | None
+    line_number: int
+    line: str
+    submatches: tuple[SubmatchRecord, ...]
+
+
+@dataclass(frozen=True)
+class ScanError:
+    scope: str
+    session: str | None
+    pane_id: str | None
+    operation: str
+    message: str
+
+
+@dataclass
+class ScanResult:
+    sessions: list[str]
+    matches: list[MatchRecord]
+    errors: list[ScanError]
+
+    @property
+    def complete(self) -> bool:
+        return not self.errors
+
+    def exit_status(self) -> int:
+        if self.errors:
+            return 2
+        return 0 if self.matches else 1
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="herdr-grep",
+        description="Search Herdr pane contents and report matching pane coordinates.",
+    )
+    parser.add_argument("pattern", nargs="?", help="ripgrep regular expression (literal with -F)")
+    parser.add_argument(
+        "-F",
+        "--fixed-strings",
+        action="store_true",
+        help="treat PATTERN as a literal string",
+    )
+    parser.add_argument(
+        "-i",
+        "--ignore-case",
+        action="store_true",
+        help="search case-insensitively",
+    )
+
+    source_group = parser.add_mutually_exclusive_group()
+    source_group.add_argument(
+        "--source",
+        choices=SOURCES,
+        help="pane content source (default: recent)",
+    )
+    source_group.add_argument(
+        "--visible",
+        action="store_true",
+        help="search only the visible pane screen",
+    )
+
+    session_group = parser.add_mutually_exclusive_group()
+    session_group.add_argument("--session", metavar="NAME", help="search one running named session")
+    session_group.add_argument(
+        "--all-sessions",
+        action="store_true",
+        help="search every running local session",
+    )
+
+    parser.add_argument("--json", action="store_true", help="emit one structured JSON document")
+    parser.add_argument(
+        "--list-sessions",
+        action="store_true",
+        help="print running session names for shell completion",
+    )
+    return parser
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.list_sessions:
+        search_options = (
+            args.pattern is not None
+            or args.fixed_strings
+            or args.ignore_case
+            or args.source is not None
+            or args.visible
+            or args.session is not None
+            or args.all_sessions
+            or args.json
+        )
+        if search_options:
+            parser.error("--list-sessions cannot be combined with PATTERN or search options")
+        return args
+
+    if args.pattern is None:
+        parser.error("the following arguments are required: PATTERN")
+
+    args.source = "visible" if args.visible else (args.source or "recent")
+    return args
+
+
+def clean_message(value: str, fallback: str) -> str:
+    message = " ".join(value.strip().splitlines())
+    return message or fallback
+
+
+def run_command(
+    argv: Sequence[str],
+    *,
+    env: dict[str, str] | None = None,
+    input_bytes: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    try:
+        return subprocess.run(
+            list(argv),
+            input=input_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            check=False,
+        )
+    except (OSError, ValueError) as exc:
+        command = argv[0] if argv else "command"
+        raise CommandLaunchError(f"failed to execute {command}: {exc}") from exc
+
+
+def parse_json_bytes(raw: bytes, description: str) -> Any:
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid {description} JSON: {exc}") from exc
+
+
+def load_sessions(herdr: str) -> list[SessionInfo]:
+    try:
+        result = run_command([herdr, "session", "list", "--json"])
+    except CommandLaunchError as exc:
+        raise ValueError(str(exc)) from exc
+    if result.returncode != 0:
+        detail = clean_message(result.stderr.decode("utf-8", errors="replace"), "herdr failed")
+        raise ValueError(f"herdr session list failed: {detail}")
+
+    payload = parse_json_bytes(result.stdout, "session-list")
+    if not isinstance(payload, dict) or not isinstance(payload.get("sessions"), list):
+        raise ValueError("session-list JSON must contain a sessions array")
+
+    sessions: list[SessionInfo] = []
+    names: set[str] = set()
+    for index, item in enumerate(payload["sessions"]):
+        if not isinstance(item, dict):
+            raise ValueError(f"session entry {index} must be an object")
+        name = item.get("name")
+        running = item.get("running")
+        socket_path = item.get("socket_path")
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"session entry {index} has an invalid name")
+        if name in names:
+            raise ValueError(f"session-list JSON contains duplicate session '{name}'")
+        if not isinstance(running, bool):
+            raise ValueError(f"session '{name}' has an invalid running value")
+        if not isinstance(socket_path, str):
+            raise ValueError(f"session '{name}' has an invalid socket_path")
+        if running and not socket_path:
+            raise ValueError(f"running session '{name}' has an empty socket_path")
+        names.add(name)
+        sessions.append(SessionInfo(name=name, running=running, socket_path=socket_path))
+    return sessions
+
+
+def select_targets(args: argparse.Namespace, sessions: list[SessionInfo]) -> list[SessionTarget]:
+    by_name = {session.name: session for session in sessions}
+
+    if args.all_sessions:
+        return [
+            SessionTarget(session.name, session.socket_path, True)
+            for session in sorted(sessions, key=lambda item: item.name)
+            if session.running
+        ]
+
+    if args.session is not None:
+        selected = by_name.get(args.session)
+        if selected is None:
+            raise ValueError(f"session '{args.session}' not found; start it with: herdr --session {args.session}")
+        if not selected.running:
+            raise ValueError(
+                f"session '{args.session}' is not running; start it with: herdr --session {args.session}"
+            )
+        return [SessionTarget(selected.name, selected.socket_path, True)]
+
+    ambient_socket = os.environ.get("HERDR_SOCKET_PATH")
+    if ambient_socket:
+        matches = [session for session in sessions if session.socket_path == ambient_socket]
+        if not matches:
+            for session in sessions:
+                if not session.socket_path:
+                    continue
+                try:
+                    if os.path.samefile(ambient_socket, session.socket_path):
+                        matches.append(session)
+                except OSError:
+                    continue
+        if len(matches) != 1:
+            raise ValueError(
+                "ambient HERDR_SOCKET_PATH does not uniquely match a registered session: "
+                f"{ambient_socket}"
+            )
+        return [SessionTarget(matches[0].name, ambient_socket, False)]
+
+    default = by_name.get("default")
+    socket_path = default.socket_path if default is not None else None
+    return [SessionTarget("default", socket_path or None, False)]
+
+
+def child_env(target: SessionTarget) -> dict[str, str]:
+    env = os.environ.copy()
+    if target.override_socket and target.socket_path is not None:
+        env["HERDR_SOCKET_PATH"] = target.socket_path
+    return env
+
+
+def optional_string(item: dict[str, Any], key: str) -> str | None:
+    value = item.get(key)
+    return value if isinstance(value, str) else None
+
+
+def list_panes(
+    herdr: str,
+    target: SessionTarget,
+) -> tuple[list[PaneRecord], list[ScanError]]:
+    try:
+        result = run_command([herdr, "pane", "list"], env=child_env(target))
+    except CommandLaunchError as exc:
+        return [], [ScanError("session", target.name, None, "pane-list", str(exc))]
+    if result.returncode != 0:
+        detail = clean_message(result.stderr.decode("utf-8", errors="replace"), "herdr failed")
+        return [], [
+            ScanError("session", target.name, None, "pane-list", detail),
+        ]
+
+    try:
+        payload = parse_json_bytes(result.stdout, "pane-list")
+    except ValueError as exc:
+        return [], [ScanError("session", target.name, None, "pane-list", str(exc))]
+
+    panes_value = payload.get("result", {}).get("panes") if isinstance(payload, dict) else None
+    if not isinstance(panes_value, list):
+        return [], [
+            ScanError(
+                "session",
+                target.name,
+                None,
+                "pane-list",
+                "pane-list JSON must contain result.panes array",
+            )
+        ]
+
+    panes: list[PaneRecord] = []
+    errors: list[ScanError] = []
+    seen: set[str] = set()
+    for index, item in enumerate(panes_value):
+        pane_id = item.get("pane_id") if isinstance(item, dict) else None
+        if not isinstance(item, dict):
+            errors.append(
+                ScanError("pane", target.name, None, "pane-entry", f"pane entry {index} must be an object")
+            )
+            continue
+        workspace_id = item.get("workspace_id")
+        tab_id = item.get("tab_id")
+        if not all(isinstance(value, str) and value for value in (workspace_id, tab_id, pane_id)):
+            errors.append(
+                ScanError(
+                    "pane",
+                    target.name,
+                    pane_id if isinstance(pane_id, str) else None,
+                    "pane-entry",
+                    f"pane entry {index} is missing workspace_id, tab_id, or pane_id",
+                )
+            )
+            continue
+        if pane_id in seen:
+            errors.append(
+                ScanError("pane", target.name, pane_id, "pane-entry", "duplicate pane_id in pane-list JSON")
+            )
+            continue
+        seen.add(pane_id)
+        panes.append(
+            PaneRecord(
+                session=target.name,
+                socket_path=target.socket_path,
+                workspace_id=workspace_id,
+                tab_id=tab_id,
+                pane_id=pane_id,
+                agent_status=optional_string(item, "agent_status"),
+                foreground_cwd=optional_string(item, "foreground_cwd"),
+                cwd=optional_string(item, "cwd"),
+            )
+        )
+
+    panes.sort(key=lambda pane: (pane.workspace_id, pane.tab_id, pane.pane_id))
+    return panes, errors
+
+
+def read_pane(
+    herdr: str,
+    target: SessionTarget,
+    pane: PaneRecord,
+    source: str,
+) -> tuple[str | None, ScanError | None]:
+    try:
+        result = run_command(
+            [herdr, "pane", "read", pane.pane_id, "--source", source, "--format", "text"],
+            env=child_env(target),
+        )
+    except CommandLaunchError as exc:
+        return None, ScanError("pane", target.name, pane.pane_id, "pane-read", str(exc))
+    if result.returncode != 0:
+        detail = clean_message(result.stderr.decode("utf-8", errors="replace"), "herdr failed")
+        return None, ScanError("pane", target.name, pane.pane_id, "pane-read", detail)
+    return result.stdout.decode("utf-8", errors="replace"), None
+
+
+def build_rg_argv(rg: str, args: argparse.Namespace) -> list[str]:
+    argv = [rg, "--no-config", "--json", "--text"]
+    if args.fixed_strings:
+        argv.append("--fixed-strings")
+    if args.ignore_case:
+        argv.append("--ignore-case")
+    argv.extend(["--", args.pattern])
+    return argv
+
+
+def validate_pattern(rg_argv: Sequence[str]) -> ScanError | None:
+    try:
+        result = run_command(rg_argv, input_bytes=b"")
+    except CommandLaunchError as exc:
+        return ScanError("global", None, None, "rg-validate", str(exc))
+    if result.returncode in (0, 1):
+        return None
+    detail = clean_message(result.stderr.decode("utf-8", errors="replace"), "ripgrep failed")
+    return ScanError("global", None, None, "rg-validate", detail)
+
+
+def parse_submatches(value: Any) -> tuple[SubmatchRecord, ...]:
+    if not isinstance(value, list) or not value:
+        raise ValueError("ripgrep match event has no submatches")
+    parsed: list[SubmatchRecord] = []
+    for item in value:
+        if not isinstance(item, dict) or not isinstance(item.get("match"), dict):
+            raise ValueError("ripgrep submatch must be an object")
+        text = item["match"].get("text")
+        start = item.get("start")
+        end = item.get("end")
+        if not isinstance(text, str) or not isinstance(start, int) or not isinstance(end, int):
+            raise ValueError("ripgrep submatch has invalid text or byte offsets")
+        if start < 0 or end < start:
+            raise ValueError("ripgrep submatch has invalid byte offset order")
+        parsed.append(SubmatchRecord(text=text, start_byte=start, end_byte=end))
+    return tuple(parsed)
+
+
+def match_pane(
+    rg_argv: Sequence[str],
+    pane: PaneRecord,
+    text: str,
+) -> tuple[list[MatchRecord], ScanError | None]:
+    try:
+        result = run_command(rg_argv, input_bytes=text.encode("utf-8"))
+    except CommandLaunchError as exc:
+        return [], ScanError("pane", pane.session, pane.pane_id, "rg-match", str(exc))
+    if result.returncode == 1:
+        return [], None
+    if result.returncode != 0:
+        detail = clean_message(result.stderr.decode("utf-8", errors="replace"), "ripgrep failed")
+        return [], ScanError("pane", pane.session, pane.pane_id, "rg-match", detail)
+
+    candidates: list[MatchRecord] = []
+    try:
+        output = result.stdout.decode("utf-8")
+        for raw_line in output.splitlines():
+            event = json.loads(raw_line)
+            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                raise ValueError("ripgrep JSON event must be an object with a type")
+            if event["type"] != "match":
+                continue
+            data = event.get("data")
+            if not isinstance(data, dict) or not isinstance(data.get("lines"), dict):
+                raise ValueError("ripgrep match event has invalid data")
+            line = data["lines"].get("text")
+            line_number = data.get("line_number")
+            if not isinstance(line, str) or not isinstance(line_number, int) or line_number < 1:
+                raise ValueError("ripgrep match event has invalid line data")
+            if line.endswith("\n"):
+                line = line[:-1]
+                if line.endswith("\r"):
+                    line = line[:-1]
+            submatches = parse_submatches(data.get("submatches"))
+            candidates.append(
+                MatchRecord(
+                    session=pane.session,
+                    socket_path=pane.socket_path,
+                    workspace_id=pane.workspace_id,
+                    tab_id=pane.tab_id,
+                    pane_id=pane.pane_id,
+                    agent_status=pane.agent_status,
+                    foreground_cwd=pane.foreground_cwd,
+                    cwd=pane.cwd,
+                    line_number=line_number,
+                    line=line,
+                    submatches=submatches,
+                )
+            )
+        if not candidates:
+            raise ValueError("ripgrep exited with matches but emitted no match events")
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, KeyError) as exc:
+        return [], ScanError("pane", pane.session, pane.pane_id, "rg-match", str(exc))
+    return candidates, None
+
+
+def match_sort_key(match: MatchRecord) -> tuple[Any, ...]:
+    first_start = match.submatches[0].start_byte if match.submatches else -1
+    return (
+        match.session,
+        match.workspace_id,
+        match.tab_id,
+        match.pane_id,
+        match.line_number,
+        first_start,
+    )
+
+
+def error_sort_key(error: ScanError) -> tuple[str, str, str, str]:
+    return (error.session or "", error.pane_id or "", error.operation, error.message)
+
+
+def scan(
+    herdr: str,
+    rg_argv: Sequence[str],
+    targets: list[SessionTarget],
+    source: str,
+) -> ScanResult:
+    result = ScanResult(
+        sessions=sorted(target.name for target in targets),
+        matches=[],
+        errors=[],
+    )
+
+    pattern_error = validate_pattern(rg_argv)
+    if pattern_error is not None:
+        result.errors.append(pattern_error)
+        return result
+
+    for target in targets:
+        panes, pane_errors = list_panes(herdr, target)
+        result.errors.extend(pane_errors)
+        for pane in panes:
+            text, read_error = read_pane(herdr, target, pane, source)
+            if read_error is not None:
+                result.errors.append(read_error)
+                continue
+            assert text is not None
+            matches, match_error = match_pane(rg_argv, pane, text)
+            if match_error is not None:
+                result.errors.append(match_error)
+                continue
+            result.matches.extend(matches)
+
+    result.matches.sort(key=match_sort_key)
+    result.errors.sort(key=error_sort_key)
+    return result
+
+
+def render_human(result: ScanResult) -> None:
+    for match in result.matches:
+        coordinate = (
+            f"session={match.session} workspace={match.workspace_id} "
+            f"tab={match.tab_id} pane={match.pane_id}"
+        )
+        print(f"[{coordinate}] {match.line_number}:{match.line}")
+    for error in result.errors:
+        location = ""
+        if error.session is not None:
+            location += f" session={error.session}"
+        if error.pane_id is not None:
+            location += f" pane={error.pane_id}"
+        print(
+            f"herdr-grep:{location} {error.operation}: {error.message}",
+            file=sys.stderr,
+        )
+
+
+def render_json(args: argparse.Namespace, result: ScanResult, source: str) -> None:
+    payload = {
+        "schema_version": 1,
+        "pattern": args.pattern,
+        "source": source,
+        "fixed_strings": bool(args.fixed_strings),
+        "ignore_case": bool(args.ignore_case),
+        "complete": result.complete,
+        "sessions": result.sessions,
+        "matches": [
+            {
+                **{key: value for key, value in asdict(match).items() if key != "submatches"},
+                "submatches": [asdict(submatch) for submatch in match.submatches],
+            }
+            for match in result.matches
+        ],
+        "errors": [asdict(error) for error in result.errors],
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def fatal_result(operation: str, message: str) -> ScanResult:
+    return ScanResult(
+        sessions=[],
+        matches=[],
+        errors=[ScanError("global", None, None, operation, message)],
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+
+    herdr = shutil.which("herdr")
+    if herdr is None:
+        if args.list_sessions:
+            print("herdr-grep: dependency: herdr not found on PATH", file=sys.stderr)
+            return 2
+        result = fatal_result("dependency", "herdr not found on PATH")
+        if args.json:
+            render_json(args, result, args.source)
+        else:
+            render_human(result)
+        return 2
+
+    try:
+        sessions = load_sessions(herdr)
+    except ValueError as exc:
+        if args.list_sessions:
+            print(f"herdr-grep: session-list: {exc}", file=sys.stderr)
+            return 2
+        result = fatal_result("session-list", str(exc))
+        if args.json:
+            render_json(args, result, args.source)
+        else:
+            render_human(result)
+        return 2
+
+    if args.list_sessions:
+        for session in sorted(item.name for item in sessions if item.running):
+            print(session)
+        return 0
+
+    rg = shutil.which("rg")
+    if rg is None:
+        result = fatal_result("dependency", "rg not found on PATH")
+        if args.json:
+            render_json(args, result, args.source)
+        else:
+            render_human(result)
+        return 2
+
+    try:
+        targets = select_targets(args, sessions)
+    except ValueError as exc:
+        result = fatal_result("session-select", str(exc))
+        if args.json:
+            render_json(args, result, args.source)
+        else:
+            render_human(result)
+        return 2
+
+    result = scan(herdr, build_rg_argv(rg, args), targets, args.source)
+    if args.json:
+        render_json(args, result, args.source)
+    else:
+        render_human(result)
+    return result.exit_status()
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except BrokenPipeError:
+        try:
+            sys.stdout.close()
+        finally:
+            raise SystemExit(0)

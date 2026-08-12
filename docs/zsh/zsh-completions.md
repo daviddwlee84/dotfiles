@@ -158,6 +158,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `view-ebook` | `dot_dotfiles/bin/executable_view-ebook` | bash hand-rolled | B | `dot_config/zsh/tools/56_view_ebook_completion.zsh` + `dot_config/bash/56_view_ebook_completion.bash` |
 | `appsrc` | `dot_dotfiles/bin/executable_appsrc` | argparse (subcommands) | B | `dot_config/zsh/tools/57_appsrc_completion.zsh` + `dot_config/bash/57_appsrc_completion.bash` |
 | `docker-net` | `dot_config/shell/51_docker_net.sh` (**shell function**, not a bin CLI) | shell hand-rolled | B | `dot_config/zsh/tools/58_docker_net_completion.zsh` + `dot_config/bash/58_docker_net_completion.bash`. Guard with `command -v`, **not** `$+commands` / a PATH test — the target is a function, so those never see it |
+| `herdr-grep` | `dot_dotfiles/bin/executable_herdr-grep` | argparse | B | `dot_config/zsh/tools/59_herdr_grep_completion.zsh` + `dot_config/bash/59_herdr_grep_completion.bash`; `--session` candidates come from `herdr-grep --list-sessions` |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
 
 **Dynamic candidates wired up:**
@@ -168,6 +169,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 - `yth` video ids — **not** auto-completed (opaque 11-char ids; enumerating the whole history on every TAB is wasteful). Use `tv yth` or `yth search <query>` instead.
 - `wake` host names — `_wake` shells out to `wake --list-names` (reads `~/.config/wake/hosts.toml`), same pattern as `_fleet_hosts_one`.
 - `appsrc which <name>` / `appsrc size <name>` — `_appsrc_names` shells out to `appsrc scan --list-names` (installed GUI app names) and adds `_command_names -e` / `compgen -c` (PATH commands), so both a GUI app name and a shell command complete. Same shell-out pattern as `_wake` / `_fleet_hosts_one`.
+- `herdr-grep --session <name>` — both completion files shell out to `herdr-grep --list-sessions`, which reads the local Herdr session registry and returns sorted running names. Errors are silent so TAB still works when no Herdr server is running.
 
 **Adding a new in-house CLI** (decision flow):
 

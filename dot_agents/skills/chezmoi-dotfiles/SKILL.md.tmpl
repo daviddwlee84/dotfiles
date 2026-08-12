@@ -135,10 +135,11 @@ Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, bu
 - **`nvidia-driver-drift-check`** — flag kernel-module vs userspace driver drift. See `docs/sysadmin/gpu-driver.md`.
 - **`yth`** — search your YouTube watch history (title/channel/description + captions; Takeout import + optional cookie sync). Picker twin: `tv yth`. See `docs/tools/yth.md`.
 - **`appsrc`** — detect how an installed app / CLI was installed & managed (cask / App Store / direct-download / apt / snap / flatpak / AppImage / cargo/npm/pipx/uv/mise/go/gem / manual): `appsrc which <cmd-or-app>` (live), `appsrc size <app>` (footprint + associated cache/data/containers), `appsrc tui` (interactive dashboard — sort by size, filter), bare `appsrc` / `appsrc scan` (cached inventory, `--json`/`--tsv`/`--size`/`--sort`). Picker twins: `tv appsrc` (by source) / `tv appsrc-size` (by footprint). See `docs/tools/appsrc.md`.
+- **`herdr-grep`** — search visible or retained content across panes in the current, one named, or all running local Herdr sessions; reports exact session/workspace/tab/pane coordinates and supports `--json`. Remote use runs the CLI through SSH. See `docs/tools/herdr.md`.
 - **`dotcfg`** — reconfigure dotfiles prompts (above).
 - **`sesh-preview`** — preview helper for the sesh picker.
 
-**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with three pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`). See `docs/tools/herdr.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
+**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with three metadata pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`) plus `herdr-grep` for pane-content search. See `docs/tools/herdr.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
 
 ## Television (`tv`) — fuzzy pickers with custom channels
 
