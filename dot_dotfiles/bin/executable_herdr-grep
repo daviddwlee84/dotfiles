@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
+import re
+import shlex
 import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any, Sequence
 
 SOURCES = ("visible", "recent", "recent-unwrapped")
+CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
 class CommandLaunchError(RuntimeError):
@@ -131,7 +136,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="search every running local session",
     )
 
-    parser.add_argument("--json", action="store_true", help="emit one structured JSON document")
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument("--json", action="store_true", help="emit one structured JSON document")
+    output_group.add_argument(
+        "--pick",
+        action="store_true",
+        help="choose a matching line with fzf, then focus/attach its pane",
+    )
     parser.add_argument(
         "--list-sessions",
         action="store_true",
@@ -154,13 +165,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             or args.session is not None
             or args.all_sessions
             or args.json
+            or args.pick
         )
         if search_options:
             parser.error("--list-sessions cannot be combined with PATTERN or search options")
         return args
 
+    args.cancelled = False
     if args.pattern is None:
-        parser.error("the following arguments are required: PATTERN")
+        if not args.pick or not sys.stdin.isatty():
+            parser.error("the following arguments are required: PATTERN")
+        try:
+            args.pattern = input("grep> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            args.pattern = ""
+        if not args.pattern:
+            args.cancelled = True
 
     args.source = "visible" if args.visible else (args.source or "recent")
     return args
@@ -504,6 +524,8 @@ def scan(
     rg_argv: Sequence[str],
     targets: list[SessionTarget],
     source: str,
+    exclude_pane_id: str | None = None,
+    exclude_socket_path: str | None = None,
 ) -> ScanResult:
     result = ScanResult(
         sessions=sorted(target.name for target in targets),
@@ -520,6 +542,12 @@ def scan(
         panes, pane_errors = list_panes(herdr, target)
         result.errors.extend(pane_errors)
         for pane in panes:
+            if (
+                exclude_pane_id
+                and pane.pane_id == exclude_pane_id
+                and same_socket(exclude_socket_path, target.socket_path)
+            ):
+                continue
             text, read_error = read_pane(herdr, target, pane, source)
             if read_error is not None:
                 result.errors.append(read_error)
@@ -576,6 +604,221 @@ def render_json(args: argparse.Namespace, result: ScanResult, source: str) -> No
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
+def sanitize_picker_text(value: str) -> str:
+    return CONTROL_CHARS.sub(" ", value).strip()
+
+
+def encode_route(match: MatchRecord, source: str) -> str:
+    if not match.socket_path:
+        raise ValueError(f"match for pane {match.pane_id} has no socket_path")
+    payload = {
+        "schema_version": 1,
+        "session": match.session,
+        "socket_path": match.socket_path,
+        "workspace_id": match.workspace_id,
+        "tab_id": match.tab_id,
+        "pane_id": match.pane_id,
+        "source": source,
+        "line_number": match.line_number,
+        "agent_status": match.agent_status,
+    }
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def picker_rows(
+    matches: list[MatchRecord],
+    source: str,
+) -> tuple[str, dict[str, MatchRecord]]:
+    rows: list[str] = []
+    routes: dict[str, MatchRecord] = {}
+    for match in matches:
+        token = encode_route(match, source)
+        status = sanitize_picker_text(match.agent_status or "-")
+        coordinate = sanitize_picker_text(
+            f"[{match.session}/{match.workspace_id}/{match.tab_id}/{match.pane_id} "
+            f"L{match.line_number} {status}]"
+        )
+        line = sanitize_picker_text(match.line)
+        rows.append(f"{token}\t{coordinate}\t{line}")
+        routes[token] = match
+    return "\n".join(rows) + ("\n" if rows else ""), routes
+
+
+def focus_helper_path() -> Path:
+    override = os.environ.get("HERDR_GREP_FOCUS_HELPER")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".config" / "herdr" / "focus-pane.py"
+
+
+def same_socket(left: str | None, right: str | None) -> bool:
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    try:
+        return os.path.samefile(left, right)
+    except OSError:
+        return False
+
+
+def run_focus_helper(helper: Path, token: str) -> int:
+    try:
+        result = run_command([sys.executable, str(helper), "--route-token", token])
+    except CommandLaunchError as exc:
+        print(f"herdr-grep: focus: {exc}", file=sys.stderr)
+        return 2
+    if result.returncode != 0:
+        detail = clean_message(
+            (result.stderr or result.stdout).decode("utf-8", errors="replace"),
+            "focus helper failed",
+        )
+        print(f"herdr-grep: focus: {detail}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def attach_session(herdr: str, session: str, socket_path: str) -> int:
+    argv = [herdr] if session == "default" else [herdr, "session", "attach", session]
+    env = os.environ.copy()
+    env["HERDR_SOCKET_PATH"] = socket_path
+    try:
+        result = subprocess.run(argv, env=env, check=False)
+    except (OSError, ValueError) as exc:
+        print(f"herdr-grep: attach: failed to execute herdr: {exc}", file=sys.stderr)
+        return 2
+    if result.returncode != 0:
+        print(f"herdr-grep: attach: herdr exited {result.returncode}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def picker_header(source: str, result: ScanResult) -> str:
+    header = "Enter=jump · Alt+S=scrollback · Alt+V=visible · Esc=cancel"
+    if not result.matches:
+        header += " · no matches in this source"
+    if result.errors:
+        first = result.errors[0]
+        warning = sanitize_picker_text(f"{first.operation}: {first.message}")
+        header += f" · ⚠ incomplete ({len(result.errors)} error(s)): {warning}"
+    return header
+
+
+def run_picker(
+    args: argparse.Namespace,
+    herdr: str,
+    rg: str,
+    targets: list[SessionTarget],
+    initial_result: ScanResult,
+) -> int:
+    fzf = shutil.which("fzf")
+    if fzf is None:
+        print("herdr-grep: dependency: fzf not found on PATH", file=sys.stderr)
+        return 2
+    helper = focus_helper_path()
+    if not helper.is_file():
+        print(f"herdr-grep: dependency: focus helper not found: {helper}", file=sys.stderr)
+        return 2
+
+    source = args.source
+    result = initial_result
+    query = ""
+    allow_empty_picker = False
+    while True:
+        if not result.matches and not allow_empty_picker:
+            if result.errors:
+                render_human(result)
+                return 2
+            return 1
+        try:
+            rows, routes = picker_rows(result.matches, source)
+        except ValueError as exc:
+            print(f"herdr-grep: pick: {exc}", file=sys.stderr)
+            return 2
+
+        preview_command = (
+            f"{shlex.quote(sys.executable)} {shlex.quote(str(helper))} "
+            "--preview-route-token {1}"
+        )
+        fzf_argv = [
+            fzf,
+            "--delimiter=\\t",
+            "--with-nth=2..",
+            "--nth=2..",
+            "--height=100%",
+            "--border",
+            "--layout=reverse",
+            "--tiebreak=index",
+            f"--prompt=pane[{source}]> ",
+            f"--header={picker_header(source, result)}",
+            "--preview-window=right,55%,wrap",
+            f"--preview={preview_command}",
+            "--print-query",
+            "--expect=alt-s,alt-v",
+            f"--query={query}",
+        ]
+        try:
+            picked = run_command(fzf_argv, input_bytes=rows.encode("utf-8"))
+        except CommandLaunchError as exc:
+            print(f"herdr-grep: pick: {exc}", file=sys.stderr)
+            return 2
+        if picked.returncode in (1, 130):
+            return 0
+        if picked.returncode != 0:
+            detail = clean_message(
+                picked.stderr.decode("utf-8", errors="replace"),
+                f"fzf exited {picked.returncode}",
+            )
+            print(f"herdr-grep: pick: {detail}", file=sys.stderr)
+            return 2
+
+        # fzf's protocol is LF-delimited; str.splitlines() would also split
+        # U+0085/U+2028/U+2029 pasted into the query and shift the fields.
+        lines = picked.stdout.decode("utf-8", errors="replace").split("\n")
+        query = lines[0] if lines else ""
+        key = lines[1] if len(lines) > 1 else ""
+        selected = lines[2] if len(lines) > 2 else ""
+        if key in ("alt-s", "alt-v"):
+            source = "recent-unwrapped" if key == "alt-s" else "visible"
+            result = scan(
+                herdr,
+                build_rg_argv(rg, args),
+                targets,
+                source,
+                exclude_pane_id=os.environ.get("HERDR_PANE_ID"),
+                exclude_socket_path=os.environ.get("HERDR_SOCKET_PATH"),
+            )
+            allow_empty_picker = True
+            continue
+        if not selected:
+            return 0
+
+        token = selected.split("\t", 1)[0]
+        match = routes.get(token)
+        if match is None or not match.socket_path:
+            print("herdr-grep: pick: fzf returned an unknown route", file=sys.stderr)
+            return 2
+
+        inside_herdr = bool(os.environ.get("HERDR_ENV"))
+        ambient_socket = os.environ.get("HERDR_SOCKET_PATH")
+        if inside_herdr and not same_socket(ambient_socket, match.socket_path):
+            attach_hint = "herdr" if match.session == "default" else f"herdr session attach {match.session}"
+            print(
+                "herdr-grep: pick: selected pane belongs to another session; "
+                f"detach first, then run: {attach_hint}",
+                file=sys.stderr,
+            )
+            return 2
+
+        focus_status = run_focus_helper(helper, token)
+        if focus_status != 0:
+            return focus_status
+        if inside_herdr:
+            return 0
+        return attach_session(herdr, match.session, match.socket_path)
+
+
 def fatal_result(operation: str, message: str) -> ScanResult:
     return ScanResult(
         sessions=[],
@@ -586,6 +829,8 @@ def fatal_result(operation: str, message: str) -> ScanResult:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    if getattr(args, "cancelled", False):
+        return 0
 
     herdr = shutil.which("herdr")
     if herdr is None:
@@ -636,7 +881,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             render_human(result)
         return 2
 
-    result = scan(herdr, build_rg_argv(rg, args), targets, args.source)
+    excluded_pane = os.environ.get("HERDR_PANE_ID") if args.pick else None
+    result = scan(
+        herdr,
+        build_rg_argv(rg, args),
+        targets,
+        args.source,
+        exclude_pane_id=excluded_pane,
+        exclude_socket_path=os.environ.get("HERDR_SOCKET_PATH") if args.pick else None,
+    )
+    if args.pick:
+        return run_picker(args, herdr, rg, targets, result)
     if args.json:
         render_json(args, result, args.source)
     else:

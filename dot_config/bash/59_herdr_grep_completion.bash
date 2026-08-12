@@ -23,7 +23,7 @@ _herdr_grep_completion() {
 
     case "$cur" in
         -*)
-            local opts="-h --help -F --fixed-strings -i --ignore-case --source --visible --session --all-sessions --json --list-sessions"
+            local opts="-h --help -F --fixed-strings -i --ignore-case --source --visible --session --all-sessions --json --pick --list-sessions"
             COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
             ;;
         *)

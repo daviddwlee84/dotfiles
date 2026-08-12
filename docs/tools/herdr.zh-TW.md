@@ -67,6 +67,8 @@ herdr-grep --source recent-unwrapped 'url'  # 搜尋保留歷史，不受硬換�
 herdr-grep --session work 'panic'           # 一個正在執行的具名 session
 herdr-grep --all-sessions 'rate limit'      # 所有正在執行的本機 session
 herdr-grep --all-sessions --json 'panic'    # 結構化 matches + errors
+herdr-grep --pick 'error|failed'             # 先 grep，再以 fzf 選擇並跳轉/attach
+herdr-grep --pick --all-sessions 'panic'     # Herdr 外：選擇、預先聚焦、attach session
 herdr-grep -F -- -leading-dash              # 保護以 `-` 開頭的 pattern
 ```
 
@@ -75,11 +77,14 @@ herdr-grep -F -- -leading-dash              # 保護以 `-` 開頭的 pattern
 | 預設範圍 | 有 `HERDR_SOCKET_PATH`（Herdr 內部）時搜尋 ambient session，否則搜尋 `default`。`--session NAME` 從 `herdr session list --json` 解析權威 socket；`--all-sessions` 只掃描正在執行的 session。ambient socket 無法唯一對應到 registry 時回傳 2，不會誤標成其他 session。 |
 | 內容來源 | 預設 `recent`（完整保留的 scrollback）；`--visible` 只看目前畫面；終端硬換行切斷片語時使用 `--source recent-unwrapped`。 |
 | 輸出 | 人類可讀輸出在每一筆命中重複 `session/workspace/tab/pane`。`--json` 另含 socket、cwd、agent 狀態、byte-offset submatches、`complete` 與結構化 errors。行號是**相對於這次 capture**，不是永久 pane 座標。 |
+| 互動 picker | `--pick PATTERN` 把已過濾 matches 交給 fzf。Enter 會精確聚焦 pane；在 Herdr 外還會 attach 所選 session。Alt+S 用 `recent-unwrapped` 重跑同一 pattern；Alt+V 回到 `visible`。 |
 | Exit status | `0` = 有命中且掃描完整；`1` = 完整掃描但無命中；`2` = 用法錯誤／執行錯誤／**掃描不完整**。pane 在掃描途中消失時，成功的 matches 仍會保留、錯誤送到 stderr/JSON，並回傳 2。 |
+
+在 Herdr 內，**`prefix+Alt+F`** 執行 `herdr-grep --pick --visible`：先輸入一次 grep pattern，再用 fzf refine 已過濾的 matches。Agent pane 使用 Herdr 的精確 `agent focus`；普通 split pane 則透過驗證過的 directional `pane neighbor` / `pane focus` 最短路徑抵達，最後再確認 active workspace/tab 與 `pane layout.focused_pane_id`。已 attach 時若選到其他 session，picker 會拒絕而不是巢狀啟動（請先 detach）。從一般 shell 執行 `--pick --all-sessions`，會先聚焦所選目標再 attach 該 session，與 `hhere` 的 focus-then-attach 模型一致。Preview 行號屬於先前 capture，pane 持續輸出時可能漂移。
 
 搜尋範圍受限於 live Herdr server 仍保留的內容：已關閉的 pane、早於 history limit 的輸出，以及 alternate screen 已丟棄的內容都無法找回。命令必須在能存取 Unix socket 的環境執行；遠端 server 請透過 SSH 執行已部署的 CLI，例如 `ssh server 'herdr-grep --all-sessions -F -- "connection refused"'`。**`herdr --remote` 是互動式 thin-client attach，不是 pane 子指令的 RPC 前綴。**
 
-`tv herdr-agent-panes` 與 `tv herdr-review` 仍只 fuzzy-search metadata（pane/session identifiers、狀態、cwd）。可見 pane 文字只是 preview，不在 Television 的 searchable source 中；要查 terminal content 請用 `herdr-grep`。
+`tv herdr-agent-panes` 與 `tv herdr-review` 仍只 fuzzy-search metadata（pane/session identifiers、狀態、cwd）。可見 pane 文字只是 preview，不在 Television 的 searchable source 中。Television 在 live query 之前執行 source，且 source 收不到 query，因此 content selection 刻意採 `herdr-grep --pick` → fzf，而不是新增 `tv herdr-grep` channel。
 
 ## cwd 與 workspace 命名模型
 
@@ -124,6 +129,7 @@ description = "new tab at the workspace (space) root dir"
 | lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
 | URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
 | 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
+| 搜尋所有 pane 內容並跳轉 | **CLI pipeline + fzf + 精確聚焦 helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`；Alt+S 搜尋 unwrapped scrollback |
 | 無縫 `Ctrl-hjkl` nvim↔pane 導覽 | **沒有 herdr-aware smart-splits** | **缺口**——見下方 workaround |
 | OSC133 copy-mode（`cpout`/`cpblock`） | tmux 專屬 | **缺口**——`cpcmd`（zsh history）仍可用 |
 | 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --token`（逐 pane metadata token、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
@@ -161,6 +167,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + T` | `tv herdr-sesh`（workspace/dir 切換） | command pane |
 | `prefix + a` | `tv herdr-agent-panes`（即時 agent panes） | command pane |
 | `prefix + f` | `tv fleet-hosts`（SSH picker） | command pane |
+| `prefix + Alt + F` | 輸入 pane-content pattern → `herdr-grep --pick --visible` → fzf 精確跳轉；Alt+S = scrollback、Alt+V = visible | command pane |
 | `prefix + m` | 切換目前 pane 的**待 review** 旗標（⭐） | command pane |
 | `prefix + i` | `tv herdr-review`——待 review **收件匣**（被標記的 pane） | command pane |
 | `prefix + P` | 複製聚焦 pane 的 **process 資訊** 到剪貼簿 | command pane |

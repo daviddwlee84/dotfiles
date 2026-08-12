@@ -1,145 +1,189 @@
 ## Context
 
-Herdr can enumerate panes and read each pane's visible screen or retained scrollback, but it has no first-class cross-pane content search. The current `tv herdr-*` channels search metadata only; pane text appears only in previews. The goal is to package the proven `herdr pane list → pane read → rg` pipeline into a reliable, scriptable `herdr-grep` that identifies the exact session/workspace/tab/pane containing each match, supports named or all running local sessions, and distinguishes a clean no-match from an incomplete scan.
+The committed `herdr-grep` CLI locates terminal content and reports exact Session / Workspace / Tab / Pane coordinates, but users must still inspect its textual output and navigate manually. The next step is a pipeline-style interactive mode:
 
-This must preserve the existing socket-routing model in `dot_config/shell/24_herdr.sh` and content-source vocabulary in `dot_config/herdr/executable_pane-copy.sh`, while remaining callable from any shell, SSH command, or future picker. Existing uncommitted work in the repository—especially documentation files—must be preserved through surgical edits.
+```text
+herdr-grep PATTERN → fzf over the filtered matches → exact pane focus → attach when outside Herdr
+```
+
+The user chose fzf rather than Television. Television 0.15.6 cannot pass its live query to a channel source, while fzf is a natural selector after `herdr-grep` has already performed the real regex/fixed-string search. This design therefore adds `herdr-grep --pick`, not a TV channel and not a separate all-lines indexer.
+
+The picker must work both inside and outside Herdr. Inside, it jumps within the selected current session. Outside, it may search one/all running sessions, pre-focus the selected target, then attach like `hhere`. Herdr 0.7.5 has no direct `pane focus PANE_ID`, so ordinary split panes require a reusable exact-focus helper.
 
 ## Recommended implementation
 
-### 1. Add a standalone Python CLI
+### 1. Add `--pick` to `herdr-grep`
 
-Create `dot_dotfiles/bin/executable_herdr-grep` as a self-contained, stdlib-only Python 3 executable (`argparse`, `dataclasses`, `json`, `os`, `shutil`, `subprocess`). Use external `rg` as the matcher, but parse Herdr and ripgrep JSON in Python; do not add a `jq` dependency and do not source interactive shell configuration.
-
-Public v1 interface:
+Extend `dot_dotfiles/bin/executable_herdr-grep` with an interactive output mode:
 
 ```text
-herdr-grep [OPTIONS] PATTERN
-herdr-grep --list-sessions
-
--F, --fixed-strings
--i, --ignore-case
---source {visible,recent,recent-unwrapped}   # default: recent
---visible                                   # alias for --source visible
---session NAME
---all-sessions
---json
--h, --help
+herdr-grep --pick [OPTIONS] [PATTERN]
+herdr-grep --pick --all-sessions 'error|failed'
+herdr-grep --pick -F -i 'connection refused'
 ```
 
-Contract:
+- `--pick` is mutually exclusive with `--json`.
+- Existing `-F`, `-i`, `--source`, `--visible`, `--session`, and `--all-sessions` semantics remain unchanged.
+- With a PATTERN, run the existing scan first and give only matching lines to fzf.
+- Without a PATTERN, prompt once in an interactive TTY (`grep> `); blank/Esc is a quiet no-op. Missing PATTERN in a noninteractive context remains usage error 2.
+- Do not introduce a second PATH CLI or a `grep-pick.sh`; keep query parsing, scan results, fzf row construction, source switching, selection, and attach behavior in the existing Python CLI.
 
-- A positional pattern is a ripgrep regex unless `-F` is supplied; `-i` composes with either mode.
-- `--source recent` is the default retained-scrollback search, matching the established scrollback-copy behavior. `recent-unwrapped` is opt-in for searches affected by terminal hard wrapping.
-- `--source` and `--visible` are mutually exclusive; `--session` and `--all-sessions` are mutually exclusive.
-- A leading-dash pattern uses the conventional `herdr-grep -- -pattern` form.
-- `--list-sessions` prints sorted running session names, one per line, for both-shell completion and does not require `rg`.
-- Keep v1 one-shot and local-socket scoped: no `--host`, watch mode, context flags, pane filters, TSV, Television channel, or keybinding. Remote automation is `ssh HOST herdr-grep ...`; `herdr --remote` remains an interactive attach mechanism, not pane-command RPC.
+Resolve `fzf` only when `--pick` is used. Resolve the focus helper from `HERDR_GREP_FOCUS_HELPER` when set (test/override hook), otherwise `~/.config/herdr/focus-pane.py`. A missing dependency is a structured operational error.
 
-### 2. Reuse Herdr's existing routing semantics
+### 2. Feed the filtered match set to fzf
 
-Port the behavior—not the shell function itself—of `_herdr_session_target` in `dot_config/shell/24_herdr.sh:80-121`:
+Convert each existing `MatchRecord` into a safe TSV row:
 
-- Parse `herdr session list --json` as `{ "sessions": [...] }`; treat invalid JSON/schema as an operational error.
-- With no selector, leave the inherited environment untouched. An ambient `HERDR_SOCKET_PATH` therefore continues to target the current Herdr session; without it, Herdr uses the default socket. Resolve the display session name by matching the ambient socket, falling back to `default` as the existing helper does.
-- `--session NAME` requires one exact, running entry with a non-empty authoritative `socket_path` and sets `HERDR_SOCKET_PATH` only in copied child environments.
-- `--all-sessions` selects only running entries, sorts them by name, and scopes the corresponding socket separately for every child call. Stopped entries are skipped; an empty running set is a complete no-match.
-- Never split hierarchical IDs to infer relationships. Take `workspace_id`, `tab_id`, and `pane_id` directly from `herdr pane list`, following `dot_config/television/cable/herdr-agent-panes.toml` and the warning in `dot_config/herdr/executable_space-root.sh`.
+1. hidden, bounded route token: URL-safe base64 JSON containing only schema version, authoritative socket, session/workspace/tab/pane IDs, source, capture-relative line number, and status (never raw match text/cwd in process argv);
+2. compact coordinate/status such as `[default/wP/wP:t2/wP:p3 L42 working]`;
+3. sanitized matched line.
 
-For each target session, run `herdr pane list`, validate `.result.panes`, sort panes by `(workspace_id, tab_id, pane_id)`, and read each pane sequentially with:
+Strip C0/C1 controls from visible fields; tabs/newlines must never corrupt the row. Invoke fzf with a tab delimiter, `--with-nth=2..`, `--nth=2..`, bordered full-height layout, stable tiebreaking, source-aware prompt/header, and right-side wrapped preview. The route token stays hidden and unsearchable.
+
+Use `--print-query` plus `--expect=alt-s,alt-v` in an explicit loop:
+
+- **Enter**: focus/attach the selected route.
+- **Alt+S**: rerun the same `herdr-grep` pattern against `recent-unwrapped`, then reopen fzf with its refinement query preserved.
+- **Alt+V**: rerun against `visible` and preserve the fzf query.
+- **Esc/no selected match**: quiet success.
+- Unexpected fzf/focus failure: concise diagnostic and nonzero exit.
+
+This is not `change:reload`: pane scanning occurs once per explicit source mode, never on every keystroke.
+
+Honor the existing scan contract:
+
+- complete match set: normal picker;
+- clean no-match: exit 1 without launching fzf;
+- partial scan with usable matches: keep them selectable and show an incomplete-scan header with error count/first diagnostic;
+- partial/fatal scan without usable matches: render normal errors and exit 2.
+
+### 3. Add a reusable route/focus helper
+
+Create `dot_config/herdr/executable_focus-pane.py`, deployed as `~/.config/herdr/focus-pane.py`.
+
+Interface:
 
 ```text
-herdr pane read PANE_ID --source SOURCE --format text
+focus-pane.py --route-token BASE64_JSON
+focus-pane.py --preview-route-token BASE64_JSON
+focus-pane.py --socket-path SOCKET --workspace-id WS --tab-id TAB --pane-id PANE
 ```
 
-Retain `agent_status`, `foreground_cwd`, and `cwd` from pane-list metadata. Decode terminal output as UTF-8 with replacement so one invalid byte cannot crash the scan. A pane disappearing between list and read is a recoverable partial-scan error, not a clean no-match.
+Exit 0 only after exact final focus verification; exit 1 for stale targets/Herdr/topology/runtime failures; exit 2 for invalid arguments/token. Print nothing on successful focus and one concise `focus-pane:` diagnostic on failure. Every Herdr subprocess receives a copied environment with the route's `HERDR_SOCKET_PATH`; never infer routing from ambient state, session name, or ID structure.
 
-### 3. Use ripgrep as a deterministic internal matcher
+Exact-focus algorithm:
 
-Build argv arrays only—never `shell=True`—around:
+1. `pane get TARGET` before mutation; require exact pane/workspace/tab coordinates.
+2. Probe `agent get TARGET`:
+   - agent pane: `agent focus TARGET`, then verify with `pane layout.focused_pane_id`;
+   - `agent_not_found`: use generic pane navigation;
+   - any other error: fail.
+3. For an ordinary pane, validate `pane layout --pane TARGET`: matching workspace/tab, unique pane IDs, target membership, maximum 128 panes.
+4. Focus workspace then tab and reread layout. If `focused_pane_id` is already the target, verify and finish.
+5. Otherwise run deterministic BFS over `left`, `right`, `up`, `down` using `pane neighbor --pane NODE --direction DIR`. Boundary responses that return the origin pane are non-edges; accept only panes in the validated layout.
+6. Before every movement, recheck the expected neighbor, then run `pane focus --direction DIR --pane NODE` and require the new layout's `focused_pane_id` to be the planned neighbor.
+7. Permit one bounded replan for a focus/topology race; a second race fails closed.
+8. Finish by requiring `workspace get.focused == true`, `workspace.active_tab_id == TARGET_TAB`, `tab get.focused == true`, and target-layout `focused_pane_id == TARGET` (`pane current` identifies the caller pane, not the server's new focus).
+
+Failure after partial movement is reported honestly; Herdr provides no atomic focus transaction.
+
+### 4. Preview selected matches
+
+`focus-pane.py --preview-route-token` decodes the same route and prints:
+
+- stored session/workspace/tab/pane, source, capture-relative line, and status;
+- no raw matched line or cwd in the route token; the fzf result row already shows the match;
+- a clearly labeled live pane snapshot read through the route socket:
 
 ```text
-rg --no-config --json --text [-F] [-i] -- PATTERN
+HERDR_SOCKET_PATH=<socket> herdr pane read <pane> --source visible --format text
 ```
 
-- Resolve `herdr` and `rg` up front with `shutil.which` (`rg` is unnecessary for `--list-sessions`).
-- Preflight the pattern once against empty stdin: ripgrep exit 0/1 means valid; exit 2 means an invalid regex or invocation. This prevents repeating one syntax error for every pane.
-- For each pane, feed captured text on stdin. Exit 0 yields JSON match events; exit 1 means no match; any other status or malformed event records a pane error and scanning continues.
-- Accept a pane's matches only after its complete ripgrep JSON stream validates, avoiding half-trusted pane output.
-- Sort final records by `(session, workspace_id, tab_id, pane_id, line_number, first_submatch_byte)` so output is stable regardless of fixture/order changes.
+A disappeared pane becomes preview text, not an fzf crash. Do not promise exact scroll positioning: the stored line number belongs to the earlier capture and can drift.
 
-### 4. Define stable human, JSON, and exit contracts
+`herdr-grep --pick` points fzf preview at this helper using the hidden route token.
 
-Human output is one line per matching captured line, with the full coordinate repeated so it remains useful when piped:
+### 5. Focus versus attach semantics
 
-```text
-[session=default workspace=w1 tab=w1:t2 pane=w1:p4] 183:matched text
+After fzf selection:
+
+- **Inside Herdr** (`HERDR_ENV`/ambient socket): require the selected socket to match the current socket, invoke the focus helper, and exit so the temporary command pane closes. If a user explicitly requested cross-session results inside Herdr, pre-focus may be possible but attach is not; fail with the detach/attach instruction rather than nesting.
+- **Outside Herdr**: invoke the focus helper through the selected socket, then attach to the selected session—bare `herdr` for `default`, `herdr session attach NAME` for named sessions. This mirrors `dot_config/shell/24_herdr.sh::_herdr_attach_if_outside` and `hhere` behavior.
+
+The default no-session picker therefore works naturally in both contexts; `--all-sessions --pick` is primarily an outside-Herdr workflow.
+
+### 6. Add the Herdr keybinding
+
+Edit `.chezmoitemplates/herdr/config.toml`:
+
+```toml
+[[keys.command]]
+key = "prefix+alt+f"
+type = "pane"
+command = "~/.dotfiles/bin/herdr-grep --pick"
+description = "search pane content and jump (fzf)"
 ```
 
-A line with multiple occurrences is printed once. Remove only its terminating newline; emit no headings, colors, summaries, or no-match message. The line number is one-based within the selected pane capture, not a persistent pane coordinate.
+`prefix+alt+f` is valid Herdr syntax (the upstream/default config documents `prefix+alt+g`), mnemonic for find, currently unbound, and avoids the existing `prefix+f` fleet picker.
 
-`--json` emits one valid JSON document with:
+### 7. Update completions and offline tests
 
-- top-level `schema_version`, query/source/mode fields, sorted targeted session names, `complete`, `matches`, and `errors`;
-- each match's `session`, `socket_path`, `workspace_id`, `tab_id`, `pane_id`, `agent_status`, `foreground_cwd`, `cwd`, capture-relative `line_number`, `line`, and all ripgrep `submatches` (`text`, zero-based half-open UTF-8 byte offsets);
-- stable error objects with `scope` (`global|session|pane`), nullable session/pane identifiers, operation, and message.
-
-After successful argument parsing, `--json` must remain valid even for dependency, discovery, selected-session, or partial-scan failures. Human mode sends diagnostics to stderr and preserves good stdout matches.
-
-Use grep-style status codes:
-
-- `0`: at least one match and the scan completed;
-- `1`: no matches and the scan completed;
-- `2`: usage/dependency/invalid-regex/malformed-Herdr-data/unavailable-session error, or any incomplete scan.
-
-A partial failure keeps successful matches, sets JSON `complete=false`, prints deterministic warnings in human mode, and returns 2 even when another pane matched.
-
-### 5. Add paired shell completions
-
-Create synchronized Strategy-B completions:
+Update both existing completion files to advertise `--pick`:
 
 - `dot_config/zsh/tools/59_herdr_grep_completion.zsh`
 - `dot_config/bash/59_herdr_grep_completion.bash`
 
-Mirror the dynamic-candidate pattern used by `54_wake_completion.{zsh,bash}`:
+Extend `tests/unit/herdr_grep.bats` for `--pick` parsing/dependencies/result handling/fzf argv and completion agreement. Add `tests/unit/herdr_focus_pane.bats` with a stateful fake Herdr backend.
 
-- complete every public flag and the three source values;
-- dynamically complete `--session` from `herdr-grep --list-sessions`, swallowing failures;
-- do not enumerate candidates for `PATTERN`;
-- include twin-file comments and command-presence guards.
+Picker coverage:
 
-Add `herdr-grep` to the in-house CLI table and dynamic-candidate notes in `docs/zsh/zsh-completions.md`. The existing zh-TW completion page does not contain the canonical Section-F inventory, so it does not need a synthetic partial mirror for this change.
+- no-pattern TTY prompt and non-TTY usage failure;
+- fzf rows/token/control sanitization;
+- Enter/Esc/no-match parsing;
+- Alt+S/Alt+V source reruns with query preservation;
+- partial/fatal scan handling;
+- preview/focus helper invocation;
+- inside same-session focus, inside cross-session refusal, outside default/named attach;
+- missing fzf/helper and attach failures.
 
-### 6. Add offline black-box coverage
+Focus-helper coverage:
 
-Create `tests/unit/herdr_grep.bats`, reusing `setup_path_stub`/`cleanup_path_stubs` from `tests/test_helper.bash` and the argv-capture style in `tests/unit/ghget.bats`.
+- agent direct focus and `agent_not_found` fallback;
+- one-pane, horizontal/vertical, nested multi-hop layouts;
+- deterministic BFS, cycles/boundaries, stale/moved panes;
+- malformed/duplicate/out-of-layout responses;
+- workspace/tab failures, one successful replan, retry exhaustion;
+- final exact verification and selected-socket enforcement;
+- preview routing and disappeared-pane behavior.
 
-Use a fixture-driven fake `herdr` that logs argv plus `HERDR_SOCKET_PATH` and returns session-, socket-, and pane-specific JSON/text. Wrap the saved real `rg` to log its argv while preserving real matching semantics; invoke the source script through an absolute Python interpreter for missing-dependency tests.
+### 8. Update documentation mirrors
 
-Cover these groups:
+Update `docs/tools/herdr.md` and `docs/tools/herdr.zh-TW.md` in the content-search, feasibility, keybinding, and Television/fzf sections. Document:
 
-- parsing/help: missing or leading-dash pattern, unknown/conflicting flags, help/completion option agreement;
-- sources/matching: default `recent`, visible/unwrapped overrides, regex, fixed-string, case-insensitive, multiple occurrences on one line, Unicode and terminal-invalid bytes;
-- routing: default without socket, ambient named socket, explicit running/missing/stopped session, all-running sessions, stopped-session skip, no running sessions, and child-only env overrides;
-- data integrity: malformed session/pane JSON, wrong schema, malformed pane entries, IDs that cannot be inferred by string splitting, deterministic shuffled input;
-- outcomes: exact human coordinates, JSON schema/content/offsets, clean no-match, invalid regex before pane enumeration, disappearing pane, failed session, missing dependencies, partial matches with exit 2;
-- completion helper: `--list-sessions` emits only sorted running names and does not require `rg`.
+- `herdr-grep --pick PATTERN` pipeline;
+- `prefix+Alt+F` with interactive pattern prompt;
+- Alt+S/Alt+V source switching;
+- exact agent/ordinary-pane jump semantics;
+- inside focus versus outside attach behavior;
+- cross-session restriction while already attached;
+- preview/capture line drift and partial-scan warnings;
+- why fzf, not a TV channel.
 
-### 7. Update user-facing and agent-facing documentation
-
-Edit existing pages rather than creating a new MkDocs page:
-
-- `docs/tools/herdr.md` and `docs/tools/herdr.zh-TW.md`: add a pane-content-search section near named-session/capture documentation with examples, sources, match modes, human/JSON shapes, status codes, partial/race behavior, retention limits, leading-dash syntax, SSH-side remote usage, and the explicit non-goal that existing `tv herdr-*` channels do not index content.
-- `README.md`: extend the existing Herdr managed-surface bullet to mention the deployed `herdr-grep` capability.
-- `docs/shells/aliases.md`: add a `CLI (bin)` inventory row with completion files and examples; do not add a short alias (`hg` conflicts with Mercurial).
-- `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl`: hand-add `herdr-grep` to the in-house CLI/Herdr inventory because the prose is not auto-generated.
-
-No changes are needed to `mkdocs.yml` (the bilingual Herdr page is already in nav), tool-manager inventories (Herdr, Python, and ripgrep are already managed), `dot_config/shell/24_herdr.sh`, Herdr config/keybindings, or Television channels.
+Update `README.md`, `docs/shells/aliases.md`, `docs/zsh/zsh-completions.md` as needed for the new flag/behavior, and `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl` for agent discoverability. No new MkDocs nav entry or PATH executable is needed.
 
 ## Verification
 
-1. Syntax-check the Python source without leaving `__pycache__` in the repo (compile the loaded source or direct pycache to a temporary directory).
-2. Run `zsh -n` and `bash -n` on the paired completion files; run applicable pre-commit checks on all touched files.
-3. Run `bats tests/unit/herdr_grep.bats`, then `just bats`. Compare full-suite failures by test name against the known clean baseline rather than requiring the existing seven baseline failures to disappear.
-4. Run `uv run mkdocs build --strict`; compare against the known baseline warnings and require no new warning/error attributable to this change.
-5. Verify chezmoi mapping/rendering with `chezmoi cat ~/.dotfiles/bin/herdr-grep` and `chezmoi diff` without applying unrelated working-tree changes.
-6. If a live Herdr server remains available, smoke-test source and rendered CLI behavior with `--help`, `--list-sessions`, a deliberately impossible `--visible -F` query (expect 1), a known matching query (expect full coordinate), and `--json | jq -e` validation. If no server is available, report the skipped live validator explicitly; the offline Bats suite remains authoritative.
+1. Compile both Python sources without leaving `__pycache__`; run zsh/bash completion syntax checks.
+2. Run updated `herdr_grep.bats`, new `herdr_focus_pane.bats`, then full Bats; distinguish known repository baseline failures by test name.
+3. Render `herdr-grep`, `focus-pane.py`, and Herdr config with `chezmoi cat`; verify target paths.
+4. Apply only those Herdr targets for live validation, preserving unrelated working-tree changes.
+5. Run `herdr server reload-config`; require applied status and empty diagnostics so `prefix+alt+f` cannot silently invalidate the keys table.
+6. Headlessly validate fzf row generation/token decode/preview and complete/partial/no-match behavior.
+7. If a TTY is available, test `prefix+Alt+F`, agent and ordinary split-pane exact jumps, Alt+S/Alt+V query preservation, quiet Esc, and an outside-shell `--all-sessions --pick` attach. If unavailable, report the skipped interactive checks explicitly.
+8. Run targeted pre-commit, strict MkDocs against the known warning baseline, `git diff --check`, and `chezmoi diff`.
+9. Leave the new feature uncommitted unless the user separately asks for another commit; preserve the five unrelated old SpecStory modifications.
+
+## References
+
+- [Herdr keyboard syntax](https://herdr.dev/docs/keyboard/)
+- [Herdr config reference](https://herdr.dev/docs/config-reference/)

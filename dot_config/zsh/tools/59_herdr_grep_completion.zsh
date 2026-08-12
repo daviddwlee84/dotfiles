@@ -16,7 +16,8 @@ _herdr_grep() {
         '(--source)--visible[search only the visible pane screen]' \
         '(--session --all-sessions)--session=[search one running named session]:session:->session' \
         '(--session)--all-sessions[search every running local session]' \
-        '--json[emit one structured JSON document]' \
+        '(--json --pick)--json[emit one structured JSON document]' \
+        '(--json)--pick[choose a match with fzf, then focus or attach its pane]' \
         '--list-sessions[print running session names for shell completion]' \
         '1:pattern:'
 

@@ -13,15 +13,23 @@ setup() {
   [ -n "$PYTHON_BIN" ] || skip "python3 is required"
   [ -n "$REAL_RG" ] || skip "rg is required"
   export PYTHON_BIN REAL_RG
-  unset HERDR_SOCKET_PATH
+  unset HERDR_ENV HERDR_SOCKET_PATH
 
   setup_path_stub
   HERDR_CALL_LOG="$BATS_STUB_DIR/herdr.log"
   RG_CALL_LOG="$BATS_STUB_DIR/rg.log"
-  export HERDR_CALL_LOG RG_CALL_LOG
+  FZF_CALL_LOG="$BATS_STUB_DIR/fzf.log"
+  FZF_INPUT_LOG="$BATS_STUB_DIR/fzf-input.tsv"
+  FZF_STATE="$BATS_STUB_DIR/fzf-state"
+  FOCUS_CALL_LOG="$BATS_STUB_DIR/focus.log"
+  HERDR_GREP_FOCUS_HELPER="$BATS_STUB_DIR/focus-helper.py"
+  export HERDR_CALL_LOG RG_CALL_LOG FZF_CALL_LOG FZF_INPUT_LOG FZF_STATE
+  export FOCUS_CALL_LOG HERDR_GREP_FOCUS_HELPER
 
   _install_herdr_stub
   _install_rg_stub
+  _install_fzf_stub
+  _install_focus_stub
 }
 
 _install_herdr_stub() {
@@ -36,6 +44,12 @@ _install_herdr_stub() {
 } >> "$HERDR_CALL_LOG"
 
 mode="${HERDR_TEST_MODE-default}"
+if [ "$#" -eq 0 ]; then
+  exit "${HERDR_ATTACH_RC:-0}"
+fi
+if [ "$1" = "session" ] && [ "$2" = "attach" ]; then
+  exit "${HERDR_ATTACH_RC:-0}"
+fi
 if [ "$1" = "session" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then
   case "$mode" in
     malformed-session)
@@ -97,6 +111,11 @@ fi
 
 if [ "$1" = "pane" ] && [ "$2" = "read" ]; then
   pane="$3"
+  source="$5"
+  if [ "$mode" = "scrollback-only" ] && [ "$source" = "visible" ]; then
+    printf 'no visible match\n'
+    exit 0
+  fi
   case "$pane" in
     opaque:p9)
       printf 'ordinary needle\nneedle needle\nliteral a.b\n-leading-dash\n'
@@ -151,6 +170,65 @@ EOF
   chmod +x "$BATS_STUB_DIR/rg"
 }
 
+_install_fzf_stub() {
+  cat > "$BATS_STUB_DIR/fzf" <<'EOF'
+#!/bin/bash
+{
+  printf 'fzf'
+  for arg in "$@"; do printf '\t%s' "$arg"; done
+  printf '\n'
+} >> "$FZF_CALL_LOG"
+cat > "$FZF_INPUT_LOG"
+first=$(IFS= read -r line < "$FZF_INPUT_LOG" && printf '%s' "$line")
+mode="${FZF_TEST_MODE:-select}"
+case "$mode" in
+  esc) exit 130 ;;
+  no-match) exit 1 ;;
+  fail) printf 'fzf failed\n' >&2; exit 9 ;;
+  alt-s-once)
+    if [ ! -e "$FZF_STATE" ]; then
+      : > "$FZF_STATE"
+      printf 'refine\nalt-s\n%s\n' "$first"
+    else
+      printf 'refine\n\n%s\n' "$first"
+    fi
+    ;;
+  alt-v-once)
+    if [ ! -e "$FZF_STATE" ]; then
+      : > "$FZF_STATE"
+      printf 'refine\nalt-v\n%s\n' "$first"
+    else
+      printf 'refine\n\n%s\n' "$first"
+    fi
+    ;;
+  alt-v-then-alt-s)
+    count=$(cat "$FZF_STATE" 2>/dev/null || printf '0')
+    case "$count" in
+      0) printf '1' > "$FZF_STATE"; printf 'refine\nalt-v\n%s\n' "$first" ;;
+      1) printf '2' > "$FZF_STATE"; printf 'refine\nalt-s\n%s\n' "$first" ;;
+      *) printf 'refine\n\n%s\n' "$first" ;;
+    esac
+    ;;
+  unicode-query) printf 'refine query\n\n%s\n' "$first" ;;
+  *) printf '\n\n%s\n' "$first" ;;
+esac
+EOF
+  chmod +x "$BATS_STUB_DIR/fzf"
+}
+
+_install_focus_stub() {
+  cat > "$HERDR_GREP_FOCUS_HELPER" <<'EOF'
+import os
+import sys
+
+with open(os.environ["FOCUS_CALL_LOG"], "a", encoding="utf-8") as handle:
+    handle.write("\t".join(sys.argv[1:]) + "\n")
+if os.environ.get("FOCUS_HELPER_RC"):
+    print("focus helper failed", file=sys.stderr)
+sys.exit(int(os.environ.get("FOCUS_HELPER_RC", "0")))
+EOF
+}
+
 _assert_log_lacks() {
   local pattern="$1" file="$2" count
   count=$(grep -F -c -- "$pattern" "$file" 2>/dev/null || true)
@@ -165,6 +243,7 @@ _assert_log_lacks() {
   [[ "$output" == *"--all-sessions"* ]]
   [[ "$output" == *"--list-sessions"* ]]
   [[ "$output" == *"--json"* ]]
+  [[ "$output" == *"--pick"* ]]
 }
 
 @test "herdr-grep: list-sessions prints sorted running names without rg" {
@@ -367,6 +446,151 @@ _assert_log_lacks() {
   [ "$output" = "$normal" ]
 }
 
+@test "herdr-grep: --pick is mutually exclusive with JSON and needs a pattern noninteractively" {
+  run "$PYTHON_BIN" "$CLI" --json --pick needle
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"not allowed with argument --json"* ]]
+
+  run "$PYTHON_BIN" "$CLI" --pick
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"required: PATTERN"* ]]
+}
+
+@test "herdr-grep: inside Herdr picks and focuses the selected current-session pane" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  grep -F -- '--route-token' "$FOCUS_CALL_LOG"
+  grep -F $'[default/workspace-A/tab-Z/opaque:p9 L1 idle]\tordinary needle' "$FZF_INPUT_LOG"
+  grep -F -- '--with-nth=2..' "$FZF_CALL_LOG"
+  grep -F -- '--preview-route-token {1}' "$FZF_CALL_LOG"
+  _assert_log_lacks $'session\tattach' "$HERDR_CALL_LOG"
+}
+
+@test "herdr-grep: outside Herdr focuses then attaches default or named session" {
+  run "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  grep -Fx 'socket=/tmp/default.sock' "$HERDR_CALL_LOG"
+
+  : > "$HERDR_CALL_LOG"
+  : > "$FOCUS_CALL_LOG"
+  run "$PYTHON_BIN" "$CLI" --pick --visible --session alpha needle
+  [ "$status" -eq 0 ]
+  grep -F $'session\tattach\talpha' "$HERDR_CALL_LOG"
+  grep -F -- '--route-token' "$FOCUS_CALL_LOG"
+}
+
+@test "herdr-grep: inside Herdr refuses a cross-session selection without nesting" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock \
+    "$PYTHON_BIN" "$CLI" --pick --visible --session alpha needle
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"belongs to another session"* ]]
+  [[ "$output" == *"herdr session attach alpha"* ]]
+  [ ! -e "$FOCUS_CALL_LOG" ]
+}
+
+@test "herdr-grep: Alt+S and Alt+V rescan explicitly and preserve fzf query" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock FZF_TEST_MODE=alt-s-once \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  grep -F -- $'--source\tvisible' "$HERDR_CALL_LOG"
+  grep -F -- $'--source\trecent-unwrapped' "$HERDR_CALL_LOG"
+  grep -F -- '--query=refine' "$FZF_CALL_LOG"
+
+  : > "$HERDR_CALL_LOG"
+  : > "$FZF_CALL_LOG"
+  rm -f "$FZF_STATE"
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock FZF_TEST_MODE=alt-v-once \
+    "$PYTHON_BIN" "$CLI" --pick --source recent-unwrapped needle
+  [ "$status" -eq 0 ]
+  grep -F -- $'--source\trecent-unwrapped' "$HERDR_CALL_LOG"
+  grep -F -- $'--source\tvisible' "$HERDR_CALL_LOG"
+}
+
+@test "herdr-grep: Esc is quiet and never invokes focus" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock FZF_TEST_MODE=esc \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  [ ! -e "$FOCUS_CALL_LOG" ]
+}
+
+@test "herdr-grep: partial matches remain pickable and warn in the fzf header" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock HERDR_TEST_MODE=disappearing \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  grep -F -- '⚠ incomplete' "$FZF_CALL_LOG"
+  grep -F -- '--route-token' "$FOCUS_CALL_LOG"
+}
+
+@test "herdr-grep: picker dependency and focus failures are operational errors" {
+  rm -f "$BATS_STUB_DIR/fzf"
+  run env PATH="$BATS_STUB_DIR" "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"fzf not found"* ]]
+
+  _install_fzf_stub
+  run env FOCUS_HELPER_RC=1 "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"focus helper failed"* ]]
+}
+
+@test "herdr-grep: pick mode excludes its own command pane" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock HERDR_PANE_ID=opaque:p9 \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  _assert_log_lacks 'opaque:p9' "$FZF_INPUT_LOG"
+  grep -F 'same:p1' "$FZF_INPUT_LOG"
+}
+
+@test "herdr-grep: command-pane exclusion is scoped to its session socket" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock HERDR_PANE_ID=same:p1 \
+    FZF_TEST_MODE=esc "$PYTHON_BIN" "$CLI" --pick --all-sessions --visible needle
+  [ "$status" -eq 0 ]
+  grep -F '[alpha/alpha-space/alpha-tab/same:p1' "$FZF_INPUT_LOG"
+  _assert_log_lacks '[default/workspace-B/tab-A/same:p1' "$FZF_INPUT_LOG"
+}
+
+@test "herdr-grep: default attach is forced through the selected socket" {
+  run env HERDR_SOCKET_PATH=/tmp/alpha.sock \
+    "$PYTHON_BIN" "$CLI" --pick --visible --session default needle
+  [ "$status" -eq 0 ]
+  grep -Fx 'socket=/tmp/default.sock' "$HERDR_CALL_LOG"
+}
+
+@test "herdr-grep: empty source toggle stays open so the previous source can return" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock \
+    HERDR_TEST_MODE=scrollback-only FZF_TEST_MODE=alt-v-then-alt-s \
+    "$PYTHON_BIN" "$CLI" --pick --source recent-unwrapped needle
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^fzf' "$FZF_CALL_LOG")" -eq 3 ]
+  grep -F -- 'no matches in this source' "$FZF_CALL_LOG"
+  grep -F -- '--route-token' "$FOCUS_CALL_LOG"
+}
+
+@test "herdr-grep: Unicode line separator in fzf query does not shift protocol fields" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock FZF_TEST_MODE=unicode-query \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  grep -F -- '--route-token' "$FOCUS_CALL_LOG"
+}
+
+@test "herdr-grep: route token is bounded to routing metadata" {
+  run env HERDR_ENV=1 HERDR_SOCKET_PATH=/tmp/default.sock \
+    "$PYTHON_BIN" "$CLI" --pick --visible needle
+  [ "$status" -eq 0 ]
+  call=$(grep -F -- '--route-token' "$FOCUS_CALL_LOG")
+  token=${call#*$'\t'}
+  TOKEN="$token" "$PYTHON_BIN" -c '
+import base64, json, os
+value = os.environ["TOKEN"]
+value += "=" * (-len(value) % 4)
+payload = json.loads(base64.urlsafe_b64decode(value).decode())
+assert "line" not in payload
+assert "cwd" not in payload
+assert len(os.environ["TOKEN"]) < 1024
+'
+}
+
 @test "herdr-grep: missing dependencies return 2 and JSON errors stay valid" {
   empty_path="$BATS_STUB_DIR/empty"
   mkdir "$empty_path"
@@ -388,7 +612,7 @@ _assert_log_lacks() {
   [ -f "$BASH_COMPLETION" ]
   run "$PYTHON_BIN" "$CLI" --help
   [ "$status" -eq 0 ]
-  for option in --fixed-strings --ignore-case --source --visible --session --all-sessions --json --list-sessions; do
+  for option in --fixed-strings --ignore-case --source --visible --session --all-sessions --json --pick --list-sessions; do
     [[ "$output" == *"$option"* ]]
     grep -F -- "$option" "$ZSH_COMPLETION"
     grep -F -- "$option" "$BASH_COMPLETION"

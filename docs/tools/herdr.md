@@ -62,6 +62,8 @@ herdr-grep --source recent-unwrapped 'url'  # retained history without hard wrap
 herdr-grep --session work 'panic'           # one running named session
 herdr-grep --all-sessions 'rate limit'      # every running local session
 herdr-grep --all-sessions --json 'panic'    # structured matches + errors
+herdr-grep --pick 'error|failed'             # grep first, then fzf-pick and jump/attach
+herdr-grep --pick --all-sessions 'panic'     # outside Herdr: pick, pre-focus, attach session
 herdr-grep -F -- -leading-dash              # protect a pattern beginning with `-`
 ```
 
@@ -70,11 +72,14 @@ herdr-grep -F -- -leading-dash              # protect a pattern beginning with `
 | Default scope | The ambient session when `HERDR_SOCKET_PATH` is set (inside Herdr); otherwise `default`. `--session NAME` resolves the authoritative socket from `herdr session list --json`; `--all-sessions` scans running sessions only. An ambient socket that cannot be mapped uniquely returns 2 rather than being mislabeled. |
 | Content source | `recent` by default (full retained scrollback); `--visible` for the current screen; `--source recent-unwrapped` when terminal wrapping splits a phrase. |
 | Output | Human output repeats `session/workspace/tab/pane` on every matching line. `--json` adds socket, cwd, agent state, byte-offset submatches, `complete`, and structured errors. Line numbers are **relative to this capture**, not persistent pane coordinates. |
+| Interactive picker | `--pick PATTERN` sends the filtered matches to fzf. Enter exact-focuses the pane; outside Herdr it then attaches the selected session. Alt+S reruns the same pattern against `recent-unwrapped`; Alt+V returns to `visible`. |
 | Exit status | `0` = match + complete scan; `1` = clean no-match; `2` = usage/error/**incomplete scan**. If a pane disappears mid-scan, good matches are preserved, the failure goes to stderr/JSON, and the command returns 2. |
+
+Inside Herdr, **`prefix+Alt+F`** runs `herdr-grep --pick --visible`: type the grep pattern once, then use fzf to refine the already-filtered matches. Agent panes use Herdr's exact `agent focus`; ordinary split panes are reached through a validated shortest path of directional `pane neighbor` / `pane focus` calls, with final active workspace/tab plus `pane layout.focused_pane_id` verification. The picker refuses a different-session selection while already attached (detach first rather than nest). From a normal shell, `--pick --all-sessions` pre-focuses the selected target and then attaches its session, matching `hhere`'s focus-then-attach model. Preview line numbers refer to the earlier capture and may drift while the pane keeps printing.
 
 The search is bounded by what the live Herdr server still retains: closed panes, output older than the history limit, and alternate-screen content already discarded cannot be recovered. The command runs where the Unix socket is accessible. For a remote server, run the deployed CLI through SSH, for example `ssh server 'herdr-grep --all-sessions -F -- "connection refused"'`; **`herdr --remote` is an interactive thin-client attach, not an RPC prefix for pane subcommands**.
 
-`tv herdr-agent-panes` and `tv herdr-review` still fuzzy-search metadata only (pane/session identifiers, state, cwd). Their visible pane text is a preview and is not part of Television's searchable source; use `herdr-grep` when the query is terminal content.
+`tv herdr-agent-panes` and `tv herdr-review` still fuzzy-search metadata only (pane/session identifiers, state, cwd). Their visible pane text is a preview and is not part of Television's searchable source. Television runs its source before—and cannot receive—the live query, so content selection deliberately uses `herdr-grep --pick` → fzf instead of a `tv herdr-grep` channel.
 
 ## cwd & workspace-naming model
 
@@ -119,6 +124,7 @@ description = "new tab at the workspace (space) root dir"
 | lazygit / scratch popups | **Custom command panes** | Key bindings |
 | URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` scans scrollback |
 | File-path picker (`prefix+p`; extrakto `prefix+Tab` on tmux) | **Custom command pane + helper** | `prefix+p` → `path-pick.sh` — two-tier (exists-under-cwd first) → `x copy` |
+| Search all pane content + jump | **CLI pipeline + fzf + exact-focus helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`; Alt+S searches unwrapped scrollback |
 | Seamless `Ctrl-hjkl` nvim↔pane nav | **No herdr-aware smart-splits** | **Gap** — workaround below |
 | OSC133 copy-mode (`cpout`/`cpblock`) | tmux-specific | **Gap** — `cpcmd` (zsh history) still works |
 | Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --token` (per-pane metadata tokens, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
@@ -156,6 +162,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + T` | `tv herdr-sesh` (workspace/dir switcher) | command pane |
 | `prefix + a` | `tv herdr-agent-panes` (live agent panes) | command pane |
 | `prefix + f` | `tv fleet-hosts` (SSH picker) | command pane |
+| `prefix + Alt + F` | prompt for pane-content pattern → `herdr-grep --pick --visible` → fzf exact jump; Alt+S = scrollback, Alt+V = visible | command pane |
 | `prefix + m` | toggle **review-pending** flag (⭐) on the current pane | command pane |
 | `prefix + i` | `tv herdr-review` — review-pending **inbox** (flagged panes) | command pane |
 | `prefix + P` | copy focused pane's **process info** to the clipboard | command pane |

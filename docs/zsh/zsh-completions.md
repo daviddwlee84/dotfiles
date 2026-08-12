@@ -158,7 +158,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `view-ebook` | `dot_dotfiles/bin/executable_view-ebook` | bash hand-rolled | B | `dot_config/zsh/tools/56_view_ebook_completion.zsh` + `dot_config/bash/56_view_ebook_completion.bash` |
 | `appsrc` | `dot_dotfiles/bin/executable_appsrc` | argparse (subcommands) | B | `dot_config/zsh/tools/57_appsrc_completion.zsh` + `dot_config/bash/57_appsrc_completion.bash` |
 | `docker-net` | `dot_config/shell/51_docker_net.sh` (**shell function**, not a bin CLI) | shell hand-rolled | B | `dot_config/zsh/tools/58_docker_net_completion.zsh` + `dot_config/bash/58_docker_net_completion.bash`. Guard with `command -v`, **not** `$+commands` / a PATH test — the target is a function, so those never see it |
-| `herdr-grep` | `dot_dotfiles/bin/executable_herdr-grep` | argparse | B | `dot_config/zsh/tools/59_herdr_grep_completion.zsh` + `dot_config/bash/59_herdr_grep_completion.bash`; `--session` candidates come from `herdr-grep --list-sessions` |
+| `herdr-grep` | `dot_dotfiles/bin/executable_herdr-grep` | argparse | B | `dot_config/zsh/tools/59_herdr_grep_completion.zsh` + `dot_config/bash/59_herdr_grep_completion.bash`; `--session` candidates come from `herdr-grep --list-sessions`; `--pick` pipes filtered matches into fzf and focuses/attaches the selection |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
 
 **Dynamic candidates wired up:**

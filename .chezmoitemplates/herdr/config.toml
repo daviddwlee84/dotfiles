@@ -228,6 +228,15 @@ type = "pane"
 command = "tv fleet-hosts"
 description = "Fleet hosts SSH picker (tv)"
 
+# Content-search picker. prefix+f stays the fleet picker; the Alt chord is the
+# collision-free mnemonic for "find in Herdr panes". Visible content opens fast;
+# Alt+S in fzf reruns the same pattern against recent-unwrapped scrollback.
+[[keys.command]]
+key = "prefix+alt+f"
+type = "pane"
+command = "~/.dotfiles/bin/herdr-grep --pick --visible"
+description = "search pane content and jump (fzf)"
+
 # --- Review-pending flag (mark-unread / ⭐) ---
 # prefix+m toggles a per-pane "I still need to review this" flag (a herdr
 # metadata token, orthogonal to agent state — survives the pane going idle when
