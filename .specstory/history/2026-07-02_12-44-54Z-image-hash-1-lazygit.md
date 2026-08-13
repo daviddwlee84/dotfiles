@@ -26,7 +26,7 @@ _**Agent (gpt-5.5 2026-07-02 12:46:46Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,220p' /Users/david/.agents/skills/chezmoi-dotfiles/SKILL.md && rg -n "lazygit|pull.*rebase|autoStash|rebase" -S dot_config docs README.md AGENTS.md 2>/dev/null`</summary>
-```
+````
 Chunk ID: 7c20c0
 Wall time: 0.0387 seconds
 Process exited with code 0
@@ -108,7 +108,7 @@ Each works from any cwd. Run with `--help`, or read `docs/tools/<name>.md`. Full
 - **`x`** — clipboard/file copy-paste-open with cross-platform fallbacks.
 - **`mi-router`** / **`reyee`** / **`sms`** — read-only router CLIs (Xiaomi MiWiFi / Ruijie Reyee / Huawei
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:46:52Z)**_
@@ -606,7 +606,7 @@ _**Agent (gpt-5.5 2026-07-02 12:52:18Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,140p' docs/tools/lazygit.md`</summary>
-```
+````
 Chunk ID: 397550
 Wall time: 0.0000 seconds
 Process exited with code 0
@@ -686,14 +686,14 @@ git reset --hard <good-sha>      # restore branch + worktree to that point
 
 - [git diff workflow](git_diff_workflow.md)
 - Per-tool tips/recipes live under `docs/tools/<tool>.md` — this page is the home for git/lazygit recipes.
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:52:18Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,260p' README.md`</summary>
-```
+````
 Chunk ID: 1ffd48
 Wall time: 0.0000 seconds
 Process exited with code 0
@@ -817,14 +817,14 @@ SUDO_PASSWORD=xxx just apply-with-sudo --pass-from-env            # one-liner
 
 The wrapper validates the password against `sudo -v` before invoking `chezmoi`, then shreds the tmpfile on exit (any signal). Inside chezmoi's run-scripts, `sudo_sessio
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:52:19Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,130p' docs/tools/git_diff_workflow.md`</summary>
-```
+````
 Chunk ID: dbd2e3
 Wall time: 0.0000 seconds
 Process exited with code 0
@@ -897,7 +897,7 @@ The `bat` Tokyo Night warning is fixed by managing the upstream `tokyonight_nigh
 - [gh-dash docs](https://www.gh-dash.dev/getting-started/)
 - [LazyGit custom pagers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md)
 - [bat](https://github.com/sharkdp/bat)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:52:19Z)**_
@@ -1063,7 +1063,7 @@ _**Agent (gpt-5.5 2026-07-02 12:52:48Z)**_
 
 **Update: `docs/tools/lazygit.md`**
 
-```diff
+````diff
 @@
  > **Golden rule: only rewrite commits that have NOT been pushed.** All recipes below rewrite history (new SHAs). If a commit is already on a shared remote, don't — or you'll need `git push --force-with-lease` and coordination.
  
@@ -1083,7 +1083,7 @@ _**Agent (gpt-5.5 2026-07-02 12:52:48Z)**_
  ## The mental model: two different "fixup"s
  
  The word *fixup* shows up in two unrelated lazygit operations — confusing them is the #1 way to mangle history:
-```
+````
 
 
 ```
@@ -1120,7 +1120,7 @@ _**Agent (gpt-5.5 2026-07-02 12:53:02Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `git diff -- modify_dot_gitconfig.tmpl README.md docs/tools/lazygit.md`</summary>
-```
+````
 Chunk ID: 0368ed
 Wall time: 0.1039 seconds
 Process exited with code 0
@@ -1178,7 +1178,7 @@ index 71a9e70..a5b454b 100644
  {{- if lookPath "delta" }}
      pager = delta
  [interactive]
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:53:02Z)**_
@@ -1271,7 +1271,7 @@ _**Agent (gpt-5.5 2026-07-02 12:53:32Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `nl -ba docs/tools/lazygit.md | sed -n '1,28p'`</summary>
-```
+````
 Chunk ID: b979e0
 Wall time: 0.0000 seconds
 Process exited with code 0
@@ -1305,7 +1305,7 @@ Output:
     26	| Add **working-tree changes** into an existing commit | **`A`** (Commits panel) = *amend commit with staged changes* | Runs `git commit --fixup` + `git rebase --autosquash` under the hood |
     27	| Merge **two existing commits** into one | **`f`** / **`c`** (Commits panel) = *fixup / squash* | Squashes the **selected** commit **into the one below it** (older) |
     28
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:53:32Z)**_
@@ -1460,7 +1460,7 @@ _**Agent (gpt-5.5 2026-07-02 12:57:14Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `git diff -- docs/tools/lazygit.md modify_dot_gitconfig.tmpl README.md`</summary>
-```
+````
 Chunk ID: b38997
 Wall time: 0.0130 seconds
 Process exited with code 0
@@ -1518,7 +1518,7 @@ index 71a9e70..a5b454b 100644
  {{- if lookPath "delta" }}
      pager = delta
  [interactive]
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 12:57:14Z)**_
@@ -1678,7 +1678,7 @@ _**Agent (gpt-5.5 2026-07-02 13:07:36Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `for f in .specstory/history/2026-07-02_12-44-54Z-image-hash-1-lazygit.md .specstory/history/2026-07-02_03-57-00Z-https-sshpass-com-https.md; do [ -f "$f" ] && { printf '%s\n' "$f"; sed -n '1,60p' "$f"; }; done`</summary>
-```
+````
 Chunk ID: 01a31c
 Wall time: 0.0625 seconds
 Process exited with code 0
@@ -1776,7 +1776,7 @@ Async agent launched successfully. (This tool result is internal metadata — ne
 agentId: a1ab52c8d62132107 (internal ID - do not mention to user. Use SendMessage with to: 'a1ab52c8d62132107', summary: '<5-10 word recap>' to continue this agent.)
 The agent
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.5 2026-07-02 13:07:47Z)**_

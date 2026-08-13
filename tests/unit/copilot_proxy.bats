@@ -330,9 +330,9 @@ SH
   run env TEST_CATALOG="$catalog" bash -c "
     cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
     _copilot_alive() { return 0; }
-    _copilot_shim_enabled() { return 0; }
+    _copilot_shim_alive() { return 0; }
+    _copilot_shim_base() { printf '%s' 'http://localhost:4242'; }
     _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
-    _copilot_client_base() { printf '%s' 'http://localhost:4141/v1'; }
     _copilot_codex_catalog_file() { printf '%s' '$TMP/bundled-models.json'; }
     codex-copilot --no-specstory exec --skip-git-repo-check 'two words'"
   [ "$status" -eq 0 ]
@@ -342,6 +342,7 @@ SH
   [[ "$output" == *"=<model_context_window=1050000>"* ]]
   [[ "$output" == *"=<model_auto_compact_token_limit=920000>"* ]]
   [[ "$output" == *"=<model_catalog_json=\"$TMP/bundled-models.json\">"* ]]
+  [[ "$output" == *"=<model_providers.copilot_api.base_url=\"http://localhost:4242\">"* ]]
   [[ "$output" == *"=<features.remote_compaction_v2=true>"* ]]
   [[ "$output" == *"=<two words>"* ]]
   [ ! -e "$TMP/proj/.codex" ]
@@ -355,9 +356,9 @@ SH
   run env TEST_CATALOG="$catalog" bash -c "
     cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
     _copilot_alive() { return 0; }
-    _copilot_shim_enabled() { return 0; }
+    _copilot_shim_alive() { return 0; }
+    _copilot_shim_base() { printf '%s' 'http://localhost:4242'; }
     _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
-    _copilot_client_base() { printf '%s' 'http://localhost:4141/v1'; }
     _copilot_codex_catalog_file() { printf '%s' '$TMP/bundled-models.json'; }
     codex-copilot --no-specstory -m claude-opus-5 exec 'two words'"
   [ "$status" -eq 0 ]
@@ -366,6 +367,53 @@ SH
   [[ "$output" == *"=<claude-opus-5>"* ]]
   [[ "$output" == *"=<model_catalog_json=\"$TMP/bundled-models.json\">"* ]]
   [[ "$output" == *"=<two words>"* ]]
+}
+
+@test "Codex launcher starts the compatibility shim even when throttling is disabled" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  write_fake_codex
+  printf '%s\n' '{"models":[{"slug":"gpt-5.6-sol"}]}' > "$TMP/bundled-models.json"
+  local catalog='{"data":[{"id":"gpt-5.6-sol"}]}'
+  run env TEST_CATALOG="$catalog" bash -c "
+    cd '$TMP/proj'; PATH='$TMP/bin':\"\$PATH\"; source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_shim_alive() { return 1; }
+    _copilot_shim_start() { printf '%s\n' started-shim; return 0; }
+    _copilot_shim_base() { printf '%s' 'http://localhost:4242'; }
+    _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+    _copilot_codex_catalog_file() { printf '%s' '$TMP/bundled-models.json'; }
+    codex-copilot --no-specstory exec 'two words'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"started-shim"* ]]
+  [[ "$output" == *"=<model_providers.copilot_api.base_url=\"http://localhost:4242\">"* ]]
+}
+
+@test "Responses shim fills only blank MCP tool descriptions" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bun -e "import { normalizeResponsesToolDescriptions as n } from '$shim';
+    const p={tools:[{type:'web_search'},{type:'function',name:'top',description:''}],input:[{type:'mcp_list_tools',tools:[{name:'alpha',description:''},{name:'beta',description:null},{name:'gamma',description:'kept'}]},{type:'message',tools:[{name:'prompt-data',description:''}]}]};
+    const r=n(p); console.log(JSON.stringify({r,p}));"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.r.changed')" = "4" ]
+  [ "$(printf '%s' "$output" | jq -r '.p.input[0].tools[0].description')" = "Tool alpha." ]
+  [ "$(printf '%s' "$output" | jq -r '.p.input[0].tools[2].description')" = "kept" ]
+  [ "$(printf '%s' "$output" | jq -r '.p.input[1].tools[0].description')" = "Tool prompt-data." ]
+  [ "$(printf '%s' "$output" | jq -r '.p.tools[0] | has("description")')" = "false" ]
+}
+
+@test "Responses shim decodes zstd before normalization" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bun -e "import { normalizeRequestBody as n } from '$shim';
+    const source=JSON.stringify({input:[{tools:[{name:'compressed',description:''}]}]});
+    const compressed=Bun.zstdCompressSync(new TextEncoder().encode(source));
+    const r=n('/responses',compressed,'zstd');
+    console.log(JSON.stringify({changed:r.changed,decoded:r.decoded,p:JSON.parse(r.body)}));"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.changed')" = "1" ]
+  [ "$(printf '%s' "$output" | jq -r '.decoded')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.p.input[0].tools[0].description')" = "Tool compressed." ]
 }
 
 @test "copilot-here on reports the shim URL it actually writes" {

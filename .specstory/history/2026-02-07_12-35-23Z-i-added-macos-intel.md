@@ -1073,7 +1073,7 @@ _**Agent (gpt-5.3-codex 2026-02-07 12:37:24Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,280p' README.md`</summary>
-```
+````
 Chunk ID: c22cfe
 Wall time: 0.0510 seconds
 Process exited with code 0
@@ -1239,7 +1239,7 @@ just info             # Show system info
 
 See [CLAUDE.md](CLAUDE.md) for development guide and [docs/ansible.md](docs/ansible.md) for ansible custo
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-07 12:37:38Z)**_
@@ -3505,7 +3505,7 @@ _**Agent (gpt-5.3-codex 2026-02-07 12:49:20Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `git diff -- .pre-commit-config.yaml dot_config/nvim/stylua.toml .specstory/history/2026-02-07_12-35-23Z-i-added-macos-intel.md | sed -n '1,260p'`</summary>
-```
+````
 Chunk ID: 14db0c
 Wall time: 0.0517 seconds
 Process exited with code 0
@@ -3615,7 +3615,7 @@ index 3d30e55..c92b25c 100644
 +.pre-commit-config.yaml:1:# Pre-commit hooks for dotfiles repository
 +.pre-commit-config.yaml
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-07 12:49:25Z)**_
@@ -3718,7 +3718,7 @@ _**Agent (gpt-5.3-codex 2026-02-07 12:49:45Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `tail -n 260 ~/.cache/pre-commit/pre-commit.log`</summary>
-```
+````
 Chunk ID: 83a2fa
 Wall time: 0.0519 seconds
 Process exited with code 0
@@ -3781,7 +3781,7 @@ stderr:
     go: errors parsing go.mod:
     /Users/david/.cache/pre-commit/repondiys330/go.mod:5: unknown directive: toolchain
 ```
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-07 12:49:53Z)**_

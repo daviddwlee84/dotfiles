@@ -25,7 +25,7 @@ _**Agent (gpt-5.6-sol 2026-07-24 00:46:32Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,240p' /Users/david/.agents/skills/chezmoi-dotfiles/SKILL.md`</summary>
-```
+````
 Chunk ID: 64fbe5
 Wall time: 0.0163 seconds
 Process exited with code 0
@@ -107,7 +107,7 @@ Each works from any cwd. Run with `--help`, or read `docs/tools/<name>.md`. Full
 - **`pqsum`** — pueue queue summary (text / AI / JSON). See `docs/tools/pueue.md`.
 - **`x`** — clipb
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.6-sol 2026-07-24 00:46:43Z)**_

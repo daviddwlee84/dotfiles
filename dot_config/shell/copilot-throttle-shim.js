@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 // copilot-throttle-shim.js — a tiny streaming reverse proxy that sits IN FRONT
-// of the local copilot-api fork (default :4141). It exists to stop GitHub's
-// enterprise Copilot backend from 403-ing ("Forbidden") on bursts of premium
-// requests, WITHOUT adding latency to normal single-agent flow.
+// of the local copilot-api fork (default :4141). It provides the request
+// compatibility fixes shared by Codex/Claude Code and stops GitHub's enterprise
+// Copilot backend from 403-ing ("Forbidden") on bursts of premium requests,
+// WITHOUT adding latency to normal single-agent flow.
 //
-//   Claude Code ─▶ shim (:4142) ─▶ copilot-api fork (:4141) ─▶ Copilot backend
+//   agent client ─▶ shim (:4142) ─▶ copilot-api fork (:4141) ─▶ Copilot backend
 //                    │
 //                    ├─ semaphore: at most MAX concurrent in-flight upstream
 //                    │   POSTs; a burst queues instead of hitting the backend
@@ -54,15 +55,84 @@ function backoffMs(attempt, retryAfter) {
   return BACKOFF_MS * 2 ** attempt + Math.floor(Math.random() * BACKOFF_MS); // + jitter
 }
 
-function buildUpstream(req, bodyBuf) {
+function buildUpstream(req, bodyBuf, bodyWasDecoded = false) {
   const url = new URL(req.url);
   const target = UPSTREAM + url.pathname + url.search;
   const headers = new Headers(req.headers);
   headers.delete("host");
   headers.delete("content-length"); // fetch recomputes from body
+  if (bodyWasDecoded) headers.delete("content-encoding");
   const init = { method: req.method, headers, signal: req.signal };
   if (bodyBuf !== undefined) init.body = bodyBuf;
   return { target, init };
+}
+
+function blankDescription(value) {
+  return typeof value !== "string" || value.trim().length === 0;
+}
+
+function toolLabel(tool) {
+  const name = tool?.name ?? tool?.tool_name ?? tool?.title;
+  return typeof name === "string" && name.trim() ? name.trim() : "unnamed tool";
+}
+
+// Codex records MCP discovery in Responses input items. Some MCP/plugin
+// servers legally omit a tool description, which Codex serializes as "". The
+// GitHub Copilot Responses endpoint is stricter than OpenAI's endpoint and
+// rejects that request before inference:
+//
+//   Invalid 'input[0].tools[0].description': empty string.
+//
+// Only touch tool-definition arrays in the two Responses locations Codex uses;
+// do not recursively rewrite user input, JSON Schema descriptions, or outputs.
+export function normalizeResponsesToolDescriptions(payload) {
+  let changed = 0;
+  const patched = [];
+
+  const normalizeTools = (tools, prefix, requireDescriptionField = false) => {
+    if (!Array.isArray(tools)) return;
+    tools.forEach((tool, index) => {
+      if (!tool || typeof tool !== "object") return;
+      if (requireDescriptionField && !("description" in tool)) return;
+      if (!blankDescription(tool.description)) return;
+      const label = toolLabel(tool);
+      tool.description = `Tool ${label}.`;
+      changed++;
+      patched.push(`${prefix}[${index}].description`);
+    });
+  };
+
+  if (!payload || typeof payload !== "object") return { changed, patched };
+  // Built-in top-level tools such as web_search do not have a description by
+  // design, so only repair an explicitly present-but-blank field there.
+  normalizeTools(payload.tools, "tools", true);
+  if (Array.isArray(payload.input)) {
+    payload.input.forEach((item, index) => {
+      // Codex versions have used more than one discriminator for persisted MCP
+      // discovery. The stable shape is the nested tool-definition array itself.
+      if (!item || typeof item !== "object") return;
+      normalizeTools(item.tools, `input[${index}].tools`);
+    });
+  }
+  return { changed, patched };
+}
+
+export function normalizeRequestBody(pathname, bodyBuf, contentEncoding = "") {
+  if (pathname !== "/responses" && pathname !== "/v1/responses") {
+    return { body: bodyBuf, changed: 0, patched: [], parseError: null, decoded: false };
+  }
+  try {
+    const encoding = contentEncoding.trim().toLowerCase();
+    const decodedBody = encoding === "zstd" ? Bun.zstdDecompressSync(new Uint8Array(bodyBuf)) : bodyBuf;
+    const payload = JSON.parse(new TextDecoder().decode(decodedBody));
+    const result = normalizeResponsesToolDescriptions(payload);
+    if (result.changed === 0) return { body: bodyBuf, ...result, parseError: null, decoded: false };
+    return { body: JSON.stringify(payload), ...result, parseError: null, decoded: encoding === "zstd" };
+  } catch (error) {
+    // Preserve malformed/non-JSON requests verbatim; the upstream remains the
+    // authority for their validation and error response.
+    return { body: bodyBuf, changed: 0, patched: [], parseError: String(error), decoded: false };
+  }
 }
 
 // Stream an upstream response to the client, holding the semaphore permit until
@@ -88,10 +158,11 @@ function streamThrough(resp, releaseOnce) {
   return new Response(stream, { status: resp.status, headers });
 }
 
-const server = Bun.serve({
-  port: PORT,
-  idleTimeout: 255, // seconds — long opus streams (saw up to ~77s)
-  async fetch(req) {
+export function startServer() {
+  const server = Bun.serve({
+    port: PORT,
+    idleTimeout: 255, // seconds — long opus streams (saw up to ~77s)
+    async fetch(req) {
     const url = new URL(req.url);
     const method = req.method;
 
@@ -108,7 +179,14 @@ const server = Bun.serve({
     // Mutating requests (POST /v1/messages …): buffer body so we can resend on
     // retry, then throttle + retry.
     const bodyBuf = await req.arrayBuffer();
-    const { target, init } = buildUpstream(req, bodyBuf);
+    const normalized = normalizeRequestBody(url.pathname, bodyBuf, req.headers.get("content-encoding") ?? "");
+    if (normalized.parseError) {
+      log(`${method} ${url.pathname} could not inspect JSON (${bodyBuf.byteLength} bytes, content-type=${req.headers.get("content-type") ?? "unset"}, content-encoding=${req.headers.get("content-encoding") ?? "unset"}): ${normalized.parseError}`);
+    }
+    if (normalized.changed > 0) {
+      log(`${method} ${url.pathname} filled ${normalized.changed} empty tool description(s): ${normalized.patched.join(", ")}`);
+    }
+    const { target, init } = buildUpstream(req, normalized.body, normalized.decoded);
 
     const willQueue = active >= MAX;
     await acquire();
@@ -153,7 +231,11 @@ const server = Bun.serve({
       releaseOnce();
       return new Response(`shim: ${err}`, { status: 500 });
     }
-  },
-});
+    },
+  });
 
-log(`listening on :${server.port} -> ${UPSTREAM} (max=${MAX}, retries=${RETRIES}, backoff=${BACKOFF_MS}ms)`);
+  log(`listening on :${server.port} -> ${UPSTREAM} (max=${MAX}, retries=${RETRIES}, backoff=${BACKOFF_MS}ms)`);
+  return server;
+}
+
+if (import.meta.main) startServer();

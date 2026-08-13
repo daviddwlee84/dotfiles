@@ -1391,7 +1391,10 @@ codex-copilot() {
     return 1
   fi
   if ! _copilot_alive; then copilot-proxy start || return 1; fi
-  if _copilot_shim_enabled && ! _copilot_shim_alive; then _copilot_shim_start || return 1; fi
+  # Codex needs the shim even when burst throttling is persistently disabled:
+  # GitHub's Responses validator rejects empty MCP tool descriptions that the
+  # native OpenAI endpoint accepts. Starting it here does not change shim state.
+  if ! _copilot_shim_alive; then _copilot_shim_start || return 1; fi
 
   catalog="$(_copilot_model_catalog)" || {
     printf '%s\n' "codex-copilot: could not read the live gateway model catalog" >&2
@@ -1423,7 +1426,7 @@ codex-copilot() {
   # upstream gateway requirement; the dummy key only satisfies Codex's provider
   # auth contract and is ignored by our unauthenticated localhost listener.
   local base cmd context='' compact=''
-  base="$(_copilot_client_base)"
+  base="$(_copilot_shim_base)"
   cmd="$(_copilot_specstory_codex_cmd)"
   if [ -n "$model" ]; then
     context="$(printf '%s' "$catalog" | jq -r --arg id "$model" '

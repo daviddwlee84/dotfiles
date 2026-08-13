@@ -226,6 +226,14 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 `copilot_api` Responses provider 傳給 Codex；不會編輯 `~/.codex/config.toml`
 或 `.codex/config.toml`，所以 plain `codex` 仍走原本 provider。
 
+Codex 一律走 `localhost:4142` shim，即使持久化的 throttling 開關是 off。
+這一層除了限流，也會正規化 Codex `mcp_list_tools` Responses item 裡的空白
+description。MCP server 與原生 Codex path 可以省略描述，但 GitHub Copilot 會以
+`Invalid 'input[0].tools[0].description': empty string` 拒絕請求。shim 只補這些
+tool definition 欄位，不改 prompt、schema 或 tool name。
+目前 Codex 會以 zstd 壓縮這些請求；shim 只解壓需要修補的 Responses body，改以
+普通 JSON 轉送，並移除已不適用的 `content-encoding` header。
+
 這是與 Claude Code `copilot-model --auto` 分開的 picker：後者保持
 Claude-first，只有這個 Codex launcher 是 OpenAI-first。
 
