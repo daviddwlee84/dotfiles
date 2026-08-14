@@ -26,7 +26,8 @@
     "showCompactions": true,
     "showSessionStartDate": true,
     "showLastResponseAt": true,
-    "contextValue": "both"
+    "contextValue": "both",
+    "sevenDayThreshold": 0
   },
   "projectLineOrder": [
     "model",
