@@ -95,6 +95,12 @@ function _sesh_ensure_session() {
 # Update the case list when specstory adds providers (track upstream:
 # specstoryai/getspecstory#146 for opencode, similar issues for others).
 #
+# NEVER emit a bare `specstory run` — its no-arg default is NOT stable. The
+# CLI picks the alphabetically-first entry of its provider registry, so
+# specstory 2.9.0 adding `antigravity` silently displaced `claude` as the
+# default (`specstory run --help` documents whatever won that sort). Always
+# name the provider explicitly.
+#
 # Args: $1=agent, $2=specstory_mode (auto|never; default auto)
 #   auto  — wrap if known provider, raw otherwise (the historical default)
 #   never — pass through raw regardless (CLI flag --no-specstory sets this)
@@ -102,17 +108,16 @@ function _sesh_wrap_agent() {
     local agent="$1" specstory_mode="${2:-auto}"
     if [ "$specstory_mode" = "never" ]; then
         # Even an empty agent goes raw → caller's responsibility to pick a
-        # sensible default (we choose `claude` upstream when --no-specstory
-        # is set, since `specstory run` with no arg defaults to claude too).
+        # sensible default; `claude` matches the wrapped path below.
         printf '%s\n' "${agent:-claude}"
         return
     fi
     case "$agent" in
         ""|"specstory")
-            # No agent specified → bare `specstory run` (default = claude).
-            printf '%s\n' "specstory run"
+            # No agent specified → our default is claude, stated explicitly.
+            printf '%s\n' "specstory run claude"
             ;;
-        claude|codex|cursor|droid|gemini)
+        antigravity|claude|codex|cursor|deepseek|droid|gemini)
             printf '%s\n' "specstory run $agent"
             ;;
         *)
@@ -286,7 +291,8 @@ Session name: `coding-agent/<repo-basename>` (one session per repo).
 Requires:     git repo (errors otherwise — use `shere` or `svibe`).
 
 Agent wrapping (auto, opt out with --no-specstory):
-  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+  antigravity / claude / codex / cursor / deepseek / droid / gemini
+                                            → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
 --on-exit MODE controls what happens when ANY pane command exits/Ctrl+C
@@ -462,7 +468,8 @@ Session name: `vibe/<repo-basename>` (collision-safe per directory).
 Requires:     git repo (use `shere` for plain shells elsewhere).
 
 Agent wrapping (auto, opt out with --no-specstory):
-  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+  antigravity / claude / codex / cursor / deepseek / droid / gemini
+                                            → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
 --on-exit MODE controls per-pane behavior on Ctrl+C / clean exit

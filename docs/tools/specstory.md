@@ -30,13 +30,20 @@ The managed config keeps the upstream sample sections as commented documentation
 
 Configured providers:
 
+- `antigravity_cmd = "agy --dangerously-skip-permissions"`
 - `claude_cmd = "claude --dangerously-skip-permissions"`
 - `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed" -c model_supports_reasoning_summaries=true'`
-- `cursor_cmd = "cursor-agent --yolo"`
+- `cursor_cmd = "cursor-agent --force"`
 - `droid_cmd = "droid --yolo"`
 - `gemini_cmd = "gemini --sandbox=none"`
 
 These are the commands `specstory run claude`, `specstory run codex`, and similar provider shortcuts will execute by default unless overridden per project or on the command line.
+
+### Always name the provider — the no-arg default is not stable
+
+`<id>_cmd` controls **how** a provider launches, never **which** one bare `specstory run` picks. There is no `default_provider` key: with no argument, specstory resolves to the **alphabetically-first** entry of its provider registry. Adding `antigravity` in 2.9.0 therefore silently displaced `claude` as the default on every existing install, and `specstory run --help` re-generated itself to match (`By default, launches Antigravity CLI.`). Since `agy` was installed, the wrong agent launched successfully with no error.
+
+Always write `specstory run claude`. This repo's wrappers do — see `_sesh_wrap_agent()` in `dot_config/shell/22_sesh.sh` (shared by `scode` / `svibe` / `hcode` / `hvibe`) and [pitfalls/specstory-run-default-agent-drift.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-run-default-agent-drift.md).
 
 ## Safety Tradeoff
 
@@ -44,7 +51,7 @@ The configured provider commands intentionally favor low-friction agent executio
 
 - Claude uses `--dangerously-skip-permissions`
 - Codex uses `--ask-for-approval never` and `--sandbox danger-full-access`
-- Cursor and Droid use `--yolo`
+- Antigravity uses `--dangerously-skip-permissions`; Cursor uses `--force` and Droid `--yolo`
 - Gemini uses `--sandbox=none`
 
 This removes most interactive permission prompts, which is useful for fast local workflows, but it also gives the wrapped agents broader filesystem or command access. Keep these defaults only if you trust the environment and want convenience over stricter guardrails. If not, override the relevant provider command in the global file, a project-local config, or the `specstory run -c ...` flag.

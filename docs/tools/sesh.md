@@ -77,7 +77,7 @@ the second invocation from a different repo would silently reuse the
 existing session pointing at the *wrong* repo.
 
 ```bash
-scode                          # current repo, default agent (specstory → claude)
+scode                          # current repo, default agent (`specstory run claude`)
 scode codex                    # right pane runs `specstory run codex`
 scode opencode                 # right pane runs `opencode` raw (not yet a specstory provider)
 scode --no-specstory claude    # right pane runs `claude` raw (no markdown auto-save)
@@ -109,8 +109,8 @@ because vibe layouts make even less sense without git context).
 
 | Argument | Right-pane command |
 |----------|--------------------|
-| (none) | `specstory run` (defaults to claude with auto-save md) |
-| `claude` / `codex` / `cursor` / `droid` / `gemini` | `specstory run <name>` (known specstory providers) |
+| (none) | `specstory run claude` (our explicit default; bare `specstory run` is NOT used — upstream's no-arg default is the alphabetically-first provider, which became `antigravity` in specstory 2.9.0) |
+| `antigravity` / `claude` / `codex` / `cursor` / `deepseek` / `droid` / `gemini` | `specstory run <name>` (known specstory providers) |
 | `opencode` and other unknown CLIs | runs the binary directly |
 | any agent + `--no-specstory` | runs the binary directly (raw) |
 

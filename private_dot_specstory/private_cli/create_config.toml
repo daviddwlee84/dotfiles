@@ -66,6 +66,15 @@
 # Agent execution commands by provider (used by `specstory run`)
 # Pass custom flags (e.g. `claude_cmd = "claude --allow-dangerously-skip-permissions"`).
 # Use of these is equivalent to `-c "custom command"`.
+#
+# These only customise HOW a provider launches — they do NOT pick the default.
+# Bare `specstory run` resolves to the alphabetically-first registered
+# provider (2.9.0 added `antigravity`, which displaced `claude`), and there is
+# no config key to override that. Always name the provider explicitly:
+# `specstory run claude`. See pitfalls/specstory-run-default-agent-drift.md.
+
+# Antigravity CLI command (binary is `agy`; add `--effort high` if wanted)
+antigravity_cmd = "agy --dangerously-skip-permissions"
 
 # Claude Code command
 claude_cmd = "claude --dangerously-skip-permissions"

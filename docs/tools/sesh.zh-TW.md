@@ -93,8 +93,8 @@ scode -h                       # 說明
 
 | 參數 | 右側窗格指令 |
 |----------|--------------------|
-| （無） | `specstory run`（預設使用 claude 並自動儲存 md） |
-| `claude` / `codex` / `cursor` / `droid` / `gemini` | `specstory run <name>`（已知的 specstory provider） |
+| （無） | `specstory run claude`（本 repo 明訂的預設；不使用裸的 `specstory run` —— 上游的無參數預設是字母序第一個 provider，在 specstory 2.9.0 起變成 `antigravity`） |
+| `antigravity` / `claude` / `codex` / `cursor` / `deepseek` / `droid` / `gemini` | `specstory run <name>`（已知的 specstory provider） |
 | `opencode` 與其他未知 CLI | 直接執行該執行檔 |
 | 任何 agent + `--no-specstory` | 直接執行該執行檔（raw） |
 

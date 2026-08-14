@@ -121,7 +121,7 @@ if [ -d "$t" ]; then
 else
   cd "$(dirname "$t")"
 fi
-exec specstory run
+exec specstory run claude
 ' -- %s1
 """, block = true, desc = "Claude (specstory)" },
   { run = """sh -lc '

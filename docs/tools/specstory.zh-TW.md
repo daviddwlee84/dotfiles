@@ -35,21 +35,27 @@
 
 已設定的 provider：
 
+- `antigravity_cmd = "agy --dangerously-skip-permissions"`
 - `claude_cmd = "claude --dangerously-skip-permissions"`
 - `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed" -c model_supports_reasoning_summaries=true'`
-- `cursor_cmd = "cursor-agent --yolo"`
+- `cursor_cmd = "cursor-agent --force"`
 - `droid_cmd = "droid --yolo"`
 - `gemini_cmd = "gemini --sandbox=none"`
 
 這些是 `specstory run claude`、`specstory run codex` 與類似 provider 捷徑預設會執行的命令，除非在專案內或命令列上另行覆寫。
 
+### 一律明寫 provider —— 無參數的預設值並不穩定
+
+`<id>_cmd` 只控制某個 provider **怎麼啟動**，從來不決定裸的 `specstory run` **挑哪一個**。設定裡沒有 `default_provider` 這個 key：沒有參數時，specstory 會解析成其 provider registry 中**字母序第一個**項目。因此 2.9.0 只是「加入」`antigravity`，就在所有既有安裝上悄悄把 `claude` 從預設位置擠掉，而 `specstory run --help` 也跟著重新生成成 `By default, launches Antigravity CLI.`。由於 `agy` 已安裝，錯的 agent 會成功啟動、完全不報錯。
+
+請一律寫 `specstory run claude`。本 repo 的包裝層已經這麼做 —— 見 `dot_config/shell/22_sesh.sh` 的 `_sesh_wrap_agent()`（由 `scode` / `svibe` / `hcode` / `hvibe` 共用）與 [pitfalls/specstory-run-default-agent-drift.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-run-default-agent-drift.md)。
 ## 安全取捨
 
 設定的 provider 命令刻意傾向低摩擦的代理執行：
 
 - Claude 使用 `--dangerously-skip-permissions`
 - Codex 使用 `--ask-for-approval never` 與 `--sandbox danger-full-access`
-- Cursor 與 Droid 使用 `--yolo`
+- Antigravity 使用 `--dangerously-skip-permissions`；Cursor 使用 `--force`、Droid 使用 `--yolo`
 - Gemini 使用 `--sandbox=none`
 
 這移除了大部分互動式權限提示，對快速本機工作流程很有用，但同時也讓被包裝的代理擁有更廣的檔案系統或命令存取權。只有在您信任該環境並重視便利勝於更嚴格的護欄時，才保留這些預設值。若否，請在全域檔、專案本機設定或 `specstory run -c ...` flag 中覆寫相關的 provider 命令。

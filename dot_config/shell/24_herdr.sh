@@ -221,7 +221,8 @@ Two modes for choosing agents:
   Heterogeneous:  hvibe --agents claude,codex,opencode  (list length = panes)
 
 Agent wrapping (auto, opt out with --no-specstory):
-  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+  antigravity / claude / codex / cursor / deepseek / droid / gemini
+                                            → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
 --on-exit MODE (per pane, on Ctrl+C / clean exit):
@@ -454,7 +455,8 @@ run from INSIDE herdr → just focuses. --no-attach builds in the background.
 inside herdr, else the default session; start one with `herdr --session NAME`).
 
 Agent wrapping (auto, opt out with --no-specstory):
-  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+  antigravity / claude / codex / cursor / deepseek / droid / gemini
+                                            → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
 --on-exit MODE (per pane): shell (default) | kill | restart
