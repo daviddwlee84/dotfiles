@@ -117,12 +117,14 @@ repos:
         # itself has no shebang by design, so skip the shebang check for it.
         exclude: (^|/)modify_[^/]+\.tmpl$
 
-  # shellcheck - static analysis for bash scripts.
+  # shellcheck - static analysis for shell scripts.
   # Two scopes, two severities:
-  #   1. scripts/*.sh + scripts/lib/*.sh — strict (severity=warning), always
-  #      green. lib/ is in scope because sudo_shared.sh and log_shared.sh are
-  #      inlined into run-scripts, where a defect only surfaces during a real
-  #      `chezmoi apply` on a fresh machine.
+  #   1. scripts/**/*.sh — strict (severity=warning), always green. Recursive
+  #      coverage matters: lib/ is inlined into run-scripts, adhoc/ contains
+  #      machine diagnostics, and ios/ contains a deployed POSIX-sh bootstrap.
+  #      Let shellcheck infer the language from each shebang (or its
+  #      `shellcheck shell=` directive) instead of forcing bash — otherwise the
+  #      iSH bootstrap's POSIX portability would not actually be checked.
   #   2. dot_config/{shell,bash}/ — relaxed (severity=error), only blocks
   #      on actual bugs while we gradually clean up the 40-odd preexisting
   #      warnings. Drop to severity=warning once `just lint-shell` is clean.
@@ -132,9 +134,9 @@ repos:
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
-        name: shellcheck (scripts/)
-        files: '^scripts/(lib/)?[^/]+\.sh$'
-        args: [--shell=bash, --severity=warning]
+        name: shellcheck (scripts/**/*.sh)
+        files: '^scripts/.*\.sh$'
+        args: [--severity=warning]
       - id: shellcheck
         alias: shellcheck-shared
         name: shellcheck (dot_config/{shell,bash}/, errors only)
