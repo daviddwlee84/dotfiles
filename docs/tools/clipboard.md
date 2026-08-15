@@ -162,12 +162,13 @@ If `tmux info` shows `clipboard: false` after editing `common.conf`, remember a 
 | Neovim yank works, but `"*p` does nothing over SSH | paste over OSC 52 not supported by outer terminal | expected — use mouse middle-click or re-type; don't fight it |
 | `prefix+y` still copies to remote clipboard | shim binary `tmux` resolves to an old pre-`load-buffer -w` version | `tmux -V` must be ≥ 3.3 for `load-buffer -w`; this repo enforces ≥ 3.3 via ansible `devtools` role |
 | Nested tmux (`tmux inside ssh inside tmux`) | inner tmux eats OSC 52 | inner tmux needs `set -g allow-passthrough on`; already on in this config. Double-nested cases may require `Ptmux;…` wrapping |
+| `x copy` errors with "OSC 52 payload too large" (e.g. copying full pane scrollback over SSH) | payload exceeds the terminal's OSC 52 cap; `x copy` now refuses loudly instead of writing an escape sequence the terminal would silently drop | copy a smaller selection, or raise the cap: `X_OSC52_MAX_BYTES=<n> x copy ...` if your terminal supports more (iTerm2 ~1 MB) |
 
 ## Design notes / non-defaults
 
 - **tmux `set-clipboard`** is `on`, not `external`. `external` disables tmux's own OSC 52 emission from copy-mode; `on` is a superset and keeps `prefix+[` → `y` working.
 - **Neovim OSC 52 provider** is gated on `SSH_CONNECTION`/`SSH_TTY` rather than always-on, specifically so local paste (`"+p`) continues to work. If you primarily work over SSH and don't mind the paste tradeoff, the `if …` block can be removed.
-- **`x` CLI ordering** prefers local backends (`pbcopy`, `wl-copy`, etc.) over OSC 52. This is intentional: when `pbcopy` is available, it's faster, doesn't touch the TTY, and works for very large payloads (OSC 52 payloads are size-limited by the terminal — iTerm2 caps at 1 MB, many others at 64-256 KB).
+- **`x` CLI ordering** prefers local backends (`pbcopy`, `wl-copy`, etc.) over OSC 52. This is intentional: when `pbcopy` is available, it's faster, doesn't touch the TTY, and works for very large payloads (OSC 52 payloads are size-limited by the terminal — iTerm2 caps at 1 MB, many others at 64-256 KB). Because OSC 52 has no delivery acknowledgment, `osc52_copy()` refuses payloads above `X_OSC52_MAX_BYTES` (default 75000 base64 chars) with an explicit error rather than writing an escape sequence the terminal would silently drop — a plain `write(2)` to `/dev/tty` succeeds either way, so without this guard `x copy` would report success even when nothing reached the clipboard.
 
 ## Clipboard history (`cb` / `cbl` / `cbe`)
 

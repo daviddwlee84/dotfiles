@@ -66,6 +66,13 @@ osc52_copy() {
     data="$(base64 | tr -d '\n')"
     [[ -n "$data" ]] || return 0
 
+    local max_len="${X_OSC52_MAX_BYTES:-75000}"
+    if (( ${#data} > max_len )); then
+        err "OSC 52 payload too large (${#data} bytes, cap ${max_len}); most terminals silently drop larger OSC 52 sequences (64-256KB is common, iTerm2 ~1MB)"
+        err "tip: copy a smaller selection, or raise the cap: X_OSC52_MAX_BYTES=<n> x copy ..."
+        exit 1
+    fi
+
     if [[ -n "${TMUX:-}" ]]; then
         # shellcheck disable=SC1003 # printf consumes the backslash escapes.
         printf '\033Ptmux;\033\033]52;c;%s\033\033\\\033\\' "$data" > /dev/tty

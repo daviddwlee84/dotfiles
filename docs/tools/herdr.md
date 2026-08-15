@@ -404,7 +404,7 @@ Six one-keypress "grab this onto the clipboard" ops, all driven by one helper (`
 | `process` | `prefix+P` | *Copy pane: process info* | foreground processes — `cmdline` + `pid` + `cwd` (from `herdr pane process-info`) |
 | `coord` | `prefix+D` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
 | `content` (visible) | `prefix+V` | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
-| `content` (scrollback) | `prefix+S` | *Copy pane: content (scrollback)* | the pane's full retained scrollback (`--source recent`) |
+| `content` (scrollback) | `prefix+S` | *Copy pane: content (scrollback)* | the pane's scrollback (`--source recent --lines 1000`), capped at herdr's own per-`pane read` hard ceiling of 1000 lines — a pane retaining more than that (check `.scroll.max_offset_from_bottom` from `herdr pane get`) only yields its most recent 1000 lines; there's no pagination flag to reach further back |
 | `dir` | `prefix+d` | *Copy space: dir* | the **workspace ("space") root directory** — see below |
 | `cwd` | `prefix+ctrl+d` | *Copy pane: cwd* | the focused pane's **live** working directory (what `pwd` / [`abspath`](../shells/aliases.md) returns) |
 

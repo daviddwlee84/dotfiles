@@ -10,7 +10,14 @@
 #            the socket path that selects a non-default session — there is NO
 #            --session flag on the pane/tab/workspace subcommands)
 #   content  the pane's terminal content — visible screen (--source visible) or
-#            the full retained scrollback (--source recent, the default)
+#            scrollback (--source recent, the default). `herdr pane read` defaults
+#            to only 80 lines unless --lines is passed, so this always requests
+#            --lines 1000 — herdr's own hard per-read ceiling (verified: any
+#            --lines value above 1000 still returns exactly 1000 lines). A pane
+#            with MORE than 1000 lines of retained scrollback (check
+#            `herdr pane get $pane | jq .result.pane.scroll.max_offset_from_bottom`)
+#            will still only yield its most recent 1000 lines — there is no
+#            pagination/offset flag on `pane read` to reach further back.
 #   dir      the WORKSPACE ("space") root directory — what the sidebar row you
 #            would right-click represents: the cwd of the space's OLDEST tab.
 #            Derived by space-root.sh (herdr has no workspace-level cwd field);
@@ -137,7 +144,7 @@ case "$action" in
             visible|recent|recent-unwrapped) ;;
             *) echo "pane-copy: --source must be visible|recent|recent-unwrapped" >&2; exit 64 ;;
         esac
-        body=$(herdr pane read "$pane" --source "$source" --format text 2>/dev/null) \
+        body=$(herdr pane read "$pane" --source "$source" --format text --lines 1000 2>/dev/null) \
             || { echo "pane-copy: failed to read content of $pane" >&2; exit 1; }
         copy "$body"
         echo "copied $source content for $pane"
