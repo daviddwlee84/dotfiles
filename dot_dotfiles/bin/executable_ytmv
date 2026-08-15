@@ -1,0 +1,146 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "yt-dlp>=2025.1",
+#   "tyro>=0.9",
+#   "rich>=13.9",
+#   "platformdirs>=4",
+#   "mutagen>=1.47",
+#   "httpx>=0.27",
+# ]
+# ///
+"""ytmv — download YouTube music videos for playback on old MP3 players.
+
+yt-dlp gets you a file; it does not get you a file a 2008 player can use. This
+adds the compatibility layer on top: ID3v2.3 instead of v2.4, optional raw
+Big5/GBK text frames, a sidecar .lrc in the encoding the device expects,
+FAT32-safe filenames, small JPEG cover art, and real synced lyrics from LRCLIB
+(official music videos usually carry no YouTube captions at all).
+
+Subcommands:
+  get <URL>…                     Download → convert → tag → attach lyrics.
+      [--audio] [--video]        mp3 (default) and/or mp4.
+      [--burn-subs]              Burn lyrics into the picture (needs libass).
+      [--profile NAME]           Player compatibility profile.
+  lyrics <PATH>…                 Find + attach lyrics to existing mp3s.
+      [--pick] [--artist/--track]  Resolve ambiguous LRCLIB matches by hand.
+  tag <PATH>…                    Re-apply a profile to existing files. Offline —
+                                 this is the "try another profile" loop.
+  doctor [--list-profiles]       Probe yt-dlp / ffmpeg / libass / cookies and
+                                 print the fully resolved profile.
+
+Profiles (--profile): safe (default) · cjk-big5 · cjk-gbk · ipod · modern.
+When the player is unknown, start with `safe`, copy one file across, and use
+`ytmv tag` to bisect from there — no re-downloading required.
+
+Config at user_config_dir/ytmv/config.toml; cache at user_cache_dir/ytmv.
+Cookies are read from `yth`'s config (docs/tools/yth.md § Cookies) so there is
+only ever one cookie jar per machine.
+
+Sibling of `yth` (dot_dotfiles/bin/executable_yth), which searches your watch
+history but deliberately never downloads. Logic lives in scripts/ytmv/*.py.
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+USAGE = """\
+Usage: ytmv <subcommand> [args...]
+
+  get <URL>...                       Download + convert + tag + lyrics.
+      [--audio] [--video]            mp3 (default) and/or mp4.
+      [--burn-subs]                  Burn lyrics into the picture (needs libass).
+      [--profile NAME] [--out DIR]   Compatibility profile / output directory.
+      [--number] [--m3u NAME]        Playlist ordering helpers for old players.
+      [--cookies]                    Use yth's cookie source (bot checks).
+  lyrics <PATH>...                   Attach lyrics to mp3s you already have.
+      [--pick] [--artist A --track T]
+  tag <PATH>...                      Re-apply a profile in place. No network.
+      [--profile NAME] [--rename] [--dry-run]
+  doctor [--list-profiles] [--json]  Environment probe + resolved profile.
+
+Profiles: safe (default) | cjk-big5 | cjk-gbk | ipod | modern
+
+Examples:
+  ytmv get 'https://www.youtube.com/watch?v=...'
+  ytmv get '<playlist-url>' --number --m3u roadtrip --out /Volumes/MP3
+  ytmv get '<url>' --video --burn-subs --max-height 480
+  ytmv tag ~/Music/ytmv --profile cjk-big5      # player showed mojibake
+  ytmv lyrics ~/Music/ytmv/*.mp3 --pick
+  ytmv doctor
+"""
+
+
+def _source_path() -> Path:
+    """Locate the chezmoi source dir so we can import scripts.ytmv.*.
+
+    Identical strategy to executable_yth:_source_path / executable_mlf.
+    Trust `chezmoi source-path`; fall back to ~/.local/share/chezmoi.
+    """
+    chezmoi = shutil.which("chezmoi")
+    if chezmoi:
+        try:
+            out = subprocess.run(
+                [chezmoi, "source-path"],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                return Path(out.stdout.strip())
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+    fallback = Path.home() / ".local" / "share" / "chezmoi"
+    if (fallback / "scripts" / "ytmv" / "__init__.py").is_file():
+        return fallback
+    print(
+        "ytmv: cannot locate chezmoi source dir.\n"
+        "  Tried: `chezmoi source-path` and ~/.local/share/chezmoi.\n"
+        "  Install chezmoi or ensure the source dir exists.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
+def _leaf(module: str, prog: str, args: list[str]) -> int:
+    """Rewrite argv and hand off to a leaf module's tyro-based main()."""
+    sys.argv = [prog, *args]
+    mod = __import__(f"scripts.ytmv.{module}", fromlist=["main"])
+    return mod.main()
+
+
+def main() -> int:
+    # Help paths print USAGE and exit BEFORE any heavy import, so `ytmv -h`
+    # stays instant and never loads yt_dlp / mutagen.
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        # Bare `ytmv` is usage, not a picker: unlike `yth` there is no local
+        # index to fuzzy-pick over, so there is no `tv ytmv` channel to exec.
+        print(USAGE)
+        return 0 if len(sys.argv) >= 2 else 2
+
+    src = _source_path()
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+
+    sub = sys.argv[1]
+    rest = sys.argv[2:]
+
+    # Leaf modules own their own tyro parsing. Subcommand `-` → module `_`.
+    leaves = {
+        "get": ("get", "ytmv get"),
+        "lyrics": ("lyrics", "ytmv lyrics"),
+        "tag": ("tag", "ytmv tag"),
+        "doctor": ("doctor", "ytmv doctor"),
+    }
+    if sub in leaves:
+        module, prog = leaves[sub]
+        return _leaf(module, prog, rest)
+
+    print(f"ytmv: unknown subcommand '{sub}'\n\n{USAGE}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

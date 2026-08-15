@@ -19,10 +19,24 @@
   community.general.homebrew:
     name:
       - ffmpeg        # provides ffmpeg, ffprobe, ffplay
+      - ffmpeg-full   # ONLY for libass — see the note below
       - imagemagick   # v7 unified `magick` binary (also ships `convert` shim)
       - exiftool
       - vips          # provides vips, vipsthumbnail, vipsedit
     state: present
+
+# Why ffmpeg-full as well as ffmpeg (macOS only):
+# homebrew/core's `ffmpeg` 8.x is built WITHOUT libass, so it exposes no
+# `subtitles` filter and cannot burn subtitles into a picture at all. That
+# breaks `ytmv get --burn-subs` (docs/tools/ytmv.md), whose entire purpose is
+# lyrics visible on players that ignore soft subtitle tracks.
+# `ffmpeg-full` is keg-only (`:versioned_formula`, no `conflicts_with`), so it
+# installs under $(brew --prefix ffmpeg-full)/bin and does NOT shadow or
+# conflict with the plain `ffmpeg` on PATH — ytmv finds it by explicit path via
+# scripts/ytmv/__init__.py::ffmpeg_bin(). Diagnose with `ytmv doctor`.
+# Debian's ffmpeg already links libass, so the apt block below needs nothing.
+# This stays INSIDE the installMediaTools-gated role on purpose; CLAUDE.md
+# forbids promoting anything ffmpeg-shaped into the always-install devtools role.
 
 # =============================================================================
 # Linux (Debian/Ubuntu) — apt

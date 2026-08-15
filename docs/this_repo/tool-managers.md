@@ -1065,6 +1065,7 @@ list.
 | **fastfetch** | brew | (Linux release if added) | devtools |
 | **fd** | brew | apt (`fd-find` + symlink) → GitHub release | base |
 | **ffmpeg** | brew | apt | media_tools |
+| **ffmpeg-full** | brew (keg-only) | — (Debian ffmpeg already links libass) | media_tools |
 | **figlet** | brew | (apt likely) | devtools |
 | **font-hack-nerd-font** | brew cask | GitHub release Hack.zip → `~/.local/share/fonts` | nerdfonts |
 | **fontconfig** | (system) | apt/yum | nerdfonts |

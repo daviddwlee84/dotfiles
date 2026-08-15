@@ -158,6 +158,7 @@ plugins:
             crash-blackbox (hard power-offs): crash-blackbox (硬斷電)
             Random hard power-offs: 隨機硬斷電
             yth (YouTube history): yth (YouTube 觀看歷史)
+            ytmv (YouTube MV for MP3 players): ytmv (YouTube MV 轉舊款 MP3 播放器)
             chezmoi prefixes: chezmoi prefixes
             chezmoi templating: chezmoi templating
             Mirrors (Chinese CDN): 鏡像 (中國 CDN)
@@ -360,6 +361,7 @@ nav:
           - "fleet exec": tools/fleet-exec.md
           - "fleet hosts": tools/fleet-hosts.md
           - "yth (YouTube history)": tools/yth.md
+          - "ytmv (YouTube MV for MP3 players)": tools/ytmv.md
           - "appsrc (install-source detector)": tools/appsrc.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md
