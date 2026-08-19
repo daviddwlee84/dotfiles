@@ -456,6 +456,40 @@ TLS 驗證仍保持開啟，這是在繞過已觀察到的 Bun/Node CA-store 差
   （兩邊指向同一個代理時無害，指向不同時就會靜默地用錯設定）。
 - 想透過 wrapper 試另一個代理／port，必須先 `copilot-here off`。
 
+### OpenAI 模型思考時整條線是靜默的 —— shim 用心跳把 socket 撐住
+
+`copilot-api` **不會**提早開啟 SSE stream：對 `:4141` 用 `gpt-5.6-sol` 實測，
+response *headers* 在 8.11s 才到、第一個 body chunk 在 8.12s，也就是 reasoning
+model 的整段思考時間都耗在同一個 `fetch()` 裡，線上一個 byte 都沒有。真正的
+Anthropic stream 會用週期性的 `ping` event 蓋住這段，這個 gateway 一個都不送。
+再加上 shim 的併發佇列（`COPILOT_SHIM_MAX`，預設 4 —— 第 5 個請求在完全靜默中
+排隊），路徑上任何一個 idle timer 都可以合法回收一條其實健康的連線。agent 這端
+不會收到錯誤、只會一直等，最後只能 Esc + `continue`。
+
+因此對「client 要求 streaming」的請求，shim 會在靜默達
+`COPILOT_SHIM_PING_AFTER_MS` 後自己先 commit `text/event-stream` response，
+並每 `COPILOT_SHIM_PING_MS` 送出 SSE *comment* frame
+（`: copilot-shim keepalive`，符合規範的 parser 一律丟棄，所以對 Anthropic 與
+OpenAI SDK 都是隱形的），直到真正的 bytes 出現 —— 排隊時間、思考時間、串流中途
+的 reasoning 間隔都一併涵蓋。`COPILOT_SHIM_STALL_MS` 則替每次嘗試設上限：
+headers 前卡死會 abort 並透明重試（此時 client 只收過 comment frame），
+串流中途卡死則以真正的錯誤結束回應，而不是無限等待。
+
+| Env | 預設 | 意義 |
+|---|---|---|
+| `COPILOT_SHIM_PING_MS` | `15000` | 心跳間隔；`0` 關閉 |
+| `COPILOT_SHIM_PING_AFTER_MS` | `10000` | 提早 commit SSE 前容忍的靜默時間 |
+| `COPILOT_SHIM_STALL_MS` | `240000` | 判定上游卡死的靜默時間；`0` 關閉 |
+
+在 grace window 內回應的請求完全不受影響 —— 真正的 status code、真正的 headers ——
+這正是讓快速失敗的 `400 model_not_supported`、`401 IDE token expired` 仍能正確
+回報的原因。反面代價是：SSE response 一旦 commit，之後才出現的 non-2xx 只能以
+SSE `error` event 送出，所以不要把 `COPILOT_SHIM_PING_AFTER_MS` 調成 0。
+
+FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器只在 agent 結束時才
+回填。先去看 `agent-<id>.jsonl` 的 `assistant` 筆數有沒有在長。完整診斷：
+[`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md)。
+
 ### fork 沒有速率限制器
 
 fork 的 `start` 拿掉了 `--rate-limit`/`--wait`。它 README 給的緩解方式是改成減少

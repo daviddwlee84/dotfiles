@@ -416,6 +416,88 @@ SH
   [ "$(printf '%s' "$output" | jq -r '.p.input[0].tools[0].description')" = "Tool compressed." ]
 }
 
+@test "wantsStream only classifies an explicit stream:true body" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bun -e "import { wantsStream as w } from '$shim';
+    const enc=(o)=>new TextEncoder().encode(JSON.stringify(o)).buffer;
+    console.log(JSON.stringify({
+      yes:      w(enc({model:'m',stream:true})),
+      str:      w(JSON.stringify({model:'m',stream:true})),
+      no:       w(enc({model:'m',stream:false})),
+      missing:  w(enc({model:'m'})),
+      truthy:   w(enc({model:'m',stream:'true'})),
+      garbage:  w(new TextEncoder().encode('not json').buffer),
+    }));"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.yes')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.str')" = "true" ]
+  # Anything that is not literally `true` must fall back to the pre-keepalive
+  # path — a non-streaming caller would choke on injected comment frames.
+  [ "$(printf '%s' "$output" | jq -r '.no')" = "false" ]
+  [ "$(printf '%s' "$output" | jq -r '.missing')" = "false" ]
+  [ "$(printf '%s' "$output" | jq -r '.truthy')" = "false" ]
+  [ "$(printf '%s' "$output" | jq -r '.garbage')" = "false" ]
+}
+
+# End-to-end against a mock upstream that withholds its response headers the way
+# copilot-api does while a reasoning model thinks. Guards the four-way split the
+# keepalive introduced; see pitfalls/copilot-proxy-openai-model-silent-stall.md.
+@test "shim keepalive fires only on slow streams, leaving fast + non-stream untouched" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  cat >"$TMP/keepalive.js" <<'JS'
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const up = Bun.serve({ port: 0, idleTimeout: 60, async fetch(req) {
+  const u = new URL(req.url);
+  await sleep(Number(u.searchParams.get("delay") ?? 0));
+  if (u.searchParams.get("mode") === "status")
+    return new Response('{"error":"nope"}', { status: 400, headers: { "content-type": "application/json" } });
+  return new Response("event: message_start\ndata: {}\n\nevent: message_stop\ndata: {}\n\n",
+    { headers: { "content-type": "text/event-stream" } });
+} });
+process.env.COPILOT_SHIM_PORT = "0";
+process.env.COPILOT_SHIM_UPSTREAM = `http://localhost:${up.port}`;
+process.env.COPILOT_SHIM_PING_MS = "150";
+process.env.COPILOT_SHIM_PING_AFTER_MS = "100";
+process.env.COPILOT_SHIM_STALL_MS = "5000";
+const { startServer } = await import(process.argv[2]);
+const shim = startServer();
+const call = async (q, stream = true) => {
+  const r = await fetch(`http://localhost:${shim.port}/v1/messages${q}`, { method: "POST",
+    headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "m", stream }) });
+  const body = await r.text();
+  return { status: r.status, ct: r.headers.get("content-type"),
+    pings: (body.match(/^: /gm) ?? []).length,
+    events: (body.match(/^event: (\S+)/gm) ?? []).map((s) => s.slice(7)) };
+};
+const out = {
+  slow:    await call("?delay=800"),
+  fast:    await call("?delay=0"),
+  plain:   await call("?delay=800&mode=status", false),
+  lateErr: await call("?delay=800&mode=status"),
+};
+console.log(JSON.stringify(out));
+shim.stop(true); up.stop(true);
+JS
+  run bash -c "bun '$TMP/keepalive.js' '$shim' 2>&1 | tail -n 1"
+  [ "$status" -eq 0 ]
+  local j="$output"
+  # Slow stream: comment frames while the upstream is silent, real events after.
+  [ "$(printf '%s' "$j" | jq -r '.slow.pings > 0')" = "true" ]
+  [ "$(printf '%s' "$j" | jq -r '.slow.events | join(",")')" = "message_start,message_stop" ]
+  # Fast stream: inside the grace window, so nothing is injected at all.
+  [ "$(printf '%s' "$j" | jq -r '.fast.pings')" = "0" ]
+  # Non-streaming request: never eligible — real 400 and the JSON body verbatim.
+  [ "$(printf '%s' "$j" | jq -r '.plain.status')" = "400" ]
+  [ "$(printf '%s' "$j" | jq -r '.plain.ct')" = "application/json" ]
+  [ "$(printf '%s' "$j" | jq -r '.plain.pings')" = "0" ]
+  # A non-2xx that arrives AFTER the early commit can only be an SSE error event.
+  [ "$(printf '%s' "$j" | jq -r '.lateErr.status')" = "200" ]
+  [ "$(printf '%s' "$j" | jq -r '.lateErr.events | join(",")')" = "error" ]
+}
+
 @test "copilot-here on reports the shim URL it actually writes" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   mkdir -p "$TMP/proj"

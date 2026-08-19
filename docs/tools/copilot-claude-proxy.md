@@ -542,6 +542,44 @@ opposite of what the official settings docs imply. Consequences:
 - Trialing another proxy/port via the wrapper requires `copilot-here off`
   first.
 
+### OpenAI models go silent while they think — the shim keeps the socket warm
+
+`copilot-api` does **not** open the SSE stream early: measured against `:4141`
+with `gpt-5.6-sol`, the response *headers* arrive at 8.11s and the first body
+chunk at 8.12s, so a reasoning model's whole think time is spent inside one
+`fetch()` with zero bytes on the wire. Real Anthropic streams cover that with
+periodic `ping` events; this gateway emits none. Add the shim's concurrency
+queue on top (`COPILOT_SHIM_MAX`, default 4 — request 5 waits in total silence)
+and any idle timer in the path is free to reap a perfectly healthy connection.
+The agent then hangs with no error, and the only way out is Esc + `continue`.
+
+So for client-requested streams the shim commits the `text/event-stream`
+response itself after `COPILOT_SHIM_PING_AFTER_MS` of silence and emits SSE
+*comment* frames (`: copilot-shim keepalive`, discarded by every spec-compliant
+parser, so invisible to both the Anthropic and OpenAI SDKs) every
+`COPILOT_SHIM_PING_MS` until real bytes arrive — covering queue time, think
+time, and mid-stream reasoning gaps alike. `COPILOT_SHIM_STALL_MS` bounds each
+attempt: a pre-header stall is aborted and retried transparently (nothing but
+comment frames has reached the client), a mid-stream stall fails the response
+with a real error instead of hanging.
+
+| Env | Default | Meaning |
+|---|---|---|
+| `COPILOT_SHIM_PING_MS` | `15000` | keepalive interval; `0` disables |
+| `COPILOT_SHIM_PING_AFTER_MS` | `10000` | silence tolerated before the SSE response is committed early |
+| `COPILOT_SHIM_STALL_MS` | `240000` | silence that counts as a wedged upstream; `0` disables |
+
+Requests answered inside the grace window are untouched — real status code, real
+headers — which is what keeps a fast `400 model_not_supported` or `401 IDE token
+expired` reporting itself properly. Beware the flip side: once the SSE response
+is committed, a late non-2xx can only be delivered as an SSE `error` event, so
+don't shrink `COPILOT_SHIM_PING_AFTER_MS` to zero.
+
+`0 tok` in FleetView is **not** evidence of this bug — that counter is only
+filled in when an agent finishes. Check `agent-<id>.jsonl` for growing
+`assistant` entries first. Full diagnosis:
+[`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md).
+
 ### The fork has no rate limiter
 
 The fork's `start` dropped `--rate-limit`/`--wait`. Its README's mitigation is

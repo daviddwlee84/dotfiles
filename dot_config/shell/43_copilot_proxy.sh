@@ -245,10 +245,16 @@ _copilot_ensure_pkg() {
 }
 
 # --- throttle shim (optional, in front of the fork) -----------------------------
-# A tiny Bun reverse proxy that caps concurrent in-flight upstream requests and
+# A tiny Bun reverse proxy that caps concurrent in-flight upstream requests,
 # transparently retries 403/429 (GitHub enterprise abuse throttling) BEFORE any
-# body streams — so downstream agents never see "Please run /login". Toggle with
-# `copilot-proxy shim on|off`; tune via COPILOT_SHIM_{PORT,MAX,RETRIES,BACKOFF_MS}.
+# body streams — so downstream agents never see "Please run /login" — and keeps
+# a streamed response alive with SSE comment frames while an OpenAI reasoning
+# model thinks (copilot-api withholds headers until the first token and sends no
+# `ping`, so the socket is otherwise silent for minutes and gets reaped; see
+# pitfalls/copilot-proxy-openai-model-silent-stall.md). Toggle with
+# `copilot-proxy shim on|off`; tune via COPILOT_SHIM_{PORT,MAX,RETRIES,
+# BACKOFF_MS,PING_MS,PING_AFTER_MS,STALL_MS} — the whole COPILOT_SHIM_* env is
+# inherited by the spawned process, so `export` them before `shim on`.
 _copilot_shim_port()    { printf '%s' "${COPILOT_SHIM_PORT:-4142}"; }
 _copilot_shim_base()    { printf 'http://localhost:%s' "$(_copilot_shim_port)"; }
 _copilot_shim_script()  { printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/shell/copilot-throttle-shim.js"; }
