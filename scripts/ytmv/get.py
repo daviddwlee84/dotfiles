@@ -24,9 +24,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import parse_qs, urlparse
 
 import tyro
 
+from scripts.yth import CookieSourceError, VIDEO_ID_RE
 from scripts.ytmv import (
     UnencodableLyrics,
     cookie_options,
@@ -45,6 +47,7 @@ from scripts.ytmv import (
     sanitize_filename,
     tag_mp3,
     write_lrc,
+    yt_dlp_runtime_opts,
     ytdl,
 )
 from scripts.ytmv.lyrics import fetch_lyrics
@@ -90,7 +93,7 @@ class Args:
         str, tyro.conf.arg(help="LAME VBR quality for mp3: 0 (best) .. 9.")
     ] = "0"
     cookies: Annotated[
-        bool, tyro.conf.arg(help="Use yth's configured cookie source (bot checks).")
+        bool, tyro.conf.arg(help="Use yth's cookie source (restricted/authenticated retry).")
     ] = False
     force: Annotated[bool, tyro.conf.arg(help="Re-download even if the target exists.")] = False
     sleep: Annotated[float, tyro.conf.arg(help="Seconds between items (rate-limit).")] = 1.5
@@ -117,9 +120,56 @@ class Args:
 def _normalize(url: str) -> str:
     """Accept a bare 11-char video id as well as a full URL."""
     url = url.strip()
-    if len(url) == 11 and "/" not in url and ":" not in url:
+    if VIDEO_ID_RE.fullmatch(url):
         return f"https://www.youtube.com/watch?v={url}"
     return url
+
+
+def _youtube_url_allowed(url: str) -> bool:
+    """Accept only canonical HTTPS media/playlist URL shapes.
+
+    Merely checking a `*.youtube.com` hostname is unsafe with cookies because
+    `/redirect` can bounce to a plaintext YouTube URL. Channel, search, consent,
+    redirect, and arbitrary generic-extractor paths are not ytmv inputs.
+    """
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        query = parse_qs(parsed.query)
+    except ValueError:
+        return False
+    if parsed.scheme != "https":
+        return False
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if host == "youtu.be":
+        return bool(path_parts and VIDEO_ID_RE.fullmatch(path_parts[0]))
+
+    youtube_hosts = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}
+    if host in youtube_hosts:
+        if parsed.path == "/watch":
+            return bool(query.get("v") and VIDEO_ID_RE.fullmatch(query["v"][0]))
+        if parsed.path == "/playlist":
+            return bool(query.get("list") and query["list"][0])
+        if len(path_parts) == 2 and path_parts[0] in {"shorts", "embed", "live"}:
+            return bool(VIDEO_ID_RE.fullmatch(path_parts[1]))
+        return False
+
+    if host in {"youtube-nocookie.com", "www.youtube-nocookie.com"}:
+        return bool(
+            len(path_parts) == 2
+            and path_parts[0] == "embed"
+            and VIDEO_ID_RE.fullmatch(path_parts[1])
+        )
+    return False
+
+
+def _input_label(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        return f"{parsed.hostname or '<missing>'}{parsed.path or '/'}"
+    except ValueError:
+        return "<invalid>"
 
 
 def collect_urls(args: Args) -> list[str]:
@@ -144,8 +194,11 @@ def expand_playlists(urls: list[str], cookies: dict) -> list[str]:
         if "list=" not in url:
             out.append(url)
             continue
-        opts = {"extract_flat": "in_playlist", "skip_download": True,
-                "quiet": True, "no_warnings": True, **cookies}
+        opts = {
+            **_base_opts(None, cookies),
+            "extract_flat": "in_playlist",
+            "skip_download": True,
+        }
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -162,7 +215,12 @@ def expand_playlists(urls: list[str], cookies: dict) -> list[str]:
 # yt-dlp calls
 # --------------------------------------------------------------------------- #
 def _base_opts(ffmpeg: str | None, cookies: dict) -> dict:
-    opts = {"quiet": True, "no_warnings": True, "noprogress": True, **cookies}
+    opts = {
+        "quiet": True,
+        "noprogress": True,
+        **yt_dlp_runtime_opts(),
+        **cookies,
+    }
     if ffmpeg:
         opts["ffmpeg_location"] = ffmpeg
     return opts
@@ -422,6 +480,18 @@ def cli(args: Args) -> int:
               file=sys.stderr)
         return 2
 
+    invalid_inputs = sorted(
+        {_input_label(url) for url in urls if not _youtube_url_allowed(url)}
+    )
+    if invalid_inputs:
+        print(
+            "ytmv get: only canonical HTTPS YouTube watch/playlist/media URLs "
+            "or bare video ids are accepted; "
+            f"rejected input(s): {', '.join(invalid_inputs)}",
+            file=sys.stderr,
+        )
+        return 2
+
     if args.lyrics not in ("auto", "lrclib", "youtube", "none"):
         print(f"ytmv get: --lyrics must be auto|lrclib|youtube|none, got "
               f"'{args.lyrics}'", file=sys.stderr)
@@ -455,7 +525,11 @@ def cli(args: Args) -> int:
     # escaping the subtitles= filter path), so a relative --out would resolve
     # against the temp dir and the encode would fail with "No such file".
     out_dir = out_dir.resolve()
-    cookies = cookie_options(cfg, args.cookies)
+    try:
+        cookies = cookie_options(cfg, args.cookies)
+    except CookieSourceError as e:
+        print(f"ytmv get: cookie source rejected — {e}", file=sys.stderr)
+        return 2
     langs = args.langs or cfg.get("langs") or []
     if not langs:
         try:

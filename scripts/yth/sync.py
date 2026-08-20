@@ -19,6 +19,7 @@ from typing import Annotated
 import tyro
 
 from scripts.yth import (
+    CookieSourceError,
     VIDEO_ID_RE,
     config_dir,
     connect,
@@ -27,6 +28,7 @@ from scripts.yth import (
     meta_get,
     meta_set,
     now_iso,
+    yt_dlp_runtime_opts,
     ytdl,
 )
 
@@ -60,7 +62,11 @@ def _no_cookies_msg() -> str:
 
 def cli(args: Args) -> int:
     cfg = load_config()
-    cookies = cookie_opts(cfg)
+    try:
+        cookies = cookie_opts(cfg)
+    except CookieSourceError as e:
+        print(f"yth sync: cookie source rejected — {e}", file=sys.stderr)
+        return 2
     if not cookies:
         print(_no_cookies_msg(), file=sys.stderr)
         return 2
@@ -69,7 +75,7 @@ def cli(args: Args) -> int:
         "extract_flat": True,
         "skip_download": True,
         "quiet": True,
-        "no_warnings": True,
+        **yt_dlp_runtime_opts(),
         **cookies,
     }
     if args.limit and args.limit > 0:

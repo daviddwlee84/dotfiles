@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "yt-dlp>=2025.1",
+#   "yt-dlp[default]>=2026.7.4",
 #   "tyro>=0.9",
 #   "rich>=13.9",
 #   "platformdirs>=4",
@@ -27,16 +27,18 @@ Subcommands:
       [--pick] [--artist/--track]  Resolve ambiguous LRCLIB matches by hand.
   tag <PATH>…                    Re-apply a profile to existing files. Offline —
                                  this is the "try another profile" loop.
-  doctor [--list-profiles]       Probe yt-dlp / ffmpeg / libass / cookies and
-                                 print the fully resolved profile.
+  doctor [--offline] [--cookies]  Probe yt-dlp/EJS/Node, YouTube, ffmpeg,
+                                 optional cookies, and the resolved profile.
+  help [SUBCOMMAND]              Complete setup guide / leaf command help.
 
 Profiles (--profile): safe (default) · cjk-big5 · cjk-gbk · ipod · modern.
 When the player is unknown, start with `safe`, copy one file across, and use
 `ytmv tag` to bisect from there — no re-downloading required.
 
 Config at user_config_dir/ytmv/config.toml; cache at user_cache_dir/ytmv.
-Cookies are read from `yth`'s config (docs/tools/yth.md § Cookies) so there is
-only ever one cookie jar per machine.
+Public videos are cookie-free first: packaged yt-dlp-ejs + managed Node handle
+YouTube challenges. Opt-in cookies are read from `yth`'s config so there is one
+source per machine; `ytmv help` documents the account risk and safe setup.
 
 Sibling of `yth` (dot_dotfiles/bin/executable_yth), which searches your watch
 history but deliberately never downloads. Logic lives in scripts/ytmv/*.py.
@@ -56,12 +58,13 @@ Usage: ytmv <subcommand> [args...]
       [--burn-subs]                  Burn lyrics into the picture (needs libass).
       [--profile NAME] [--out DIR]   Compatibility profile / output directory.
       [--number] [--m3u NAME]        Playlist ordering helpers for old players.
-      [--cookies]                    Use yth's cookie source (bot checks).
+      [--cookies]                    Use yth's cookie source (restricted/authenticated retry).
   lyrics <PATH>...                   Attach lyrics to mp3s you already have.
       [--pick] [--artist A --track T]
   tag <PATH>...                      Re-apply a profile in place. No network.
       [--profile NAME] [--rename] [--dry-run]
-  doctor [--list-profiles] [--json]  Environment probe + resolved profile.
+  doctor [--offline] [--cookies]       Environment/auth probe + resolved profile.
+  help [SUBCOMMAND]                  Full setup guide / leaf command help.
 
 Profiles: safe (default) | cjk-big5 | cjk-gbk | ipod | modern
 
@@ -73,6 +76,158 @@ Examples:
   ytmv lyrics ~/Music/ytmv/*.mp3 --pick
   ytmv doctor
 """
+
+
+GUIDE = """\
+ytmv setup guide
+==================
+
+1. Install and verify
+---------------------
+`ytmv` is deployed by chezmoi and self-runs through uv. Media conversion needs
+ffmpeg; burned-in subtitles additionally need libass:
+
+  dotcfg --set installMediaTools=true --yes
+  command -v node && node --version
+  ytmv doctor
+
+Node 22+ is managed by mise. If it is missing, reload the shell, then run
+`mise install` and `mise which node`. Legacy armv7/armv6 hosts are pinned to
+Node 20 and EL7 normally exposes Node 16; neither can run current yt-dlp EJS,
+so doctor fails clearly and embedded calls do not advertise that old runtime.
+`ytmv doctor --offline` checks the local stack without touching the network.
+
+2. Start cookie-free
+--------------------
+Public YouTube videos normally do NOT need an account cookie:
+
+  ytmv get 'https://www.youtube.com/watch?v=...'
+
+`ytmv` packages yt-dlp's EJS challenge solver and explicitly uses Node. If a
+public video still fails, diagnose in this order:
+
+  1. `ytmv doctor` — fix yt-dlp-ejs / Node / ffmpeg failures first.
+  2. Use a clean residential connection; VPN, proxy, cloud, and datacenter IPs
+     commonly trigger `Sign in to confirm you're not a bot`.
+  3. Stop retrying, wait, and reduce request rate (for batches, try `--sleep 10`).
+  4. Use cookies only for private/restricted content, or as a last resort for a
+     bot check. Advanced PO-token providers come after these steps.
+
+3. Cookies are credentials — opt in deliberately
+-------------------------------------------------
+yt-dlp use with a logged-in account can lead to temporary or permanent account
+suspension. A cookies.txt file is a bearer credential: anyone who gets it may
+act as that browser session.
+
+Never print, paste, screenshot, commit, `chezmoi add`, or cloud-backup cookie
+contents. File sources are rejected unless mode 0600, valid Netscape format,
+and YouTube-only; extraction itself accepts only YouTube URL hosts. Prefer a
+dedicated browser profile/account used only for YouTube, not a daily primary
+account.
+
+`ytmv` reuses yth's cookie source. Configure one in:
+
+  ~/.config/yth/config.toml
+
+Recommended repeat-use setup (Firefox or Zen profile):
+
+  from_browser = "firefox:/absolute/path/to/profile"
+
+Explicit `--cookies` fails instead of silently falling back when no safe source is configured.
+Then validate and use it explicitly:
+
+  ytmv doctor --cookies
+  ytmv get '<url>' --cookies
+
+4. Safe Arc / Chromium export
+-----------------------------
+Arc is not a supported `--cookies-from-browser` name. For a narrow YouTube-only
+Netscape cookie file:
+
+  1. Open a private/incognito session and sign in to YouTube.
+  2. Keep exactly one tab open: https://www.youtube.com/robots.txt
+  3. Export only youtube.com cookies with the exact extension
+     "Get cookies.txt LOCALLY". A similarly named former extension without
+     "LOCALLY" was reported as malware.
+  4. Save as ~/.config/yth/cookies.txt and run:
+
+       chmod 600 ~/.config/yth/cookies.txt
+
+  5. Close the private session. Replace/delete the file when it expires or is
+     invalidated. Configure:
+
+       cookiefile = "~/.config/yth/cookies.txt"
+
+Do not combine `--cookies-from-browser` with `--cookies FILE` to export a daily
+profile: that can write cookies for every site in the profile, not just YouTube.
+
+5. macOS Chrome: no popup + v10 decryption failure
+--------------------------------------------------
+This metadata-only query checks whether Chrome's Safe Storage item is
+addressable without printing its secret:
+
+  security find-generic-password -a Chrome -s 'Chrome Safe Storage' >/dev/null
+  echo $?
+
+Exit 44 (OSStatus -25300; inspect with `security error -25300`) means the item
+was not found. Authorization is never reached, so no popup is expected.
+`cannot decrypt v10 cookies: no key found` then means yt-dlp found Chrome's
+cookie DB but cannot derive its decryption key (`v10` is a Chromium encryption
+marker, not Chrome version 10). Creating a new same-named item cannot decrypt
+cookies written with the missing original key.
+
+Use a new dedicated supported-browser profile, or the isolated YouTube-only
+export above. Do not run a Keychain command that prints the Safe Storage value.
+
+6. Player compatibility loop
+----------------------------
+Start with the safe profile, copy one file to the player, then retag offline:
+
+  ytmv get '<url>' --profile safe
+  ytmv tag ~/Music/ytmv --profile cjk-big5
+  ytmv tag ~/Music/ytmv --profile cjk-gbk
+  ytmv tag ~/Music/ytmv --profile ipod
+
+Use `ytmv doctor --list-profiles` for built-in and user-defined profiles.
+`ytmv tag` never downloads again.
+
+7. Manual converter fallback
+----------------------------
+If a public web converter succeeds where the local downloader is challenged,
+download manually — never give the site Google credentials or cookies — then
+bring the local MP3 back through ytmv's compatibility and lyrics layers:
+
+  ffprobe -v error ~/Downloads/song.mp3
+  ytmv tag ~/Downloads/song.mp3 --profile safe --artist 'Artist' --track 'Song'
+  ytmv lyrics ~/Downloads/song.mp3 --artist 'Artist' --track 'Song'
+
+The third party sees your IP and requested URL and may cache the converted file.
+Do not automate or scrape a service unless it publishes an API permitting that
+use; prefer an audited/self-hosted backend. A web site's "320 kbps" output
+cannot restore quality absent from YouTube's original lossy audio.
+
+8. Discovery boundary
+---------------------
+`ytmv` accepts known YouTube URLs/video IDs; it deliberately does not search
+YouTube and has no Television channel. Discover and verify a URL first, then
+pass it to `ytmv get`. Lyrics discovery is separate (`ytmv lyrics --pick`).
+
+Leaf help:
+  ytmv help get
+  ytmv help lyrics
+  ytmv help tag
+  ytmv help doctor
+
+Full documentation:
+  https://daviddwlee84.github.io/dotfiles/tools/ytmv/
+"""
+
+LEAVES = {
+    "get": ("get", "ytmv get"),
+    "lyrics": ("lyrics", "ytmv lyrics"),
+    "tag": ("tag", "ytmv tag"),
+    "doctor": ("doctor", "ytmv doctor"),
+}
 
 
 def _source_path() -> Path:
@@ -112,30 +267,45 @@ def _leaf(module: str, prog: str, args: list[str]) -> int:
 
 
 def main() -> int:
-    # Help paths print USAGE and exit BEFORE any heavy import, so `ytmv -h`
-    # stays instant and never loads yt_dlp / mutagen.
-    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
-        # Bare `ytmv` is usage, not a picker: unlike `yth` there is no local
-        # index to fuzzy-pick over, so there is no `tv ytmv` channel to exec.
+    # Help paths print before heavy imports, so root help stays instant and
+    # remains usable for diagnosing a missing dependency.
+    if len(sys.argv) < 2:
         print(USAGE)
-        return 0 if len(sys.argv) >= 2 else 2
+        return 2
+
+    sub = sys.argv[1]
+    rest = sys.argv[2:]
+    if sub in ("-h", "--help"):
+        print(USAGE)
+        return 0
+    if sub == "help" and not rest:
+        print(GUIDE)
+        return 0
+
+    # Bare `ytmv` is usage, not a picker: unlike `yth` there is no local index
+    # to fuzzy-pick over, so there is no `tv ytmv` channel to exec.
+    if sub == "help":
+        topic = rest[0]
+        if topic not in LEAVES:
+            print(f"ytmv: unknown help topic '{topic}'\n\n{USAGE}", file=sys.stderr)
+            return 2
+        if len(rest) > 1:
+            print(
+                f"ytmv: unexpected help argument '{rest[1]}'\n"
+                "Usage: ytmv help [get|lyrics|tag|doctor]",
+                file=sys.stderr,
+            )
+            return 2
+        sub = topic
+        rest = ["--help"]
 
     src = _source_path()
     if str(src) not in sys.path:
         sys.path.insert(0, str(src))
 
-    sub = sys.argv[1]
-    rest = sys.argv[2:]
-
     # Leaf modules own their own tyro parsing. Subcommand `-` → module `_`.
-    leaves = {
-        "get": ("get", "ytmv get"),
-        "lyrics": ("lyrics", "ytmv lyrics"),
-        "tag": ("tag", "ytmv tag"),
-        "doctor": ("doctor", "ytmv doctor"),
-    }
-    if sub in leaves:
-        module, prog = leaves[sub]
+    if sub in LEAVES:
+        module, prog = LEAVES[sub]
         return _leaf(module, prog, rest)
 
     print(f"ytmv: unknown subcommand '{sub}'\n\n{USAGE}", file=sys.stderr)

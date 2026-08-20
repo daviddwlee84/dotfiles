@@ -492,6 +492,13 @@ installs, `uv self update` for the curl-installer. Mirror logic in
 [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md) and
 [`pitfalls/uv-self-update-homebrew-noop.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/uv-self-update-homebrew-noop.md).
 
+Two install-completeness guards repair an existing tool without turning the role into an
+upgrade loop: `extra_binaries` checks entry-point shims in `~/.local/bin`, while
+`required_distributions` (paired with `env_name`) checks packages inside the uv tool venv.
+A missing declaration triggers one `uv tool install --force`; a complete environment remains
+unchanged. `yt-dlp[default]` uses the latter to ensure its matched `yt-dlp-ejs` solver is
+present on hosts that previously installed bare `yt-dlp`.
+
 **Tool inventory** (`python_uv_tools/defaults/main.yml`):
 
 | Tool | `--with` / `--with-executables-from` | `needs_modern_gcc` |
@@ -509,7 +516,7 @@ installs, `uv self update` for the curl-installer. Mirror logic in
 | `marimo[recommended,mcp]` | `httpx[socks]` | ✓ |
 | `jupyterlab` (`jupyter-lab`) | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets`; `with_executables_from: notebook, jupyter-core`; `extra_binaries: jupyter, jupyter-notebook` | ✓ |
 | `xonsh` | `xontrib-jedi`, `xontrib-zoxide`, `xontrib-pipeliner`, `xontrib-fzf-widgets` | — |
-| `yt-dlp` | — | — |
+| `yt-dlp[default]` | `required_distributions: yt-dlp-ejs` (EJS challenge solver; Node is enabled by yth/ytmv) | — |
 | `markitdown[docx,xlsx,pptx]` | — (extras in name; pulls pandas 3.x) | ✓ |
 
 From `llm_tools/defaults/main.yml`:
@@ -1214,7 +1221,7 @@ list.
 | **xonsh** | uv tool (with xontribs) | uv tool | python_uv_tools |
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
-| **yt-dlp** | uv tool | uv tool | python_uv_tools |
+| **yt-dlp** | uv tool (`[default]` + `yt-dlp-ejs`) | uv tool (`[default]` + `yt-dlp-ejs`) | python_uv_tools |
 | **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`, thereafter matched by glob `zen*.AppImage` | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl official installer | devtools |

@@ -200,6 +200,28 @@
     gcc_too_old: >-
       {{ ((gcc_version_probe.stdout | trim).split('.')[0] | int) < 9 }}
 
+- name: Resolve uv tool environment directory
+  ansible.builtin.command: uv tool dir
+  register: _uv_tool_dir
+  changed_when: false
+
+- name: Probe required Python distributions inside uv tool environments
+  ansible.builtin.command:
+    argv:
+      - "{{ _uv_tool_dir.stdout | trim }}/{{ item.0.env_name }}/bin/python"
+      - -c
+      - "import importlib.metadata as m; m.version({{ item.1 | to_json }})"
+  loop: >-
+    {{ python_uv_tools
+       | subelements('required_distributions', skip_missing=True) }}
+  loop_control:
+    label: "{{ item.0.name }} -> {{ item.1 }}"
+  register: _uv_required_distributions_probe
+  changed_when: false
+  failed_when: false
+  when:
+    - not (item.0.needs_modern_gcc | default(false) and gcc_too_old)
+
 - name: Probe extra_binaries presence (for entries using with_executables_from)
   ansible.builtin.stat:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.1 }}"
@@ -233,16 +255,24 @@
          | rejectattr('stat.exists')
          | map(attribute='item.1')
          | list }}
-    _force_reinstall: "{{ _missing_extras | length > 0 }}"
+    _missing_distributions: >-
+      {{ _uv_required_distributions_probe.results
+         | default([])
+         | selectattr('item.0.name', 'equalto', item.name)
+         | selectattr('rc', 'defined')
+         | rejectattr('rc', 'equalto', 0)
+         | map(attribute='item.1')
+         | list }}
+    _force_reinstall: >-
+      {{ (_missing_extras | length > 0) or (_missing_distributions | length > 0) }}
     _primary_binary_path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
     _primary_exists: "{{ _primary_binary_path is exists }}"
   register: python_uv_tool_install
   until: python_uv_tool_install is succeeded
   retries: 3
   delay: 5
-  # Skip when:
-  #   - primary binary already exists, AND
-  #   - either no extras declared, or all extras already present
+  # Skip when the primary binary exists, all declared entry-point shims
+  # exist, and every required distribution is present inside the tool venv.
   changed_when: python_uv_tool_install.rc == 0 and (_force_reinstall or not _primary_exists)
   environment:
     UV_HTTP_TIMEOUT: "120"
@@ -255,4 +285,22 @@
     label: >-
       {{ item.name
          }}{% if item.needs_modern_gcc | default(false) and gcc_too_old %} [SKIPPED: needs gcc >= 9]{% endif
-         %}{% if item.extra_binaries is defined %} [extras: {{ item.extra_binaries | join(',') }}]{% endif %}
+         %}{% if item.extra_binaries is defined %} [extras: {{ item.extra_binaries | join(',') }}]{% endif
+         %}{% if item.required_distributions is defined %} [distributions: {{ item.required_distributions | join(',') }}]{% endif %}
+
+- name: Verify required Python distributions after uv tool install
+  ansible.builtin.command:
+    argv:
+      - "{{ _uv_tool_dir.stdout | trim }}/{{ item.0.env_name }}/bin/python"
+      - -c
+      - "import importlib.metadata as m; print(m.version({{ item.1 | to_json }}))"
+  loop: >-
+    {{ python_uv_tools
+       | subelements('required_distributions', skip_missing=True) }}
+  loop_control:
+    label: "{{ item.0.name }} -> {{ item.1 }}"
+  register: _uv_required_distributions_verify
+  changed_when: false
+  failed_when: _uv_required_distributions_verify.rc != 0
+  when:
+    - not (item.0.needs_modern_gcc | default(false) and gcc_too_old)

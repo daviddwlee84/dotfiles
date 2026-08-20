@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "yt-dlp>=2025.1",
+#   "yt-dlp[default]>=2026.7.4",
 #   "tyro>=0.9",
 #   "rich>=13.9",
 #   "platformdirs>=4",

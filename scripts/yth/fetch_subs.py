@@ -26,7 +26,17 @@ from typing import Annotated
 
 import tyro
 
-from scripts.yth import connect, cookie_opts, load_config, now_iso, video_url, vtt_to_text, ytdl
+from scripts.yth import (
+    CookieSourceError,
+    connect,
+    cookie_opts,
+    load_config,
+    now_iso,
+    video_url,
+    vtt_to_text,
+    yt_dlp_runtime_opts,
+    ytdl,
+)
 
 
 @dataclass
@@ -88,8 +98,8 @@ def fetch_subs_for(yt_dlp, vid: str, langs: list[str], cookies: dict) -> dict[st
             "subtitlesformat": "vtt",
             "outtmpl": os.path.join(td, "%(id)s.%(ext)s"),
             "quiet": True,
-            "no_warnings": True,
-            "sleep_interval_subtitles": 1,
+                "sleep_interval_subtitles": 1,
+            **yt_dlp_runtime_opts(),
             **cookies,
         }
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -116,7 +126,11 @@ def cli(args: Args) -> int:
 
     cfg = load_config()
     langs = args.langs or cfg.get("langs") or ["en", "en-US"]
-    cookies = cookie_opts(cfg) if args.cookies else {}
+    try:
+        cookies = cookie_opts(cfg, required=True) if args.cookies else {}
+    except CookieSourceError as e:
+        print(f"yth fetch-subs: cookie source rejected — {e}", file=sys.stderr)
+        return 2
     yt_dlp = ytdl()
 
     with_subs = no_subs = failed = 0

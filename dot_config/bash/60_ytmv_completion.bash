@@ -2,7 +2,8 @@
 # Source CLI: dot_dotfiles/bin/executable_ytmv.
 # Mirrors dot_config/zsh/tools/60_ytmv_completion.zsh — keep both in sync.
 
-command -v ytmv >/dev/null 2>&1 || return 0
+# Register unconditionally: Bash loads this directory before the shared PATH
+# module adds ~/.dotfiles/bin. Dynamic profile lookup already fails quietly.
 
 _ytmv_profile_list() {
     ytmv doctor --list-profiles 2>/dev/null
@@ -13,11 +14,17 @@ _ytmv_completion() {
     _init_completion -n = || return
 
     if [ "$cword" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "get lyrics tag doctor" -- "$cur") )
+        COMPREPLY=( $(compgen -W "get lyrics tag doctor help" -- "$cur") )
         return
     fi
 
     local sub="${words[1]}"
+    if [ "$sub" = "help" ]; then
+        if [ "$cword" -eq 2 ]; then
+            COMPREPLY=( $(compgen -W "get lyrics tag doctor" -- "$cur") )
+        fi
+        return
+    fi
 
     # Value slots shared by every subcommand: offer the right candidates and
     # stop, so a filename never leaks into an enum argument.
@@ -49,7 +56,7 @@ _ytmv_completion() {
         get)
             case "$cur" in
                 -*) COMPREPLY=( $(compgen -W "--from-file --out --profile --audio --video \
---soft-subs --burn-subs --lyrics --langs --artist --track --album --number --m3u \
+--no-audio --soft-subs --no-soft-subs --burn-subs --lyrics --langs --artist --track --album --number --m3u \
 --max-height --audio-quality --cookies --force --sleep --refresh-lyrics --json \
 $common_overrides" -- "$cur") ) ;;
             esac
@@ -70,7 +77,7 @@ $common_overrides" -- "$cur") ) ;;
             ;;
         doctor)
             case "$cur" in
-                -*) COMPREPLY=( $(compgen -W "--profile --list-profiles --offline --json" \
+                -*) COMPREPLY=( $(compgen -W "--profile --list-profiles --offline --cookies --json" \
 -- "$cur") ) ;;
             esac
             ;;

@@ -17,9 +17,14 @@ Storage layout (via ``platformdirs``, so it's correct on macOS *and* Linux):
 """
 from __future__ import annotations
 
+import contextlib
+import functools
+import http.cookiejar
+import io
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -337,24 +342,125 @@ def _detect_zen_profile() -> str | None:
     return None
 
 
-def cookie_opts(cfg: dict) -> dict:
-    """Translate config into yt-dlp cookie options.
+class CookieSourceError(ValueError):
+    """A configured cookie source is unsafe or unusable (message is value-free)."""
 
-    Returns ``{}`` when no cookie source is configured — correct for public
-    videos (enrich / fetch-subs), which need no auth. ``sync`` and restricted
-    videos require one of the two keys to be set.
+
+def _validated_cookiefile(raw_path: str) -> str:
+    """Validate a Netscape jar silently before yt-dlp can echo malformed rows.
+
+    yt-dlp's loader warns with ``line!r`` for a malformed entry, which includes
+    the bearer value. All file-backed sinks therefore pass through here first.
+    Error messages describe only the class of failure — never a row or value.
+    """
+    path = Path(os.path.expanduser(raw_path))
+    if not path.is_file():
+        raise CookieSourceError("cookie file is missing")
+    try:
+        metadata = path.stat()
+    except OSError as e:
+        raise CookieSourceError(f"cookie file cannot be inspected ({type(e).__name__})") from None
+    if metadata.st_size <= 0:
+        raise CookieSourceError("cookie file is empty")
+    mode = stat.S_IMODE(metadata.st_mode)
+    if os.name != "nt" and mode != 0o600:
+        raise CookieSourceError(f"cookie file mode is {mode:04o}; expected 0600")
+
+    # Validate with yt-dlp's exact parser. It normally warns with `line!r` for
+    # a skipped row (including the bearer value), so capture and discard every
+    # diagnostic and turn any warning/error into a value-free rejection.
+    from yt_dlp.cookies import YoutubeDLCookieJar
+
+    jar = YoutubeDLCookieJar(str(path))
+    diagnostics = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(diagnostics):
+            jar.load(ignore_discard=True, ignore_expires=True)
+    except (http.cookiejar.LoadError, OSError, ValueError):
+        raise CookieSourceError("cookie file is not valid Netscape format") from None
+    if diagnostics.getvalue():
+        raise CookieSourceError("cookie file contains an entry yt-dlp cannot parse")
+
+    all_cookies = list(jar)
+
+    def is_youtube_cookie(cookie) -> bool:
+        domain = cookie.domain.lstrip(".").lower()
+        return domain == "youtube.com" or domain.endswith(".youtube.com")
+
+    if any(not is_youtube_cookie(cookie) for cookie in all_cookies):
+        raise CookieSourceError(
+            "cookie file contains non-YouTube domains; export an isolated YouTube-only jar"
+        )
+    # Netscape exports use expires=0 for session cookies. stdlib treats 0 as
+    # expired, while yt-dlp correctly normalizes it to a live session cookie.
+    usable = [
+        cookie
+        for cookie in all_cookies
+        if cookie.expires in (None, 0) or not cookie.is_expired()
+    ]
+    if not usable:
+        raise CookieSourceError("cookie file has no unexpired YouTube-domain entries")
+    return str(path)
+
+
+def cookie_opts(cfg: dict, *, required: bool = False) -> dict:
+    """Translate a safe configured source into yt-dlp cookie options.
+
+    Returns ``{}`` when an optional source is absent. Explicit authenticated
+    paths pass ``required=True`` so a missing source cannot silently fall back
+    to anonymous access. File-backed sources are rejected before yt-dlp sees
+    them if missing, non-0600, malformed, empty/expired, or multi-domain.
     """
     if cfg.get("cookiefile"):
-        return {"cookiefile": os.path.expanduser(cfg["cookiefile"])}
+        return {"cookiefile": _validated_cookiefile(str(cfg["cookiefile"]))}
     if cfg.get("from_browser"):
         browser, _, profile = str(cfg["from_browser"]).partition(":")
+        browser = browser.strip().lower()
+        supported = {
+            "brave", "chrome", "chromium", "edge", "firefox", "opera",
+            "safari", "vivaldi", "whale",
+        }
+        if browser not in supported:
+            raise CookieSourceError(
+                f"unsupported yt-dlp browser name: {browser or '<empty>'}"
+            )
         return {"cookiesfrombrowser": (browser, profile or None, None, None)}
+    if required:
+        raise CookieSourceError("no cookie source configured")
     return {}
 
 
 # --------------------------------------------------------------------------- #
 # yt-dlp (lazy)
 # --------------------------------------------------------------------------- #
+@functools.lru_cache(maxsize=1)
+def _node_supports_yt_dlp_ejs() -> bool:
+    """Return true only for the Node 22+ runtime required by current yt-dlp."""
+    node = shutil.which("node")
+    if not node:
+        return False
+    try:
+        result = subprocess.run(
+            [node, "--version"], capture_output=True, text=True, timeout=5, check=False
+        )
+        major = int((result.stdout or result.stderr).strip().lstrip("v").split(".", 1)[0])
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return False
+    return result.returncode == 0 and major >= 22
+
+
+def yt_dlp_runtime_opts() -> dict:
+    """Return a supported managed JS runtime for embedded yt-dlp calls.
+
+    yt-dlp's Python API does not read standalone CLI config. This repo manages
+    Node through mise, but legacy armv7/EL7 hosts may expose only Node 20/16;
+    never select those as though they could run EJS. Doctor reports the hard
+    requirement, while simple extraction may still degrade without a runtime.
+    """
+    runtimes = {"node": {}} if _node_supports_yt_dlp_ejs() else {}
+    return {"js_runtimes": runtimes}
+
+
 def ytdl():
     """Lazily import and return the ``yt_dlp`` module.
 

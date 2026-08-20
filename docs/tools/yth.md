@@ -58,24 +58,53 @@ tv yth                                              # fuzzy-pick the whole histo
 | `show <id> [--json]` | One-video detail (DB-only, no network). Powers the tv preview. |
 | `open <id>` / `copy <id>` / `play <id>` | Open in browser / copy URL / play (mpv if configured, else browser). |
 
-## Cookies (only `sync` + restricted videos)
+## YouTube runtime + cookies (only `sync` + restricted videos)
 
-**Public videos need no cookies** — `enrich` and `fetch-subs` of public content work
-unauthenticated. Cookies are required only for `yth sync` (your account-private history)
-and for members-only / age-restricted / private videos.
+**Public videos need no cookies** — `enrich` and `fetch-subs` use packaged
+`yt-dlp-ejs` + the repo-managed Node 22+ runtime and should work unauthenticated. Legacy
+armv7/armv6 Node 20 and EL7 Node 16 are deliberately not selected as EJS runtimes; doctor
+reports that platform limitation. Cookies are intrinsically required only for `yth sync` (account-private history) and private/restricted
+content. For complete history, prefer cookie-free Google Takeout.
 
-yt-dlp's `--cookies-from-browser` knows `brave, chrome, chromium, edge, firefox, opera,
-safari, vivaldi, whale` — **not** `arc` or `zen` (both are forks). Handle them like this:
+Do not collapse every `Sign in to confirm you're not a bot` into a cookie problem. Fix EJS /
+Node warnings first, then stop retrying, use a clean residential IP, and reduce request rate.
+Upstream warns that using a logged-in account with yt-dlp can cause temporary or permanent
+account suspension.
+
+!!! danger "Cookies are bearer credentials"
+    Never print, paste, screenshot, commit, `chezmoi add`, or cloud-backup cookies. Prefer a
+    dedicated YouTube-only profile/account, not a daily primary account. The target
+    `~/.config/{yth,ytmv}/cookies.txt` are explicitly excluded from chezmoi management.
+    The shared loader requires mode `0600` and rejects malformed, expired/empty, and non-YouTube-domain
+    files before yt-dlp can echo a malformed row or consume the jar.
+
+yt-dlp's supported browser names include `brave, chrome, chromium, edge, firefox, opera,
+safari, vivaldi, whale` — not Arc or Zen:
 
 | Browser | Mechanism | Config |
 |---|---|---|
-| **Zen** (Firefox fork) | yt-dlp reads Firefox-format `cookies.sqlite` from an explicit profile path. Auto-detected if Zen is installed. | `from_browser = "firefox:/path/to/zen/Profiles/<profile>"` |
-| **Arc** (Chromium fork) | The `chrome` keyword derives the Keychain service name *"Chrome Safe Storage"*; Arc's is *"Arc Safe Storage"* and there's no flag to override it, so keyword extraction can't decrypt Arc cookies on macOS. Export a `cookies.txt` instead. | `cookiefile = "~/.config/yth/cookies.txt"` |
-| Standard Chrome/Firefox/… | Use the keyword directly. | `from_browser = "firefox"` (or `chrome`, …) |
+| **Zen** (Firefox fork) | Read its Firefox-format profile; auto-detected when installed. | `from_browser = "firefox:/path/to/zen/Profiles/<profile>"` |
+| **Arc** | Arc is not a supported browser name; Chrome's macOS handler is hard-coded to Chrome Safe Storage. Use an isolated YouTube-only export. | `cookiefile = "~/.config/yth/cookies.txt"` |
+| Standard Chrome/Firefox/… | Use the supported name, preferably with a dedicated profile. | `from_browser = "firefox"` (or `chrome`, …) |
 
-To export Arc cookies: install the **"Get cookies.txt LOCALLY"** extension (Arc is Chromium,
-so Chrome Web Store extensions install), visit `youtube.com` logged in, Export → save as
-`~/.config/yth/cookies.txt`. These expire; re-export periodically.
+### Safe Arc/Chromium export
+
+1. Open a private/incognito session and sign in to YouTube.
+2. Keep exactly one tab: <https://www.youtube.com/robots.txt>.
+3. Export only `youtube.com` cookies using the exact extension
+   **Get cookies.txt LOCALLY**. The similarly named former extension without “LOCALLY” was
+   reported as malware.
+4. Save as `~/.config/yth/cookies.txt`, then `chmod 600 ~/.config/yth/cookies.txt`.
+5. Close the private session; replace/delete the file after expiry/invalidation.
+
+Do not combine `--cookies-from-browser` with `--cookies FILE` to export a daily profile: it
+can write cookies for every site. `ytmv doctor --cookies` safely checks source
+loading/decryption without printing contents.
+
+On macOS, `find-generic-password failed` plus `cannot decrypt v10 cookies: no key found`
+may mean Chrome's exact Safe Storage item is absent. Status 44 / OSStatus `-25300` happens
+before authorization, so no popup appears; a replacement key cannot decrypt old values. See
+[`ytmv help`](ytmv.md#cookies) for the metadata-only diagnostic and safe alternatives.
 
 ## The `tv yth` channel
 
@@ -98,8 +127,8 @@ SSOT for a future `yth tui`.
 ## Config — `~/.config/yth/config.toml`
 
 ```toml
-# cookiefile   = "~/.config/yth/cookies.txt"                    # Arc / any browser (export)
-# from_browser = "firefox:/…/zen/Profiles/xxxx.Default"        # Zen (auto-detected if unset)
+# cookiefile   = "~/.config/yth/cookies.txt"                    # isolated YouTube-only export; chmod 600
+# from_browser = "firefox:/…/zen/Profiles/xxxx.Default"        # dedicated Firefox/Zen profile
 langs        = ["en", "en-US"]                                 # subtitle languages to fetch
 open_target  = "browser"                                       # browser | mpv
 ```
@@ -122,18 +151,18 @@ Touching `yth` means keeping these in sync (see the `CLAUDE.md` cross-file table
    `yth tui`; new actions use `Alt+`.
 3. `dot_config/zsh/tools/53_yth_completion.zsh` + `dot_config/bash/53_yth_completion.bash` —
    keep the two in sync (Strategy B).
-4. `dot_ansible/roles/python_uv_tools/defaults/main.yml` — the `yt-dlp` entry (dual with the
-   launcher PEP723 block).
+4. `yt-dlp[default]` stays aligned across this launcher's PEP723 block, ytmv's PEP723 block,
+   and `python_uv_tools`; `yt-dlp-ejs` plus `yt_dlp_runtime_opts()`/Node are one runtime contract.
 5. Docs: this page (+ `yth.zh-TW.md`), `docs/shells/aliases.md`, `docs/zsh/zsh-completions.md`
    §F, `docs/this_repo/tool-managers.md` A–Z + uv inventory, `mkdocs.yml` nav,
    `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl`.
 
 ## Troubleshooting
 
-- **`Sign in to confirm you're not a bot`** on `enrich`/`fetch-subs`/`sync` — YouTube
-  bot-check, common from datacenter IPs. It's treated as transient (not stamped), so it
-  retries next run. Configure cookies (`--cookies` for enrich/fetch-subs) or run from a
-  residential IP.
+- **`Sign in to confirm you're not a bot`** on `enrich`/`fetch-subs`/`sync` — treated as
+  transient (not stamped). Fix EJS/Node warnings first, stop repeated retries, leave
+  datacenter/VPN/proxy egress, and reduce rate. Cookies are intrinsic for `sync`, but an
+  account-risking last resort—not the first fix—for public `enrich`/`fetch-subs`.
 - **`no captions`** — the video genuinely has no subtitles in the configured `langs`. Add
   langs (`--langs en,en-orig,zh-Hant`) or accept it (the video is stamped so it won't retry;
   `--force` to retry).

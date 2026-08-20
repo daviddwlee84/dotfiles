@@ -472,6 +472,12 @@ Homebrew 安裝走 `brew upgrade uv`、curl-installer 安裝走
 詳見 [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md) 與
 [`pitfalls/uv-self-update-homebrew-noop.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/uv-self-update-homebrew-noop.md)。
 
+兩個完整性 guard 可修復既有 tool、但不會把 role 變成自動升級：`extra_binaries`
+檢查 `~/.local/bin` 的 entry-point shim；`required_distributions`（搭配
+`env_name`）檢查 uv tool venv 內的 Python distribution。缺少時只執行一次
+`uv tool install --force`，完整環境保持不變。`yt-dlp[default]` 用後者確保從前
+安裝 bare `yt-dlp` 的主機也補上相容的 `yt-dlp-ejs` solver。
+
 **工具清單**(`python_uv_tools/defaults/main.yml`):
 
 | 工具 | `--with` / `--with-executables-from` | `needs_modern_gcc` |
@@ -489,7 +495,7 @@ Homebrew 安裝走 `brew upgrade uv`、curl-installer 安裝走
 | `marimo[recommended,mcp]` | `httpx[socks]` | ✓ |
 | `jupyterlab`(`jupyter-lab`) | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets`;`with_executables_from: notebook, jupyter-core`;`extra_binaries: jupyter, jupyter-notebook` | ✓ |
 | `xonsh` | `xontrib-jedi`, `xontrib-zoxide`, `xontrib-pipeliner`, `xontrib-fzf-widgets` | — |
-| `yt-dlp` | — | — |
+| `yt-dlp[default]` | `required_distributions: yt-dlp-ejs`（EJS solver；yth/ytmv 啟用 Node） | — |
 
 來自 `llm_tools/defaults/main.yml`:
 
@@ -1104,7 +1110,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **xonsh** | uv tool(配 xontribs) | uv tool | python_uv_tools |
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
-| **yt-dlp** | uv tool | uv tool | python_uv_tools |
+| **yt-dlp** | uv tool（`[default]` + `yt-dlp-ejs`） | uv tool（`[default]` + `yt-dlp-ejs`） | python_uv_tools |
 | **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`,之後以 glob `zen*.AppImage` 比對 | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl 官方 installer | devtools |

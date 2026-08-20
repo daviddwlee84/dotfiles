@@ -11,6 +11,11 @@
 #     For the meta-CLI dispatch model + the 8 jupyter binaries this exposes,
 #     see docs/tools/notebooks.md "The `jupyter` meta-CLI vs standalone binaries".
 #     For the auto-upgrade dispatch when uv is too old, see docs/this_repo/uv-bootstrap.md.
+#   - required_distributions: (optional) Python distributions that must exist
+#     inside the installed tool environment, even when the primary binary is
+#     already present. Requires env_name so the role can locate the uv venv.
+#     Missing distributions trigger an idempotent `uv tool install --force`.
+#   - env_name: (required with required_distributions) uv tool environment dir.
 #   - extra_binaries: (optional) list of additional binary names that must
 #     also exist in ~/.local/bin for the install to be considered complete.
 #     Use this whenever `with_executables_from` is set, so adding a new
@@ -96,13 +101,15 @@ python_uv_tools:
       - xontrib-zoxide        # z / zi directory jumping (uses zoxide binary on PATH)
       - xontrib-pipeliner     # pipe shell output through Python expressions (xonsh selling point)
       - xontrib-fzf-widgets   # Ctrl+R / Ctrl+T fzf widgets (uses fzf binary on PATH)
-  # yt-dlp: powers the in-house `yth` CLI (YouTube watch-history search). Also
-  # declared in executable_yth's PEP723 block so `yth` self-bootstraps even
-  # before ansible runs; this entry additionally exposes the standalone
-  # `yt-dlp` binary on PATH (same dual pattern as `mlflow` ↔ `mlf`). Pure
-  # Python, single entry point — no needs_modern_gcc / extras.
-  - name: yt-dlp
+  # yt-dlp: powers `yth` + `ytmv`. The [default] extra supplies the matched
+  # yt-dlp-ejs challenge solver; embedded calls explicitly enable managed Node.
+  # Both PEP723 launchers declare the same extra so they self-bootstrap before
+  # ansible runs. required_distributions repairs existing bare-tool installs.
+  - name: yt-dlp[default]
+    env_name: yt-dlp
     binary: yt-dlp
+    required_distributions:
+      - yt-dlp-ejs
   # markitdown: Microsoft's Office/PDF → Markdown converter. Powers the `.xlsx`
   # and `.pptx` paths of the in-house `view-office` CLI (pandoc canNOT read
   # pptx/xlsx, so markitdown is the universal Office→markdown engine there) and

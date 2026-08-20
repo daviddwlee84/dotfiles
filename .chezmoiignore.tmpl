@@ -36,10 +36,14 @@ site/**
 # See scripts/init/README.md.
 bootstrap.sh
 
-*.txt   # ignore *.txt in the target directory
-*/*.txt # ignore *.txt in subdirectories of the target directory
-        # but not in subdirectories of subdirectories;
-        # so a/b/c.txt would *not* be ignored
+# Ignore *.txt in the target directory and one directory below. Like
+# .gitignore, an inline `#` is literal rather than a trailing comment.
+*.txt
+*/*.txt
+# Deeper plaintext YouTube bearer credentials; yth/ytmv may read these,
+# but chezmoi must never own them (including ytmv's supported local override).
+.config/yth/cookies.txt
+.config/ytmv/cookies.txt
 
 */*.org# # Ignore org-mode backup files that end with `#`
 

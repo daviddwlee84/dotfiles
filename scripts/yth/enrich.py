@@ -23,7 +23,16 @@ from typing import Annotated
 
 import tyro
 
-from scripts.yth import connect, cookie_opts, load_config, now_iso, video_url, ytdl
+from scripts.yth import (
+    CookieSourceError,
+    connect,
+    cookie_opts,
+    load_config,
+    now_iso,
+    video_url,
+    yt_dlp_runtime_opts,
+    ytdl,
+)
 
 # Errors that mean the video is gone for good → safe to sentinel-stamp so we
 # never retry. Anything NOT matching (bot-check, 429, timeouts, unknown) is
@@ -80,13 +89,17 @@ def cli(args: Args) -> int:
     opts = {
         "skip_download": True,
         "quiet": True,
-        "no_warnings": True,
         "extract_flat": False,
         "sleep_interval": 1,
         "max_sleep_interval": 3,
+        **yt_dlp_runtime_opts(),
     }
     if args.cookies:
-        opts.update(cookie_opts(cfg))
+        try:
+            opts.update(cookie_opts(cfg, required=True))
+        except CookieSourceError as e:
+            print(f"yth enrich: cookie source rejected — {e}", file=sys.stderr)
+            return 2
 
     yt_dlp = ytdl()
     ok = permanent = transient = 0

@@ -71,6 +71,12 @@ need.
 | 22.x (LTS until 2027-04) | 2.28 | ❌ | ✅ | ✅ |
 | 24.x (current) | 2.28 | ❌ | ✅ | ✅ |
 
+!!! warning "yt-dlp EJS now requires Node 22+"
+    The in-house `yth` / `ytmv` CLIs do not treat an older `node` executable as a usable
+    JavaScript runtime. EL7's Node 16 and the repo's armv7/armv6 Node 20 pin fail
+    `ytmv doctor` for online extraction. EL7 x86_64 can use the micromamba Node 22 escape
+    hatch below; armv7 currently has no managed supported EJS runtime.
+
 **EL7 escape hatch**: NodeSource still publishes Node 16 RPMs for EL7
 (the last EL7-compatible LTS). The package is built specifically against
 glibc 2.17 + libstdc++ 4.8 with a bundled-runtime workaround.

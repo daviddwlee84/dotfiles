@@ -237,20 +237,33 @@ def profile_names(cfg: dict | None = None) -> list[str]:
     return sorted(names)
 
 
-def cookie_options(cfg: dict, enabled: bool) -> dict:
-    """yt-dlp cookie kwargs. Reuses ``yth``'s config unless ytmv overrides it.
+def resolve_cookie_config(cfg: dict) -> tuple[dict, str]:
+    """Return the effective cookie config and its non-secret owner label.
 
-    Keeping one cookie source means the Arc ``cookies.txt`` export and the Zen
-    profile auto-detection are configured and documented once, in
-    ``~/.config/yth/config.toml`` (docs/tools/yth.md § Cookies).
+    ``ytmv`` may override the shared ``yth`` source, but both download and
+    doctor must follow the same precedence. The returned mapping is never
+    printed wholesale because it can contain a sensitive cookie-file path.
     """
+    if cfg.get("cookiefile") or cfg.get("from_browser"):
+        return cfg, "ytmv"
+
+    from scripts.yth import load_config as yth_config
+
+    shared = yth_config()
+    if shared.get("cookiefile") or shared.get("from_browser"):
+        return shared, "yth"
+    return {}, "none"
+
+
+def cookie_options(cfg: dict, enabled: bool) -> dict:
+    """yt-dlp cookie kwargs. Reuses ``yth``'s config unless ytmv overrides it."""
     if not enabled:
         return {}
-    from scripts.yth import cookie_opts, load_config as yth_config
 
-    if cfg.get("cookiefile") or cfg.get("from_browser"):
-        return cookie_opts(cfg)
-    return cookie_opts(yth_config())
+    from scripts.yth import cookie_opts
+
+    effective, _owner = resolve_cookie_config(cfg)
+    return cookie_opts(effective, required=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -776,6 +789,13 @@ def pick_hit(hits: list[dict], artist: str, track: str, duration: float | None,
 # --------------------------------------------------------------------------- #
 # yt-dlp (lazy)
 # --------------------------------------------------------------------------- #
+def yt_dlp_runtime_opts() -> dict:
+    """Use the same managed Node runtime as the sibling ``yth`` CLI."""
+    from scripts.yth import yt_dlp_runtime_opts as shared_runtime_opts
+
+    return shared_runtime_opts()
+
+
 def ytdl():
     """Lazily import and return the ``yt_dlp`` module.
 

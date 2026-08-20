@@ -7,7 +7,7 @@
 # user defined) via `ytmv doctor --list-profiles`. URLs and video ids are NOT —
 # they are opaque and there is no local index to enumerate.
 
-(( $+commands[ytmv] )) || return 0
+# Register without a source-time binary check; PATH may finish loading later.
 
 _ytmv_profiles() {
     local -a profiles
@@ -29,7 +29,8 @@ _ytmv() {
                 'get:Download + convert + tag + attach lyrics'
                 'lyrics:Find and attach lyrics to mp3s you already have'
                 'tag:Re-apply a player profile in place (offline)'
-                'doctor:Probe yt-dlp / ffmpeg / libass / cookies + show the profile'
+                'doctor:Probe yt-dlp / EJS / Node / ffmpeg / cookies + show the profile'
+                'help:Show the complete setup guide or one subcommand help page'
             )
             _describe -t subcommands 'ytmv subcommand' subs
             ;;
@@ -42,8 +43,10 @@ _ytmv() {
                         '--out=[output directory]:dir:_files -/' \
                         '--profile=[player compatibility profile]:profile:_ytmv_profiles' \
                         '--audio[produce an mp3 (default)]' \
+                        '--no-audio[disable the default mp3 output]' \
                         '--video[also produce an mp4]' \
                         '--soft-subs[embed subtitles as an mp4 track]' \
+                        '--no-soft-subs[do not embed a subtitle track in mp4]' \
                         '--burn-subs[burn lyrics into the picture (needs libass)]' \
                         '--lyrics=[lyrics source]:source:(auto lrclib youtube none)' \
                         '--langs=[caption languages to try]:langs:' \
@@ -118,8 +121,12 @@ _ytmv() {
                     _arguments \
                         '--profile=[profile to resolve and display]:profile:_ytmv_profiles' \
                         '--list-profiles[print known profile names, one per line]' \
-                        '--offline[skip the LRCLIB reachability check]' \
+                        '--offline[skip public YouTube and LRCLIB probes]' \
+                        '--cookies[also load and decrypt the configured cookie source]' \
                         '--json[emit JSON instead of a table]'
+                    ;;
+                help)
+                    _arguments '1:subcommand help topic:(get lyrics tag doctor)'
                     ;;
             esac
             ;;
