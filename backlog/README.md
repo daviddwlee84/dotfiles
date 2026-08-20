@@ -105,6 +105,7 @@ Add new entries here as you create them. Keep alphabetical.
 | [`chezmoi-diff-pager-agent`](chezmoi-diff-pager-agent.md) | P? deferred | "chezmoi diff pager: TTY-aware delta fallback" |
 | [`copilot-proxy-global-apply-mode`](copilot-proxy-global-apply-mode.md) | P? deferred 2026-08 | "copilot-proxy global apply mode for Claude Code and Codex" |
 | [`copilot-proxy-supervisor`](copilot-proxy-supervisor.md) | P? deferred 2026-07 | "copilot-proxy: replace nohup start with a real supervisor (launchd/systemd/pueue)" |
+| [`fleet-windows-workers`](fleet-windows-workers.md) | P? design captured 2026-08 | "`fleet`: Windows / WSL worker support" |
 | [`mkdocs-anchor-drift`](mkdocs-anchor-drift.md) | P3 ready | "mkdocs site: ~20 stale in-page anchor links to clean up before re-enabling strict `anchors: warn`" |
 | [`chezmoiscripts-namespace-refactor`](chezmoiscripts-namespace-refactor.md) | P2 ready | "Migrate run_onchange scripts into .chezmoiscripts/{global,repo}/" |
 | [`fish-shell-evaluation`](fish-shell-evaluation.md) | P? declined 2026-05 | "Add `fish` as a third primaryShell choice" |
