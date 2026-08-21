@@ -1,5 +1,5 @@
 # 24_herdr.sh - herdr workspace layout helpers (shared backend; bash 4+ / zsh).
-# https://github.com/ogulcancelik/herdr
+# https://github.com/herdrdev/herdr
 #
 # herdr-native analogs of the sesh/tmux helpers in 22_sesh.sh. herdr's model is
 # Workspace -> Tab -> Pane (tmux is Session -> Window -> Pane), and its CLI

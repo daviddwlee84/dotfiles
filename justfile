@@ -466,10 +466,10 @@ upgrade-warp:
 upgrade-atuin:
     ./scripts/upgrade_tools.sh atuin
 
-# Linux-only: `herdr update --handoff` (live, pane-preserving). Must be run from
+# `herdr update --handoff` (live, pane-preserving) on macOS/Linux, followed by
+# syncing the binary-matched global agent skill. Must be run from
 # OUTSIDE herdr after detaching (prefix+q) — the handoff replaces the server that
-# owns your pane, so herdr refuses from inside one. macOS herdr is in upgrade-brew
-# (upstream disables `herdr update` on brew installs). See docs/tools/herdr.md.
+# owns your pane, so herdr refuses from inside one. See docs/tools/herdr.md.
 upgrade-herdr:
     ./scripts/upgrade_tools.sh herdr
 

@@ -70,7 +70,9 @@ pitfalls/** # ignore past-pitfalls knowledge base (repo metadata, not user confi
 #   (merger script, see docs/tools/agent-skills.md).  The skills/ folder under
 #   it is owned by the npx skills CLI and re-populated by
 #   run_onchange_after_install_global_skills.sh.tmpl whenever the lock changes,
-#   so we do NOT want chezmoi to manage skills/ contents directly.
+#   so we do NOT want chezmoi to manage skills/ contents directly. Herdr is the
+#   one direct-managed exception: run_after_42_sync_herdr_skill.sh.tmpl writes
+#   its binary-matched SKILL.md, while chezmoi only owns Claude's symlink to it.
 #
 # Patterns use single-`*` (direct child) + `*/**` (its contents) form instead of a
 # bare `**`. This is load-bearing: a recursive `**` (or a bare `.agents/skills`
@@ -85,14 +87,15 @@ pitfalls/** # ignore past-pitfalls knowledge base (repo metadata, not user confi
 .claude/skills/*/**
 skills-lock.json
 
-# Exception: the first-party, chezmoi-managed, *templated* skill (NOT npx-owned).
-# Re-include it past the npx ignore above (last match wins). It renders per-host
-# from .chezmoi.toml and re-renders on every `chezmoi apply` — unlike the npx
-# clones, which is why it must be chezmoi-managed. The .claude/ entry is a symlink
-# into the universal ~/.agents/skills/ copy. See docs/tools/agent-skills.md.
+# Exceptions: re-include the first-party templated skill and Claude discovery
+# symlinks for direct-managed skills past the npx ignore above (last match wins).
+# `chezmoi-dotfiles` renders per-host; Herdr's real SKILL.md remains ignored and
+# is emitted by the installed binary, while only its .claude/ symlink is managed.
+# See docs/tools/agent-skills.md.
 !.agents/skills/chezmoi-dotfiles
 !.agents/skills/chezmoi-dotfiles/**
 !.claude/skills/chezmoi-dotfiles
+!.claude/skills/herdr
 
 scripts/**
 

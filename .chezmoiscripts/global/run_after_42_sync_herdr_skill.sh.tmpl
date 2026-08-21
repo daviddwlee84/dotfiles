@@ -1,0 +1,22 @@
+#!/bin/bash
+# Keep the global Herdr agent skill byte-aligned with the installed binary.
+#
+# `run_after_*`, not `run_onchange_after_*`: the product lives outside
+# chezmoi's managed tree and the binary can change through `herdr update`.
+# The healthy path is only one command plus a byte comparison.
+
+set -u
+export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
+
+LOG_STREAM=stdout
+{{ include "scripts/lib/log_shared.sh" }}
+{{ include "scripts/lib/herdr_skill.sh" }}
+
+sync_herdr_skill "$HOME/.agents/skills/herdr/SKILL.md"
+rc=$?
+if [[ "$rc" -ne 0 && "$rc" -ne 77 ]]; then
+  warn "Herdr is installed, but its global agent skill could not be synchronized; the next \`chezmoi apply\` will retry"
+fi
+
+# A run-script failure must not abort the rest of chezmoi apply.
+exit 0

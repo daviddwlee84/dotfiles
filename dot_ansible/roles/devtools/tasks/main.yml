@@ -4757,7 +4757,7 @@
     - name: Get latest herdr release
       when: herdr_arch | trim != ''
       ansible.builtin.uri:
-        url: https://api.github.com/repos/ogulcancelik/herdr/releases/latest
+        url: https://api.github.com/repos/herdrdev/herdr/releases/latest
         return_content: true
       register: herdr_release
 

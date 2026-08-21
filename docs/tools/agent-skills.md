@@ -1,7 +1,8 @@
-# Agent skills (`vercel-labs/skills`)
+# Agent skills
 
-This repo manages [`vercel-labs/skills`](https://github.com/vercel-labs/skills)
-agent skills two ways, with sharply different scopes.
+This repo manages ordinary Git-backed skills through
+[`vercel-labs/skills`](https://github.com/vercel-labs/skills), plus two
+direct-managed skills whose content must come from local state.
 
 ## TL;DR
 
@@ -10,6 +11,7 @@ agent skills two ways, with sharply different scopes.
 | **Global** (every project, every shell) | `~/.agents/.skill-lock.json` (chezmoi-managed) | `~/.agents/skills/<name>/` | `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply` |
 | **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `.chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl` on every `chezmoi apply` (when source dir == repo); manual fallback: `just bootstrap-skills` |
 | **First-party templated** (`chezmoi-dotfiles`) | none — chezmoi-managed | `~/.agents/skills/chezmoi-dotfiles/` (+ symlink in `~/.claude/skills/`) | `chezmoi apply` (re-renders per host from `.chezmoi.toml`) — see [§ First-party templated skill](#first-party-templated-skill-chezmoi-dotfiles) |
+| **Binary-matched** (`herdr`) | none — deliberately excluded from the npx lock | `~/.agents/skills/herdr/` (+ symlink in `~/.claude/skills/`) | `herdr --skill` after every `chezmoi apply` and successful `just upgrade-herdr` |
 
 The two scopes happen to overlap today (both install
 `project-knowledge-harness`), but they serve different purposes — see "Why two
@@ -32,7 +34,9 @@ apply`:
    `.skills`, preserving any `installedAt`/`updatedAt`/`skillFolderHash` from
    the live entry.
 3. Preserves any `.skills.<name>` entries **not** in the managed-set (so
-   ad-hoc `npx skills add … -g` installs survive).
+   ad-hoc `npx skills add … -g` installs survive), except `herdr`, which is
+   removed to prevent `npx skills update --global` from overwriting the
+   binary-matched copy.
 4. Preserves `.dismissed` and `.lastSelectedAgents` per-machine state
    verbatim.
 
@@ -81,6 +85,9 @@ become managed across the fleet:
 
 If you only want it on one machine, do nothing — the merger preserves the
 live entry on the source machine, and other hosts simply never see it.
+
+Do not add `herdr` to this block. It is direct-managed from the installed
+binary as described below.
 
 ## Project scope: editing-this-repo convenience
 
@@ -166,6 +173,28 @@ and self-discovering** (it points at `docs/`, `tv list-channels`, `just --list`,
 version: freshness is automatic; only edit the `.tmpl` when a section must be gated
 on a **new prompt key** or a stable new CLI is worth naming.
 
+## Binary-matched skill (`herdr`)
+
+Herdr publishes an official skill, but the runtime copy does not come from a
+Git branch or this repo's external mechanism. The installed binary exposes the
+skill for its exact release through `herdr --skill`; that output is the source
+of truth.
+
+- `.chezmoiscripts/global/run_after_42_sync_herdr_skill.sh.tmpl` runs after
+  Ansible on every apply and atomically writes
+  `~/.agents/skills/herdr/SKILL.md` only when the content changed.
+- `~/.claude/skills/herdr` is a chezmoi-managed symlink to the universal copy.
+- `just upgrade-herdr` runs the pane-preserving binary upgrade first, then calls
+  the same synchronizer before reporting success.
+- A missing binary is a quiet no-op. Invalid or unsupported `--skill` output
+  leaves the previous known-good file untouched and is retried on the next apply.
+- The global npx lock merger removes `.skills.herdr`; otherwise
+  `just upgrade-skills` could replace the release-matched file with whichever
+  commit happens to be current upstream.
+
+The separately vendored copy in `daviddwlee84/agent-skills` is for catalog and
+generic distribution only. It is not the runtime source for these dotfiles.
+
 ## How `npx skills` actually wires agents (mechanism reference)
 
 Verified by reading [`vercel-labs/skills/src/agents.ts`](https://github.com/vercel-labs/skills/blob/main/src/agents.ts)
@@ -244,10 +273,11 @@ new location; chezmoi's lock-file management still uses
 
 ## Anti-patterns
 
-- **Don't put skill source files (`.agents/skills/<name>/SKILL.md`,
+- **Don't put ordinary skill source files (`.agents/skills/<name>/SKILL.md`,
   templates, etc.) in chezmoi source.** They're owned by the npx skills CLI;
   chezmoi managing them creates a constant fight with the CLI's
-  `skillFolderHash`. Only the **lock file** is chezmoi-managed.
+  `skillFolderHash`. Only the **lock file** is chezmoi-managed. The explicit
+  exceptions are `chezmoi-dotfiles` (templated) and `herdr` (binary-emitted).
 - **Don't run `chezmoi re-add ~/.agents/.skill-lock.json`** to capture local
   changes. Edit the merger's `$managed` block instead — that's the
   source-of-truth list. `re-add` would freeze a snapshot of one machine's

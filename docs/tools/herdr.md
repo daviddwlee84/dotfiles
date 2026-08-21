@@ -1,6 +1,6 @@
 # Herdr — Rust terminal multiplexer + AI-agent orchestrator (trial)
 
-[ogulcancelik/herdr](https://github.com/ogulcancelik/herdr) is a Rust terminal multiplexer with **built-in coding-agent awareness** (it tracks per-pane agent state: idle / working / blocked / done). It sits in the same niche as tmux/zellij but is mouse-first and agent-native. Docs: <https://herdr.dev/docs/>.
+[herdrdev/herdr](https://github.com/herdrdev/herdr) is a Rust terminal multiplexer with **built-in coding-agent awareness** (it tracks per-pane agent state: idle / working / blocked / done). It sits in the same niche as tmux/zellij but is mouse-first and agent-native. Docs: <https://herdr.dev/docs/>.
 
 This repo ships herdr as a **trial tool that coexists with tmux** — you run `herdr` *or* `tmux`, never nested. Nothing about the existing tmux / `sesh` / `tmuxp` / workmux setup changes; herdr is purely additive so you can evaluate it without losing your daily driver.
 
@@ -8,7 +8,12 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
   - **Both platforms** — GitHub release **single static binary** (`herdr-{linux,macos}-{x86_64,aarch64}`) into `~/.local/bin/herdr`, managed by the `# --- herdr ... ---` block in `dot_ansible/roles/devtools/tasks/main.yml`. No tarball, so no unarchive step.
   - macOS is **deliberately not** Homebrew, and it is the only tool in this repo where that's true. Upstream disables `herdr update` on Homebrew/mise/Nix installs because the package manager owns the binary — which removes the *only* pane-preserving upgrade path and leaves a server restart, i.e. killing every pane process, as the sole option. The formula was dropped in favour of the release binary so macOS gets `--handoff` too. Boxes provisioned before the switch are migrated by a one-time `brew uninstall herdr` in the same role (leaving both installed would put two binaries on `PATH` and risk a client/server `protocol_mismatch` against yourself).
 - **Verify**: `herdr --version` · validate config with `herdr server reload-config`
-- **Upgrade**: `just upgrade-herdr` (→ `herdr update --handoff`) on both platforms — **run it from outside herdr**, see below
+- **Agent skill**: every `chezmoi apply` installs the official global skill from
+  `herdr --skill` into `~/.agents/skills/herdr/SKILL.md`, with a Claude discovery
+  symlink. The binary is the version authority; the Git-vendored catalog copy is
+  deliberately not used at runtime.
+- **Upgrade**: `just upgrade-herdr` (→ `herdr update --handoff`, then refresh the
+  binary-matched skill) on both platforms — **run it from outside herdr**, see below
 
 > **`herdr update` refuses to run from inside a herdr pane.** The handoff replaces the server process that owns the pane you are typing in, so it fails closed:
 >

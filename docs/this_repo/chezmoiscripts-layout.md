@@ -121,6 +121,7 @@ top-level files alphabetically).
   - bat theme rebuild
   - Raycast config import (gated on `syncRaycast` opt-in)
   - Global skills restore (`~/.agents/.skill-lock.json` → `~/.agents/skills/`)
+    plus binary-matched Herdr skill synchronization (`herdr --skill`)
 
 - **`repo/`** — anything that ONLY makes sense when the local source dir
   IS this repo's working tree (not a deploy-from-GitHub consumer). Today

@@ -70,6 +70,8 @@ fi
 #     real install state) but overwrite source/sourceUrl/skillPath from $managed
 #     (those are the contract we enforce).
 #   - .skills.<name> entries NOT in $managed.skills are preserved as-is.
+#   - .skills.herdr is removed: Herdr is direct-managed from `herdr --skill`,
+#     because a Git-backed npx entry could drift away from the installed binary.
 #   - .dismissed and .lastSelectedAgents: preserve from live (per-machine state).
 printf '%s' "$base" | jq --argjson managed "$managed" '
   . as $base
@@ -77,7 +79,7 @@ printf '%s' "$base" | jq --argjson managed "$managed" '
   | ($managed.skills // {}) as $managed_skills
   | {
       version: ([($base.version // 0), ($managed.version // 0)] | max),
-      skills: (
+      skills: ((
         $live_skills
         + (
             $managed_skills
@@ -91,7 +93,7 @@ printf '%s' "$base" | jq --argjson managed "$managed" '
               })
             | from_entries
           )
-      )
+      ) | del(.herdr))
     }
     + (if ($base.dismissed // null) != null         then {dismissed:         $base.dismissed}         else {} end)
     + (if ($base.lastSelectedAgents // null) != null then {lastSelectedAgents: $base.lastSelectedAgents} else {} end)

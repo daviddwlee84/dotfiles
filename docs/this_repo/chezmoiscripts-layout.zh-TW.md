@@ -86,7 +86,8 @@ global/run_onchange_after_20_…
   - Brewfile 同步
   - bat 主題重建
   - Raycast 設定匯入（以 `syncRaycast` opt-in 為閘門）
-  - 全域 skill 還原（`~/.agents/.skill-lock.json` → `~/.agents/skills/`）
+  - 全域 skill 還原（`~/.agents/.skill-lock.json` → `~/.agents/skills/`），以及
+    binary-matched Herdr skill 同步（`herdr --skill`）
 
 - **`repo/`** — 只有在本機原始碼目錄*就是*本 repo 工作目錄（不是 deploy-from-GitHub 的消費者）時才合理的東西。今天就只有專案範圍的 skill bootstrap（`./skills-lock.json` → `./.agents/skills/`）；腳本第一個動作是檢查 `[[ "$(cd ~/.local/share/chezmoi && pwd)" == "$source_dir" ]]`，否則退出 0。
 

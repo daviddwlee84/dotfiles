@@ -5,7 +5,7 @@
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文
     （如 `embedding`、`tokenizer`）。代碼、API 名、CLI flag、套件名、檔名一律不翻。
 
-[ogulcancelik/herdr](https://github.com/ogulcancelik/herdr) 是一個用 Rust 寫的終端多工器 (terminal multiplexer)，內建 **coding-agent 感知**——它會追蹤每個 pane 的 agent 狀態（idle / working / blocked / done）。它跟 tmux/zellij 屬於同一類工具，但更偏滑鼠優先 (mouse-first)、更 agent-native。官方文件：<https://herdr.dev/docs/>。
+[herdrdev/herdr](https://github.com/herdrdev/herdr) 是一個用 Rust 寫的終端多工器 (terminal multiplexer)，內建 **coding-agent 感知**——它會追蹤每個 pane 的 agent 狀態（idle / working / blocked / done）。它跟 tmux/zellij 屬於同一類工具，但更偏滑鼠優先 (mouse-first)、更 agent-native。官方文件：<https://herdr.dev/docs/>。
 
 本 repo 把 herdr 當作一個**與 tmux 共存的試用工具 (trial tool)**——你只會執行 `herdr` *或* `tmux`，永不巢狀 (nested)。既有的 tmux / `sesh` / `tmuxp` / workmux 設定完全不動；herdr 純粹是加法，讓你能在不失去日常工具的前提下評估它。
 
@@ -13,7 +13,11 @@
   - **兩個平台都是** —— GitHub release 的**單一靜態 binary**（`herdr-{linux,macos}-{x86_64,aarch64}`）放到 `~/.local/bin/herdr`，由 `dot_ansible/roles/devtools/tasks/main.yml` 中 `# --- herdr ... ---` 區塊管理。沒有 tarball，所以不需要解壓步驟。
   - macOS **刻意不走** Homebrew，而且這是本 repo 唯一這樣做的工具。上游在 Homebrew/mise/Nix 安裝上停用 `herdr update`，因為 binary 歸套件管理器所有 —— 那等於拿掉了**唯一**能保住 pane 的升級路徑，只剩下重啟 server（也就是殺掉每一個 pane 內的行程）這一條。所以我們捨棄 formula 改用 release binary，讓 macOS 也拿得到 `--handoff`。切換前就裝好的機器，由同一個 role 裡的一次性 `brew uninstall herdr` 遷移（兩份都留著會讓 `PATH` 上出現兩個 binary，最糟是自己對自己 `protocol_mismatch`）。
 - **驗證 (Verify)**：`herdr --version`；用 `herdr server reload-config` 驗證設定檔
-- **升級 (Upgrade)**：macOS 用 brew；自管的 Linux binary 用 `just upgrade-herdr`（即 `herdr update --handoff`）—— **必須在 herdr 外面跑**，見下
+- **Agent skill**：每次 `chezmoi apply` 都會從 `herdr --skill` 安裝官方 global skill
+  到 `~/.agents/skills/herdr/SKILL.md`，並建立 Claude discovery symlink。binary 是版本
+  權威；Git vendored 的 catalog 副本刻意不作為 runtime 來源。
+- **升級 (Upgrade)**：兩個平台都用 `just upgrade-herdr`（即先執行
+  `herdr update --handoff`，再刷新與 binary 同版本的 skill）—— **必須在 herdr 外面跑**，見下
 
 > **`herdr update` 在 herdr pane 裡面會拒絕執行。** handoff 要換掉的正是持有你當下這個 pane 的 server process，所以它 fail closed：
 >

@@ -37,6 +37,8 @@ _REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/log_shared.sh
 # shellcheck disable=SC1091
 source "$_REPO_ROOT/scripts/lib/log_shared.sh"
+# shellcheck source=lib/herdr_skill.sh
+source "$_REPO_ROOT/scripts/lib/herdr_skill.sh"
 
 # ----------------------------------------------------------------------------
 # Source shared sudo helper (same file used by run_*.sh.tmpl via `include`)
@@ -844,6 +846,11 @@ cat_herdr() {
   info "Upgrading herdr (self-managed binary, live handoff)"
   if ! _run herdr update --handoff; then
     error "herdr update --handoff failed"
+    return 1
+  fi
+
+  if ! _run sync_herdr_skill "$HOME/.agents/skills/herdr/SKILL.md"; then
+    error "herdr updated, but its global agent skill could not be synchronized"
     return 1
   fi
 

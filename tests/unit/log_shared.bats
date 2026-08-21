@@ -282,6 +282,7 @@ EOF
     ".chezmoiscripts/global/run_onchange_after_26_install_blesh.sh.tmpl"
     ".chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl"
     ".chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl"
+    ".chezmoiscripts/global/run_after_42_sync_herdr_skill.sh.tmpl"
     ".chezmoiscripts/global/run_after_45_yazi_plugins.sh.tmpl"
     ".chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl"
     "backlog/raycast-sync/run_onchange_after_32_raycast_config.sh.tmpl"
