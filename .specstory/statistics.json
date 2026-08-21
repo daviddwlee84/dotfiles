@@ -2305,13 +2305,13 @@
       "last_updated": "2026-06-18T12:52:10Z"
     },
     "f13c543b-8501-4b36-ab5c-64bb17718b42": {
-      "user_message_count": 1,
-      "agent_message_count": 363,
+      "user_message_count": 30,
+      "agent_message_count": 1982,
       "start_timestamp": "2026-08-20T03:14:04.507Z",
-      "end_timestamp": "2026-08-20T03:27:02.207Z",
-      "markdown_size_bytes": 1676162,
+      "end_timestamp": "2026-08-21T07:25:48.512Z",
+      "markdown_size_bytes": 6174878,
       "provider": "claude",
-      "last_updated": "2026-08-20T03:34:57Z"
+      "last_updated": "2026-08-21T07:29:30Z"
     },
     "f21f7ef2-7036-487f-8023-06a563dda1b3": {
       "user_message_count": 3,

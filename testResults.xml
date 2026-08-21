@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<test-results xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="nunit_schema_2.5.xsd" name="Pester" total="101" errors="0" failures="0" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2026-08-21" time="01:40:14">
+  <environment clr-version="8.0.10" cwd="/Users/david/.local/share/chezmoi" user-domain="" os-version="25.3.0" user="david" platform="Darwin" machine-name="Hanrus-MacBook-Pro.local" nunit-version="2.5.8.0" />
+  <culture-info current-culture="en-US" current-uiculture="en-US" />
+  <test-suite type="TestFixture" name="Pester" executed="True" result="Success" success="True" time="10.9914" asserts="0" description="Pester">
+    <results>
+      <test-suite type="TestFixture" name="/Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1" executed="True" result="Success" success="True" time="10.9914" asserts="0" description="/Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Copilot module" executed="True" result="Success" success="True" time="10.2064" asserts="0" description="Copilot module">
+            <results>
+              <test-suite type="TestFixture" name="Copilot module.profile module loading" executed="True" result="Success" success="True" time="0.2296" asserts="0" description="Copilot module.profile module loading">
+                <results>
+                  <test-case description="forces a fresh module import so reload picks up deployed fixes" name="Copilot module.profile module loading.forces a fresh module import so reload picks up deployed fixes" time="0.1665" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.package flavor detection" executed="True" result="Success" success="True" time="0.3466" asserts="0" description="Copilot module.package flavor detection">
+                <results>
+                  <test-case description="keeps the maintained fork default pinned exactly" name="Copilot module.package flavor detection.keeps the maintained fork default pinned exactly" time="0.0624" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="treats the bare original package as &quot;original&quot;" name="Copilot module.package flavor detection.treats the bare original package as &quot;original&quot;" time="0.0312" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="treats the scoped fork as &quot;fork&quot;" name="Copilot module.package flavor detection.treats the scoped fork as &quot;fork&quot;" time="0.0174" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.default model resolution" executed="True" result="Success" success="True" time="0.7004" asserts="0" description="Copilot module.default model resolution">
+                <results>
+                  <test-case description="falls back to the built-in default" name="Copilot module.default model resolution.falls back to the built-in default" time="0.3335" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="honors $COPILOT_CLAUDE_MODEL" name="Copilot module.default model resolution.honors $COPILOT_CLAUDE_MODEL" time="0.0125" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.package name parsing (the scoped-spec trap)" executed="True" result="Success" success="True" time="0.8332" asserts="0" description="Copilot module.package name parsing (the scoped-spec trap)">
+                <results>
+                  <test-case description="keeps the @scope while stripping the version" name="Copilot module.package name parsing (the scoped-spec trap).keeps the @scope while stripping the version" time="0.0223" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="returns a scoped spec with no version unchanged" name="Copilot module.package name parsing (the scoped-spec trap).returns a scoped spec with no version unchanged" time="0.0115" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="strips the version from an unscoped spec" name="Copilot module.package name parsing (the scoped-spec trap).strips the version from an unscoped spec" time="0.0182" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="rejects npm aliases and local path selectors" name="Copilot module.package name parsing (the scoped-spec trap).rejects npm aliases and local path selectors" time="0.0539" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.installed package metadata and verified stamps" executed="True" result="Success" success="True" time="2.572" asserts="0" description="Copilot module.installed package metadata and verified stamps">
+                <results>
+                  <test-case description="parses only exact requested versions" name="Copilot module.installed package metadata and verified stamps.parses only exact requested versions" time="0.0743" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="accepts matching metadata only with a runnable launch path" name="Copilot module.installed package metadata and verified stamps.accepts matching metadata only with a runnable launch path" time="0.1532" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="rejects matching metadata when no package binlink landed" name="Copilot module.installed package metadata and verified stamps.rejects matching metadata when no package binlink landed" time="0.0607" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="runs hash-pinned CDN files directly with Bun when no binlink exists" name="Copilot module.installed package metadata and verified stamps.runs hash-pinned CDN files directly with Bun when no binlink exists" time="0.0912" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="exposes the CDN manifest only for the reviewed default pin" name="Copilot module.installed package metadata and verified stamps.exposes the CDN manifest only for the reviewed default pin" time="0.0276" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="installs a mocked CDN package only after every file hash verifies" name="Copilot module.installed package metadata and verified stamps.installs a mocked CDN package only after every file hash verifies" time="0.6331" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="rejects stale metadata even when the binlink remains" name="Copilot module.installed package metadata and verified stamps.rejects stale metadata even when the binlink remains" time="0.0438" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="rejects a stale binlink without readable package metadata" name="Copilot module.installed package metadata and verified stamps.rejects a stale binlink without readable package metadata" time="0.0259" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="reads corrupt package metadata safely" name="Copilot module.installed package metadata and verified stamps.reads corrupt package metadata safely" time="0.0509" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="requires selector, verified stamp, metadata and launch to agree" name="Copilot module.installed package metadata and verified stamps.requires selector, verified stamp, metadata and launch to agree" time="0.0725" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="reads corrupt verified stamps safely" name="Copilot module.installed package metadata and verified stamps.reads corrupt verified stamps safely" time="0.0326" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="migrates a matching exact legacy stamp without network access" name="Copilot module.installed package metadata and verified stamps.migrates a matching exact legacy stamp without network access" time="0.065" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="does not migrate stale 1.13.14 metadata for desired 2.1.0" name="Copilot module.installed package metadata and verified stamps.does not migrate stale 1.13.14 metadata for desired 2.1.0" time="0.0821" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="does not migrate legacy stamps for non-exact selectors" name="Copilot module.installed package metadata and verified stamps.does not migrate legacy stamps for non-exact selectors" time="0.068" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="rejects an unsupported selector before any filesystem cleanup or installer launch" name="Copilot module.installed package metadata and verified stamps.rejects an unsupported selector before any filesystem cleanup or installer launch" time="0.0495" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="stops before installer launch when the previous target cannot be cleared" name="Copilot module.installed package metadata and verified stamps.stops before installer launch when the previous target cannot be cleared" time="0.0567" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="fails the install postcondition after ETARGET leaves only the old tree" name="Copilot module.installed package metadata and verified stamps.fails the install postcondition after ETARGET leaves only the old tree" time="0.132" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.shared OpenAI model ordering" executed="True" result="Success" success="True" time="2.7703" asserts="0" description="Copilot module.shared OpenAI model ordering">
+                <results>
+                  <test-case description="keeps every named tier in one order for Claude and Codex" name="Copilot module.shared OpenAI model ordering.keeps every named tier in one order for Claude and Codex" time="0.1292" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="uses the same future-model vectors for Claude and Codex" name="Copilot module.shared OpenAI model ordering.uses the same future-model vectors for Claude and Codex" time="0.0606" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.best-model picker (--auto)" executed="True" result="Success" success="True" time="2.927" asserts="0" description="Copilot module.best-model picker (--auto)">
+                <results>
+                  <test-case description="prefers Fable, then the strongest Claude family, and returns a raw id" name="Copilot module.best-model picker (--auto).prefers Fable, then the strongest Claude family, and returns a raw id" time="0.0075" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="returns a raw id and leaves context hints to catalog metadata" name="Copilot module.best-model picker (--auto).returns a raw id and leaves context hints to catalog metadata" time="0.0106" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="puts gpt-5.6-sol ahead of every other OpenAI tier" name="Copilot module.best-model picker (--auto).puts gpt-5.6-sol ahead of every other OpenAI tier" time="0.0082" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="keeps named older flagship and coding models ahead of lightweight models" name="Copilot module.best-model picker (--auto).keeps named older flagship and coding models ahead of lightweight models" time="0.0271" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="prefers a non-flash Gemini as the last family" name="Copilot module.best-model picker (--auto).prefers a non-flash Gemini as the last family" time="0.0395" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="returns nothing for an empty catalog" name="Copilot module.best-model picker (--auto).returns nothing for an empty catalog" time="0.0277" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.Codex model picker" executed="True" result="Success" success="True" time="3.1405" asserts="0" description="Copilot module.Codex model picker">
+                <results>
+                  <test-case description="puts OpenAI Sol ahead of Claude and Gemini" name="Copilot module.Codex model picker.puts OpenAI Sol ahead of Claude and Gemini" time="0.0289" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="uses Claude before Gemini when OpenAI is unavailable" name="Copilot module.Codex model picker.uses Claude before Gemini when OpenAI is unavailable" time="0.0277" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="prefers non-flash Gemini as the final named family" name="Copilot module.Codex model picker.prefers non-flash Gemini as the final named family" time="0.0365" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="detects every supported explicit model spelling without false positives" name="Copilot module.Codex model picker.detects every supported explicit model spelling without false positives" time="0.0315" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="preserves the project SpecStory codex command" name="Copilot module.Codex model picker.preserves the project SpecStory codex command" time="0.0487" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.catalog eligibility policy" executed="True" result="Success" success="True" time="3.2033" asserts="0" description="Copilot module.catalog eligibility policy">
+                <results>
+                  <test-case description="excludes every veto while retaining entries with absent metadata" name="Copilot module.catalog eligibility policy.excludes every veto while retaining entries with absent metadata" time="0.0336" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="returns no automatic candidate for an embedding-only catalog" name="Copilot module.catalog eligibility policy.returns no automatic candidate for an embedding-only catalog" time="0.017" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.catalog metadata and Claude Code role profiles" executed="True" result="Success" success="True" time="3.4042" asserts="0" description="Copilot module.catalog metadata and Claude Code role profiles">
+                <results>
+                  <test-case description="adds [1m] only when the live model metadata advertises a 1M context window" name="Copilot module.catalog metadata and Claude Code role profiles.adds [1m] only when the live model metadata advertises a 1M context window" time="0.0266" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="maps an OpenAI main model to Sol/Sol/Terra/Luna role tiers" name="Copilot module.catalog metadata and Claude Code role profiles.maps an OpenAI main model to Sol/Sol/Terra/Luna role tiers" time="0.0456" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="does not derive role aliases from vetoed catalog entries" name="Copilot module.catalog metadata and Claude Code role profiles.does not derive role aliases from vetoed catalog entries" time="0.0137" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="falls every missing OpenAI role back to the selected main model" name="Copilot module.catalog metadata and Claude Code role profiles.falls every missing OpenAI role back to the selected main model" time="0.0122" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="uses the strongest served native Claude model in each role family" name="Copilot module.catalog metadata and Claude Code role profiles.uses the strongest served native Claude model in each role family" time="0.0321" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="injects the complete role profile including Fable and small-fast" name="Copilot module.catalog metadata and Claude Code role profiles.injects the complete role profile including Fable and small-fast" time="0.0629" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.copilot-model writes" executed="True" result="Success" success="True" time="3.6824" asserts="0" description="Copilot module.copilot-model writes">
+                <results>
+                  <test-case description="refuses --auto when no live catalog is available" name="Copilot module.copilot-model writes.refuses --auto when no live catalog is available" time="0.0978" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="skips vetoed catalog entries during --auto selection" name="Copilot module.copilot-model writes.skips vetoed catalog entries during --auto selection" time="0.0714" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="refreshes all local role pins while preserving unrelated settings" name="Copilot module.copilot-model writes.refreshes all local role pins while preserving unrelated settings" time="0.1021" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.package command authentication" executed="True" result="Success" success="True" time="4.9764" asserts="0" description="Copilot module.package command authentication">
+                <results>
+                  <test-case description="uses the maintained fork login argv exactly" name="Copilot module.package command authentication.uses the maintained fork login argv exactly" time="0.0959" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="keeps the original package on bare auth" name="Copilot module.package command authentication.keeps the original package on bare auth" time="0.0753" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="surfaces a foreground command nonzero without exiting the caller" name="Copilot module.package command authentication.surfaces a foreground command nonzero without exiting the caller" time="0.481" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="throws and sets a failure status when package setup fails before launch" name="Copilot module.package command authentication.throws and sets a failure status when package setup fails before launch" time="0.0326" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="throws and sets a failure status when the launch path disappears" name="Copilot module.package command authentication.throws and sets a failure status when the launch path disappears" time="0.0598" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="preserves foreground stdout without appending a success boolean" name="Copilot module.package command authentication.preserves foreground stdout without appending a success boolean" time="0.5423" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.copilot-here drift (env block is the single source of truth)" executed="True" result="Success" success="True" time="5.4049" asserts="0" description="Copilot module.copilot-here drift (env block is the single source of truth)">
+                <results>
+                  <test-case description="reports no drift for a pin that matches the current block" name="Copilot module.copilot-here drift (env block is the single source of truth).reports no drift for a pin that matches the current block" time="0.2013" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="reports the model key when the pin is stale" name="Copilot module.copilot-here drift (env block is the single source of truth).reports the model key when the pin is stale" time="0.094" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="catches keys missing from an older pin (the 4-of-8 bug)" name="Copilot module.copilot-here drift (env block is the single source of truth).catches keys missing from an older pin (the 4-of-8 bug)" time="0.0945" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="reports nothing when the pin is off (no ANTHROPIC_BASE_URL)" name="Copilot module.copilot-here drift (env block is the single source of truth).reports nothing when the pin is off (no ANTHROPIC_BASE_URL)" time="0.0319" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.specstory claude_cmd resolution" executed="True" result="Success" success="True" time="5.5817" asserts="0" description="Copilot module.specstory claude_cmd resolution">
+                <results>
+                  <test-case description="reads an uncommented double-quoted claude_cmd" name="Copilot module.specstory claude_cmd resolution.reads an uncommented double-quoted claude_cmd" time="0.0334" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="ignores the commented example that ships in the default config" name="Copilot module.specstory claude_cmd resolution.ignores the commented example that ships in the default config" time="0.0307" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="reads a single-quoted claude_cmd" name="Copilot module.specstory claude_cmd resolution.reads a single-quoted claude_cmd" time="0.0312" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="decodes escaped quotes in a TOML basic string without truncating the command" name="Copilot module.specstory claude_cmd resolution.decodes escaped quotes in a TOML basic string without truncating the command" time="0.0357" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="ships an active bypass command in the create-seeded user config" name="Copilot module.specstory claude_cmd resolution.ships an active bypass command in the create-seeded user config" time="0.0389" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.specstory -c argument quoting" executed="True" result="Success" success="True" time="5.608" asserts="0" description="Copilot module.specstory -c argument quoting">
+                <results>
+                  <test-case description="wraps an argument in single quotes" name="Copilot module.specstory -c argument quoting.wraps an argument in single quotes" time="0.0101" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="escapes an embedded single quote POSIX-style" name="Copilot module.specstory -c argument quoting.escapes an embedded single quote POSIX-style" time="0.0101" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.specstory Claude command policy" executed="True" result="Success" success="True" time="5.7642" asserts="0" description="Copilot module.specstory Claude command policy">
+                <results>
+                  <test-case description="adds bypass to a plain configured command" name="Copilot module.specstory Claude command policy.adds bypass to a plain configured command" time="0.0373" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="preserves configured flags and adds bypass once" name="Copilot module.specstory Claude command policy.preserves configured flags and adds bypass once" time="0.027" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="does not duplicate bypass from the configured command or wrapper arguments" name="Copilot module.specstory Claude command policy.does not duplicate bypass from the configured command or wrapper arguments" time="0.0406" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="preserves argument order, duplicates, spaces, and embedded quotes" name="Copilot module.specstory Claude command policy.preserves argument order, duplicates, spaces, and embedded quotes" time="0.0451" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.claude-copilot launch routing" executed="True" result="Success" success="True" time="6.1869" asserts="0" description="Copilot module.claude-copilot launch routing">
+                <results>
+                  <test-case description="always passes an explicit bypass-enabled command to SpecStory with zero arguments" name="Copilot module.claude-copilot launch routing.always passes an explicit bypass-enabled command to SpecStory with zero arguments" time="0.0951" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="consumes a lone --specstory control without leaking it to Claude" name="Copilot module.claude-copilot launch routing.consumes a lone --specstory control without leaking it to Claude" time="0.0539" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="consumes a lone --no-specstory control and uses the direct bypass path" name="Copilot module.claude-copilot launch routing.consumes a lone --no-specstory control and uses the direct bypass path" time="0.0293" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="uses the direct bypass path when SpecStory is unavailable" name="Copilot module.claude-copilot launch routing.uses the direct bypass path when SpecStory is unavailable" time="0.0481" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="keeps claude-copilot-once as a single delegating policy layer" name="Copilot module.claude-copilot launch routing.keeps claude-copilot-once as a single delegating policy layer" time="0.1879" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.http proxy resolution" executed="True" result="Success" success="True" time="6.2402" asserts="0" description="Copilot module.http proxy resolution">
+                <results>
+                  <test-case description="returns nothing when disabled" name="Copilot module.http proxy resolution.returns nothing when disabled" time="0.0202" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="passes an explicit URL straight through" name="Copilot module.http proxy resolution.passes an explicit URL straight through" time="0.0142" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.optional ChatGPT Apps probe classification" executed="True" result="Success" success="True" time="6.3393" asserts="0" description="Copilot module.optional ChatGPT Apps probe classification">
+                <results>
+                  <test-case description="keeps timeout, TLS, and generic network failures distinct" name="Copilot module.optional ChatGPT Apps probe classification.keeps timeout, TLS, and generic network failures distinct" time="0.0209" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="counts an HTTP authentication rejection as reachable" name="Copilot module.optional ChatGPT Apps probe classification.counts an HTTP authentication rejection as reachable" time="0.0658" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.served-model parsing (includes claude_model_id alias)" executed="True" result="Success" success="True" time="6.4036" asserts="0" description="Copilot module.served-model parsing (includes claude_model_id alias)">
+                <results>
+                  <test-case description="returns both .id and .claude_model_id, sorted-unique" name="Copilot module.served-model parsing (includes claude_model_id alias).returns both .id and .claude_model_id, sorted-unique" time="0.0582" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.effective-model precedence" executed="True" result="Success" success="True" time="6.4786" asserts="0" description="Copilot module.effective-model precedence">
+                <results>
+                  <test-case description="reports the built-in default when nothing is pinned" name="Copilot module.effective-model precedence.reports the built-in default when nothing is pinned" time="0.0337" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="does not fall through when an active project proxy pin omits its main model" name="Copilot module.effective-model precedence.does not fall through when an active project proxy pin omits its main model" time="0.0215" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.doctor live-target selection" executed="True" result="Success" success="True" time="6.5638" asserts="0" description="Copilot module.doctor live-target selection">
+                <results>
+                  <test-case description="uses the configured main raw id when the catalog serves its [1m] pin" name="Copilot module.doctor live-target selection.uses the configured main raw id when the catalog serves its [1m] pin" time="0.0235" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="labels and explains a capability-ranked catalog fallback" name="Copilot module.doctor live-target selection.labels and explains a capability-ranked catalog fallback" time="0.0186" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="uses only selectable ids for an automatic catalog fallback" name="Copilot module.doctor live-target selection.uses only selectable ids for an automatic catalog fallback" time="0.019" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="refuses to probe an unrelated fallback when the active project main is missing" name="Copilot module.doctor live-target selection.refuses to probe an unrelated fallback when the active project main is missing" time="0.0144" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.doctor inference error parsing and classification" executed="True" result="Success" success="True" time="6.738" asserts="0" description="Copilot module.doctor inference error parsing and classification">
+                <results>
+                  <test-case description="classifies a direct billing error as account-wide and nonretryable" name="Copilot module.doctor inference error parsing and classification.classifies a direct billing error as account-wide and nonretryable" time="0.0478" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="classifies an error.code billing envelope" name="Copilot module.doctor inference error parsing and classification.classifies an error.code billing envelope" time="0.0203" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="classifies billing JSON encoded inside error.message" name="Copilot module.doctor inference error parsing and classification.classifies billing JSON encoded inside error.message" time="0.0425" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="merges an outer billing code with a nested JSON message" name="Copilot module.doctor inference error parsing and classification.merges an outer billing code with a nested JSON message" time="0.0233" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="gives unsupported models only model-selection guidance" name="Copilot module.doctor inference error parsing and classification.gives unsupported models only model-selection guidance" time="0.0127" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="keeps an unknown generic 4xx body compact and nonretryable" name="Copilot module.doctor inference error parsing and classification.keeps an unknown generic 4xx body compact and nonretryable" time="0.0216" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.doctor catalog snapshot and single inference attempt" executed="True" result="Success" success="True" time="7.3234" asserts="0" description="Copilot module.doctor catalog snapshot and single inference attempt">
+                <results>
+                  <test-case description="fetches one catalog and never retries a failed live request" name="Copilot module.doctor catalog snapshot and single inference attempt.fetches one catalog and never retries a failed live request" time="0.5784" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.public surface" executed="True" result="Success" success="True" time="7.3692" asserts="0" description="Copilot module.public surface">
+                <results>
+                  <test-case description="exports the ten commands" name="Copilot module.public surface.exports the ten commands" time="0.0368" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Copilot module.Responses compatibility shim" executed="True" result="Success" success="True" time="10.1856" asserts="0" description="Copilot module.Responses compatibility shim">
+                <results>
+                  <test-case description="matches the reviewed Unix shim artifact without a sibling checkout" name="Copilot module.Responses compatibility shim.matches the reviewed Unix shim artifact without a sibling checkout" time="0.0192" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="fills blank MCP descriptions without adding one to a native tool" name="Copilot module.Responses compatibility shim.fills blank MCP descriptions without adding one to a native tool" time="0.0882" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="decodes zstd Responses bodies before normalization" name="Copilot module.Responses compatibility shim.decodes zstd Responses bodies before normalization" time="0.0695" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="classifies only an explicit stream true body as streaming" name="Copilot module.Responses compatibility shim.classifies only an explicit stream true body as streaming" time="0.0849" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="keeps fast and non-streaming responses transparent while protecting slow streams" name="Copilot module.Responses compatibility shim.keeps fast and non-streaming responses transparent while protecting slow streams" time="2.5476" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

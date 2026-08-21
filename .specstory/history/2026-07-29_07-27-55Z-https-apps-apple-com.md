@@ -9,6 +9,8 @@ _**User (2026-07-29 07:27:55Z)**_
 https://apps.apple.com/cn/app/ish-shell/id1436902243 幫忙看看我們的這套是否能fit iOS的 iSH shell
 [Image #1] 特別是一些agentic coding相關的
 
+---
+
 _**User (2026-07-29 07:27:55Z)**_
 
 [Image: source: /Users/david/Downloads/IMG_9952.PNG]
@@ -6792,6 +6794,8 @@ I'm checking the .chezmoiignore file to see if there's any OS-specific filtering
 _**User (2026-07-29 07:32:34Z)**_
 
 BTW  如果安裝font的話 我發現它是會去找[Image #2] system font (而我們一些都需要nerd font才能比較好的展示)
+
+---
 
 _**User (2026-07-29 07:32:34Z)**_
 
@@ -80793,7 +80797,7 @@ _**Agent - sidechain (claude-opus-5 2026-07-29 11:04:12Z)**_
 <summary>Tool use: **Bash**</summary>
 Read Apple's BrowserEngineKit JIT article
 
-```bash
+````bash
 cd /tmp && curl -sL --max-time 40 "https://developer.apple.com/tutorials/data/documentation/browserenginekit/protecting-code-compiled-just-in-time.json" -o jit.json; python3 - <<'EOF'
 import json
 d=json.load(open('/tmp/jit.json'))
@@ -80801,7 +80805,7 @@ def walk(n,out):
     if isinstance(n,dict):
         if n.get('type')=='text': out.append(n['text'])
         elif n.get('type')=='codeVoice': out.append('`'+n['code']+'`')
-        elif n.get('type')=='codeListing': out.append('\n\```\n'+'\n'.join(n.get('code',[]))+'\n\```\n')
+        elif n.get('type')=='codeListing': out.append('\n```\n'+'\n'.join(n.get('code',[]))+'\n```\n')
         elif n.get('type')=='heading': out.append('\n## '+n.get('text','')+'\n')
         for k,v in n.items():
             if k in ('inlineContent','content','items','primaryContentSections','sections'): walk(v,out)
@@ -80812,7 +80816,7 @@ walk(d.get('primaryContentSections'),out)
 print(''.join(out)[:4000])
 print('\nPLATFORMS:', d.get('metadata',{}).get('platforms'))
 EOF
-```
+````
 
 ```text
 ## Overview
@@ -83381,6 +83385,8 @@ docs可以補上了
 另外是否把mount Obsidian相關的做成alias or shell function?
 [Image #3] [Image #4]
 
+---
+
 _**User (2026-07-29 11:25:29Z)**_
 
 [Image: source: /Users/david/Downloads/IMG_9956.PNG]
@@ -84018,7 +84024,7 @@ _**Agent (claude-opus-5 2026-07-29 11:30:40Z)**_
 <tool-use data-tool-type="write" data-tool-name="Write"><details>
 <summary>Tool use: **Write**</summary>
 
-```md
+````md
 # iOS terminals (iSH, a-Shell, SSH clients)
 
 Whether this repo runs on iOS (it does not), what does, and how to keep an iPad
@@ -84194,9 +84200,9 @@ full raw/UDP socket support and iOS reclaims sockets on suspend. Use plain SSH
 
 ## Setting up iSH
 
-\```sh
+```sh
 wget -qO- https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/scripts/ios/ish-bootstrap.sh | sh
-\```
+```
 
 [`scripts/ios/ish-bootstrap.sh`](../../scripts/ios/ish-bootstrap.sh) installs a
 deliberately small set (git, openssh-client, tmux, nano, vim, curl), seeds
@@ -84208,11 +84214,11 @@ iSH reaches iOS Files via `mount -t ios null <dir>`, which shows the folder
 picker and stores a security-scoped bookmark. **The mount does not survive an
 app restart** — which is why `mount -t ios` accumulates in everyone's history.
 
-\```sh
+```sh
 ovault              # mount if needed, cd into the vault
 ovault Jingle.AI    # ...and descend into a repo
 ovsync Jingle.AI    # add -A, commit, pull --rebase --autostash, push
-\```
+```
 
 `ovault` also registers the repo in `safe.directory`, because the iOS-backed
 tree always looks foreign-owned and git otherwise refuses it with "detected
@@ -84249,11 +84255,11 @@ The bootstrap keeps your current branch unless you pass
 Useful for one thing: letting an agent on your laptop drive the iSH setup over
 LAN instead of you typing on a soft keyboard.
 
-\```sh
+```sh
 apk add openssh && ssh-keygen -A && passwd
 sed -i 's/^#\?Port .*/Port 22000/' /etc/ssh/sshd_config
 /usr/sbin/sshd
-\```
+```
 
 Ports below 1024 are unavailable (the app is unprivileged). The session dies
 when iSH leaves the foreground; `cat /dev/location > /dev/null &` extends that
@@ -84288,7 +84294,7 @@ open a shell and cannot run a single agent.
   resumable tmux session, which is what makes a mobile client usable
 - [copilot-claude-proxy](../tools/copilot-claude-proxy.md)
 
-```
+````
 
 ```text
 File created successfully at: /Users/david/.local/share/chezmoi/docs/playbooks/ios-terminals.md (file state is current in your context — no need to Read it back)
@@ -84306,7 +84312,7 @@ _**Agent (claude-opus-5 2026-07-29 11:32:17Z)**_
 <tool-use data-tool-type="write" data-tool-name="Write"><details>
 <summary>Tool use: **Write**</summary>
 
-```md
+````md
 # iOS 終端機（iSH、a-Shell、SSH client）
 
 這個 repo 能不能跑在 iOS 上（不能）、什麼能跑，以及 iPad 該怎麼用才有價值。
@@ -84412,9 +84418,9 @@ compute 留在 fleet。iPad 只當 control plane 加上本機檔案層。
 
 ## 設定 iSH
 
-\```sh
+```sh
 wget -qO- https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/scripts/ios/ish-bootstrap.sh | sh
-\```
+```
 
 [`scripts/ios/ish-bootstrap.sh`](../../scripts/ios/ish-bootstrap.sh) 會安裝一組刻意精簡的套件（git、openssh-client、tmux、nano、vim、curl）、seed `~/.ssh/config`，並在 `~/.profile` 加入兩個 helper。
 
@@ -84422,11 +84428,11 @@ wget -qO- https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/scripts/i
 
 iSH 透過 `mount -t ios null <dir>` 存取 iOS Files，該指令會叫出資料夾選擇器並儲存一個 security-scoped bookmark。**這個 mount 不會在 app 重啟後保留** —— 這就是為什麼 `mount -t ios` 會在每個人的 shell history 裡累積好幾次。
 
-\```sh
+```sh
 ovault              # 需要時掛載，然後 cd 進 vault
 ovault Jingle.AI    # ...並進入某個 repo
 ovsync Jingle.AI    # add -A、commit、pull --rebase --autostash、push
-\```
+```
 
 `ovault` 同時會把該 repo 註冊到 `safe.directory`，因為 iOS 掛載的樹永遠看起來屬於別的 owner，git 會以「detected dubious ownership」拒絕。這筆設定寫進 Alpine rootfs 裡的 `~/.gitconfig`，所以會保留。
 
@@ -84453,11 +84459,11 @@ bootstrap 預設保留你目前的 branch，除非你傳 `ISH_SWITCH_BRANCH=1`�
 
 只對一件事有用：讓你筆電上的 agent 透過 LAN 驅動 iSH 的設定，而不是你在軟鍵盤上一個字一個字打。
 
-\```sh
+```sh
 apk add openssh && ssh-keygen -A && passwd
 sed -i 's/^#\?Port .*/Port 22000/' /etc/ssh/sshd_config
 /usr/sbin/sshd
-\```
+```
 
 1024 以下的 port 不可用（app 是非特權身分）。iSH 一離開前景 session 就死；`cat /dev/location > /dev/null &` 可用背景定位延長，但耗電且不可靠（ish-app/ish#1613、#2195）。Tailscale 幫不上忙 —— iOS app 不含 CLI，`tailscale serve` 在那裡不存在。
 
@@ -84482,7 +84488,7 @@ sed -i 's/^#\?Port .*/Port 22000/' /etc/ssh/sshd_config
 - [fleet-hosts](../tools/fleet-hosts.md) —— picker 現在會讓你降落在可續接的 tmux session，這正是行動 client 好用的關鍵
 - [copilot-claude-proxy](../tools/copilot-claude-proxy.zh-TW.md)
 
-```
+````
 
 ```text
 File created successfully at: /Users/david/.local/share/chezmoi/docs/playbooks/ios-terminals.zh-TW.md (file state is current in your context — no need to Read it back)
@@ -85216,7 +85222,7 @@ _**Agent (claude-opus-5 2026-07-29 11:48:01Z)**_
 <tool-use data-tool-type="write" data-tool-name="Write"><details>
 <summary>Tool use: **Write**</summary>
 
-```md
+````md
 # `Illegal instruction` in iSH for a binary that only uses SSE2
 
 **Symptoms** (grep this section): `Illegal instruction` / `illegal instruction at 0x571b64ee: 66 0f 6a d0 66 0f 7e d0` / `illegal instruction at 0x56da8a42: 66 0f 72 f0 05 66 0f fe` / `Bad system call` when running `node`, `npm`, `rg`, `cargo`, `rustc` inside iSH on iOS; `nodejs and npm versions are not supported` when installing an agent CLI; `apk add` succeeded but the binary dies instantly
@@ -85228,26 +85234,26 @@ _**Agent (claude-opus-5 2026-07-29 11:48:01Z)**_
 
 A package installs cleanly and then refuses to run:
 
-\```
+```
 localhost:~# apk add nodejs
 (1/4) Installing nodejs (...)
 OK: 142 MiB in 61 packages
 localhost:~# node --version
 Illegal instruction
-\```
+```
 
 `dmesg` inside iSH shows the offending opcode bytes:
 
-\```
+```
 illegal instruction at 0x571b64ee: 66 0f 6a d0 66 0f 7e d0
 illegal instruction at 0x56da8a42: 66 0f 72 f0 05 66 0f fe
-\```
+```
 
 Older reports show `Bad system call` instead. Installing an agent CLI reports:
 
-\```
+```
 nodejs and npm versions are not supported
-\```
+```
 
 Also hits `ripgrep` (`rg`), `cargo`, `rustc` — i.e. things you would not
 suspect of using SIMD at all.
@@ -85332,7 +85338,7 @@ unavailable regardless of CPU. See the ios-terminals playbook.
 - Upstream: ish-app/ish#90, #805, #917, #1230, #1417, #1564, #1724, #2335,
   #2604; rust-lang/rust#114479; astral-sh/uv#2732 (closed not-planned)
 
-```
+````
 
 ```text
 File created successfully at: /Users/david/.local/share/chezmoi/pitfalls/ish-illegal-instruction-despite-sse2.md (file state is current in your context — no need to Read it back)
@@ -85344,7 +85350,7 @@ _**Agent (claude-opus-5 2026-07-29 11:48:44Z)**_
 <tool-use data-tool-type="write" data-tool-name="Write"><details>
 <summary>Tool use: **Write**</summary>
 
-```md
+````md
 # tmux `Ctrl+1`..`Ctrl+9` dead in iSH, and `Ctrl+2` fires the wrong binding
 
 **Symptoms** (grep this section): `Ctrl+1` / `C-1` window switching does nothing in tmux inside iSH on iOS; `Ctrl+2` unexpectedly toggles the last pane or triggers a `C-Space` binding; `Ctrl+6` behaves like `C-^`; Shift+Enter does nothing in Claude Code; mouse wheel / touch scroll never enters tmux copy-mode; no error message anywhere
@@ -85377,12 +85383,12 @@ Two independent false-positive capability reports.
 ([`dot_config/tmux/common.conf.tmpl`](../dot_config/tmux/common.conf.tmpl))
 says:
 
-\```tmux
+```tmux
 set -s extended-keys on
 if-shell 'tmux -V | grep -qE "tmux ([3-9]\.[5-9]|[3-9]\.[1-9][0-9]|[4-9]\.)"' \
   'set -s extended-keys-format csi-u'
 set -as terminal-features 'xterm*:extkeys'
-\```
+```
 
 `xterm*` matches, so tmux believes the outer terminal speaks extended keys and
 emits the enable sequence `CSI > 4 ; 1 m`. iSH's terminal is hterm-derived, and
@@ -85417,7 +85423,7 @@ that quietly triggers *a different action* gets reported as "tmux is haunted".
 Do not deploy this repo's tmux config to iSH. Hand-write a minimal
 `~/.tmux.conf` **on the device**:
 
-\```tmux
+```tmux
 # iSH: TERM lies about extended-keys support. Leaving these on breaks
 # Ctrl+digit and makes Ctrl+2 / Ctrl+6 fire the wrong bindings.
 set -s extended-keys off
@@ -85432,7 +85438,7 @@ setw -g mouse off
 
 # This one DOES work — keep it.
 set -g set-clipboard on
-\```
+```
 
 Then use `prefix + 1..9` for window switching and `Ctrl+J` instead of
 `Shift+Enter` in Claude Code (`Ctrl+J` is LF and needs no CSI-u anywhere).
@@ -85466,7 +85472,7 @@ deliberately does not install this repo's tmux config.
 - Upstream: ish-app/ish#2537, #2375, #2708 (mouse); hterm control-sequence docs
   (`CSI > Pm m` → "Won't support")
 
-```
+````
 
 ```text
 File created successfully at: /Users/david/.local/share/chezmoi/pitfalls/ish-tmux-ctrl-digit-dead-wrong-binding.md (file state is current in your context — no need to Read it back)
@@ -93415,3 +93421,334 @@ eb3b7ae docs(pitfalls): backfill the 30 entries missing from the index
 
 1. **push** —— 9 個 commit 還在本地
 2. **pre-commit shellcheck 的 regex** —— `^scripts/[^/]+\.sh$` 漏掉子目錄，四個檔案從未被 lint（手動跑過全 PASS），改成 `^scripts/.*\.sh$` 是零風險一行
+
+---
+
+_**User (2026-08-14 02:48:01Z)**_
+
+pre-commit shellcheck 可以加一下
+
+---
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:10Z)**_
+
+我把 hook 擴到 `scripts/**.sh`，再跑四個原本漏掉的檔案和完整 pre-commit。
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:13Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.pre-commit-config.yaml`
+
+```text
+115	        # `{{ template ... }}` the shared editor/modify.sh whose rendered
+116	        # output already carries `#!/usr/bin/env bash`. The source wrapper
+117	        # itself has no shebang by design, so skip the shebang check for it.
+118	        exclude: (^|/)modify_[^/]+\.tmpl$
+119	
+120	  # shellcheck - static analysis for bash scripts.
+121	  # Two scopes, two severities:
+122	  #   1. scripts/*.sh + scripts/lib/*.sh — strict (severity=warning), always
+123	  #      green. lib/ is in scope because sudo_shared.sh and log_shared.sh are
+124	  #      inlined into run-scripts, where a defect only surfaces during a real
+125	  #      `chezmoi apply` on a fresh machine.
+126	  #   2. dot_config/{shell,bash}/ — relaxed (severity=error), only blocks
+127	  #      on actual bugs while we gradually clean up the 40-odd preexisting
+128	  #      warnings. Drop to severity=warning once `just lint-shell` is clean.
+129	  # `.tmpl` files and zsh modules stay excluded — shellcheck's bash parser
+130	  # rejects go-template `{{ ... }}`, zsh `(( ))`, `${(P)v}`, `print -u2`, etc.
+131	  - repo: https://github.com/shellcheck-py/shellcheck-py
+132	    rev: v0.10.0.1
+133	    hooks:
+134	      - id: shellcheck
+135	        name: shellcheck (scripts/)
+136	        files: '^scripts/(lib/)?[^/]+\.sh$'
+137	        args: [--shell=bash, --severity=warning]
+138	      - id: shellcheck
+139	        alias: shellcheck-shared
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:30Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Evaluating shellcheck usage**
+
+I need to focus on "shellcheck coverage." Specifically, `#!/bin/sh` should be used if there's no `--shell` provided, since shellcheck relies on the shebang. I'm thinking about existing files; they likely all contain shebangs. I should check the scripts with the *.sh extension. Maybe I can modify the arguments to remove the `--shell=bash` portion. Considering that templates are excluded by .sh, all of them probably have a shebang. I'll start by inspecting the first lines of all the scripts.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check pre-commit config change history
+
+`git status --short .pre-commit-config.yaml && git log -1 --oneline -- .pre-commit-config.yaml`
+
+```text
+2f9fe27 chore(pre-commit): raise the large-file cap to 8 MB for agent transcripts
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect shell script shebangs recursively
+
+`for f in $(find scripts -type f -name '*.sh' | sort); do printf '%-58s ' "$f"; IFS= read -r line < "$f"; printf '%s\n' "$line"; done`
+
+```text
+scripts/adhoc/check_brew_cast.sh                           #!/usr/bin/env bash
+scripts/adhoc/test_ubuntu_mirror.sh                        #!/usr/bin/env bash
+scripts/apply_with_sudo.sh                                 #!/usr/bin/env bash
+scripts/generate_completions.sh                            #!/usr/bin/env bash
+scripts/import_ssh_to_bw.sh                                #!/usr/bin/env bash
+scripts/install_specstory.sh                               #!/usr/bin/env bash
+scripts/ios/ish-bootstrap.sh                               #!/bin/sh
+scripts/lib/log_shared.sh                                  # shellcheck shell=bash
+scripts/lib/sudo_shared.sh                                 # shellcheck shell=bash
+scripts/pre-commit-doctor.sh                               #!/usr/bin/env bash
+scripts/upgrade_tools.sh                                   #!/usr/bin/env bash
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:49Z)**_
+
+目前 hook 已涵蓋 `scripts/lib/`，但漏了 `adhoc/` 與 `ios/`；我會改成遞迴匹配，並讓 shellcheck 依 shebang／`shellcheck shell=` 自動選 parser，確保 iSH script 真正按 POSIX `sh` 檢查，而不是誤當 bash。
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:48:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/.pre-commit-config.yaml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:49:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/.pre-commit-config.yaml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:49:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run recursive shellcheck pre-commit hook
+
+`pre-commit run shellcheck --all-files`
+
+```text
+shellcheck (scripts/**/*.sh).............................................Passed
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:49:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify regex covers every script recursively
+
+```bash
+python3 - <<'PY'
+import re
+from pathlib import Path
+pat = re.compile(r'^scripts/.*\.sh$')
+all_sh = sorted(str(p) for p in Path('scripts').rglob('*.sh'))
+matched = [p for p in all_sh if pat.match(p)]
+print(f'matched {len(matched)}/{len(all_sh)} scripts')
+for p in matched:
+    print('  ', p)
+PY
+```
+
+```text
+matched 11/11 scripts
+   scripts/adhoc/check_brew_cast.sh
+   scripts/adhoc/test_ubuntu_mirror.sh
+   scripts/apply_with_sudo.sh
+   scripts/generate_completions.sh
+   scripts/import_ssh_to_bw.sh
+   scripts/install_specstory.sh
+   scripts/ios/ish-bootstrap.sh
+   scripts/lib/log_shared.sh
+   scripts/lib/sudo_shared.sh
+   scripts/pre-commit-doctor.sh
+   scripts/upgrade_tools.sh
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:49:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Evaluating pre-commit process**
+
+I need to think about performing a full pre-commit check, focusing on YAML files as the user seems to want to add something. I should run a pre-commit to verify everything and ensure only the relevant files are included. There's a possibility that modifying the specstory might be necessary, which could get a bit complicated. I'll also run a specific check for the YAML config and then proceed with the commit. Using `git diff` is also on my mind for any formatting issues.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:50:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate pre-commit config and YAML
+
+`pre-commit validate-config && pre-commit run check-yaml --files .pre-commit-config.yaml`
+
+```text
+check yaml...............................................................Passed
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:50:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Review hook diff and working tree
+
+`git diff -- .pre-commit-config.yaml && git status --short`
+
+```text
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index b85d2e3..6e4d0f6 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -117,12 +117,14 @@ repos:
+         # itself has no shebang by design, so skip the shebang check for it.
+         exclude: (^|/)modify_[^/]+\.tmpl$
+ 
+-  # shellcheck - static analysis for bash scripts.
++  # shellcheck - static analysis for shell scripts.
+   # Two scopes, two severities:
+-  #   1. scripts/*.sh + scripts/lib/*.sh — strict (severity=warning), always
+-  #      green. lib/ is in scope because sudo_shared.sh and log_shared.sh are
+-  #      inlined into run-scripts, where a defect only surfaces during a real
+-  #      `chezmoi apply` on a fresh machine.
++  #   1. scripts/**/*.sh — strict (severity=warning), always green. Recursive
++  #      coverage matters: lib/ is inlined into run-scripts, adhoc/ contains
++  #      machine diagnostics, and ios/ contains a deployed POSIX-sh bootstrap.
++  #      Let shellcheck infer the language from each shebang (or its
++  #      `shellcheck shell=` directive) instead of forcing bash — otherwise the
++  #      iSH bootstrap's POSIX portability would not actually be checked.
+   #   2. dot_config/{shell,bash}/ — relaxed (severity=error), only blocks
+   #      on actual bugs while we gradually clean up the 40-odd preexisting
+   #      warnings. Drop to severity=warning once `just lint-shell` is clean.
+@@ -132,9 +134,9 @@ repos:
+     rev: v0.10.0.1
+     hooks:
+       - id: shellcheck
+-        name: shellcheck (scripts/)
+-        files: '^scripts/(lib/)?[^/]+\.sh$'
+-        args: [--shell=bash, --severity=warning]
++        name: shellcheck (scripts/**/*.sh)
++        files: '^scripts/.*\.sh$'
++        args: [--severity=warning]
+       - id: shellcheck
+         alias: shellcheck-shared
+         name: shellcheck (dot_config/{shell,bash}/, errors only)
+ M .pre-commit-config.yaml
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:50:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Clarifying commit messages**
+
+I’m realizing that only the precommit is visible. It's possible earlier specstory files were committed in another session. So, I should check the status since only one looks like it was committed. Maybe a concurrent session might have moved some. I need to make sure the commit message exactly follows the mandated format for Fable 5, not Opus, and end with the proper co-author line. I've noted previous violations, but now we're following the guidelines correctly.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:50:14Z)**_
+
+驗證通過：regex 現在涵蓋 `scripts/` 下 11/11 個 `.sh`，兩個 shellcheck scope 都通過；POSIX iSH bootstrap 由 shebang 自動用 `sh` parser。現在提交。
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:50:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit recursive shellcheck coverage
+
+```bash
+git add .pre-commit-config.yaml && git commit -F - <<'EOF'
+chore(pre-commit): shellcheck every scripts subtree
+
+The strict shellcheck hook only matched top-level scripts and scripts/lib,
+leaving scripts/adhoc and scripts/ios outside CI. The missing set included the
+new iSH bootstrap, where POSIX-sh portability is part of the contract.
+
+Match scripts/**/*.sh recursively and stop forcing the bash parser. Every file
+already declares its language via a shebang or `shellcheck shell=` directive,
+so inference checks ish-bootstrap.sh as sh while retaining bash semantics for
+the other ten scripts.
+
+Verified the regex covers 11/11 shell scripts; both shellcheck pre-commit hooks
+pass with --all-files; pre-commit validate-config and check-yaml pass.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+EOF
+git log -1 --oneline && git status -sb | head -5
+```
+
+```text
+Auto-redact secrets in agent artifacts..............................(no files to check)Skipped
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..............................................................................Passed
+check toml..........................................................(no files to check)Skipped
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/**/*.sh)........................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[main 55d11ee] chore(pre-commit): shellcheck every scripts subtree
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+55d11ee chore(pre-commit): shellcheck every scripts subtree
+## main...origin/main [ahead 1]
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-14 02:50:37Z)**_
+
+已完成並提交：
+
+```text
+55d11ee chore(pre-commit): shellcheck every scripts subtree
+```
+
+變更：
+
+- regex 從僅涵蓋頂層與 `scripts/lib/`：
+  ```yaml
+  ^scripts/(lib/)?[^/]+\.sh$
+  ```
+- 改為遞迴涵蓋：
+  ```yaml
+  ^scripts/.*\.sh$
+  ```
+- 移除強制 `--shell=bash`，改由 shebang 或 `shellcheck shell=` 自動判斷：
+  - `scripts/ios/ish-bootstrap.sh` 使用 POSIX `sh`
+  - 其他十個腳本維持 Bash 語意
+
+驗證結果：
+
+- regex 涵蓋 `scripts/` 下 **11/11** 個 `.sh`
+- 兩個 shellcheck hooks `--all-files` 全部通過
+- `pre-commit validate-config` 通過
+- `check-yaml` 通過
+- 工作區乾淨
+
+目前 `main` 比 `origin/main` ahead 1 commit。
