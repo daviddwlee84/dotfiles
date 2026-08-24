@@ -22,8 +22,8 @@ Both packages share the same token file
   [Gotchas](#start-used-to-hang-at-resolving-dependencies-behind-a-socks-proxy).
   A warm start does zero network before it binds the port.
 - **Not installed by ansible** — installed on first `copilot-proxy start`, so it
-  stays off the provisioning path. Force a clean re-install with
-  `copilot-proxy reinstall` (a version bump re-installs on its own).
+  stays off the provisioning path. `copilot-proxy update --check` is read-only;
+  only an explicit exact `copilot-proxy update VERSION` changes the pin.
 
 !!! warning "This violates GitHub Copilot's Terms of Service"
     Using a Copilot subscription to power a non-GitHub agent is not permitted, and
@@ -53,19 +53,19 @@ copilot-here off        # unpin — back to the real Anthropic backend
 ## How it works
 
 ```
-Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
+Claude Code ──Anthropic /v1/messages──▶ throttle/metrics shim (:4142) ─▶ copilot-api (:4141)
                                           │ Claude: native Messages path
                                           │ GPT: Anthropic → Responses translation
                                           ▼
                                    api.githubcopilot.com  (your Copilot sub)
 
-Codex ──OpenAI /v1/responses──────────▶ the same localhost gateway
+Codex ──OpenAI /v1/responses──────────▶ the same :4142 managed gateway
         (provider/model are one-invocation `-c` / `-m` overrides)
 ```
 
 - Claude Code speaks only the **Anthropic Messages API** (`/v1/messages`).
 - The fork uses Copilot's native Anthropic path for Claude ids and translates
-  Claude Code requests to the **Responses API** for GPT ids. Version `2.1.0`
+  Claude Code requests to the **Responses API** for GPT ids. The pinned `2.3.0`
   forwards Claude Code's `output_config.effort` to `reasoning.effort`, preserves
   reasoning state, and handles the GPT-5.6 request shape.
 - The original (`copilot-api@0.7.0`) always translates through
@@ -110,7 +110,7 @@ So the proxy uses the two layers nobody else owns:
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|restart|status|doctor [--live]|logs [N]|whoami|auth]`
+### `copilot-proxy [start|stop|status|stats|events|quota|bench|update|...]`
 
 Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 
@@ -118,7 +118,7 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
 | `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
-| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@2.1.0` | package spec to install (pin / upgrade; `copilot-api@0.7.0` = old original). Changing it re-installs. `2.1.0` is required for Claude Code effort passthrough to GPT-5.6. |
+| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.3.0` pin. While set, `update VERSION` refuses to change persisted state. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = install the package with the proxy env stripped, skipping the 45s stall on a host where bun cannot resolve through the proxy |
@@ -138,12 +138,58 @@ either attempt is killed on a timeout, so a stalled install can never keep bun's
 global cache lock and wedge the next one. If `start` times out it now also **kills
 the server it spawned**, instead of leaving an orphan behind for every retry.
 
-`copilot-proxy whoami` is the real login check: it prints your plan / quota
-(fails loudly if the token is missing or expired). On the fork it queries the
-running proxy's `/usage` endpoint (jq-summarized) and falls back to the installed
-binary's `debug` when the proxy is down; on the original it runs
-`check-usage`. Use it instead of eyeballing the token file — the token is a
-plaintext credential and should not be opened in an editor.
+`copilot-proxy quota [--json]` (also `whoami`) is the real live plan/quota check.
+On the fork it reads `/usage`, the same payload used by `/usage-viewer`; it
+requires the proxy to be running. Use it instead of opening the plaintext token.
+
+### Traffic statistics and safe benchmarks
+
+The shim is enabled by default for managed Claude/Codex launchers. If it is
+enabled but cannot start, launchers fail closed instead of silently bypassing
+measurement; `copilot-proxy shim off` is the explicit direct-to-`:4141`
+break-glass mode.
+
+```sh
+copilot-proxy stats week --model gpt-5.6-sol
+copilot-proxy events day --limit 20 --json
+copilot-proxy quota --json
+copilot-proxy bench --model gpt-5.6-sol --runs 3 --max-output 256
+```
+
+`stats` defaults to normal interactive traffic; choose `--scope benchmark` or
+`--scope all` explicitly. It reports request/error/retry counts, p50/p90/max
+queue time, upstream-header time, first-byte time, stream/end-to-end duration,
+tokens, AIU and output tokens/sec. Output throughput is only calculated for a
+completed stream that has a matching token event; otherwise it is `null`.
+
+Timing rows are stored without prompts or response bodies in
+`$XDG_STATE_HOME/copilot-proxy/metrics.sqlite` (WAL, 90-day retention). The
+fork separately owns `$XDG_DATA_HOME/copilot-api/copilot-api.sqlite`; its
+`token_usage_events` table is what `/usage-viewer` and `/token-usage*` read.
+There is no quota-history table: `/usage` is live GitHub data. The CLI joins the
+two databases by `x-trace-id`, aggregating multiple token events for the same
+request/model first. `stats` and `events` work offline while both processes are
+down.
+
+`bench` sends real streaming Responses requests and consumes real quota. Safety
+limits are enforced: 1–10 runs, 32–2048 maximum output tokens and concurrency
+1–4. Benchmark rows are tagged separately and do not pollute normal-use stats.
+
+### Package supply and explicit updates
+
+Warm starts execute the installed binary and do not contact npm, so registry
+availability only affects first install, reinstall or update. Normal npm
+unpublishing is unlikely for an established package, but maintainer, policy and
+Copilot-protocol risks remain; the package is still unofficial and has a small
+maintainer surface.
+
+`copilot-proxy update --check` queries canonical npm (configured registry only
+as a warned fallback) and never installs. `update VERSION` accepts exact semver
+only, verifies npm's SHA-512 tarball integrity, installs and smoke-tests a
+staging prefix, atomically swaps it, and keeps `pkg.previous`. If a previously
+running proxy fails to start after the swap, the old package selection and
+prefix are restored and restarted. The selected `{spec, integrity, registry,
+selected_at}` lives in `$XDG_STATE_HOME/copilot-proxy/package.json`.
 
 ### `copilot-proxy doctor [--live]` (alias: `test`)
 
@@ -266,8 +312,8 @@ launchers. They start the gateway/shim when necessary and pass a custom
 `~/.codex/config.toml` or `.codex/config.toml`, so plain `codex` remains on its
 normal provider.
 
-Codex always uses the shim on `localhost:4142`, even when the persisted
-throttling toggle is off. Besides throttling, that boundary normalizes blank
+Codex uses the shim on `localhost:4142` by default. Besides throttling and
+measurement, that boundary normalizes blank
 descriptions in Codex `mcp_list_tools` Responses items. GitHub Copilot rejects
 those with `Invalid 'input[0].tools[0].description': empty string`, while MCP
 servers and the native Codex path may omit them. The shim fills only those tool
@@ -275,6 +321,8 @@ definition fields and leaves prompts, schemas, and tool names unchanged.
 Codex currently zstd-compresses these requests; the shim decodes only the
 Responses body it must repair, forwards ordinary JSON, and removes the stale
 `content-encoding` header.
+Explicit `copilot-proxy shim off` bypasses this compatibility repair as well as
+metrics, so it is only a break-glass diagnostic mode.
 
 This is a separate picker from Claude Code's `copilot-model --auto`: that path
 remains Claude-first, while only this Codex launcher is OpenAI-first.
@@ -453,7 +501,7 @@ The important split is **local orchestration vs Anthropic cloud services**:
 |---|---|---|
 | CLI, tools, hooks, skills, memory, plugins, MCP, checkpoints, sandboxing | Yes | These are local Claude Code features; model behavior can still differ because GPT receives translated Claude prompts/tool schemas. |
 | Subagents and dynamic workflows | Yes | Do not set `CLAUDE_CODE_SUBAGENT_MODEL` globally here, so workflow scripts/frontmatter retain normal routing. [Workflow docs](https://code.claude.com/docs/en/workflows) |
-| `ultracode` | Yes on `2.1.0` | Ultracode is xhigh effort plus dynamic workflows, not a separate model. The upgraded fork forwards the requested effort to GPT-5.6. |
+| `ultracode` | Yes on `2.3.0` | Ultracode is xhigh effort plus dynamic workflows, not a separate model. The upgraded fork forwards the requested effort to GPT-5.6. |
 | Thinking/reasoning | Translated | GPT uses Responses reasoning rather than Anthropic-native thinking semantics. Persisted reasoning support is proxy-dependent. |
 | Web search, fast/auto mode, MCP tool search | Provider-dependent | The base-URL gateway and Copilot endpoint decide availability; non-first-party tool search may require an extra bridge/plugin. |
 | Ultrareview, Remote Control, Chrome, cloud Code Review, routines, web/mobile/Slack sessions | No | These require Claude.ai authentication/cloud services; a local API gateway cannot supply the subscription identity. `ultrareview` is unrelated to `ultracode`. |
@@ -593,7 +641,7 @@ original: `COPILOT_API_PKG=copilot-api@0.7.0`.
 Older fork releases could forward Claude Code's `context_management` field to
 an endpoint that rejected it with 400
 ([caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)). The
-`2.1.0` GPT-5.6 path suppresses that incompatible field and relies on Responses
+The pinned `2.3.0` GPT-5.6 path suppresses that incompatible field and relies on Responses
 reasoning/context handling instead. This avoids the 400, but Anthropic's exact
 context-editing and prompt-cache semantics are not reproduced; long-session
 behavior remains a compatibility surface to watch.

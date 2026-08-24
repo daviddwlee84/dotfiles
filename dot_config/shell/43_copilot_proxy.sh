@@ -10,7 +10,7 @@
 # needs no re-auth. Full guide + risks: docs/tools/copilot-claude-proxy.md.
 #
 # Public surface:
-#   copilot-proxy [start|stop|status|restart|doctor|logs|whoami|auth]  - manage the proxy
+#   copilot-proxy [start|stop|status|stats|events|quota|bench|update|...] - manage/measure
 #   copilot-proxy doctor [--live]  - diagnose prereqs/auth/proxy/model-entitlement/
 #                                upstream; --live sends one real request. The
 #                                model-entitlement check catches the common
@@ -53,8 +53,9 @@
 #     resolving through a socks ALL_PROXY — which wedged `start` at "Resolving
 #     dependencies" AND kept bun's global cache lock, so every retry hung too.
 #     See pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md.
-#     Override the spec with COPILOT_API_PKG; force a re-install with
-#     `copilot-proxy reinstall`.
+#     `copilot-proxy update VERSION` persists an exact verified selection;
+#     COPILOT_API_PKG remains a highest-priority temporary override. Force a
+#     clean install of the selected spec with `copilot-proxy reinstall`.
 #   - no ZLE/compdef/setopt/glob-qualifiers here (bash would error on source).
 #
 # Env (set in ~/.shellrc.adhoc or ~/.config/{zsh/secrets.zsh,bash/secrets.sh}):
@@ -69,10 +70,10 @@
 #                          always = same, but warn when no local proxy is found
 #                          never  = never pass --proxy-env (non-GFW machines)
 #                          http://127.0.0.1:PORT = force that URL
-#   COPILOT_API_PKG      default: @jeffreycao/copilot-api@2.1.0
-#                                             - package spec to install (pin/
-#                                               upgrade; copilot-api@0.7.0 = old
-#                                               original). Changing it re-installs.
+#   COPILOT_API_PKG      default: unset       - temporary highest-priority
+#                                               package override. Otherwise use
+#                                               persisted selection, then built-in
+#                                               @jeffreycao/copilot-api@2.3.0.
 #   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
 #                                               by the original package (the fork
 #                                               has no rate limiter)
@@ -83,7 +84,33 @@
 # --- shared constants / helpers -------------------------------------------------
 
 _copilot_port() { printf '%s' "${COPILOT_PROXY_PORT:-4141}"; }
-_copilot_pkg()  { printf '%s' "${COPILOT_API_PKG:-@jeffreycao/copilot-api@2.1.0}"; }
+_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.3.0'; }
+_copilot_builtin_integrity() { printf '%s' 'sha512-4h7ysNAO8N9zJkIcOnNPio9asGTMsRkvQ70deSRBSwkBJFOZXYeoKmiHU06VSP712gVNaTrRA7abLAPkTuINqA=='; }
+_copilot_pkg_selection_state() { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/package.json"; }
+_copilot_pkg() {
+  if [ -n "${COPILOT_API_PKG:-}" ]; then printf '%s' "$COPILOT_API_PKG"; return; fi
+  local sf; sf="$(_copilot_pkg_selection_state)"
+  if [ -f "$sf" ]; then
+    if command -v jq >/dev/null 2>&1; then
+      local selected; selected="$(jq -r '.spec // empty' "$sf" 2>/dev/null)"
+      if [ -n "$selected" ]; then printf '%s' "$selected"; return; fi
+    else
+      local selected; selected="$(command sed -n 's/.*"spec"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$sf" | command head -n1)"
+      if [ -n "$selected" ]; then printf '%s' "$selected"; return; fi
+    fi
+  fi
+  _copilot_builtin_pkg
+}
+
+_copilot_expected_integrity() {
+  [ -n "${COPILOT_API_PKG:-}" ] && return 0
+  local sf; sf="$(_copilot_pkg_selection_state)"
+  if [ -f "$sf" ] && command -v jq >/dev/null 2>&1; then
+    jq -r '.integrity // empty' "$sf" 2>/dev/null
+  elif [ "$(_copilot_pkg)" = "$(_copilot_builtin_pkg)" ]; then
+    _copilot_builtin_integrity
+  fi
+}
 
 # CLI flavor from the package spec: the ORIGINAL bare `copilot-api` takes
 # --rate-limit/--wait and has `check-usage`; the fork (and anything else)
@@ -241,10 +268,159 @@ _copilot_ensure_pkg() {
     printf '%s\n' "copilot-proxy: install finished but $bin is missing." >&2
     return 1
   fi
+  # For the built-in or persisted pin, require the package manager's recorded
+  # npm integrity (when available) to match the trusted selection. Bun verifies
+  # registry integrity itself; the metadata comparison covers a Bun-only lock.
+  local expected_integrity actual_integrity selected_version integrity_meta
+  expected_integrity="$(_copilot_expected_integrity)"
+  if [ -n "$expected_integrity" ]; then
+    actual_integrity=""
+    if [ -f "$prefix/package-lock.json" ] && command -v jq >/dev/null 2>&1; then
+      actual_integrity="$(jq -r --arg p "node_modules/$(_copilot_pkg_name)" '.packages[$p].integrity // empty' "$prefix/package-lock.json" 2>/dev/null)"
+    fi
+    if [ -n "$actual_integrity" ] && [ "$actual_integrity" != "$expected_integrity" ]; then
+      printf '%s\n' "copilot-proxy: installed package integrity does not match the trusted pin." >&2
+      return 1
+    elif [ -z "$actual_integrity" ] && command -v jq >/dev/null 2>&1; then
+      selected_version="${spec##*@}"
+      integrity_meta="$(_copilot_registry_metadata "$selected_version" 2>/dev/null || true)"
+      actual_integrity="$(printf '%s' "$integrity_meta" | jq -r '.dist.integrity // empty' 2>/dev/null)"
+      if [ -z "$actual_integrity" ] || [ "$actual_integrity" != "$expected_integrity" ]; then
+        printf '%s\n' "copilot-proxy: could not verify the installed package against trusted npm integrity." >&2
+        return 1
+      fi
+    fi
+  fi
   printf '%s\n' "$spec" >"$(_copilot_pkg_stamp)"
 }
 
-# --- throttle shim (optional, in front of the fork) -----------------------------
+_copilot_pkg_actual_version() {
+  local f
+  f="$(_copilot_pkg_prefix)/node_modules/$(_copilot_pkg_name)/package.json"
+  [ -f "$f" ] || return 1
+  if command -v jq >/dev/null 2>&1; then jq -r '.version // empty' "$f" 2>/dev/null
+  else command sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | command head -n1; fi
+}
+
+_copilot_registry_metadata() {
+  # $1 version or "latest". Prefer canonical npm; a configured mirror is only
+  # a fallback and is identified to the caller on stderr.
+  local version="$1" encoded='%40jeffreycao%2Fcopilot-api' url registry
+  url="https://registry.npmjs.org/$encoded/$version"
+  if command curl -fsSL --max-time 20 "$url" 2>/dev/null; then return 0; fi
+  registry="$(command npm config get registry 2>/dev/null | command sed 's:/*$::')"
+  [ -n "$registry" ] && [ "$registry" != "https://registry.npmjs.org" ] || return 1
+  printf '%s\n' "copilot-proxy: canonical npm unavailable; using configured registry $registry" >&2
+  command curl -fsSL --max-time 20 "$registry/$encoded/$version"
+}
+
+_copilot_write_selection() {
+  local spec="$1" integrity="$2" registry="$3" sf tmp
+  sf="$(_copilot_pkg_selection_state)"; tmp="$sf.tmp.$$"
+  command mkdir -p "$(command dirname "$sf")" || return 1
+  jq -n --arg spec "$spec" --arg integrity "$integrity" --arg registry "$registry" \
+    --arg selected_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{spec:$spec,integrity:$integrity,registry:$registry,selected_at:$selected_at}' >"$tmp" || return 1
+  command mv -f "$tmp" "$sf"
+}
+
+_copilot_update_check() {
+  command -v jq >/dev/null 2>&1 || { printf '%s\n' "copilot-proxy: update requires jq." >&2; return 1; }
+  local meta latest selected actual
+  meta="$(_copilot_registry_metadata latest)" || {
+    printf '%s\n' "copilot-proxy: could not query npm metadata." >&2; return 1; }
+  latest="$(printf '%s' "$meta" | jq -r '.version // empty')"
+  selected="$(_copilot_pkg)"; actual="$(_copilot_pkg_actual_version 2>/dev/null || true)"
+  printf '%s\n' "copilot-proxy package"
+  printf '%s\n' "  built-in: $(_copilot_builtin_pkg)"
+  printf '%s\n' "  selected: $selected"
+  printf '%s\n' "  installed: ${actual:-not installed}"
+  printf '%s\n' "  official latest: ${latest:-unknown}"
+  [ "$selected" = "@jeffreycao/copilot-api@$latest" ] || \
+    printf '%s\n' "  update available: copilot-proxy update $latest"
+}
+
+_copilot_update_exact() {
+  local version="$1"
+  if [ -n "${COPILOT_API_PKG:-}" ]; then
+    printf '%s\n' "copilot-proxy: COPILOT_API_PKG is active; refusing to mutate persisted selection." >&2
+    return 1
+  fi
+  printf '%s' "$version" | command grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || {
+    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.3.0)." >&2; return 1; }
+  for _tool in jq curl openssl bun; do command -v "$_tool" >/dev/null 2>&1 || {
+    printf '%s\n' "copilot-proxy: update requires $_tool." >&2; return 1; }; done
+
+  local meta spec integrity tarball registry prefix stage previous archive digest expected
+  meta="$(_copilot_registry_metadata "$version")" || { printf '%s\n' "copilot-proxy: version $version was not found." >&2; return 1; }
+  spec="@jeffreycao/copilot-api@$version"
+  integrity="$(printf '%s' "$meta" | jq -r '.dist.integrity // empty')"
+  tarball="$(printf '%s' "$meta" | jq -r '.dist.tarball // empty')"
+  registry="$(printf '%s' "$tarball" | command sed -E 's#(https?://[^/]+).*#\1#')"
+  [ -n "$integrity" ] && [ -n "$tarball" ] || { printf '%s\n' "copilot-proxy: registry metadata lacks tarball integrity." >&2; return 1; }
+  case "$integrity" in sha512-*) ;; *) printf '%s\n' "copilot-proxy: unsupported integrity algorithm: $integrity" >&2; return 1 ;; esac
+
+  prefix="$(_copilot_pkg_prefix)"; stage="$prefix.stage.$$"; previous="$prefix.previous"; archive="${TMPDIR:-/tmp}/copilot-api-$version-$$.tgz"
+  command rm -rf -- "$stage"
+  command mkdir -p "$stage" || return 1
+  printf '%s\n' '{"name":"copilot-api-runner","private":true,"version":"0.0.0"}' >"$stage/package.json"
+  printf '%s\n' "copilot-proxy: downloading and verifying $spec ..."
+  if ! command curl -fsSL --max-time 60 "$tarball" -o "$archive"; then command rm -rf -- "$stage"; return 1; fi
+  digest="$(command openssl dgst -sha512 -binary "$archive" | command openssl base64 -A)"
+  expected="${integrity#sha512-}"
+  command rm -f -- "$archive"
+  if [ "$digest" != "$expected" ]; then
+    command rm -rf -- "$stage"
+    printf '%s\n' "copilot-proxy: SHA-512 integrity mismatch; refusing the update." >&2
+    return 1
+  fi
+
+  if ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" env 90; then
+    command rm -rf -- "$stage/node_modules" "$stage/bun.lock" "$stage/package-lock.json"
+    if ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" noproxy 90; then
+      command rm -rf -- "$stage/node_modules" "$stage/bun.lock" "$stage/package-lock.json"
+      if ! command -v npm >/dev/null 2>&1 \
+         || ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" npm 90; then
+        command rm -rf -- "$stage"
+        return 1
+      fi
+    fi
+  fi
+  [ -x "$stage/node_modules/.bin/copilot-api" ] || { command rm -rf -- "$stage"; return 1; }
+  local staged_version
+  staged_version="$(jq -r '.version // empty' "$stage/node_modules/@jeffreycao/copilot-api/package.json" 2>/dev/null)"
+  [ "$staged_version" = "$version" ] || { command rm -rf -- "$stage"; printf '%s\n' "copilot-proxy: staged version mismatch ($staged_version)." >&2; return 1; }
+  "$stage/node_modules/.bin/copilot-api" --help >/dev/null 2>&1 || { command rm -rf -- "$stage"; printf '%s\n' "copilot-proxy: staged binary failed its help smoke test." >&2; return 1; }
+  printf '%s\n' "$spec" >"$stage/.installed-spec"
+
+  local was_running sf state_backup
+  was_running=0
+  sf="$(_copilot_pkg_selection_state)"
+  state_backup="$(_copilot_pkg_selection_state).previous"
+  _copilot_alive && was_running=1
+  [ "$was_running" -eq 0 ] || copilot-proxy stop || return 1
+  command rm -rf -- "$previous"
+  [ ! -e "$prefix" ] || command mv "$prefix" "$previous" || return 1
+  command mv "$stage" "$prefix" || { [ ! -e "$previous" ] || command mv "$previous" "$prefix"; return 1; }
+  command rm -f -- "$state_backup"
+  [ ! -f "$sf" ] || command cp -f "$sf" "$state_backup"
+  if ! _copilot_write_selection "$spec" "$integrity" "$registry"; then
+    command rm -rf -- "$prefix"; [ ! -e "$previous" ] || command mv "$previous" "$prefix"; return 1
+  fi
+
+  if [ "$was_running" -eq 1 ] && ! copilot-proxy start; then
+    printf '%s\n' "copilot-proxy: new version failed startup; rolling back." >&2
+    copilot-proxy stop >/dev/null 2>&1 || true
+    command rm -rf -- "$prefix"
+    [ ! -e "$previous" ] || command mv "$previous" "$prefix"
+    if [ -f "$state_backup" ]; then command mv -f "$state_backup" "$sf"; else command rm -f -- "$sf"; fi
+    copilot-proxy start || printf '%s\n' "copilot-proxy: rollback restored files but the old proxy did not restart." >&2
+    return 1
+  fi
+  printf '%s\n' "copilot-proxy: selected and installed $spec (previous generation: $previous)"
+}
+
+# --- throttle + metrics shim (default, in front of the fork) --------------------
 # A tiny Bun reverse proxy that caps concurrent in-flight upstream requests,
 # transparently retries 403/429 (GitHub enterprise abuse throttling) BEFORE any
 # body streams — so downstream agents never see "Please run /login" — and keeps
@@ -262,26 +438,36 @@ _copilot_shim_logfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-shim-$(_copilot_s
 _copilot_shim_pidfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-shim-$(_copilot_shim_port).pid"; }
 _copilot_shim_state()   { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/shim"; }
 
-# Enabled? env COPILOT_PROXY_SHIM overrides a persisted on/off state file.
+# Enabled by default. COPILOT_PROXY_SHIM or the persisted state can explicitly
+# disable it as a break-glass direct-to-:4141 route.
 _copilot_shim_enabled() {
   case "${COPILOT_PROXY_SHIM:-}" in
     1|on|true|yes)  return 0 ;;
     0|off|false|no) return 1 ;;
   esac
   local sf; sf="$(_copilot_shim_state)"
-  [ -f "$sf" ] && [ "$(command head -n1 "$sf" 2>/dev/null)" = "on" ]
+  [ ! -f "$sf" ] || [ "$(command head -n1 "$sf" 2>/dev/null)" != "off" ]
 }
 
-# Is the shim port answering at all? (curl w/o -f: any HTTP reply = exit 0, so a
-# 502 from a fork-down passthrough still counts as "shim process is up".)
+# Is this metrics-capable shim answering (not merely an arbitrary process or an
+# older passthrough build on the same port)?
 _copilot_shim_alive() {
-  command curl -s -o /dev/null --max-time 2 "$(_copilot_shim_base)/v1/models" >/dev/null 2>&1
+  command curl -fsS -o /dev/null --max-time 2 "$(_copilot_shim_base)/_shim/health" >/dev/null 2>&1
 }
 
-# Base URL Claude Code should talk to: the shim when it's enabled AND actually
-# up, otherwise the fork directly (never break just because the shim is down).
+# Base URL managed clients should use. An enabled-but-down shim is a hard fault:
+# launchers start it and fail rather than silently bypassing request metrics.
 _copilot_client_base() {
-  if _copilot_shim_enabled && _copilot_shim_alive; then _copilot_shim_base; else _copilot_base; fi
+  if _copilot_shim_enabled; then _copilot_shim_base; else _copilot_base; fi
+}
+
+_copilot_require_shim() {
+  _copilot_shim_enabled || return 0
+  _copilot_shim_alive || _copilot_shim_start || {
+    printf '%s\n' "copilot-proxy: managed client refused to bypass the enabled metrics shim." >&2
+    printf '%s\n' "  use 'copilot-proxy shim off' only for an intentional direct-mode escape." >&2
+    return 1
+  }
 }
 
 # Base URL for PERSISTENT pins (copilot-here settings.local.json): the shim when
@@ -325,6 +511,15 @@ _copilot_shim_stop() {
   fi
   command pkill -f "copilot-throttle-shim.js" 2>/dev/null
   return 0
+}
+
+_copilot_metrics_cli() {
+  local script; script="$(_copilot_shim_script)"
+  if [ ! -f "$script" ]; then
+    printf '%s\n' "copilot-proxy: metrics script not found at $script" >&2
+    return 1
+  fi
+  command bun "$script" "$@"
 }
 
 # Global default-model state file (used by copilot-run/claude-copilot when the
@@ -611,6 +806,7 @@ copilot-proxy() {
   case "$action" in
     start)
       if _copilot_alive; then
+        _copilot_require_shim || return 1
         printf '%s\n' "copilot-proxy: already running on port $port" >&2
         return 0
       fi
@@ -693,7 +889,13 @@ copilot-proxy() {
       while [ "$i" -lt "$start_timeout" ]; do
         if _copilot_alive; then
           if _copilot_shim_enabled; then
-            _copilot_shim_start && printf '%s\n' "copilot-proxy: throttle shim up → $(_copilot_shim_base) (→ $(_copilot_base))"
+            if ! _copilot_shim_start; then
+              kill "$srv_pid" 2>/dev/null
+              command rm -f -- "$pidf"
+              printf '%s\n' "copilot-proxy: fork started, but the required metrics shim failed; stopped the fork." >&2
+              return 1
+            fi
+            printf '%s\n' "copilot-proxy: throttle/metrics shim up → $(_copilot_shim_base) (→ $(_copilot_base))"
           fi
           printf '%s\n' "copilot-proxy: up → $(_copilot_client_base)  (logs: copilot-proxy logs)"
           return 0
@@ -750,7 +952,7 @@ copilot-proxy() {
           if _copilot_shim_alive; then
             printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)  → clients use this"
           else
-            printf '%s\n' "  shim:   ON but DOWN (clients fall back to $(_copilot_base); try 'copilot-proxy shim on')"
+            printf '%s\n' "  shim:   ON but DOWN (managed clients fail closed; try 'copilot-proxy shim on')"
           fi
         else
           printf '%s\n' "  shim:   off  (enable: copilot-proxy shim on)"
@@ -803,10 +1005,20 @@ copilot-proxy() {
       if _copilot_pkg_ready; then
         _ok "installed" "$pkg"
         _skip "bin" "$(_copilot_pkg_bin)"
+        local _actual_version _expected_integrity
+        _actual_version="$(_copilot_pkg_actual_version 2>/dev/null || true)"
+        _expected_integrity="$(_copilot_expected_integrity 2>/dev/null || true)"
+        _skip "built-in" "$(_copilot_builtin_pkg)"
+        _skip "actual" "${_actual_version:-unknown}"
+        [ -z "$_expected_integrity" ] || _skip "integrity" "$_expected_integrity"
+        if [ -f "$(_copilot_pkg_prefix)/bun.lock" ] && command grep -q '@jeffreycao/copilot-api@1\.' "$(_copilot_pkg_prefix)/bun.lock" 2>/dev/null; then
+          _note "lock drift" "bun.lock mentions an older package; installed package + stamp remain authoritative"
+        fi
       else
         _note "not installed" "$pkg — the next 'copilot-proxy start' installs it (one-time)"
         _hint "copilot-proxy reinstall   # or force it now"
       fi
+      _skip "updates" "copilot-proxy update --check (never auto-installs latest)"
 
       printf '\n%s\n' "Authentication"
       local _tok="$HOME/.local/share/copilot-api/github_token"
@@ -1130,6 +1342,12 @@ EOF
         "$(_copilot_pkg_bin)" auth --provider copilot
       fi
       ;;
+    update)
+      case "${2:---check}" in
+        --check) _copilot_update_check ;;
+        *) _copilot_update_exact "$2" ;;
+      esac
+      ;;
     reinstall)
       # Force a clean re-install of the pinned spec (normally only needed if the
       # prefix got corrupted — a version bump re-installs on its own via the stamp).
@@ -1138,9 +1356,34 @@ EOF
       _copilot_ensure_pkg || return 1
       printf '%s\n' "copilot-proxy: installed $(_copilot_pkg) → $(_copilot_pkg_bin)"
       ;;
-    whoami|usage)
+    stats|events)
+      local _metric_action="$action"
+      shift
+      _copilot_metrics_cli "$_metric_action" "$@"
+      ;;
+    bench)
+      shift
+      if ! _copilot_alive; then copilot-proxy start || return 1; fi
+      if ! _copilot_shim_enabled; then
+        printf '%s\n' "copilot-proxy: bench requires the metrics shim; run 'copilot-proxy shim on'." >&2
+        return 1
+      fi
+      _copilot_require_shim || return 1
+      local _has_model=0 _arg _bench_model
+      for _arg in "$@"; do [ "$_arg" = "--model" ] && _has_model=1; done
+      _bench_model="$(_copilot_default_model)"; _bench_model="${_bench_model%\[1m\]}"
+      printf '%s\n' "copilot-proxy: benchmark sends real inference requests and consumes quota." >&2
+      if [ "$_has_model" -eq 1 ]; then
+        _copilot_metrics_cli bench --base "$(_copilot_shim_base)" "$@"
+      else
+        _copilot_metrics_cli bench --base "$(_copilot_shim_base)" --model "$_bench_model" "$@"
+      fi
+      ;;
+    quota|whoami|usage)
       # Real login check: exchanges the stored token against GitHub and prints
       # the account / plan / quota. Fails loudly if the token is missing/expired.
+      local _quota_json=0
+      [ "${2:-}" = "--json" ] && _quota_json=1
       if [ ! -f "$HOME/.local/share/copilot-api/github_token" ]; then
         printf '%s\n' "copilot-proxy: not authenticated — run 'copilot-proxy auth' first." >&2
         return 1
@@ -1151,7 +1394,9 @@ EOF
       elif _copilot_alive; then
         # Fork has no check-usage subcommand; its /usage endpoint serves the
         # GitHub quota payload (same data as the bundled /usage-viewer).
-        if command -v jq >/dev/null 2>&1; then
+        if [ "$_quota_json" -eq 1 ] || ! command -v jq >/dev/null 2>&1; then
+          command curl -fsS --max-time 5 "$(_copilot_base)/usage"
+        else
           command curl -fsS --max-time 5 "$(_copilot_base)/usage" | jq '{
             plan: (.copilot_plan // .access_type_sku // "unknown"),
             quota_reset: (.quota_reset_date // null),
@@ -1160,14 +1405,10 @@ EOF
                 {remaining, entitlement, percent_remaining, unlimited}
               else . end))
           }'
-        else
-          command curl -fsS --max-time 5 "$(_copilot_base)/usage"
         fi
       else
-        # Proxy down → the fork's `debug` still validates auth state / paths.
-        printf '%s\n' "copilot-proxy: not running — showing auth/debug info instead of quota." >&2
-        _copilot_ensure_pkg || return 1
-        "$(_copilot_pkg_bin)" debug
+        printf '%s\n' "copilot-proxy: quota is live data and the proxy is not running." >&2
+        return 1
       fi
       ;;
     shim)
@@ -1185,6 +1426,7 @@ EOF
           printf '%s\n' "  NOTE: restart Claude Code so it picks up ANTHROPIC_BASE_URL=$(_copilot_shim_base)"
           ;;
         off)
+          command mkdir -p "$(command dirname "$sf")" || return 1
           printf 'off\n' >"$sf"; _copilot_shim_stop
           printf '%s\n' "copilot-proxy: shim OFF (clients use $(_copilot_base) directly)"
           printf '%s\n' "  NOTE: restart Claude Code to point back at $(_copilot_base)"
@@ -1199,14 +1441,18 @@ EOF
       esac
       ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|doctor [--live]|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth|reinstall]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|stats|events|quota|bench|update|doctor|...]"
+      printf '%s\n' "  stats [day|week|month] [--model ID] [--scope normal|benchmark|all] [--json]"
+      printf '%s\n' "  events [day|week|month] [--model ID] [--scope ...] [--limit N] [--json]"
+      printf '%s\n' "  quota [--json]       live plan/quota payload from the running fork"
+      printf '%s\n' "  bench [--model ID] [--runs 1..10] [--max-output 32..2048] [--concurrency 1..4] [--json]"
+      printf '%s\n' "  update --check | update VERSION   inspect latest or install an exact verified version"
       printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, Claude catalog (direct vs via"
       printf '%s\n' "                        Clash), upstream reachability and Codex Apps."
       printf '%s\n' "                        --live probes Apps and costs 1 inference quota unit."
       printf '%s\n' "  COPILOT_HTTP_PROXY    auto|always|never|http://127.0.0.1:PORT  (default auto)"
       printf '%s\n' "                        auto attaches --proxy-env when proxy-status finds a local proxy."
-      printf '%s\n' "  reinstall             wipe + re-install the pinned package (a version bump"
-      printf '%s\n' "                        re-installs on its own; this is for a corrupted prefix)."
+      printf '%s\n' "  reinstall             wipe + re-install the selected package (for a corrupted prefix)."
       ;;
     *)
       printf '%s\n' "copilot-proxy: unknown action '$action' (try --help)" >&2
@@ -1239,7 +1485,7 @@ copilot-run() {
   fi
   # If the shim is enabled but not up (e.g. toggled on after the proxy started),
   # bring it up now so ANTHROPIC_BASE_URL below resolves to it.
-  if _copilot_shim_enabled && ! _copilot_shim_alive; then _copilot_shim_start; fi
+  _copilot_require_shim || return 1
   local profile model fable opus sonnet haiku
   profile="$(_copilot_model_profile_json "$(_copilot_default_model)")" || return 1
   model="$(printf '%s' "$profile" | jq -r '.main')"
@@ -1397,10 +1643,9 @@ codex-copilot() {
     return 1
   fi
   if ! _copilot_alive; then copilot-proxy start || return 1; fi
-  # Codex needs the shim even when burst throttling is persistently disabled:
-  # GitHub's Responses validator rejects empty MCP tool descriptions that the
-  # native OpenAI endpoint accepts. Starting it here does not change shim state.
-  if ! _copilot_shim_alive; then _copilot_shim_start || return 1; fi
+  # Normal mode requires the shim for metrics and Responses normalization.
+  # Explicit `shim off` is the only break-glass route around it.
+  _copilot_require_shim || return 1
 
   catalog="$(_copilot_model_catalog)" || {
     printf '%s\n' "codex-copilot: could not read the live gateway model catalog" >&2
@@ -1432,7 +1677,7 @@ codex-copilot() {
   # upstream gateway requirement; the dummy key only satisfies Codex's provider
   # auth contract and is ignored by our unauthenticated localhost listener.
   local base cmd context='' compact=''
-  base="$(_copilot_shim_base)"
+  base="$(_copilot_client_base)"
   cmd="$(_copilot_specstory_codex_cmd)"
   if [ -n "$model" ]; then
     context="$(printf '%s' "$catalog" | jq -r --arg id "$model" '

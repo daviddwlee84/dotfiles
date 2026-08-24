@@ -45,6 +45,28 @@ write_fake_codex() {
   chmod +x "$TMP/bin/codex"
 }
 
+write_update_fakes() {
+  mkdir -p "$TMP/bin"
+  printf '%s' 'copilot-api update fixture' > "$TMP/package.tgz"
+  cat > "$TMP/bin/curl" <<'SH'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -o ]; then out="$2"; shift 2; else shift; fi
+done
+cp "$FAKE_TARBALL" "$out"
+SH
+  cat > "$TMP/bin/bun" <<'SH'
+#!/bin/sh
+version="${2##*@}"
+mkdir -p node_modules/.bin node_modules/@jeffreycao/copilot-api
+printf '%s\n' '#!/bin/sh' 'exit 0' > node_modules/.bin/copilot-api
+chmod +x node_modules/.bin/copilot-api
+printf '{"version":"%s"}\n' "$version" > node_modules/@jeffreycao/copilot-api/package.json
+SH
+  chmod +x "$TMP/bin/curl" "$TMP/bin/bun"
+}
+
 # --- _copilot_norm_models -------------------------------------------------------
 
 @test "probe failure kind: curl timeout is distinct from TLS and network" {
@@ -221,6 +243,71 @@ JSON
   [ "$status" -ne 0 ]
 }
 
+@test "package selection precedence is env then persisted state then built-in" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/state/copilot-proxy"
+  run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
+  [ "$status" -eq 0 ]
+  [ "$output" = "@jeffreycao/copilot-api@2.3.0" ]
+  printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.2.0","integrity":"sha512-test"}' > "$TMP/state/copilot-proxy/package.json"
+  run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
+  [ "$status" -eq 0 ]
+  [ "$output" = "@jeffreycao/copilot-api@2.2.0" ]
+  run bash -c "export XDG_STATE_HOME='$TMP/state' COPILOT_API_PKG='copilot-api@0.7.0'; source '$SHELL_LIB'; _copilot_pkg"
+  [ "$status" -eq 0 ]
+  [ "$output" = "copilot-api@0.7.0" ]
+}
+
+@test "exact update refuses to mutate state while env override is active" {
+  run bash -c "export COPILOT_API_PKG='@jeffreycao/copilot-api@2.1.0'; source '$SHELL_LIB'; _copilot_update_exact 2.3.0"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"refusing to mutate persisted selection"* ]]
+}
+
+@test "exact update rejects a tarball integrity mismatch before install" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  command -v openssl >/dev/null 2>&1 || skip "openssl not installed"
+  write_update_fakes
+  run env FAKE_TARBALL="$TMP/package.tgz" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state';
+    source '$SHELL_LIB';
+    _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"sha512-wrong\",\"tarball\":\"https://fake/package.tgz\"}}'; }
+    _copilot_update_exact 2.3.0"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"integrity mismatch"* ]]
+  [ ! -e "$TMP/data/copilot-api/pkg" ]
+}
+
+@test "failed post-update startup rolls package and selection back" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  command -v openssl >/dev/null 2>&1 || skip "openssl not installed"
+  write_update_fakes
+  local digest
+  digest="$(openssl dgst -sha512 -binary "$TMP/package.tgz" | openssl base64 -A)"
+  mkdir -p "$TMP/data/copilot-api/pkg/node_modules/.bin" "$TMP/state/copilot-proxy"
+  printf old > "$TMP/data/copilot-api/pkg/old-marker"
+  printf '%s\n' '#!/bin/sh' 'exit 0' > "$TMP/data/copilot-api/pkg/node_modules/.bin/copilot-api"
+  chmod +x "$TMP/data/copilot-api/pkg/node_modules/.bin/copilot-api"
+  printf '%s\n' '@jeffreycao/copilot-api@2.1.0' > "$TMP/data/copilot-api/pkg/.installed-spec"
+  printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.1.0","integrity":"sha512-old"}' > "$TMP/state/copilot-proxy/package.json"
+  run env FAKE_TARBALL="$TMP/package.tgz" META_INTEGRITY="sha512-$digest" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state';
+    source '$SHELL_LIB';
+    _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
+    _copilot_alive() { return 0; }
+    copilot-proxy() {
+      case \"\$1\" in
+        stop) return 0 ;;
+        start) n=0; [ -f '$TMP/start-count' ] && n=\"\$(cat '$TMP/start-count')\"; n=\$((n+1)); printf '%s' \"\$n\" >'$TMP/start-count'; [ \"\$n\" -gt 1 ] ;;
+      esac
+    }
+    _copilot_update_exact 2.3.0"
+  [ "$status" -ne 0 ]
+  [ -f "$TMP/data/copilot-api/pkg/old-marker" ]
+  [ "$(jq -r '.spec' "$TMP/state/copilot-proxy/package.json")" = "@jeffreycao/copilot-api@2.1.0" ]
+  [ "$(cat "$TMP/start-count")" = "2" ]
+}
+
 @test "pkg install: npm CA-stack fallback rescues two failed Bun attempts" {
   mkdir -p "$TMP/bin"
   cat > "$TMP/bin/bun" <<'SH'
@@ -240,7 +327,7 @@ SH
     source '$SHELL_LIB'; _copilot_ensure_pkg >/dev/null"
   [ "$status" -eq 0 ]
   [ -f "$TMP/data/copilot-api/pkg/npm-fallback-used" ]
-  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.1.0" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.0" ]
 }
 
 @test "effective_model: a settings.local.json WITHOUT our base_url is not a pin" {
@@ -369,7 +456,7 @@ SH
   [[ "$output" == *"=<two words>"* ]]
 }
 
-@test "Codex launcher starts the compatibility shim even when throttling is disabled" {
+@test "Codex launcher starts the metrics shim by default" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   write_fake_codex
   printf '%s\n' '{"models":[{"slug":"gpt-5.6-sol"}]}' > "$TMP/bundled-models.json"
@@ -386,6 +473,15 @@ SH
   [ "$status" -eq 0 ]
   [[ "$output" == *"started-shim"* ]]
   [[ "$output" == *"=<model_providers.copilot_api.base_url=\"http://localhost:4242\">"* ]]
+}
+
+@test "explicit shim off is a direct-mode break-glass route" {
+  run bash -c "export XDG_STATE_HOME='$TMP/state'; mkdir -p '$TMP/state/copilot-proxy'; printf 'off\n' >'$TMP/state/copilot-proxy/shim'; source '$SHELL_LIB';
+    _copilot_shim_alive() { return 1; }
+    _copilot_shim_start() { printf should-not-start; return 1; }
+    printf '%s' \"\$(_copilot_client_base)\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "http://localhost:4141" ]
 }
 
 @test "Responses shim fills only blank MCP tool descriptions" {
@@ -414,6 +510,18 @@ SH
   [ "$(printf '%s' "$output" | jq -r '.changed')" = "1" ]
   [ "$(printf '%s' "$output" | jq -r '.decoded')" = "true" ]
   [ "$(printf '%s' "$output" | jq -r '.p.input[0].tools[0].description')" = "Tool compressed." ]
+}
+
+@test "unchanged zstd Responses body remains inspectable for stream metrics" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bun -e "import { normalizeRequestBody as n, wantsStream as w } from '$shim';
+    const compressed=Bun.zstdCompressSync(new TextEncoder().encode(JSON.stringify({model:'m',stream:true})));
+    const r=n('/v1/responses',compressed,'zstd');
+    console.log(JSON.stringify({changed:r.changed,decoded:r.decoded,stream:w(r.inspectBody),forwardedCompressed:r.body===compressed.buffer}));"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.changed')" = "0" ]
+  [ "$(printf '%s' "$output" | jq -r '.stream')" = "true" ]
 }
 
 @test "wantsStream only classifies an explicit stream:true body" {
@@ -462,6 +570,7 @@ process.env.COPILOT_SHIM_UPSTREAM = `http://localhost:${up.port}`;
 process.env.COPILOT_SHIM_PING_MS = "150";
 process.env.COPILOT_SHIM_PING_AFTER_MS = "100";
 process.env.COPILOT_SHIM_STALL_MS = "5000";
+process.env.COPILOT_SHIM_METRICS_DB = process.argv[3];
 const { startServer } = await import(process.argv[2]);
 const shim = startServer();
 const call = async (q, stream = true) => {
@@ -469,6 +578,7 @@ const call = async (q, stream = true) => {
     headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "m", stream }) });
   const body = await r.text();
   return { status: r.status, ct: r.headers.get("content-type"),
+    trace: r.headers.get("x-trace-id"),
     pings: (body.match(/^: /gm) ?? []).length,
     events: (body.match(/^event: (\S+)/gm) ?? []).map((s) => s.slice(7)) };
 };
@@ -478,15 +588,17 @@ const out = {
   plain:   await call("?delay=800&mode=status", false),
   lateErr: await call("?delay=800&mode=status"),
 };
+out.metrics = await (await fetch(`http://localhost:${shim.port}/_shim/events?period=day&scope=all&limit=20`)).json();
 console.log(JSON.stringify(out));
 shim.stop(true); up.stop(true);
 JS
-  run bash -c "bun '$TMP/keepalive.js' '$shim' 2>&1 | tail -n 1"
+  run bash -c "bun '$TMP/keepalive.js' '$shim' '$TMP/keepalive-metrics.sqlite' 2>&1 | tail -n 1"
   [ "$status" -eq 0 ]
   local j="$output"
   # Slow stream: comment frames while the upstream is silent, real events after.
   [ "$(printf '%s' "$j" | jq -r '.slow.pings > 0')" = "true" ]
   [ "$(printf '%s' "$j" | jq -r '.slow.events | join(",")')" = "message_start,message_stop" ]
+  [ "$(printf '%s' "$j" | jq -r '.slow.trace | length > 0')" = "true" ]
   # Fast stream: inside the grace window, so nothing is injected at all.
   [ "$(printf '%s' "$j" | jq -r '.fast.pings')" = "0" ]
   # Non-streaming request: never eligible — real 400 and the JSON body verbatim.
@@ -496,6 +608,54 @@ JS
   # A non-2xx that arrives AFTER the early commit can only be an SSE error event.
   [ "$(printf '%s' "$j" | jq -r '.lateErr.status')" = "200" ]
   [ "$(printf '%s' "$j" | jq -r '.lateErr.events | join(",")')" = "error" ]
+  [ "$(printf '%s' "$j" | jq -r '.metrics | length')" = "4" ]
+}
+
+@test "shim metrics join one-to-many token events and compute throughput" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run env METRICS="$TMP/metrics.sqlite" TOKENS="$TMP/tokens.sqlite" bun -e "
+    process.env.COPILOT_SHIM_METRICS_DB=process.env.METRICS;
+    process.env.COPILOT_API_SQLITE_DB_PATH=process.env.TOKENS;
+    const {Database}=await import('bun:sqlite');
+    const m=await import('$shim');
+    const tdb=new Database(process.env.TOKENS,{create:true});
+    tdb.exec('CREATE TABLE token_usage_events(trace_id TEXT,model TEXT,input_tokens INTEGER,output_tokens INTEGER,total_tokens INTEGER,total_nano_aiu INTEGER)');
+    tdb.query('INSERT INTO token_usage_events VALUES (?,?,?,?,?,?)').run('trace-1','model-a',10,40,50,1000000000);
+    tdb.query('INSERT INTO token_usage_events VALUES (?,?,?,?,?,?)').run('trace-1','model-a',5,60,65,2000000000);
+    tdb.close();
+    const db=m.openMetricsDb(process.env.METRICS); let times=[0,5,25,35,1035];
+    db.query(\"INSERT INTO request_metrics(trace_id,created_at_ms,endpoint,scope) VALUES (?,?,?,?)\").run('old-trace',Date.now()-91*86400*1000,'/old','normal');
+    m.pruneMetrics(db);
+    const tracker=m.createMetricTracker({traceId:'trace-1',endpoint:'/v1/responses',model:'model-a',scope:'normal',streaming:true},db,()=>times.shift());
+    tracker.acquired(); tracker.headers(); tracker.firstByte(); tracker.attempt(); tracker.finalize(200); db.close();
+    console.log(JSON.stringify(m.queryStats({period:'day',scope:'normal',model:'model-a'})));
+  "
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.requests')" = "1" ]
+  [ "$(printf '%s' "$output" | jq -r '.output_tokens')" = "100" ]
+  [ "$(printf '%s' "$output" | jq -r '.total_aiu')" = "3" ]
+  [ "$(printf '%s' "$output" | jq -r '.timing.output_tps.p50')" = "100" ]
+}
+
+@test "metrics CLI validates benchmark safety limits without network traffic" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run env COPILOT_SHIM_METRICS_DB="$TMP/metrics.sqlite" bun "$shim" bench --model model-a --runs 11 --json
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--runs must be 1..10"* ]]
+}
+
+@test "copilot-proxy stats and events work offline in JSON and human modes" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bash -c "export COPILOT_SHIM_METRICS_DB='$TMP/offline.sqlite'; source '$SHELL_LIB';
+    _copilot_shim_script() { printf '%s' '$shim'; }
+    copilot-proxy stats day --json; copilot-proxy events day"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | head -n1 | jq -r '.requests')" = "0" ]
+  [[ "$output" == *"no matching requests"* ]]
 }
 
 @test "copilot-here on reports the shim URL it actually writes" {

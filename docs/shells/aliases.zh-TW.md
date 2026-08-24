@@ -658,7 +658,7 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `copilot-proxy [start\|stop\|restart\|status\|doctor [--live]\|logs [N]\|whoami\|auth]` | function | `dot_config/shell/43_copilot_proxy.sh` | 管理釘選 proxy。`doctor` 區分 stale catalog、geo/policy filter 與網路故障，驗證 main + Claude roles，並獨立檢查遠端 ChatGPT `codex_apps` 路由。`--live` 的 inference probe 花一個 quota unit；Apps GET 不會。 |
+| `copilot-proxy [start\|stop\|status\|stats\|events\|quota\|bench\|update\|doctor\|…]` | function | `dot_config/shell/43_copilot_proxy.sh` | 管理並量測釘選 proxy。預設 `:4142` shim 把不含內容的 timing 寫入獨立 90 天 SQLite DB，以 trace id join fork token event；`stats/events --json` 可離線使用。`bench` 有安全上限但消耗真實 quota。exact-version update 驗證 SHA-512、staging、smoke-test 並可 rollback。completion：`61_copilot_proxy_completion.{zsh,bash}`。 |
 | `claude-copilot [--no-specstory] [args...]` | function | `dot_config/shell/43_copilot_proxy.sh` | 一次性走 proxy 的 Claude Code session，**零檔案寫入**：自動啟動 proxy，per-process 注入完整 role-aware `ANTHROPIC_*` env。既有 `copilot-here` local pin 會蓋過這層。specstory passthrough 會保留設定的 `claude_cmd`；下次直接跑 `claude` 即還原。 |
 | `codex-copilot [--no-specstory] [args...]` / `codex-copilot-once` | function | `dot_config/shell/43_copilot_proxy.sh` | 零持久化的 Codex launcher，走本機 Responses gateway。自動啟動 proxy/shim；明確 `-m` 優先，否則即時排序 OpenAI/Codex → Claude → Gemini。預設整合 SpecStory 並保留 project/user `codex_cmd`；兩個名稱都不改 Codex config。 |
 | `copilot-run <cmd...>` | function | `dot_config/shell/43_copilot_proxy.sh` | 泛用積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令（例如 `copilot-run specstory run claude`、`copilot-run claude --resume`） |

@@ -19,8 +19,8 @@ fork（npm `@jeffreycao/copilot-api`）。
   `bunx`：bunx 每次啟動都會重新解析套件，而 bun 透過 socks `ALL_PROXY` 解析相依會永遠卡住
   —— 詳見[陷阱](#start-used-to-hang-at-resolving-dependencies-behind-a-socks-proxy)。
   熱啟動 (warm start) 在綁定 port 之前完全不碰網路。
-- **不由 ansible 安裝** —— 在第一次 `copilot-proxy start` 時安裝，因此不進佈建
-  (provisioning) 流程。要強制重裝：`copilot-proxy reinstall`（改版號會自動重裝）。
+- **不由 ansible 安裝** —— 第一次 `copilot-proxy start` 才安裝。`update --check`
+  只檢查；只有明確指定 `copilot-proxy update VERSION` 才會改變釘選版本。
 
 !!! warning "這違反 GitHub Copilot 的服務條款 (Terms of Service)"
     用 Copilot 訂閱去驅動非 GitHub 的 agent 是不被允許的，且 copilot-api 是逆向工程/非官方
@@ -49,19 +49,19 @@ copilot-here off        # 取消釘選 —— 回到真正的 Anthropic 後端
 ## 運作原理
 
 ```
-Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
+Claude Code ──Anthropic /v1/messages──▶ throttle/metrics shim (:4142) ─▶ copilot-api (:4141)
                                           │ Claude：native Messages path
                                           │ GPT：Anthropic → Responses 轉譯
                                           ▼
                                    api.githubcopilot.com  （你的 Copilot 訂閱）
 
-Codex ──OpenAI /v1/responses──────────▶ 同一個 localhost gateway
+Codex ──OpenAI /v1/responses──────────▶ 同一個 :4142 managed gateway
         （provider/model 只透過本次啟動的 `-c` / `-m` 覆寫）
 ```
 
 - Claude Code 只講 **Anthropic Messages API**（`/v1/messages`）。
 - fork 對 Claude id 使用 Copilot native Anthropic path；對 GPT id 把 Claude Code
-  request 轉成 **Responses API**。`2.1.0` 會把 `output_config.effort` 正確轉成
+  request 轉成 **Responses API**。目前釘選的 `2.3.0` 會把 `output_config.effort` 正確轉成
   `reasoning.effort`，並支援 GPT-5.6 request shape 與 reasoning state。
 - Claude Code 透過 `ANTHROPIC_BASE_URL` 被指向代理 —— 注入方式有兩種：
   per-process 環境變數（`claude-copilot`），或 gitignore 掉的
@@ -96,7 +96,7 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|restart|status|doctor [--live]|logs [N]|whoami|auth]`
+### `copilot-proxy [start|stop|status|stats|events|quota|bench|update|...]`
 
 在 `$COPILOT_PROXY_PORT`（預設 `4141`）管理背景代理。
 
@@ -104,7 +104,7 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | 代理監聽的 port |
 | `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto`（本機 Clash/Verge/mihomo 有在聽就帶 `--proxy-env`）、`never`（直連）、`always`（一定要偵測到 proxy）、或明確 URL |
-| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@2.1.0` | 要安裝的套件規格（釘選/升級）。`2.1.0` 才會把 Claude Code effort 傳到 GPT-5.6。 |
+| `COPILOT_API_PKG` | 未設定 | 最高優先的暫時套件覆寫；否則使用已保存的 exact selection，再 fallback 到內建 `@jeffreycao/copilot-api@2.3.0`。設著時 `update VERSION` 不會改 persisted state。 |
 | `COPILOT_PROXY_RATE` | `15` | 僅舊版 `copilot-api@0.7.0` 使用；fork 沒有 rate limiter |
 | `COPILOT_PROXY_QUIET` | `0` | `1` 減少背景模型呼叫，但會犧牲部分 UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = 安裝時把 proxy 環境變數拿掉，跳過「bun 無法透過 proxy 解析」那 45 秒的卡頓 |
@@ -119,9 +119,46 @@ proxy 的重試；兩種嘗試都有 timeout 並會被殺掉，所以卡死的�
 快取鎖而拖垮下一次。`start` 逾時的時候現在也會**把自己啟動的 server 殺掉**，不會像以前
 那樣每重試一次就留下一個孤兒程序。
 
-`copilot-proxy whoami` 是真正的登入檢查：它拿儲存的 token 對 GitHub 交換，並印出你的
-帳號 / plan / quota（token 缺失或過期時會明確報錯）。用它取代直接看 token 檔案 —— token
-是明文憑證 (plaintext credential)，不應在編輯器裡打開。
+`copilot-proxy quota [--json]`（`whoami` 仍是 alias）讀取即時 plan / quota；fork 上使用
+與 `/usage-viewer` 相同的 `/usage` payload，代理未執行時不會假裝有離線 quota。
+
+### 正常流量統計與安全 benchmark
+
+managed Claude/Codex launcher 預設全部經過 shim。shim 啟用但啟動失敗時會 fail closed，
+不會靜默 fallback 到 `:4141`；`copilot-proxy shim off` 是明確的 break-glass 直連模式。
+
+```sh
+copilot-proxy stats week --model gpt-5.6-sol
+copilot-proxy events day --limit 20 --json
+copilot-proxy quota --json
+copilot-proxy bench --model gpt-5.6-sol --runs 3 --max-output 256
+```
+
+`stats` 預設只算一般使用；benchmark 要用 `--scope benchmark`，兩者合併則用 `all`。
+輸出包含 request/error/retry、queue、upstream headers、first byte、stream、end-to-end 的
+p50/p90/max，以及 token、AIU、output token/s。只有完成的 stream 且能對到 token event
+時才計算吞吐量，否則為 `null`。
+
+shim 不儲存 prompt 或 response body，只把 timing 寫到
+`$XDG_STATE_HOME/copilot-proxy/metrics.sqlite`（WAL、保留 90 天）。fork 的 dashboard 則讀
+`$XDG_DATA_HOME/copilot-api/copilot-api.sqlite` 的 `token_usage_events`；它不保存 quota
+歷史，`/usage` 是即時 GitHub 資料。CLI 以 `x-trace-id` join 兩個 DB，並先彙總同一
+request/model 的多筆 token event。`stats`、`events` 在代理與 shim 都停機時仍可離線讀取。
+
+`bench` 會送真實 streaming Responses request，確實消耗 quota；限制為 1–10 runs、
+32–2048 max output tokens、concurrency 1–4，並獨立標記，不污染正常使用統計。
+
+### 套件供應與明確更新
+
+warm start 只執行已安裝 binary，不接觸 npm，因此 registry 下架只影響新機、重裝或更新。
+成熟 npm 套件一般下架門檻較高，但 maintainer、政策與 Copilot protocol 改變的風險仍存在；
+它畢竟是非官方且 maintainer surface 小的套件。
+
+`update --check` 優先查 canonical npm，失敗才帶警告使用 configured registry，且絕不安裝。
+`update VERSION` 只接受 exact semver，驗證 npm tarball SHA-512 integrity，在 staging prefix
+安裝並 smoke-test 後 atomic swap，保留 `pkg.previous`。若原本正在跑，而新版 swap 後健康
+啟動失敗，會還原舊 prefix 與 selection 並重啟。selection JSON 位於
+`$XDG_STATE_HOME/copilot-proxy/package.json`。
 
 ### `copilot-proxy doctor [--live]`（別名：`test`）
 
@@ -226,13 +263,14 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 `copilot_api` Responses provider 傳給 Codex；不會編輯 `~/.codex/config.toml`
 或 `.codex/config.toml`，所以 plain `codex` 仍走原本 provider。
 
-Codex 一律走 `localhost:4142` shim，即使持久化的 throttling 開關是 off。
-這一層除了限流，也會正規化 Codex `mcp_list_tools` Responses item 裡的空白
+Codex 預設走 `localhost:4142` shim。這一層除了限流與 measurement，也會正規化
+Codex `mcp_list_tools` Responses item 裡的空白
 description。MCP server 與原生 Codex path 可以省略描述，但 GitHub Copilot 會以
 `Invalid 'input[0].tools[0].description': empty string` 拒絕請求。shim 只補這些
 tool definition 欄位，不改 prompt、schema 或 tool name。
 目前 Codex 會以 zstd 壓縮這些請求；shim 只解壓需要修補的 Responses body，改以
 普通 JSON 轉送，並移除已不適用的 `content-encoding` header。
+明確執行 `copilot-proxy shim off` 也會略過這個相容性修補與 metrics，因此只適合診斷逃生。
 
 這是與 Claude Code `copilot-model --auto` 分開的 picker：後者保持
 Claude-first，只有這個 Codex launcher 是 OpenAI-first。
@@ -378,7 +416,7 @@ copilot-here on             # 黏著本專案，或改用 claude-copilot-once
 |---|---|---|
 | CLI、tools、hooks、skills、memory、plugins、MCP、checkpoints、sandboxing | 可以 | 這些是本機 Claude Code 功能；GPT 收到的是經過轉譯的 Claude prompt/tool schema，行為可能不完全一樣。 |
 | subagents、dynamic workflows | 可以 | 不強制 `CLAUDE_CODE_SUBAGENT_MODEL`，保留 workflow/frontmatter 的 routing。[Workflow 文件](https://code.claude.com/docs/en/workflows) |
-| `ultracode` | `2.1.0` 可以 | Ultracode 是 xhigh effort + dynamic workflows，不是單獨模型；2.1.0 會把 effort 傳到 GPT-5.6。 |
+| `ultracode` | `2.3.0` 可以 | Ultracode 是 xhigh effort + dynamic workflows，不是單獨模型；2.3.0 會把 effort 傳到 GPT-5.6。 |
 | thinking/reasoning | 轉譯後可用 | GPT 使用 Responses reasoning，不是 Anthropic-native thinking semantics。 |
 | Web Search、fast/auto mode、MCP tool search | 依 provider | 由 base-URL gateway 與 Copilot endpoint 能力決定；non-first-party tool search 可能需要額外 bridge/plugin。 |
 | Ultrareview、Remote Control、Chrome、cloud Code Review、routines、web/mobile/Slack session | 不可以 | 這些需要 Claude.ai auth/cloud identity；local API gateway 無法取代。`ultrareview` 和 `ultracode` 無關。 |
@@ -500,7 +538,7 @@ Claude Code 的背景雜訊 —— 那正是 `COPILOT_PROXY_QUIET=1` 注入的�
 ### Context management 是轉譯，不是 Anthropic-native
 
 舊 fork 可能把 Claude Code 的 `context_management` 原樣送到會回 400 的 endpoint
-（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)）。`2.1.0` 的
+（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)）。目前釘選的 `2.3.0` 的
 GPT-5.6 path 會壓掉這個不相容欄位，改依 Responses reasoning/context handling。這避開 400，
 但不會完整重現 Anthropic 的 context editing 與 prompt-cache semantics；長 session 仍需觀察。
 
