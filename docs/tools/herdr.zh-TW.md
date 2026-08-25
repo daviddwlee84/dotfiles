@@ -137,7 +137,7 @@ description = "new tab at the workspace (space) root dir"
 | 無縫 `Ctrl-hjkl` nvim↔pane 導覽 | **沒有 herdr-aware smart-splits** | **缺口**——見下方 workaround |
 | OSC133 copy-mode（`cpout`/`cpblock`） | tmux 專屬 | **缺口**——`cpcmd`（zsh history）仍可用 |
 | 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --token`（逐 pane metadata token、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
-| AI session-summary / agent-wakeup 擷取 | 可改用 `herdr pane read` / `pane list --json` 重寫 | **延後**——超出試用範圍 |
+| AI session-summary / agent-wakeup 擷取 | `agent-wakeup` 使用原生 `agent list/get/read` 與穩定的 agent-session ID | **已完成**——tmux/Herdr 雙 backend 狀態、排程、預覽與安全送出 |
 
 ## 快捷鍵 (Keybindings)
 
@@ -170,6 +170,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `` prefix + u `` | **URL 選單** — 從 pane fzf 挑一個 URL 並開啟（`x open`）；tmux-fzf-url 對應物。`--source recent` = 完整 scrollback | command pane |
 | `prefix + T` | `tv herdr-sesh`（workspace/dir 切換） | command pane |
 | `prefix + a` | `tv herdr-agent-panes`（即時 agent panes） | command pane |
+| `prefix + Alt + A` | `tv agent-wakeup`（tmux/Herdr 雙 backend quota 等待與排程 continue） | command pane |
 | `prefix + f` | `tv fleet-hosts`（SSH picker） | command pane |
 | `prefix + Alt + F` | 輸入 pane-content pattern → `herdr-grep --pick --visible` → fzf 精確跳轉；Alt+S = scrollback、Alt+V = visible | command pane |
 | `prefix + m` | 切換目前 pane 的**待 review** 旗標（⭐） | command pane |

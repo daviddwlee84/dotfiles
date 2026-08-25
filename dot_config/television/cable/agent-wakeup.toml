@@ -14,7 +14,7 @@
 [metadata]
 name = "agent-wakeup"
 description = "Agent quota wakeup dashboard: quota waits, reset timers, scheduled continue tasks"
-requirements = ["tmux", "python3", "pueue"]
+requirements = ["python3", "pueue"]
 
 [source]
 command = "~/.config/television/agent-wakeup.py status --tsv"
@@ -24,7 +24,7 @@ watch = 5.0
 no_sort = true
 
 [preview]
-command = "~/.config/television/agent-wakeup.py preview --pane '{split:\t:3}' || true"
+command = "~/.config/television/agent-wakeup.py preview --pane '{split:\t:3}' --backend '{split:\t:13}' --herdr-session '{split:\t:14}' || true"
 header = "{split:\t:0}  {split:\t:1}  {split:\t:2}"
 
 [ui]
@@ -41,22 +41,9 @@ alt-n = ["actions:send_now", "reload_source"]
 alt-x = ["actions:cancel", "reload_source"]
 
 [actions.switch_pane]
-description = "Switch tmux focus to that pane"
+description = "Focus the selected tmux/Herdr pane"
 command = '''
-target='{split:\t:2}'
-[ -z "$target" ] && exit 0
-case "$target" in
-  %*) tmux select-pane -t "$target" 2>/dev/null || tmux display-message "agent-wakeup: pane $target no longer exists" ;;
-  *)
-    session="${target%%:*}"
-    winpane="${target#*:}"
-    window="${winpane%.*}"
-    tmux switch-client -t "$session" 2>/dev/null \
-      && tmux select-window -t "$session:$window" 2>/dev/null \
-      && tmux select-pane -t "$target" 2>/dev/null \
-      || tmux display-message "agent-wakeup: pane $target no longer exists"
-    ;;
-esac
+~/.config/television/agent-wakeup.py focus --pane '{split:\t:3}' --backend '{split:\t:13}' --herdr-session '{split:\t:14}' --agent-session-id '{split:\t:15}'
 '''
 mode = "fork"
 
@@ -70,7 +57,7 @@ if [ -z "$pane" ] || [ -z "$epoch" ]; then
   echo "[Press Enter]"; read -r _
   exit 0
 fi
-~/.config/television/agent-wakeup.py schedule --pane "$pane" --at-epoch "$epoch" --buffer-minutes 2 --auto
+~/.config/television/agent-wakeup.py schedule --pane "$pane" --backend '{split:\t:13}' --herdr-session '{split:\t:14}' --agent-session-id '{split:\t:15}' --at-epoch "$epoch" --buffer-minutes 2 --auto
 echo "[Press Enter]"; read -r _
 '''
 mode = "execute"
@@ -83,7 +70,7 @@ pane='{split:\t:3}'
 printf 'Time/delay (examples: 01:52am, 2026-06-19 01:52:00, 70m, 5h): '
 read -r when
 [ -z "$when" ] && exit 0
-~/.config/television/agent-wakeup.py schedule --pane "$pane" --when "$when" --no-expect-quota --auto
+~/.config/television/agent-wakeup.py schedule --pane "$pane" --backend '{split:\t:13}' --herdr-session '{split:\t:14}' --agent-session-id '{split:\t:15}' --when "$when" --no-expect-quota --auto
 echo "[Press Enter]"; read -r _
 '''
 mode = "execute"
@@ -93,7 +80,7 @@ description = "Smart send now"
 command = '''
 pane='{split:\t:3}'
 [ -z "$pane" ] && exit 0
-~/.config/television/agent-wakeup.py send-now --pane "$pane" --auto
+~/.config/television/agent-wakeup.py send-now --pane "$pane" --backend '{split:\t:13}' --herdr-session '{split:\t:14}' --agent-session-id '{split:\t:15}' --auto
 echo "[Press Enter]"; read -r _
 '''
 mode = "execute"
@@ -103,7 +90,7 @@ description = "Cancel queued wakeup tasks for selected pane"
 command = '''
 pane='{split:\t:3}'
 [ -z "$pane" ] && exit 0
-~/.config/television/agent-wakeup.py cancel --pane "$pane"
+~/.config/television/agent-wakeup.py cancel --pane "$pane" --backend '{split:\t:13}' --herdr-session '{split:\t:14}' --agent-session-id '{split:\t:15}'
 echo "[Press Enter]"; read -r _
 '''
 mode = "execute"

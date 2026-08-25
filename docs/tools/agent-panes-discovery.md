@@ -66,12 +66,13 @@ others.
 
 ## `tv agent-wakeup` (quota waits + scheduled continue)
 
-Open with `prefix + M-a`, via the popup menu
+Open with tmux `prefix + M-a`, Herdr `prefix + Alt+A`, via the popup menu
 (`prefix + Space → → Agents → Quota wakeup (tv)`), or from a shell with
 `tv agent-wakeup`.
 
-The channel reuses the live pane resolver from `tv agent-panes`, captures the
-last part of each pane scrollback, and conservatively marks panes as quota
+The channel aggregates tmux and all running Herdr sessions from an ordinary
+shell. Inside a multiplexer, `auto` stays ambient (Herdr inside Herdr, tmux
+inside tmux). It captures the last part of each pane and conservatively marks panes as quota
 waiting only when it sees explicit limit wording such as `session limit`,
 `rate limit`, `limit reached`, or `quota`. It parses reset phrases like
 `resets 1:50am`, `resets in 70m`, or `resets in 5h 20m`, then shows any
@@ -87,26 +88,35 @@ recommended action is `enter`, not `continue`.
 
 | Key | Action |
 |---|---|
-| `Enter` | Switch tmux focus to that pane |
+| `Enter` | Focus that tmux or ambient-Herdr pane |
 | `Alt+C` | Schedule a smart wakeup at the detected reset time + 2 minutes |
 | `Alt+T` | Prompt for a custom time/delay (`01:52am`, `70m`, `5h`, etc.) |
 | `Alt+N` | Smart send now: `Enter` for `WAIT_MENU`, otherwise `continue` + Enter |
 | `Alt+X` | Cancel queued wakeup tasks for that pane |
-| `Ctrl+F` | Cycle preview; the default preview is live `tmux capture-pane` output |
+| `Ctrl+F` | Cycle preview; live `tmux capture-pane` or `herdr agent read --source visible` output |
 
 The shell equivalent is:
 
 ```bash
 agent-wakeup status
+agent-wakeup status --backend all
+agent-wakeup status --backend herdr --herdr-session default
 agent-continue-at --pane %12 --at 01:52am
+agent-continue-at --backend herdr --current --delay 70m
 agent-wakeup send-now --pane %44 --auto        # Enter for /rate-limit-options, continue otherwise
 agent-wakeup send-now --pane %44 --enter-only  # force selecting Stop-and-wait menu item
 agent-continue-at --current --delay 70m
 agent-wakeup cancel --pane %12
 ```
 
-Scheduled wakeups are pueue tasks in group `agent-wakeup` with labels
-`agent-wakeup:%pane_id`. The scheduled task re-captures the pane right before
+Scheduled wakeups are pueue tasks in group `agent-wakeup`. Tmux labels remain
+`agent-wakeup:%pane_id`; Herdr labels are
+`agent-wakeup:herdr:<session>:<agent-session-id>`. A Herdr task re-resolves the
+stable agent session ID when it fires, so pane moves are followed. It fails
+closed if the identity disappeared or the quota marker is gone. Sending uses
+literal `pane send-text` plus explicit keys rather than `agent prompt`, because
+Herdr intentionally rejects prompts while an agent is already `blocked`.
+The scheduled task re-captures the pane right before
 sending. If the quota marker has disappeared, it aborts instead of blindly
 typing into a session that may already be doing unrelated work. With `--auto`,
 the send step re-captures the pane and chooses `Enter` for a rate-limit menu

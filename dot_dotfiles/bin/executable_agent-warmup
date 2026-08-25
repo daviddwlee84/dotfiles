@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["tyro>=0.9"]
 # ///
 """agent-warmup — start the Claude Pro/Max 5-hour subscription window on a schedule.
 
@@ -10,11 +10,11 @@ Why interactive (and not ``claude -p``):
   usage advances the rolling 5-hour subscription window. Headless ``claude -p``
   (and the Agent SDK) draw from a separate metered credit pool and do NOT move
   the window. So to "warm up" the window we must drive a real interactive
-  ``claude`` TUI: this tool launches one in a detached tmux session (dedicated
-  socket, isolated cwd, subscription auth), sends a tiny prompt + Enter, then
-  tears the session down. See pitfalls/headless-claude-p-does-not-move-5h-window.md.
+  ``claude`` TUI: this tool launches one in an isolated Herdr workspace
+  (preferred) or a detached tmux session, sends a tiny prompt + Enter, then
+  tears it down. See pitfalls/headless-claude-p-does-not-move-5h-window.md.
 
-  Whether a *tmux-driven* interactive session still counts as interactive to
+  Whether a multiplexer-driven interactive session still counts as interactive to
   Anthropic is unverified — run ``agent-warmup verify`` near a reset boundary and
   eyeball the captured /usage panel before trusting the recurring install.
 
@@ -33,7 +33,9 @@ Run flags (shared by run / at / install):
   --prompt P    Warmup prompt (default: a one-line "reply hi").
   --timeout S   Seconds to wait for a reply before giving up (default 120).
   --verify      After the reply, send /usage and capture the panel into the log.
-  --keep        Do not kill the tmux session afterwards (for inspection).
+  --keep        Do not close the created workspace/session (for inspection).
+  --backend B   auto (prefer Herdr), herdr, or tmux.
+  --herdr-session NAME  Select a running named Herdr session.
 
 Env:
   AICAP_CLAUDE_MODEL    default model (mirrors dot_config/shell/04_ai_agents.sh)
@@ -42,18 +44,21 @@ Cache / logs: $XDG_CACHE_HOME/agent-warmup/ (run-*.log, launchd/systemd output).
 """
 from __future__ import annotations
 
-import argparse
+import base64
 import getpass
 import json
 import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 GROUP = "agent-warmup"
 LABEL_PREFIX = "agent-warmup:"
@@ -63,6 +68,84 @@ DEFAULT_PROMPT = "Reply with just: hi"
 DEFAULT_TIMEOUT = 120
 READY_TIMEOUT = 45
 STABLE_SECS = 4.0
+BOOTSTRAP_SENTINEL_TIMEOUT = 30
+SCHEDULE_SCHEMA = 1
+Backend = Literal["auto", "tmux", "herdr"]
+
+
+@dataclass
+class Run:
+    """Spawn interactive Claude and send the warmup prompt."""
+
+    model: str | None = None
+    prompt: str | None = None
+    timeout: int = DEFAULT_TIMEOUT
+    verify: bool = False
+    keep: bool = False
+    backend: Backend = "auto"
+    herdr_session: str | None = None
+
+
+@dataclass
+class At:
+    """Queue a one-shot run via pueue."""
+
+    at: str | None = None
+    delay: str | None = None
+    dry_run: bool = False
+    model: str | None = None
+    prompt: str | None = None
+    timeout: int = DEFAULT_TIMEOUT
+    verify: bool = False
+    backend: Backend = "auto"
+    herdr_session: str | None = None
+
+
+@dataclass
+class Install:
+    """Install a recurring launchd/systemd timer."""
+
+    daily: str = "weekdays"
+    time: str = "06:00"
+    model: str | None = None
+    prompt: str | None = None
+    timeout: int = DEFAULT_TIMEOUT
+    verify: bool = False
+    backend: Backend = "auto"
+    herdr_session: str | None = None
+
+
+@dataclass
+class Uninstall:
+    """Remove the recurring timer."""
+
+
+@dataclass
+class Status:
+    """Show timer, pending one-shots, and recent runs."""
+
+    json: bool = False
+
+
+@dataclass
+class Cancel:
+    """Remove pending pueue one-shots."""
+
+
+@dataclass
+class Verify:
+    """Run with --verify --keep for empirical inspection."""
+
+    model: str | None = None
+    prompt: str | None = None
+    timeout: int = DEFAULT_TIMEOUT
+    backend: Backend = "auto"
+    herdr_session: str | None = None
+
+
+Command = (
+    Run | At | Install | Uninstall | Status | Cancel | Verify
+)
 
 # Mirror scripts/fleet/exec.py:_PATH_PRELUDE so tmux/claude/pueue/launchctl are
 # found in the minimal env launchd/systemd hand us (deliberately puts package
@@ -205,7 +288,211 @@ def _wait_response(session: str, deadline: float) -> str:
     return last
 
 
-def cmd_run(args: argparse.Namespace) -> int:
+def _json_result(cp: subprocess.CompletedProcess[str]) -> dict[str, object]:
+    if cp.returncode != 0:
+        return {}
+    try:
+        data = json.loads(cp.stdout)
+    except json.JSONDecodeError:
+        return {}
+    if isinstance(data, dict) and isinstance(data.get("result"), dict):
+        return data["result"]
+    return data if isinstance(data, dict) else {}
+
+
+def _agent_info(cp: subprocess.CompletedProcess[str]) -> dict[str, object]:
+    result = _json_result(cp)
+    agent = result.get("agent")
+    return agent if isinstance(agent, dict) else result
+
+
+def _herdr(session: str, *args: str, timeout: float = 15) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["HERDR_SESSION"] = session
+    try:
+        return subprocess.run(
+            ["herdr", *args], text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env=env, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return subprocess.CompletedProcess(
+            ["herdr", *args], 124, exc.stdout or "",
+            (exc.stderr or "") + "\n[agent-warmup: herdr timed out]",
+        )
+
+
+def _running_herdr_sessions() -> list[dict[str, object]]:
+    if not shutil.which("herdr"):
+        return []
+    result = _json_result(run(["herdr", "session", "list", "--json"], timeout=10))
+    sessions = result.get("sessions", [])
+    return [s for s in sessions if isinstance(s, dict) and s.get("running")]
+
+
+def _resolve_herdr_session(explicit: str | None) -> str:
+    sessions = _running_herdr_sessions()
+    if explicit:
+        if any(s.get("name") == explicit for s in sessions):
+            return explicit
+        raise RuntimeError(f"Herdr session {explicit!r} is not running")
+    ambient = os.environ.get("HERDR_SESSION")
+    if ambient and any(s.get("name") == ambient for s in sessions):
+        return ambient
+    ambient_socket = os.environ.get("HERDR_SOCKET_PATH")
+    socket_matches = [str(s.get("name")) for s in sessions if s.get("socket_path") == ambient_socket]
+    if len(socket_matches) == 1:
+        return socket_matches[0]
+    defaults = [str(s.get("name")) for s in sessions if s.get("default")]
+    if len(defaults) == 1:
+        return defaults[0]
+    if len(sessions) == 1:
+        return str(sessions[0].get("name"))
+    if not sessions:
+        raise RuntimeError("no running Herdr session")
+    names = ", ".join(str(s.get("name")) for s in sessions)
+    raise RuntimeError(f"multiple Herdr sessions are running ({names}); pass --herdr-session")
+
+
+def _resolve_backend(args: Run | At | Install | Verify) -> tuple[str, str | None]:
+    if args.backend == "herdr":
+        return "herdr", _resolve_herdr_session(args.herdr_session)
+    if args.backend == "tmux":
+        return "tmux", None
+    try:
+        return "herdr", _resolve_herdr_session(args.herdr_session)
+    except RuntimeError as exc:
+        if str(exc) == "no running Herdr session":
+            return "tmux", None
+        raise
+
+
+def _herdr_capture(session: str, pane: str, lines: int = 200) -> str:
+    cp = _herdr(session, "agent", "read", pane, "--source", "visible", "--lines", str(lines))
+    result = _json_result(cp)
+    for key in ("text", "output", "content"):
+        if isinstance(result.get(key), str):
+            return str(result[key])
+    return cp.stdout if cp.returncode == 0 else ""
+
+
+def _find_created_ids(data: dict[str, object]) -> tuple[str, str]:
+    workspace = str(data.get("workspace_id") or data.get("id") or "")
+    pane = str(data.get("pane_id") or "")
+    root = data.get("root_pane")
+    workspace_rec = data.get("workspace")
+    if isinstance(root, dict):
+        workspace = workspace or str(root.get("workspace_id") or "")
+        pane = pane or str(root.get("pane_id") or "")
+    if isinstance(workspace_rec, dict):
+        workspace = workspace or str(workspace_rec.get("workspace_id") or "")
+    return workspace, pane
+
+
+def _wait_herdr_ready(session: str, pane: str, deadline: float) -> tuple[bool, str]:
+    trusted = False
+    while time.time() < deadline:
+        text = _herdr_capture(session, pane).lower()
+        if not trusted and any(marker in text for marker in _TRUST_MARKERS):
+            _herdr(session, "pane", "send-keys", pane, "enter")
+            trusted = True
+            time.sleep(1)
+            continue
+        if any(marker in text for marker in _AUTH_MARKERS):
+            return False, _herdr_capture(session, pane)
+        agent = _agent_info(_herdr(session, "agent", "get", pane))
+        status = str(agent.get("agent_status") or agent.get("status") or "")
+        if status in {"idle", "done"} and any(marker in text for marker in _READY_MARKERS):
+            return True, _herdr_capture(session, pane)
+        time.sleep(1)
+    return False, _herdr_capture(session, pane)
+
+
+def _wait_herdr_response(session: str, pane: str, timeout: int) -> str:
+    _herdr(
+        session, "agent", "wait", pane, "--until", "idle", "--until", "done",
+        "--until", "blocked", "--timeout", str(timeout * 1000), timeout=timeout + 5,
+    )
+    return _herdr_capture(session, pane)
+
+
+def _run_herdr(args: Run, session: str) -> int:
+    if not shutil.which("claude"):
+        notify("agent-warmup", "claude CLI not found on PATH; cannot warm up")
+        return 127
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    label = f"warmup-{ts}"
+    log = cache_dir() / f"run-{ts}.log"
+    cwd = isolated_cwd()
+    model = args.model or os.environ.get("AICAP_CLAUDE_MODEL") or "haiku"
+    prompt = args.prompt or DEFAULT_PROMPT
+    workspace = pane = ""
+    started = datetime.now().astimezone()
+
+    def write_log(status: str, capture: str, usage: str = "") -> None:
+        with log.open("w") as fh:
+            fh.write(f"# agent-warmup run {started.isoformat()}\nstatus: {status}\n")
+            fh.write(f"runtime: {os.environ.get('AGENT_WARMUP_RUNTIME', 'interactive')}\n")
+            fh.write(f"backend: herdr\nherdr_session: {session}\nworkspace: {workspace}\npane: {pane}\n")
+            fh.write(f"model: {model}\nprompt: {prompt}\ncwd: {cwd}\n")
+            if usage:
+                fh.write(f"\n## /usage panel\n{usage}\n")
+            fh.write(f"\n## final pane capture\n{capture}\n")
+
+    try:
+        cp = _herdr(session, "workspace", "create", "--cwd", str(cwd), "--label", label, "--no-focus", timeout=30)
+        workspace, pane = _find_created_ids(_json_result(cp))
+        if cp.returncode != 0 or not workspace or not pane:
+            write_log("error: Herdr workspace create failed", cp.stderr or cp.stdout)
+            return 1
+
+        shell_deadline = time.time() + 15
+        while time.time() < shell_deadline:
+            info = _json_result(_herdr(session, "pane", "process-info", "--pane", pane))
+            process_info = info.get("process_info")
+            processes = process_info.get("foreground_processes", []) if isinstance(process_info, dict) else []
+            foreground = ""
+            if processes and isinstance(processes[0], dict):
+                foreground = str(processes[0].get("name") or processes[0].get("argv0") or "")
+            if re.search(r"(?:^|/)(?:ba|z|fi)?sh$", foreground):
+                break
+            time.sleep(0.5)
+        else:
+            write_log("error: Herdr pane shell not ready", _herdr_capture(session, pane))
+            return 2
+
+        command = f"exec env -u ANTHROPIC_API_KEY claude --model {shlex.quote(model)}"
+        cp = _herdr(session, "pane", "run", pane, command, timeout=30)
+        if cp.returncode != 0:
+            write_log("error: Herdr pane run failed", cp.stderr or cp.stdout)
+            return 1
+        ready, capture = _wait_herdr_ready(session, pane, time.time() + READY_TIMEOUT)
+        if not ready:
+            write_log("error: claude not ready / auth required", capture)
+            return 2
+
+        cp = _herdr(session, "agent", "prompt", pane, prompt)
+        if cp.returncode != 0:
+            write_log("error: Herdr agent prompt failed", cp.stderr or cp.stdout)
+            return 2
+        capture = _wait_herdr_response(session, pane, args.timeout)
+        usage = ""
+        if args.verify:
+            cp = _herdr(session, "agent", "prompt", pane, "/usage")
+            if cp.returncode == 0:
+                usage = _wait_herdr_response(session, pane, 30)
+        status = "ok" if capture.strip() else "warning: blank pane (claude did not render)"
+        write_log(status, capture, usage)
+        if args.keep:
+            print(f"agent-warmup: warmup sent; kept Herdr {session}:{workspace}:{pane}; log {log}")
+        else:
+            print(f"agent-warmup: warmup sent via Herdr {session}; log {log}")
+        return 0
+    finally:
+        if workspace and not args.keep:
+            _herdr(session, "workspace", "close", workspace)
+
+
+def _run_tmux(args: Run) -> int:
     if not shutil.which("tmux"):
         notify("agent-warmup", "tmux not found on PATH; cannot warm up")
         return 127
@@ -236,6 +523,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         with log.open("w") as fh:
             fh.write(f"# agent-warmup run {started.isoformat()}\n")
             fh.write(f"status: {status}\n")
+            fh.write(f"runtime: {os.environ.get('AGENT_WARMUP_RUNTIME', 'interactive')}\n")
+            fh.write("backend: tmux\n")
             fh.write(f"model: {model}\n")
             fh.write(f"prompt: {prompt}\n")
             fh.write(f"session: {session} (default tmux server)\n")
@@ -296,6 +585,20 @@ def cmd_run(args: argparse.Namespace) -> int:
         cleanup()
 
 
+def cmd_run(args: Run) -> int:
+    sentinel = os.environ.get("AGENT_WARMUP_STARTUP_SENTINEL")
+    if sentinel:
+        Path(sentinel).touch()
+    try:
+        backend, session = _resolve_backend(args)
+    except RuntimeError as exc:
+        print(f"agent-warmup: {exc}", file=sys.stderr)
+        return 4
+    if backend == "herdr":
+        return _run_herdr(args, session or "default")
+    return _run_tmux(args)
+
+
 # --- pueue one-shot ---------------------------------------------------------
 
 def _scheduled_python() -> str:
@@ -310,8 +613,8 @@ def _scheduled_python() -> str:
        under a daemon bootstrap (a volume-access/TCC gate the GUI session has but
        daemons don't), wedging the run forever with no session and no log.
 
-    So prefer a Python on the main system volume. The script is stdlib-only
-    (dependencies = []), so any python3.11+ works.
+    So prefer a Python on the main system volume for the stdlib bootstrap. That
+    bootstrap can then launch the PEP 723/Tyro environment through uv safely.
     """
     if sys.platform == "darwin":
         candidates = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"]
@@ -325,18 +628,138 @@ def _scheduled_python() -> str:
     return shutil.which("python3") or sys.executable
 
 
-def _run_argv(args: argparse.Namespace) -> list[str]:
-    """Reconstruct a `run` invocation for unattended (pueue / launchd / systemd) use."""
-    argv = [_scheduled_python(), str(script_path()), "run"]
-    if args.model:
-        argv += ["--model", args.model]
-    if args.prompt:
-        argv += ["--prompt", args.prompt]
-    if args.timeout != DEFAULT_TIMEOUT:
-        argv += ["--timeout", str(args.timeout)]
-    if getattr(args, "verify", False):
+def _as_run(args: Run | At | Install | Verify) -> Run:
+    return Run(
+        model=args.model, prompt=args.prompt, timeout=args.timeout,
+        verify=getattr(args, "verify", False), keep=getattr(args, "keep", False),
+        backend=args.backend, herdr_session=args.herdr_session,
+    )
+
+
+def _public_run_args(spec: Run) -> list[str]:
+    argv = ["run"]
+    if spec.model:
+        argv += ["--model", spec.model]
+    if spec.prompt:
+        argv += ["--prompt", spec.prompt]
+    if spec.timeout != DEFAULT_TIMEOUT:
+        argv += ["--timeout", str(spec.timeout)]
+    if spec.verify:
         argv.append("--verify")
+    if spec.keep:
+        argv.append("--keep")
+    if spec.backend != "auto":
+        argv += ["--backend", spec.backend]
+    if spec.herdr_session:
+        argv += ["--herdr-session", spec.herdr_session]
     return argv
+
+
+def _encode_run_spec(spec: Run) -> str:
+    raw = json.dumps({"schema": SCHEDULE_SCHEMA, "run": asdict(spec)}, separators=(",", ":"))
+    return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+
+def _decode_run_spec(payload: str) -> Run:
+    padded = payload + "=" * (-len(payload) % 4)
+    data = json.loads(base64.urlsafe_b64decode(padded).decode())
+    if data.get("schema") != SCHEDULE_SCHEMA or not isinstance(data.get("run"), dict):
+        raise ValueError("unsupported scheduled payload schema")
+    return Run(**data["run"])
+
+
+def _run_argv(args: Run | At | Install | Verify) -> list[str]:
+    """Build a stdlib-only scheduled bootstrap invocation."""
+    spec = _as_run(args)
+    backend, session = _resolve_backend(spec)
+    spec.backend = backend  # Scheduled runs must not silently switch backends.
+    spec.herdr_session = session
+    spec.keep = False
+    return [_scheduled_python(), str(script_path()), "__scheduled-run", _encode_run_spec(spec)]
+
+
+def _prewarm_uv() -> None:
+    uv = shutil.which("uv")
+    if not uv:
+        return
+    cp = run([
+        uv, "run", "--quiet", "--no-project", "--no-env-file",
+        "--python", _scheduled_python(), "--script", str(script_path()), "--help",
+    ], timeout=120)
+    diagnostic = cache_dir() / "uv-bootstrap.log"
+    with diagnostic.open("a") as fh:
+        version = run([uv, "--version"], timeout=5)
+        fh.write(f"{datetime.now().astimezone().isoformat()} prewarm rc={cp.returncode} ")
+        fh.write(f"uv={uv} version={version.stdout.strip()}\n{cp.stderr}\n")
+
+
+def _scheduled_bootstrap(payload: str) -> int:
+    """Try uv first; direct-call the stdlib core only before its startup sentinel."""
+    try:
+        spec = _decode_run_spec(payload)
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        print(f"agent-warmup: invalid scheduled payload: {exc}", file=sys.stderr)
+        return 2
+    uv = shutil.which("uv")
+    sentinel = cache_dir() / f"bootstrap-{os.getpid()}.started"
+    diagnostic = cache_dir() / "uv-bootstrap.log"
+    if uv:
+        env = os.environ.copy()
+        env["AGENT_WARMUP_STARTUP_SENTINEL"] = str(sentinel)
+        env["AGENT_WARMUP_RUNTIME"] = "uv"
+        command = [
+            uv, "run", "--quiet", "--no-project", "--no-env-file", "--offline",
+            "--python", _scheduled_python(), "--script", str(script_path()),
+            *_public_run_args(spec),
+        ]
+        started = time.monotonic()
+        try:
+            proc = subprocess.Popen(
+                command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                env=env, start_new_session=True,
+            )
+        except OSError as exc:
+            with diagnostic.open("a") as fh:
+                fh.write(f"{datetime.now().astimezone().isoformat()} fallback=uv-launch-error uv={uv}: {exc}\n")
+            proc = None
+        if proc is None:
+            os.environ.pop("AGENT_WARMUP_STARTUP_SENTINEL", None)
+            os.environ["AGENT_WARMUP_RUNTIME"] = "direct-fallback"
+            return cmd_run(spec)
+        while time.monotonic() - started < BOOTSTRAP_SENTINEL_TIMEOUT:
+            if sentinel.exists():
+                stdout, stderr = proc.communicate()
+                if stdout:
+                    print(stdout, end="")
+                if stderr:
+                    print(stderr, file=sys.stderr, end="")
+                sentinel.unlink(missing_ok=True)
+                return proc.returncode
+            if proc.poll() is not None:
+                break
+            time.sleep(0.1)
+        if proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        stdout, stderr = proc.communicate()
+        with diagnostic.open("a") as fh:
+            version = run([uv, "--version"], timeout=5)
+            reason = "timeout" if proc.returncode is None or time.monotonic() - started >= BOOTSTRAP_SENTINEL_TIMEOUT else "pre-sentinel-exit"
+            fh.write(f"{datetime.now().astimezone().isoformat()} fallback={reason} rc={proc.returncode} ")
+            fh.write(f"uv={uv} version={version.stdout.strip()}\n{stderr}\n")
+        sentinel.unlink(missing_ok=True)
+    os.environ.pop("AGENT_WARMUP_STARTUP_SENTINEL", None)
+    os.environ["AGENT_WARMUP_RUNTIME"] = "direct-fallback"
+    return cmd_run(spec)
 
 
 def _ensure_group() -> None:
@@ -344,7 +767,7 @@ def _ensure_group() -> None:
     run(["pueue", "parallel", "-g", GROUP, "1"])
 
 
-def cmd_at(args: argparse.Namespace) -> int:
+def cmd_at(args: At) -> int:
     if not shutil.which("pueue"):
         print("agent-warmup: pueue not installed", file=sys.stderr)
         return 127
@@ -358,6 +781,7 @@ def cmd_at(args: argparse.Namespace) -> int:
         print(f"pueue add -g {GROUP} --label {shlex.quote(label)} "
               f"--delay {shlex.quote(delay)} {shlex.quote(command)}")
         return 0
+    _prewarm_uv()
     _ensure_group()
     cp = run(["pueue", "add", "-g", GROUP, "--label", label,
               "--delay", delay, "--print-task-id", command])
@@ -394,7 +818,7 @@ def _pueue_oneshots() -> list[tuple[str, str, str]]:
     return out
 
 
-def cmd_cancel(args: argparse.Namespace) -> int:
+def cmd_cancel(args: Cancel) -> int:
     tasks = _pueue_oneshots()
     if not tasks:
         print("no pending agent-warmup one-shots")
@@ -447,7 +871,7 @@ def _launchd_plist_path() -> Path:
     return Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
 
 
-def _install_launchd(args: argparse.Namespace, days: list[int], hh: int, mm: int) -> int:
+def _install_launchd(args: Install, days: list[int], hh: int, mm: int) -> int:
     # Lazy import: plistlib pulls in the pyexpat C-extension, whose load triggers
     # macOS amfid code-sign verification that can STALL under a daemon (launchd /
     # pueue) bootstrap. The scheduled `run` hot path must never import it — only
@@ -498,7 +922,7 @@ def _systemd_dir() -> Path:
     return d
 
 
-def _install_systemd(args: argparse.Namespace, days: list[int], hh: int, mm: int) -> int:
+def _install_systemd(args: Install, days: list[int], hh: int, mm: int) -> int:
     program = " ".join(shlex.quote(p) for p in _run_argv(args))
     if days:
         names = ",".join(_SYSTEMD_DAY[d] for d in sorted(days))
@@ -536,15 +960,16 @@ def _install_systemd(args: argparse.Namespace, days: list[int], hh: int, mm: int
     return 0
 
 
-def cmd_install(args: argparse.Namespace) -> int:
+def cmd_install(args: Install) -> int:
     days = _parse_days(args.daily)
     hh, mm = _parse_hhmm(args.time)
+    _prewarm_uv()
     if sys.platform == "darwin":
         return _install_launchd(args, days, hh, mm)
     return _install_systemd(args, days, hh, mm)
 
 
-def cmd_uninstall(args: argparse.Namespace) -> int:
+def cmd_uninstall(args: Uninstall) -> int:
     if sys.platform == "darwin":
         uid = os.getuid()
         run(["launchctl", "bootout", f"gui/{uid}/{LAUNCHD_LABEL}"])
@@ -602,7 +1027,7 @@ def _recent_runs(limit: int = 5) -> list[tuple[str, str]]:
     return out
 
 
-def cmd_status(args: argparse.Namespace) -> int:
+def cmd_status(args: Status) -> int:
     if args.json:
         print(json.dumps({
             "timer": _timer_state(),
@@ -622,65 +1047,40 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-# --- arg parsing ------------------------------------------------------------
-
-def _add_run_flags(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--model", help="Claude model (default $AICAP_CLAUDE_MODEL or haiku)")
-    p.add_argument("--prompt", help=f"Warmup prompt (default: {DEFAULT_PROMPT!r})")
-    p.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="Reply wait seconds")
-    p.add_argument("--verify", action="store_true", help="Send /usage and capture the panel")
-
-
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="agent-warmup", description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = p.add_subparsers(dest="cmd", required=False)
-
-    s = sub.add_parser("run", help="Spawn interactive claude and send the warmup prompt")
-    _add_run_flags(s)
-    s.add_argument("--keep", action="store_true", help="Keep the tmux session afterwards")
-    s.set_defaults(func=cmd_run)
-
-    s = sub.add_parser("at", help="Queue a one-shot run via pueue")
-    s.add_argument("--at", help="Absolute time for pueue --delay (e.g. '06:00', 'tomorrow 06:00')")
-    s.add_argument("--delay", help="Relative delay for pueue --delay (e.g. 8h, 30m)")
-    s.add_argument("--dry-run", action="store_true")
-    _add_run_flags(s)
-    s.set_defaults(func=cmd_at)
-
-    s = sub.add_parser("install", help="Install a recurring launchd/systemd timer")
-    s.add_argument("--daily", default="weekdays",
-                   help="daily | weekdays | weekends | comma list (mon,wed,fri)")
-    s.add_argument("--time", default="06:00", help="HH:MM (24h)")
-    _add_run_flags(s)
-    s.set_defaults(func=cmd_install)
-
-    s = sub.add_parser("uninstall", help="Remove the recurring timer")
-    s.set_defaults(func=cmd_uninstall)
-
-    s = sub.add_parser("status", help="Show timer, pending one-shots, recent runs")
-    s.add_argument("--json", action="store_true")
-    s.set_defaults(func=cmd_status)
-
-    s = sub.add_parser("cancel", help="Remove pending pueue one-shots")
-    s.set_defaults(func=cmd_cancel)
-
-    s = sub.add_parser("verify", help="run --verify --keep (empirical experiment helper)")
-    _add_run_flags(s)
-    s.set_defaults(func=lambda a: cmd_run(argparse.Namespace(
-        **{**vars(a), "keep": True, "verify": True})))
-
-    return p
-
-
 def main(argv: list[str] | None = None) -> int:
     _augment_path()
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    if not hasattr(args, "func"):
-        parser.print_help()
-        return 0
-    return int(args.func(args))
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if raw and raw[0] == "__scheduled-run":
+        if len(raw) != 2:
+            print("agent-warmup: __scheduled-run expects one payload", file=sys.stderr)
+            return 2
+        return _scheduled_bootstrap(raw[1])
+
+    # Public parsing is Tyro; it stays out of the daemon bootstrap path above.
+    import tyro
+
+    if not raw:
+        raw = ["--help"]
+    command = tyro.cli(Command, args=raw, prog="agent-warmup")
+    if isinstance(command, Run):
+        return cmd_run(command)
+    if isinstance(command, At):
+        return cmd_at(command)
+    if isinstance(command, Install):
+        return cmd_install(command)
+    if isinstance(command, Uninstall):
+        return cmd_uninstall(command)
+    if isinstance(command, Status):
+        return cmd_status(command)
+    if isinstance(command, Cancel):
+        return cmd_cancel(command)
+    if isinstance(command, Verify):
+        return cmd_run(Run(
+            model=command.model, prompt=command.prompt, timeout=command.timeout,
+            verify=True, keep=True, backend=command.backend,
+            herdr_session=command.herdr_session,
+        ))
+    raise AssertionError(f"unhandled command: {type(command).__name__}")
 
 
 if __name__ == "__main__":

@@ -130,7 +130,7 @@ Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, bu
 - **`ping-monitor`** — record ping over time, flag latency spikes. See `docs/tools/ping-monitor.md`.
 - **`wake`** — Wake-on-LAN sender: `wake <host>` powers a box on by magic packet (hosts in `~/.config/wake/hosts.toml`). Passive side = `installWakeOnLan` ansible role. See `docs/sysadmin/wake-on-lan.md`.
 - **`tsnet`** — Tailscale helper: `tsnet list` (tailnet devices, `--tsv`/`--json`), `tsnet ssh-config <machine>` (idempotent managed block in `~/.ssh/config.d/20-tailscale`; detects the legacy no-`Include` case and shadowing `Host` blocks, both of which make ssh config silently inert), `tsnet serve <port>` (preflight → `tailscale serve --bg --https=443` → verify, for services that hard-require an `https://` origin), `tsnet doctor`. `--host H` drives any of it on a remote box over ssh. Picker twin: `tv tailnet`. See `docs/tools/tsnet.md`.
-- **`agent-warmup`** — drive a real interactive agent TUI at a scheduled time to move the quota window (launchd/systemd/pueue). See `docs/tools/agent-warmup.md`.
+- **`agent-warmup`** — Tyro CLI that drives a real interactive Claude TUI at a scheduled time through an existing Herdr session (preferred) or tmux, with uv-first daemon bootstrap and safe fallback. See `docs/tools/agent-warmup.md`.
 - **`crash-blackbox`** — flight recorder for hard power-offs / unclean shutdowns. See `docs/tools/crash-blackbox.md`.
 - **`nvidia-driver-drift-check`** — flag kernel-module vs userspace driver drift. See `docs/sysadmin/gpu-driver.md`.
 - **`raid-perm-check`** — read-only auditor for a group+ACL-shared data mount (`summary`/`orphans`/`groups`/`units`/`user`/`all`, default `/mnt/raid`). Catches the two silent breakages: orphaned uid/gid after an account is deleted, and a stale `systemd --user` manager whose frozen groups make timers hit EACCES on paths your shell reads fine. Never modifies — prints the fix. See `docs/sysadmin/shared-storage-permissions.md`.
@@ -158,7 +158,7 @@ ls "$(chezmoi source-path)/dot_config/television/cable/"   # the channel definit
 Handy ones: `fleet-hosts`, `tailnet`, `ssh-config`, `mlflow`, `pueue`, `ports`,
 `kill-process`, `services`, `sessions`, `keybindings`, `aliases`, `git-ops`,
 `mac-apps`/`linux-apps`, the agent trio (`agent-panes`, `agent-sessions`,
-`agent-wakeup`) and the `herdr-*` family. Full reference: `docs/tools/tv.md`.
+`agent-wakeup`, dual tmux/Herdr with stable agent-session scheduling) and the `herdr-*` family. Full reference: `docs/tools/tv.md`.
 
 ## Keybindings & keymaps
 

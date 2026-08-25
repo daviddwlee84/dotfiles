@@ -57,9 +57,10 @@ For pasting an invocation to the shell buffer (with trailing space for tools tha
 ### `agent-wakeup` channel
 
 Dashboard for live coding-agent panes that are waiting on quota/rate-limit
-resets. Open with `tv agent-wakeup` or tmux `prefix + M-a`.
+resets. Open with `tv agent-wakeup`, tmux `prefix + M-a`, or Herdr
+`prefix + Alt+A`.
 
-It shows each live agent pane, detected quota message, parsed reset time, and
+It shows ambient tmux/Herdr panes (or aggregates both from an ordinary shell), detected quota message, parsed reset time, and
 any queued pueue wakeup task. `Alt+C` schedules `continue` at the detected
 reset time plus a small buffer, `Alt+T` prompts for a custom time/delay,
 `Alt+N` smart-sends immediately (`Enter` for Claude's `/rate-limit-options`

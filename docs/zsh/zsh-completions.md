@@ -151,7 +151,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `pqsum` | `dot_dotfiles/bin/executable_pqsum` | argparse | B | `dot_config/zsh/tools/48_pqsum_completion.zsh` + `dot_config/bash/48_pqsum_completion.bash` |
 | `x` | `dot_dotfiles/bin/executable_x` | bash hand-rolled | B | `dot_config/zsh/tools/49_x_completion.zsh` + `dot_config/bash/49_x_completion.bash` |
 | `dotcfg` | `dot_dotfiles/bin/executable_dotcfg` (thin shell → `scripts/init/dotfiles_init.py reconfigure`) | bash wrapper | B | `dot_config/zsh/tools/51_dotcfg_completion.zsh` + `dot_config/bash/51_dotcfg_completion.bash` (keys mirror PROMPTS) |
-| `agent-warmup` | `dot_dotfiles/bin/executable_agent-warmup` | argparse (subcommands) | B | `dot_config/zsh/tools/52_agent_warmup_completion.zsh` + `dot_config/bash/52_agent_warmup_completion.bash` |
+| `agent-warmup` | `dot_dotfiles/bin/executable_agent-warmup` | tyro | A (lazy autoload) | `dot_config/shell/52_agent_warmup.sh` (gen + mtime check); refresh helper `agent-warmup-update-completion` |
 | `yth` | `dot_dotfiles/bin/executable_yth` + `scripts/yth/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/53_yth_completion.zsh` + `dot_config/bash/53_yth_completion.bash` |
 | `wake` | `dot_dotfiles/bin/executable_wake` | argparse | B | `dot_config/zsh/tools/54_wake_completion.zsh` + `dot_config/bash/54_wake_completion.bash` |
 | `view-office` | `dot_dotfiles/bin/executable_view-office` | bash hand-rolled | B | `dot_config/zsh/tools/55_view_office_completion.zsh` + `dot_config/bash/55_view_office_completion.bash` |
@@ -237,7 +237,7 @@ Edit the `regen <tool> "<zsh-args>" "<bash-args>"` block in `scripts/generate_co
 - **`sesh` / `tv` / `worktrunk`**: shell-startup mtime check (each tool has its own `dot_config/zsh/tools/<NN>_<tool>.zsh` file that runs the version check on every shell start — these tools are typically `cargo install`-ed outside chezmoi, so they need the per-startup probe to catch user upgrades).
 - **`bw` / `marimo` / `thefuck` / `try-cli`**: cached eval at startup (their completion script has side effects beyond `compdef`, so the file is `source`'d into the running shell rather than autoloaded).
 - **`mi-router`**: tyro self-gen, lives in `dot_config/shell/47_mi_router.sh` (not the bulk script — has its own `#compdef` rewrite for tyro's full-path output quirk).
-- **`fleet` / `mlf` / `pqsum` / `x` / `dotcfg` / `agent-warmup`**: hand-written completion in `dot_config/{zsh/tools,bash}/45-54_*_completion.*` (in-house CLIs without a built-in completion generator). `dotcfg`'s `--set` key list mirrors the PROMPTS table in `scripts/init/dotfiles_init.py`.
+- **`fleet` / `mlf` / `pqsum` / `x` / `dotcfg`**: hand-written completion in `dot_config/{zsh/tools,bash}/45-54_*_completion.*` (in-house CLIs without a built-in completion generator). `dotcfg`'s `--set` key list mirrors the PROMPTS table in `scripts/init/dotfiles_init.py`. `agent-warmup` moved to the Tyro self-generation pattern above.
 
 ## Priority / Override Order
 

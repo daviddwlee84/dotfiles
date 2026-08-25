@@ -1,4 +1,4 @@
-# 62_agent_wakeup.sh - agent quota wakeup helpers for tmux panes.
+# 62_agent_wakeup.sh - agent quota wakeup helpers for tmux and Herdr panes.
 # Shared by zsh and bash. The implementation lives in
 # ~/.config/television/agent-wakeup.py so TV channels, shell functions, and
 # pueue scheduled jobs all share one code path.

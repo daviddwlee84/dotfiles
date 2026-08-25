@@ -46,6 +46,8 @@ once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
 .config/zsh/tools/04_ai_capture.zsh
 .config/zsh/tools/29_media.zsh
 .config/zsh/tools/96_ssh_setup.zsh
+.config/zsh/tools/52_agent_warmup_completion.zsh
+.config/bash/52_agent_warmup_completion.bash
 {{- /*
 Legacy AeroSpace config at $HOME root. We manage the XDG copy
 (~/.config/aerospace/aerospace.toml); AeroSpace errors if BOTH it and

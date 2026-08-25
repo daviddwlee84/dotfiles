@@ -133,7 +133,7 @@ description = "new tab at the workspace (space) root dir"
 | Seamless `Ctrl-hjkl` nvim↔pane nav | **No herdr-aware smart-splits** | **Gap** — workaround below |
 | OSC133 copy-mode (`cpout`/`cpblock`) | tmux-specific | **Gap** — `cpcmd` (zsh history) still works |
 | Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --token` (per-pane metadata tokens, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
-| AI session-summary / agent-wakeup capture | re-portable against `herdr pane read` / `pane list --json` | **Deferred** — out of trial scope |
+| AI session-summary / agent-wakeup capture | `agent-wakeup` uses native `agent list/get/read` and stable agent-session IDs | **Shipped** — dual tmux/Herdr status, scheduling, preview, and safe send |
 
 ## Keybindings
 
@@ -166,6 +166,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `` prefix + u `` | **URL picker** — fzf-pick a URL from the pane and open it (`x open`); tmux-fzf-url analog. `--source recent` = full scrollback | command pane |
 | `prefix + T` | `tv herdr-sesh` (workspace/dir switcher) | command pane |
 | `prefix + a` | `tv herdr-agent-panes` (live agent panes) | command pane |
+| `prefix + Alt + A` | `tv agent-wakeup` (dual-backend quota waits + scheduled continue) | command pane |
 | `prefix + f` | `tv fleet-hosts` (SSH picker) | command pane |
 | `prefix + Alt + F` | prompt for pane-content pattern → `herdr-grep --pick --visible` → fzf exact jump; Alt+S = scrollback, Alt+V = visible | command pane |
 | `prefix + m` | toggle **review-pending** flag (⭐) on the current pane | command pane |

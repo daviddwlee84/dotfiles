@@ -223,6 +223,12 @@ command = "tv herdr-agent-panes"
 description = "Live agent panes (herdr-aware tv channel)"
 
 [[keys.command]]
+key = "prefix+alt+a"
+type = "pane"
+command = "tv agent-wakeup"
+description = "Agent quota wakeup dashboard (tmux + Herdr)"
+
+[[keys.command]]
 key = "prefix+f"
 type = "pane"
 command = "tv fleet-hosts"

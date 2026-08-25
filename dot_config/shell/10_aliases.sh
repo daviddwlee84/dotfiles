@@ -99,6 +99,27 @@ run-for() {
 # doesn't affect that helper.
 command -v gtimeout >/dev/null 2>&1 && alias timeout='gtimeout'
 
+# Refresh Tyro's generated completion cache for agent-warmup. The next shell
+# load also regenerates automatically when the executable is newer.
+agent-warmup-update-completion() {
+	cache_base="${XDG_CACHE_HOME:-$HOME/.cache}/agent-warmup/completions"
+	rm -f "$cache_base/_agent-warmup" "$cache_base/agent-warmup.bash"
+	if [ -r "${XDG_CONFIG_HOME:-$HOME/.config}/shell/52_agent_warmup.sh" ]; then
+		. "${XDG_CONFIG_HOME:-$HOME/.config}/shell/52_agent_warmup.sh"
+		cache_rc=$?
+	else
+		printf 'agent-warmup: completion loader not deployed (run chezmoi apply?)\n' >&2
+		cache_rc=1
+	fi
+	unset cache_base
+	if [ "$cache_rc" -eq 0 ]; then
+		unset cache_rc
+		return 0
+	fi
+	unset cache_rc
+	return 1
+}
+
 # --- Reload shell config (source-rc / reload) ------------------------------
 # Re-source the CURRENT shell's rc entry point in place, so a running session
 # picks up new aliases/functions after `chezmoi apply` — without exec'ing a

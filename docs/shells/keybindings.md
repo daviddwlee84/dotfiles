@@ -63,6 +63,10 @@ Layer 4 omitted on purpose (per the design spec): listing every
 | **Television channel** | `tv keybindings` | zsh & bash, any TTY | Same data source; `Enter` paste-comment, `Ctrl+Y` copy key combo |
 | **Static viewer** | `bindings` | zsh & bash (POSIX function in `dot_config/shell/10_aliases.sh`) | Picks `tv` → `bat` → `less` → `cat` in that order; safe in non-interactive `bash -c` too |
 
+Multiplexer bindings live in their own namespaces: tmux opens the quota wakeup
+dashboard with `prefix + M-a`, while Herdr uses `prefix + Alt+A`. Both launch
+the same `tv agent-wakeup` channel; neither chord shadows an inner-shell key.
+
 The ZLE widget is rebound from `zvm_after_init` in
 [`dot_zshrc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_zshrc.tmpl)
 to survive `zsh-vi-mode`'s init-time keybind wipe — the same pattern as

@@ -87,10 +87,12 @@ Results cache at `$XDG_CACHE_HOME/pqsum/<host>-<prompt_hash>.json` (default
 
 `agent-wakeup` uses pueue as a small persistent scheduler for quota/rate-limit
 resets in live coding-agent panes. It creates group `agent-wakeup`, sets group
-parallelism to 1, and labels each task as `agent-wakeup:%pane_id`.
+parallelism to 1, and labels tmux tasks as `agent-wakeup:%pane_id` and Herdr
+tasks as `agent-wakeup:herdr:<session>:<agent-session-id>`.
 
 ```bash
 agent-wakeup status
+agent-wakeup status --backend all
 agent-continue-at --pane %12 --at 01:52am
 agent-wakeup send-now --pane %44 --auto
 agent-wakeup send-now --pane %44 --enter-only
@@ -100,7 +102,8 @@ agent-wakeup cancel --pane %12
 
 The scheduled command calls back into
 `~/.config/television/agent-wakeup.py send-now`. When the task runs, it
-captures the target tmux pane again. If the original quota marker has
+captures the target tmux or Herdr pane again. Herdr tasks re-resolve the stable
+agent session ID first, so a moved agent follows its new pane. If the original quota marker has
 disappeared, the task exits without sending text unless `--force` was used.
 That guard is intentional: scheduled `continue` should not type into a pane
 that may already have resumed or changed context.

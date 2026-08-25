@@ -13,7 +13,32 @@ same `agent-warmup verify` works perfectly when run by hand in a terminal.
 **Affects**: macOS background launch contexts (launchd `gui/uid` agents, `pueued`
 daemon) spawning an interactive `claude` TUI. Likely any tool launching a fresh
 GUI-bound TUI from a daemon bootstrap.
-**Status**: fixed in `agent-warmup` (four stacked fixes below)
+**Status**: fixed in `agent-warmup` (four original traps plus the 2026-08-25
+uv-first bootstrap correction below)
+
+## 2026-08-25 correction: uv is not categorically daemon-unsafe
+
+A controlled PEP 723 + Tyro probe succeeded with the existing standalone
+`uv 0.9.24` through both pueue and a temporary macOS `gui/502` LaunchAgent when
+invoked as:
+
+```text
+uv run --quiet --no-project --no-env-file --offline \
+  --python /usr/local/bin/python3 --script <script> ...
+```
+
+That isolates the script from the repo `.venv`, pins a main-volume interpreter,
+and requires a pre-warmed cache. The old finding remains valid for the original
+unqualified shebang/secondary-volume setup, but "never use uv from a daemon" is
+too broad.
+
+Current scheduled jobs therefore enter through main-volume Python and a hidden
+stdlib bootstrap. It tries the exact uv command above, waits up to 30 seconds
+for a startup sentinel written immediately before core side effects, and only
+then falls back to the stdlib core. A post-sentinel failure never falls back, so
+Claude cannot receive the warmup prompt twice. Runtime is recorded as `uv` or
+`direct-fallback`; probe diagnostics append to
+`~/.cache/agent-warmup/uv-bootstrap.log`.
 
 ## Four stacked traps, each masking the next
 
@@ -22,8 +47,9 @@ Debugging found FOUR separate failures, only visible one at a time:
 1. **`uv run` shebang hangs under launchd.** The first scheduled run wedged in
    the `uv` launcher itself (the stuck PID was `uv`, no Python child, stuck in
    dyld) before Python started — no session, no log, no exit.
-   → Fix: invoke a Python interpreter directly on the script for scheduled runs
-   (`_run_argv` / `_scheduled_python`), never the `uv run` shebang.
+   → Original fix: invoke a main-volume Python directly. Current fix: retain
+   that Python as the stdlib bootstrap, then run uv with the isolated flags and
+   pre-side-effect sentinel described above.
 
 2. **`import plistlib` → `pyexpat.so` stalls in amfid.** Loading a C-extension
    `.so` triggers macOS `amfid` code-signature verification, which can deadlock
@@ -38,7 +64,8 @@ Debugging found FOUR separate failures, only visible one at a time:
    gate the GUI session has but daemons don't. A trivial `python -c print` from
    the same interpreter ran fine; the full import set hung.
    → Fix: `_scheduled_python()` prefers a **main-volume** interpreter
-   (`/opt/homebrew/bin/python3`); the script is stdlib-only so any 3.11+ works.
+   (`/opt/homebrew/bin/python3` or `/usr/local/bin/python3`); it is used by both
+   the bootstrap and uv's exact `--python` selection.
 
 4. **claude's TUI renders NOTHING in a daemon-created tmux server.** After the
    hangs were gone the run completed but the pane was blank: claude launched in a
