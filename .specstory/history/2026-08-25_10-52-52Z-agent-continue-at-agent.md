@@ -3217,3 +3217,41 @@ const r = await tools.exec_command({"cmd":"git add -- .specstory/history/2026-08
 ...
 ```
 </details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-25 12:02:56Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Verifying unstaged changes after commit****Planning commit amend to include transcript updates****Drafting atomic git amend command**
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-25 12:02:58Z)**_
+
+Commit 已成功建立在 `main`：`eab5547`。Hook 與 staged secret scan 全數通過；我現在只做唯讀核對，確認 commit 內容沒有夾帶其他 SpecStory session，並列出 commit 後仍屬於使用者原有的工作樹變更。
+
+_**Agent (gpt-5.6-sol 2026-08-25 12:02:58Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input (truncated): ```
+const r = await tools.exec_command({"cmd":"git show --stat --oneline --decorate --no-renames HEAD && git show --format= --name-only HEAD | rg '^\\.specstory/' && git status --short --branch","workdir"
+...
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-25 12:03:09Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Deciding transcript amendment strategy****Summarizing commit and transcript state**
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-25 12:03:11Z)**_
+
+Committed on `main`:
+
+- Commit: `eab5547`
+- Message: `feat: add dual agent multiplexer backends`
+- Included our SpecStory session only.
+- Secret scan and all commit hooks passed.
+- Branch is ahead of `origin/main` by one commit; not pushed.
+
+Other pre-existing SpecStory changes remain uncommitted. Our active transcript also received post-commit verification lines after the snapshot, so it appears modified again as expected.

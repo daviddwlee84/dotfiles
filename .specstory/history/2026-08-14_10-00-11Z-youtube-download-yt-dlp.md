@@ -9737,7 +9737,7 @@ _**Agent (claude-opus-5 2026-08-14 10:15:45Z)**_
 <tool-use data-tool-type="write" data-tool-name="Write"><details>
 <summary>Tool use: **Write**</summary>
 
-````md
+````markdown
 # `ytmv` — YouTube MV → old-MP3-player CLI (uv script + tyro)
 
 ## Context
@@ -15438,7 +15438,7 @@ _**Agent (claude-opus-5 2026-08-14 12:32:28Z)**_
 <tool-use data-tool-type="write" data-tool-name="Write"><details>
 <summary>Tool use: **Write**</summary>
 
-````md
+````markdown
 # ytmv — YouTube music videos for old MP3 players
 
 `ytmv` downloads YouTube music videos and prepares them for playback on **old MP3 players**,
@@ -17948,3 +17948,1079 @@ CLAUDE.md **33721 → 33190**。老實說只省了 ~530 字元，離 ~30k 還有
 ## 一個誠實的但書
 
 `ffmpeg-full` 是 9.0.1，`--profile safe` 的預設我是照「未知播放器最保險」推的猜測。真正能定案的只有把檔案丟進你那台機器看。`ytmv tag` 就是為了讓這個試錯不用重載——上面 docs 裡有症狀對照表。
+
+---
+
+_**User (2026-08-23 03:12:07Z)**_
+
+```
+愛情的訊息
+午夜魔法                 
+不怕
+世界赠与我的
+第57次取消发送
+关中王の小曲
+菊次郎的夏天
+Underground 
+魑魅魍魉
+不管正派反派，吃个年夜饭先！
+达拉崩吧
+万疆
+吉量
+巴拉莱卡
+拼好歌
+稻香
+```
+
+幫我下載這些 如果不行則列出YouTube URLs
+
+---
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:12:58Z)**_
+
+我會先用每個歌名做 YouTube 搜尋、確認候選影片的標題/頻道/長度，再交給 `ytmv` 批次下載；找不到或下載失敗的項目會保留搜尋到的 URL 和原因。輸出先放預設的 `~/Music/ytmv`，沿用 `safe` profile。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:13:01Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="Skill"><details>
+<summary>Tool use: **Skill**</summary>
+
+**Input:**
+
+- args: `Use the newly added ytmv CLI to find and download the user's 16 listed songs. Need inspect current CLI usage and available yt-dlp search capability, download to default ~/Music/ytmv with safe profile, and report failures with YouTube URLs.`
+- skill: `chezmoi-dotfiles`
+
+</details></tool-use>
+
+---
+
+_**User (2026-08-23 03:13:01Z)**_
+
+Base directory for this skill: /Users/david/.claude/skills/chezmoi-dotfiles
+
+<!-- managed-by: chezmoi-dotfiles (chezmoi source: dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl) — do not hand-edit the deployed copy; it re-renders on every `chezmoi apply`. -->
+
+# chezmoi-dotfiles
+
+This machine's `$HOME` is managed by a **chezmoi** (configs) + **ansible** (system
+deps) dotfiles repo. This skill is the agent-facing map: how to drive it, and what
+custom tooling exists that you wouldn't otherwise know about. It is rendered per-host
+— the "What's enabled on THIS machine" section reflects what the user actually
+selected at init.
+
+## Orientation (read this first)
+
+- **Repo root**: `chezmoi source-path` (no args) prints the source dir. Work there
+  to edit: `cd "$(chezmoi source-path)"`.
+- **Source path of one file**: `chezmoi source-path ~/.config/foo/bar` → the
+  managed source file for that target.
+- **`docs/**` is NOT deployed to `$HOME`** (it's chezmoi-ignored). Read detail via
+  `"$(chezmoi source-path)/docs/..."`. A *subset* is deployed to `~/.config/docs/`
+  (e.g. keybindings, cli-tools) for runtime helpers.
+- **Read the contract before editing**: `"$(chezmoi source-path)/CLAUDE.md"` holds
+  Hard invariants and cross-file maintenance rules. Honor them.
+- This host: profile `macos`, OS `darwin`/`amd64`, primary shell `zsh`.
+
+## chezmoi essentials
+
+```bash
+chezmoi diff                 # preview changes (also: just chezmoi-diff)
+chezmoi apply                # deploy + run scripts (also: cas, or just chezmoi-apply)
+chezmoi status               # modified/added/removed targets
+chezmoi edit ~/.zshrc        # edit the SOURCE of a target
+chezmoi add  ~/.config/x     # start managing an existing file
+chezmoi re-add               # pull live edits back into source
+chezmoi managed | grep foo   # is X managed?
+chezmoi cat ~/.config/x      # render a target without applying
+chezmoi data | jq            # the template data (ground truth for the toggles below)
+```
+
+- **`cas`** = `chezmoi apply` + reload hint; **`cau`** = update from remote then apply
+  (defined in `dot_config/shell/99_chezmoi_reload.sh`).
+- **`dotcfg`** = reconfigure the init prompts on an already-set-up machine
+  (`dotcfg` for the TUI, `dotcfg --set installLlmTools=true --yes` for one toggle,
+  `dotcfg --dry-run` to preview). Shell twin: `czcfg`.
+- **Never `chezmoi add` a `modify_`/`create_` target** — it overwrites the script.
+- Full command cheat-sheet: `docs/this_repo/cheatsheet.md`. Install-vs-upgrade is
+  split: `chezmoi apply`/ansible is **install-only**; upgrades go through
+  `just upgrade-*`.
+
+## What's enabled on THIS machine
+
+(Rendered from this host's selections. For live truth: `chezmoi data | jq`.)
+- **Coding agents** — Claude Code, OpenCode, Cursor, Codex, Gemini, Copilot (configs + CLIs). See `docs/tools/agent-overlays.md`, `docs/tools/agent-skills.md`.
+- **Python uv tools** — mlflow, marimo, jupyter, etc. (powers the `mlf` CLI). See `docs/this_repo/uv-bootstrap.md`.
+- **Extra runtimes** — rust, bun, ruby via mise (+ cargo/gem tools). Node is always present.
+- **LLM tools** — Ollama / LiteLLM / local models.
+- **JS CLI tools** — standalone npm CLIs (e.g. readability-cli).
+- **.NET tools** — .NET SDK (mise) + dotnet global tools.
+- **IaC** — Azure CLI, Terraform, OpenTofu.
+- **Media** — ffmpeg, ImageMagick, exiftool, libvips.
+- **Media control** — nowplaying-cli + switchaudio-osx (macOS) / playerctl (Linux); unlocks full `sysplay`/`sysnow` (built-in `sysvol`/`sysmute` work regardless).
+- **Networking** — nmap, mtr, httpie, gping, trippy.
+- **Tunnels** — ngrok, cloudflared (expose localhost to the **public** internet).
+- **Tailscale** — WireGuard mesh VPN (tailnet-only, the opposite of the tunnel tools). Helper CLI: `tsnet`. Picker: `tv tailnet`. See `docs/tools/tsnet.md`, `docs/tools/Tailscale.md`.
+- **Agent sounds** — audio notifications on agent Stop/Notification hooks. See `docs/tools/agent-sounds.md`.
+- **Vim mode** — shell modal editing + tmux vim nav (NOT Neovim/editors — those are always vim).
+
+## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
+
+Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, but not all (`x` → `clipboard.md`, `view-ebook` → `yazi-previews.md`, `fleet` → `this_repo/fleet-apply.md`); grep `docs/` if the obvious path 404s. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.
+
+- **`fleet`** — cross-host ops over your machines: `fleet chezmoi apply`, `fleet hosts`, `fleet tmux`, `fleet info`, `fleet pueue`, `fleet exec`. See `docs/this_repo/fleet-apply.md`, `docs/tools/fleet-exec.md`, `docs/tools/fleet-hosts.md`.
+- **`mlf`** — MLflow umbrella CLI + TUI dashboard (needs Python uv tools). Picker twin: `tv mlflow`.
+- **`pqsum`** — pueue queue summary (text / AI / JSON). See `docs/tools/pueue.md`.
+- **`x`** — clipboard/file copy-paste-open with cross-platform fallbacks.
+- **`view-office`** / **`view-ebook`** — open/preview Office docs (.docx/.xlsx/.pptx + legacy .doc/.xls/.ppt) and ebooks (epub/mobi/azw3, calibre-backed) in the terminal; also power the yazi previewers. See `docs/tools/office-viewers.md`, `docs/tools/yazi-previews.md`.
+- **`mi-router`** / **`reyee`** / **`sms`** — read-only router CLIs (Xiaomi MiWiFi / Ruijie Reyee / Huawei HiLink SMS). See `docs/tools/{mi-router,reyee,sms}.md`.
+- **`mi-dhcp-bind`** — opt-in **write** companion to `mi-router`: set/remove MiWiFi static DHCP reservations (`bind --self` autodetects this host). See `docs/tools/mi-dhcp-bind.md`.
+- **`ping-monitor`** — record ping over time, flag latency spikes. See `docs/tools/ping-monitor.md`.
+- **`wake`** — Wake-on-LAN sender: `wake <host>` powers a box on by magic packet (hosts in `~/.config/wake/hosts.toml`). Passive side = `installWakeOnLan` ansible role. See `docs/sysadmin/wake-on-lan.md`.
+- **`tsnet`** — Tailscale helper: `tsnet list` (tailnet devices, `--tsv`/`--json`), `tsnet ssh-config <machine>` (idempotent managed block in `~/.ssh/config.d/20-tailscale`; detects the legacy no-`Include` case and shadowing `Host` blocks, both of which make ssh config silently inert), `tsnet serve <port>` (preflight → `tailscale serve --bg --https=443` → verify, for services that hard-require an `https://` origin), `tsnet doctor`. `--host H` drives any of it on a remote box over ssh. Picker twin: `tv tailnet`. See `docs/tools/tsnet.md`.
+- **`agent-warmup`** — drive a real interactive agent TUI at a scheduled time to move the quota window (launchd/systemd/pueue). See `docs/tools/agent-warmup.md`.
+- **`crash-blackbox`** — flight recorder for hard power-offs / unclean shutdowns. See `docs/tools/crash-blackbox.md`.
+- **`nvidia-driver-drift-check`** — flag kernel-module vs userspace driver drift. See `docs/sysadmin/gpu-driver.md`.
+- **`yth`** — search your YouTube watch history (title/channel/description + captions; Takeout import + optional cookie sync). Picker twin: `tv yth`. See `docs/tools/yth.md`.
+- **`ytmv`** — download YouTube music videos for **old MP3 players**: mp3 + sidecar `.lrc` + ID3v2.3/USLT lyrics, or mp4 with soft/burned-in subtitles. Subcommands `get` / `lyrics` / `tag` / `doctor`; `ytmv help` is the complete setup/cookie-safety guide and `doctor --cookies` explicitly tests a configured source. Public downloads use packaged EJS + managed Node 22+ cookie-free first (doctor flags legacy Node 20/16). Compatibility profiles (`safe`, `cjk-big5`, `cjk-gbk`, `ipod`, `modern`) are re-appliable offline via `ytmv tag`. Needs ffmpeg (`installMediaTools`); `--burn-subs` needs the keg-only `ffmpeg-full`. No `tv` channel by design. See `docs/tools/ytmv.md`.
+- **`appsrc`** — detect how an installed app / CLI was installed & managed (cask / App Store / direct-download / apt / snap / flatpak / AppImage / cargo/npm/pipx/uv/mise/go/gem / manual): `appsrc which <cmd-or-app>` (live), `appsrc size <app>` (footprint + associated cache/data/containers), `appsrc tui` (interactive dashboard — sort by size, filter), bare `appsrc` / `appsrc scan` (cached inventory, `--json`/`--tsv`/`--size`/`--sort`). Picker twins: `tv appsrc` (by source) / `tv appsrc-size` (by footprint). See `docs/tools/appsrc.md`.
+- **`herdr-grep`** — search visible or retained content across panes in the current, one named, or all running local Herdr sessions; reports exact session/workspace/tab/pane coordinates, supports `--json`, and `--pick` pipes matches to fzf then exact-focuses/attaches the selection. Inside Herdr, `prefix+Alt+F` opens a visible-content picker (Alt+S = scrollback, Alt+V = visible). Remote use runs the CLI through SSH. See `docs/tools/herdr.md`.
+- **`dotcfg`** — reconfigure dotfiles prompts (above).
+- **`sesh-preview`** — preview helper for the sesh picker.
+
+**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with three metadata pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`) plus `herdr-grep` for pane-content search. See `docs/tools/herdr.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
+
+## Television (`tv`) — fuzzy pickers with custom channels
+
+There are ~50 **custom** channels (system state, fleet, services, infra, agents…)
+that you won't discover otherwise. Browse them:
+
+```bash
+tv                      # default picker
+tv list-channels        # list everything available
+tv <channel>            # open one, e.g. tv fleet-hosts | tv mlflow | tv pueue
+ls "$(chezmoi source-path)/dot_config/television/cable/"   # the channel definitions
+```
+
+Handy ones: `fleet-hosts`, `tailnet`, `ssh-config`, `mlflow`, `pueue`, `ports`,
+`kill-process`, `services`, `sessions`, `keybindings`, `aliases`, `git-ops`,
+`mac-apps`/`linux-apps`, the agent trio (`agent-panes`, `agent-sessions`,
+`agent-wakeup`) and the `herdr-*` family. Full reference: `docs/tools/tv.md`.
+
+## Keybindings & keymaps
+
+- **`bindings`** (shell function) or **`tv keybindings`** — interactive reference.
+- **tmux**: `prefix + Space` opens the action menu. There is **no `prefix + e`** —
+  that alias was removed, and `prefix + E` is "break every pane into its own
+  window", so do not guess it. `prefix + T` = sesh picker, `prefix + U` = tools.
+  Deep ref: `docs/tools/tmux/keybindings.md`.
+- **shell ZLE widgets**: `Alt+S` sesh sessions, `Alt+T` tools, `Ctrl+R` history (atuin).
+- Master reference: `docs/shells/keybindings.md` (also deployed to `~/.config/docs/shells/keybindings.md`).
+
+## Aliases & functions
+
+`alias` to list shell aliases, or `tv aliases`. Catalog: `docs/shells/aliases.md`.
+Helpers worth knowing: `chezmoi-cd` (jump to source), `run-for` (time-box a command),
+`bindings` (above). App control: `applaunch`/`appquit`/`apprestart`/… (cross-platform).
+System audio (cross-platform, built-in): `sysvol`/`sysmute` (+ `sysplay`/`sysnow` with `installMediaControl`); remote mute via `fleet exec --login -- sysmute on`.
+
+## just recipes (run from the source dir)
+
+```bash
+cd "$(chezmoi source-path)" && just --list
+```
+
+Categories: `chezmoi-*`, `ansible-*`, `upgrade-*` (brew/mise/uv/npm/cargo/…),
+`fleet`/`fleet-*`, `gen-prompts` (regenerate prompt scaffolding), `check`/`lint`,
+`docker-*`. See `docs/this_repo/cheatsheet.md`.
+
+## Editing rules (don't skip)
+
+Before changing anything under the repo, read `CLAUDE.md` Hard invariants and the
+"Cross-file maintenance rules" table — many surfaces have mandatory mirror updates
+in the same commit (docs, completions, tool-managers index, this very skill, …).
+
+
+ARGUMENTS: Use the newly added ytmv CLI to find and download the user's 16 listed songs. Need inspect current CLI usage and available yt-dlp search capability, download to default ~/Music/ytmv with safe profile, and report failures with YouTube URLs.
+
+---
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:13:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Checking search syntax**
+
+I'm checking the syntax for `ytmv help` and `yt-dlp --help`. It looks like I could use `yt-dlp --flat-playlist --dump-json "ytsearch5:..."`, and that should work. I want to run the help command now, and I'm curious if ytmv supports search strings based on recent changes in the system. I'll investigate that further by calling help to see what it returns.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:13:47Z)**_
+
+目前的 `ytmv` 已比剛才版本多了完整 cookie/EJS 診斷；我先看現在實際部署的 help，避免按舊介面操作。然後會先只抓搜尋 metadata，不直接下載第一個命中，避免同名歌曲抓錯版本。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:13:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show current ytmv usage guide
+
+`ytmv help | sed -n '1,220p'`
+
+```text
+ytmv setup guide
+==================
+
+1. Install and verify
+---------------------
+`ytmv` is deployed by chezmoi and self-runs through uv. Media conversion needs
+ffmpeg; burned-in subtitles additionally need libass:
+
+  dotcfg --set installMediaTools=true --yes
+  command -v node && node --version
+  ytmv doctor
+
+Node 22+ is managed by mise. If it is missing, reload the shell, then run
+`mise install` and `mise which node`. Legacy armv7/armv6 hosts are pinned to
+Node 20 and EL7 normally exposes Node 16; neither can run current yt-dlp EJS,
+so doctor fails clearly and embedded calls do not advertise that old runtime.
+`ytmv doctor --offline` checks the local stack without touching the network.
+
+2. Start cookie-free
+--------------------
+Public YouTube videos normally do NOT need an account cookie:
+
+  ytmv get 'https://www.youtube.com/watch?v=...'
+
+`ytmv` packages yt-dlp's EJS challenge solver and explicitly uses Node. If a
+public video still fails, diagnose in this order:
+
+  1. `ytmv doctor` — fix yt-dlp-ejs / Node / ffmpeg failures first.
+  2. Use a clean residential connection; VPN, proxy, cloud, and datacenter IPs
+     commonly trigger `Sign in to confirm you're not a bot`.
+  3. Stop retrying, wait, and reduce request rate (for batches, try `--sleep 10`).
+  4. Use cookies only for private/restricted content, or as a last resort for a
+     bot check. Advanced PO-token providers come after these steps.
+
+3. Cookies are credentials — opt in deliberately
+-------------------------------------------------
+yt-dlp use with a logged-in account can lead to temporary or permanent account
+suspension. A cookies.txt file is a bearer credential: anyone who gets it may
+act as that browser session.
+
+Never print, paste, screenshot, commit, `chezmoi add`, or cloud-backup cookie
+contents. File sources are rejected unless mode 0600, valid Netscape format,
+and YouTube-only; extraction itself accepts only YouTube URL hosts. Prefer a
+dedicated browser profile/account used only for YouTube, not a daily primary
+account.
+
+`ytmv` reuses yth's cookie source. Configure one in:
+
+  ~/.config/yth/config.toml
+
+Recommended repeat-use setup (Firefox or Zen profile):
+
+  from_browser = "firefox:/absolute/path/to/profile"
+
+Explicit `--cookies` fails instead of silently falling back when no safe source is configured.
+Then validate and use it explicitly:
+
+  ytmv doctor --cookies
+  ytmv get '<url>' --cookies
+
+4. Safe Arc / Chromium export
+-----------------------------
+Arc is not a supported `--cookies-from-browser` name. For a narrow YouTube-only
+Netscape cookie file:
+
+  1. Open a private/incognito session and sign in to YouTube.
+  2. Keep exactly one tab open: https://www.youtube.com/robots.txt
+  3. Export only youtube.com cookies with the exact extension
+     "Get cookies.txt LOCALLY". A similarly named former extension without
+     "LOCALLY" was reported as malware.
+  4. Save as ~/.config/yth/cookies.txt and run:
+
+       chmod 600 ~/.config/yth/cookies.txt
+
+  5. Close the private session. Replace/delete the file when it expires or is
+     invalidated. Configure:
+
+       cookiefile = "~/.config/yth/cookies.txt"
+
+Do not combine `--cookies-from-browser` with `--cookies FILE` to export a daily
+profile: that can write cookies for every site in the profile, not just YouTube.
+
+5. macOS Chrome: no popup + v10 decryption failure
+--------------------------------------------------
+This metadata-only query checks whether Chrome's Safe Storage item is
+addressable without printing its secret:
+
+  security find-generic-password -a Chrome -s 'Chrome Safe Storage' >/dev/null
+  echo $?
+
+Exit 44 (OSStatus -25300; inspect with `security error -25300`) means the item
+was not found. Authorization is never reached, so no popup is expected.
+`cannot decrypt v10 cookies: no key found` then means yt-dlp found Chrome's
+cookie DB but cannot derive its decryption key (`v10` is a Chromium encryption
+marker, not Chrome version 10). Creating a new same-named item cannot decrypt
+cookies written with the missing original key.
+
+Use a new dedicated supported-browser profile, or the isolated YouTube-only
+export above. Do not run a Keychain command that prints the Safe Storage value.
+
+6. Player compatibility loop
+----------------------------
+Start with the safe profile, copy one file to the player, then retag offline:
+
+  ytmv get '<url>' --profile safe
+  ytmv tag ~/Music/ytmv --profile cjk-big5
+  ytmv tag ~/Music/ytmv --profile cjk-gbk
+  ytmv tag ~/Music/ytmv --profile ipod
+
+Use `ytmv doctor --list-profiles` for built-in and user-defined profiles.
+`ytmv tag` never downloads again.
+
+7. Manual converter fallback
+----------------------------
+If a public web converter succeeds where the local downloader is challenged,
+download manually — never give the site Google credentials or cookies — then
+bring the local MP3 back through ytmv's compatibility and lyrics layers:
+
+  ffprobe -v error ~/Downloads/song.mp3
+  ytmv tag ~/Downloads/song.mp3 --profile safe --artist 'Artist' --track 'Song'
+  ytmv lyrics ~/Downloads/song.mp3 --artist 'Artist' --track 'Song'
+
+The third party sees your IP and requested URL and may cache the converted file.
+Do not automate or scrape a service unless it publishes an API permitting that
+use; prefer an audited/self-hosted backend. A web site's "320 kbps" output
+cannot restore quality absent from YouTube's original lossy audio.
+
+8. Discovery boundary
+---------------------
+`ytmv` accepts known YouTube URLs/video IDs; it deliberately does not search
+YouTube and has no Television channel. Discover and verify a URL first, then
+pass it to `ytmv get`. Lyrics discovery is separate (`ytmv lyrics --pick`).
+
+Leaf help:
+  ytmv help get
+  ytmv help lyrics
+  ytmv help tag
+  ytmv help doctor
+
+Full documentation:
+  https://daviddwlee84.github.io/dotfiles/tools/ytmv/
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:14:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check current ytmv environment
+
+`ytmv doctor --offline --json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print('\n'.join(f\"{x['name']}: {x['ok']} — {x['detail']}\" for x in d['checks']))"`
+
+```text
+uv: True — /Users/david/.local/bin/uv
+yt-dlp: True — 2026.7.4
+yt-dlp EJS solver: True — 0.8.0
+Node JavaScript runtime: True — v24.13.1 (/Users/david/.local/share/mise/installs/node/lts/bin/node)
+mutagen: True — 1.48.1
+httpx: True — 0.28.1
+ffmpeg: True — /usr/local/opt/ffmpeg-full/bin/ffmpeg
+ffmpeg libass (--burn-subs): True — subtitles filter present
+output directory: True — /Users/david/Music/ytmv
+cookie source: True — none configured (normal for public videos)
+public YouTube metadata: True — offline mode
+lrclib.net: True — offline mode
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:14:47Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Exploring search methods**
+
+I need to search for candidates. I could do a web search, but maybe using `yt-dlp ytsearch` might be better. I’m thinking the user might want something more autonomous, so I could set up task tracking with multiple steps. A Python script invoking sequential `yt-dlp` searches might be useful, though I should avoid too many queries that could trigger a bot check. I’ll test some YouTube search queries in Chinese and figure out how to retrieve the needed information.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:15:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test YouTube search candidate retrieval
+
+`timeout 120 yt-dlp --flat-playlist --playlist-end 5 --no-warnings --print '%(id)s\t%(title)s\t%(channel)s\t%(duration_string)s\t%(view_count)s' 'ytsearch5:稻香 周杰伦 官方' 2>&1`
+
+```text
+sHD_z90ZKV0\t周杰倫 Jay Chou【稻香 Rice Field】-Official Music Video\t周杰倫 Jay Chou\t3:44\t71694964
+kC2bkbMC6Zs\tJay Chou 周杰伦【稻香 Rice Field】 English & Pinyin & Chinese Lyrics\tPURRING MUSIC - Chinese Music Translation\t3:45\t500351
+3FSAyz_hVRM\t周杰伦 《稻香》 Pinyin Lyrics 动态拼音歌词 4k\tJwee Studio\t3:44\t4733
+eIoUmHc0cMI\t【稻香】周杰伦 歌詞 (日本語訳pinyin)\t唯唯 ෆ\t3:45\t13322
+1CehOPhYnJE\t周杰倫 Jay Chou【稻香 Rice Field】-Official Music Video\tNgọc Luân\t3:46\t4737
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:15:56Z)**_
+
+搜尋管線可用；以《稻香》測試已找到周杰倫官方 MV（7169 萬觀看）。現在批次取每首前 5 個候選，會用頻道、標題、長度與觀看數篩選，尤其留意《不怕》《Underground》《午夜魔法》這類高度同名項目。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:16:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```python
+#!/usr/bin/env python3
+import json
+import subprocess
+import time
+
+queries = [
+    ("愛情的訊息", "愛情的訊息 歌曲 官方 MV"),
+    ("午夜魔法", "午夜魔法 歌曲 官方 MV"),
+    ("不怕", "不怕 歌曲 官方 MV"),
+    ("世界赠与我的", "世界赠与我的 歌曲 官方 MV"),
+    ("第57次取消发送", "第57次取消发送 歌曲 官方 MV"),
+    ("关中王の小曲", "关中王の小曲 歌曲"),
+    ("菊次郎的夏天", "菊次郎的夏天 久石让 官方 音乐"),
+    ("Underground", "Underground 歌曲 中文 官方 MV"),
+    ("魑魅魍魉", "魑魅魍魉 歌曲 官方 MV"),
+    ("不管正派反派，吃个年夜饭先！", "不管正派反派 吃个年夜饭先 歌曲"),
+    ("达拉崩吧", "达拉崩吧 洛天依 言和 官方"),
+    ("万疆", "万疆 李玉刚 官方 MV"),
+    ("吉量", "吉量 歌曲 官方 MV"),
+    ("巴拉莱卡", "巴拉莱卡 月岛きらり 官方"),
+    ("拼好歌", "拼好歌 歌曲 官方 MV"),
+    ("稻香", "稻香 周杰伦 官方 MV"),
+]
+
+all_results = {}
+for i, (name, query) in enumerate(queries, 1):
+    cmd = [
+        "yt-dlp", "--flat-playlist", "--playlist-end", "5", "--no-warnings",
+        "--dump-json", f"ytsearch5:{query}",
+    ]
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    hits = []
+    for line in p.stdout.splitlines():
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        hits.append({
+            "id": d.get("id"),
+            "title": d.get("title"),
+            "channel": d.get("channel") or d.get("uploader"),
+            "duration": d.get("duration"),
+            "views": d.get("view_count"),
+            "url": f"https://www.youtube.com/watch?v={d.get('id')}",
+        })
+    all_results[name] = {"query": query, "hits": hits, "stderr": p.stderr[-500:]}
+    print(f"[{i:02d}/{len(queries)}] {name}: {len(hits)} hits")
+    time.sleep(1.5)
+
+with open("/private/tmp/ytmv-candidates.json", "w", encoding="utf-8") as f:
+    json.dump(all_results, f, ensure_ascii=False, indent=2)
+
+```
+
+```text
+File created successfully at: /private/tmp/ytmv-search-candidates.py (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:18:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Search YouTube candidates for all 16 songs
+
+`timeout 2400 python3 /private/tmp/ytmv-search-candidates.py`
+
+```text
+[01/16] 愛情的訊息: 5 hits
+[02/16] 午夜魔法: 5 hits
+[03/16] 不怕: 5 hits
+[04/16] 世界赠与我的: 5 hits
+[05/16] 第57次取消发送: 5 hits
+[06/16] 关中王の小曲: 5 hits
+[07/16] 菊次郎的夏天: 5 hits
+[08/16] Underground: 5 hits
+[09/16] 魑魅魍魉: 5 hits
+[10/16] 不管正派反派，吃个年夜饭先！: 5 hits
+[11/16] 达拉崩吧: 5 hits
+[12/16] 万疆: 5 hits
+[13/16] 吉量: 5 hits
+[14/16] 巴拉莱卡: 5 hits
+[15/16] 拼好歌: 5 hits
+[16/16] 稻香: 5 hits
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:18:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Inspections in Python**
+
+I’m thinking about how I need to inspect candidates, and it seems like using Python’s pretty print functionality could be really helpful for that. Pretty print can provide a better visual output, making it easier to review the data. So I should ensure I implement that correctly when I’m inspecting the candidates. It’s all about making the information clear and understandable, right? I’ll just make sure to format it nicely as I go!
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:18:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Review all YouTube search candidates
+
+```bash
+python3 - <<'PY'
+import json
+x=json.load(open('/private/tmp/ytmv-candidates.json'))
+for name,r in x.items():
+ print('\n##',name)
+ for i,h in enumerate(r['hits'],1):
+  dur=h['duration']; ds='?' if not dur else f'{int(dur)//60}:{int(dur)%60:02d}'
+  views=h['views']; vs='?' if views is None else f'{views:,}'
+  print(f"{i}. {h['title']} | {h['channel']} | {ds} | {vs} | {h['id']}")
+PY
+```
+
+```text
+## 愛情的訊息
+1. 郭靜 Claire Kuo - 愛情訊息 (官方版MV) | 福茂唱片 | 4:40 | 1,584,835 | t7Q-MkGfdHg
+2. 爱情讯息 敦靜 【歌词版】 | MZ Lyric | 4:38 | 210,736 | Ye9UZpY02ug
+3. 施文彬  Michael Shih -  愛愈深心愈凝 (官方完整版MV) | Timeless Music | 4:01 | 719,155 | PPbqroSTaFU
+4. 郭靜 Claire Kuo - 心牆 (官方版MV) | 福茂唱片 | 3:53 | 31,956,636 | VhCRokYVF1I
+5. 黃鶯鶯 Tracy Huang - 來自心海的消息 Words From The Bottom Of My Heart (official官方完整版MV) | Timeless Music | 6:14 | 618,104 | 4y1QWOSafD4
+
+## 午夜魔法
+1. 酥酥芸 - 午夜魔法『月光被踩在脚下，召唤午夜的魔法。』【4K | 动态歌词MV】 | Angel Music | 2:31 | 24,517 | XR8Yts9ZYS0
+2. 酥酥蕓 - 午夜魔法『月光被踩在腳下，召喚午夜的魔法，Fascinating 的酒吧 點一杯 soda，凌亂著頭髮。』【動態歌詞MV】 | Mousse Music | 2:31 | 330 | OjFCKkSoOlA
+3. 酥酥芸 - 午夜魔法『月光被踩在腳下，召喚午夜的魔法。』【熱門歌曲】【EHP Studio】 | EHP Studio | 2:31 | 651 | AugxMylXIrY
+4. 酥酥芸 - 生而为女『她拘于囚笼里改名唤做招娣，孩子生个不停只盼他的来临。』【4K | 动态歌词MV】 | Angel Music | 2:46 | 614,993 | AXAwZGZLFSk
+5. 封茗囧菌 - 安娜的櫥窗「神賜予她耀眼光芒，無人察覺神情哀傷。」[ High Quality Lyrics ] tk推薦 | tk Music Time | 3:35 | 3,573,546 | SVv0RhZhDzs
+
+## 不怕
+1. 郭美美 Jocie Kok - 不怕不怕 (official官方完整版MV) | Timeless Music | 3:51 | 573,387 | Y34An9RTSgE
+2. 林嘉欣 Karena Lam - 我不怕  (官方完整版MV) | Timeless Music | 4:32 | 69,559 | yVifTtGh63Q
+3. 草蜢 - 爱不怕 (MV) | Edwin Lau | 3:46 | 5,662 | Q3euRl-UciM
+4. 郭美美-不怕不怕-《下一站再爱你》电影主题曲 bu pa bu pa - Guo Meimei.经典中文歌曲.Chinese songs lyrics with Pinyin. | Pinyin_lyrics | 3:36 | 10,926 | QDc6UNzFLzg
+5. 郭美美 - 《不怕不怕》 [歌词]　『看见蟑螂　我不怕不怕啦』 | 佳选歌曲 - 纯享歌词版好歌　(JiaXuan Nice Songs - Lyrics Video) | 3:41 | 36,412 | m4tL9MPeNHI
+
+## 世界赠与我的
+1. 世界赠予我的 | Faye Wong Official Channel 王菲 官方頻道 | 3:53 | 2,958,540 | CwwQvC_JiN4
+2. 王菲时隔七年再登春晚 新歌《世界赠予我的》太好听了！「2025央视春晚」| CCTV春晚 | CCTV春晚 | 3:58 | 5,273,620 | LffTkRuB7z0
+3. 春晚-#世界赠予我的  What The World Gifted Me with English lyrics, Chinese lyrics and Pinyin | #王菲 Faye Wong | Chinese & English对外汉语小曾 | 3:55 | 127,572 | O_lwpivv2cE
+4. 童声合唱《世界赠予我的》 Gifts from the World - Cover by Hydrangea Children's Choir | Hydrangea Children's Choir 绣球花小合唱团 | 4:52 | 1,379,568 | dhhhvn36KdE
+5. 《世界赠予我的》 Gifts from the World - Cover by Hydrangea Children's Choir | Hydrangea Children's Choir 绣球花小合唱团 | 4:06 | 218,102 | vw-H8hbk1FE
+
+## 第57次取消发送
+1. 菲菲公主 - 第57次取消发送『我好想你 在每個夜裡』 | Music in the Air | 3:03 | 14,180,935 | 8eg__nN-CtQ
+2. 承桓 - 第57次取消發送『我好想你 在每個夜裡，孤單自敘 紛飛的回憶，猜不透你，褪色的熟悉 是我編造的幻覺。』【動態歌詞MV】 | EHPMusicChannel | 3:06 | 4,377 | UhR-oQj5SWU
+3. 第57次取消发送 | 菲菲公主_Feyfey - Topic | 3:01 | 17,586,504 | gHk8MIx6nfY
+4. 【纯享版】张新成姚晓棠"师兄妹"二搭《第57次取消发送》 律动感十足的旋律搭配直白洒脱的歌词 将恋爱的酸甜诠释得淋漓尽致！#天赐的声音6 EP6 20250523 | 浙江卫视音乐频道 ZJSTV Music Channel - 欢迎订阅 - | 3:04 | 1,913,520 | Y9sfxmHDrRU
+5. 【4K超清】#宋威龙 #张婧仪《第57次取消发送》2026湖南卫视芒果TV跨年晚会｜MangoTV | 芒果TV音乐 MangoTV Music | 2:07 | 324,371 | sbB-WAATLjE
+
+## 关中王の小曲
+1. 《精卫》关中王进行曲完整版『流星的雨许愿的你，可后来你还是离开，投身人海，只剩下我等待，那誓言就随便去说说』氛围感BGM | 抖音最火 | Douyin Compilation | 3:45 | 3,552,202 | DBvSLMiwosY
+2. 【关中王の小曲】"啊~是关中王来了！"《鸿门宴の小曲》《精卫（dj戏腔版）》 | 灯塔下的旋律 | 1:47 | 72,758 | _9NoYYfdV-A
+3. Jingwei | MIBYTCNM - Topic | 2:55 | 332,659 | 12VvhxIUemQ
+4. 关中王进行曲The March of the King of Guanzhong原曲精卫Yuanqu Jingwei | 随风而起 | 3:39 | 49,486 | qX_qlIDu0q4
+5. 【精卫】Tinh Vệ Remix【关中王进行曲】【刘邦の小曲】『是现在我所有期待 所有的爱，为什么不明白 说的话为什么不记得 为什么不记得。』抖音最火｜ 氛围感BGM | TikTok Sound | 60:07 | 11,249 | dDbLkE1yksk
+
+## 菊次郎的夏天
+1. 久石让----菊次郎的夏天 | 董生 | 2:53 | 723,780 | 4vQc8WC7clI
+2. Joe Hisaishi - Summer | Joe Hisaishi Official | 4:03 | 51,130,129 | l0GN40EL1VU
+3. [Piano Cover] 久石讓 Joe Hisaishi - 菊次郎的夏天(Summer)｜一聽前奏就知道的旋律 | Nice piano sheets | 2:33 | 1,859,302 | I-rzHBySupc
+4. 【官方正式版】宮崎駿久石讓音樂會上的惊喜演绎：孤勇者的不可思议之旅！在樂團返場時，樂手問大家想聽什麼，小朋友大聲喊“孤勇者”，而樂團卻拉起了菊次郎的夏天，但結局卻是那麼的出人意料，全場觀眾都沸騰起來！ | 太極巭美女 | 3:04 | 671,738 | eg_vpGGcDtI
+5. 久石讓十部作品鋼琴合輯 | Relaxing Joe Hisaishi Piano Melodies for Working Studying ♫ 吉卜力.菊次郎の夏.天空の城.風の谷.宮﨑駿 🅼🅼 | Meader Music 米德音樂藝術 | 158:29 | 18,914 | hYz-erVT-9U
+
+## Underground
+1. 《3977》- ljz329[OFFICIAL MUSIC VIDEO] | ljz329 | 2:22 | 1,532,870 | 9bclDiysZxU
+2. 《哪里人》-Official MV - HRBELIAL This is Chinese Underground rap 2025 | 街头贝利 | 2:02 | 255 | IgUt17YGNKQ
+3. 理想混蛋 Bestards【離開的一路上 Farewell】Official Music Video | 理想混蛋 Bestards | 4:32 | 56,275,152 | 3hLESh77fSg
+4. 盧廣仲 Crowd Lu【太陽與地球 Sun & Earth】Official Video | 添翼音樂 TEAM EAR MUSIC | 4:23 | 24,227,628 | i5YRIjxyJP8
+5. 玖壹壹(Nine one one)-下輩子 官方MV首播 | 玖壹壹 | 4:22 | 57,735,264 | f2u9F-IT9wY
+
+## 魑魅魍魉
+1. 周林枫 - 魑魅魍魉『你看魑魅魍魉求神拜佛，它三叩九拜求些什么。』【4K | 动态歌词MV】 | Angel Music | 3:21 | 1,624,704 | JN5To3rwu9Q
+2. [Vietsub + Pinyin] Si Mị Võng Lượng - Châu Lâm Phong / 魑魅魍魎 - 周林楓 | Cỏ dại - Nhạc trung channel | 3:19 | 596,454 | 4F7LFQrR2us
+3. 魑魅魍魉 | 周林枫 - Topic | 3:21 | 710,152 | 4u4zmpL1AEo
+4. 周林楓 - 魑魅魍魎『你看魑魅魍魎求神拜佛，它三叩九拜求些什麼。』【動態歌詞 | Pinyin Lyrics】【AWALK MUSIC】 | AWALK MUSIC CHANNEL | 3:16 | 91,416 | JLmBQdtlYzw
+5. 西瓜JUN - 长生诀『魑魅魍魉一剑破万法，犹记伊与君执手天涯。』【动态歌词MV】 | 彩云音乐 | 3:12 | 13,230 | pjiGOk1lwwQ
+
+## 不管正派反派，吃个年夜饭先！
+1. 小鷹 - 不管正派反派吃个年夜饭先! (杀青梗BGM官方超级加长版) (抖音热播DJ版)『请聆听歌曲』【2k25抖音火流行歌曲推荐TikTok】 | Smile TikTok VN | 9:20 | 21,616 | _jFmYM7fAH8
+2. 不管正派反派,吃个年夜饭先! | 小鷹 | 1:52 | 58,796 | 1IoPgA8XRoU
+3. 不管正派反派，吃个年夜饭先!! 网易云小鹰 | 패션 | 1:53 | 46,027 | DA6SYkHzwtQ
+4. 小鷹 - 不管正派反派,吃个年夜饭先!! (抖音热播DJ版) Melody TikTok (Remix)『请聆听歌曲』【2k25抖音火流行歌曲推荐TikTok】 |  Smile TikTok VN | 9:20 | 3,937 | dn81pC5TXqY
+5. 《不管正派反派，吃个年夜饭先》竹笛版 不是杀青，是来日方长！杀青梗   杀青梗是最伟大的发明 笛子 杀青梗bgm好伟大  不管正派反派，吃个年夜饭先 | Leo梅队 | 0:16 | 1,716 | QvTdrkyVQrI
+
+## 达拉崩吧
+1. 【洛天依，言和】 原创《达拉崩吧》——ilem | 洛天依·言和·乐正绫 bilibili二次元原创曲 | 3:29 | 112,498 | RRss5tRfkck
+2. 【纯享】#周深 挑战二次元神曲《#达拉崩吧》解锁魔性舞步 | 歌手·当打之年 | Singer 2020 | MangoTV | 芒果TV音乐 MangoTV Music | 4:16 | 33,101,735 | XHedu3KcPP0
+3. ILEM, 言和, 洛天依 - 達拉崩吧『英雄達拉崩巴 騎上最快的馬 帶著大家的希望 從城堡里出發』【Lyrics Video】 | Boba Beats | 3:29 | 22,279 | CLANyik-FJ0
+4. 洛天依（Luo Tianyi）/ 2019 江蘇衛視カウントダウン《达拉崩吧》洛天依 薛之谦 | 洛天依 - Luo Tianyi | 3:42 | 1,425,077 | EN0K5Te3qig
+5. 达拉崩吧 (Live) | ZhouShen Official | 4:06 | 1,184,179 | XpzdegogEGE
+
+## 万疆
+1. 李玉刚《万疆》MV 萬疆 Wan Jiang 紅日昇在東方 其大道滿霞光 4K | guoguosir | 4:04 | 61,851 | ihY9G4EkZqQ
+2. 万疆 李玉刚 [动态歌词] Lyircs | Sam Music | 3:55 | 825,940 | M8fhzT3L7XY
+3. Top10 歌曲《万疆》李玉刚【2021央视中秋晚会】｜秋晚榜中榜 | CCTV春晚 | 3:53 | 260,971 | q6b42GUKJEY
+4. 万疆——李玉刚个人向mv | 钓鱼箱David Diao | 3:53 | 31,268 | nKkbxtKNnC0
+5. 【万疆】李玉刚一首《万疆》献礼祖国，祝福伟大祖国繁荣昌盛。 | -启航音乐- | 3:50 | 614 | HDG6LqKUc90
+
+## 吉量
+1. 开口跪！周深和孩子们同唱《吉量》！用清澈歌声勾勒出《山海经》里的神马 「2026央视春晚」| CCTV春晚 | CCTV春晚 | 4:06 | 362,133 | C7j-HocIXLE
+2. 周深《吉量》｜官方動態歌詞版MV ｜騰訊音樂發行頻道 | 腾讯音乐发行 | 3:57 | 132,216 | GXMfOPVyvtA
+3. 周深 - 吉量 「羲和车上金铃铛 叮当叮当」【動態歌詞/Lyrics Video】 #周深 #吉量 #動態歌詞 | WCY Classic Music | 3:57 | 785 | ardFCofR3BA
+4. 周深 - 吉量『羲和车上金铃铛 叮当叮当，望舒驾后银尾巴 摇摇晃晃，弱水岸边唤吉量 吉量吉量。』🎧高质音乐｜拼音动态歌词｜抖音最火｜抖音｜TikTok | 抖音 Music | 3:57 | 208 | klb78Tknk78
+5. 周深《吉量》歌词纯享版 - “弱水岸边唤吉量 吉量吉量  叮叮当当 天地叮叮当当” | 听见鹣鲽 | 3:57 | 64 | 0gMU3F7yIR0
+
+## 巴拉莱卡
+1. 月島きらり「バラライカ」　ビデオクリップ | アップフロントチャンネル | 3:43 | 30,430,276 | SYLWe09cOjc
+2. きらりん☆レボリューション OP2 バラライカ / 月島きらり | ShoProアニメチャンネル | 1:29 | 11,474,935 | hOwTyqbX_80
+3. Kusumi Koharu - Balalaika | Dwojy18 | 3:43 | 2,798,309 | BF7J78C3aRo
+4. 月島きらり starring 久住小春「バラライカ」 Color Coded 日本語歌詞/英語字幕 | エル。Ele | 3:35 | 211,760 | bdGLPbqwe6E
+5. Kusumi Koharu ~ 久住小春 ~ Balalaika ~ H!P Wonderful Hearts 2007 | H.G. | 2:43 | 511,399 | R6KxAWRjfyg
+
+## 拼好歌
+1. ⚡️拼好歌⚡️（素材来自抖音 | 发霉面包 | 1:12 | 745,944 | HgjqOIg2FYo
+2. 拼好歌 (抖音DJ版) - 2024抖音热歌合集 ♪ || 年度最佳抖音歌曲 | 抖音最火歌曲音 | 抖音 | TikTok •|• Douyin ♪ | Fantastic Music Station | 4:17 | 1,218 | FYMlY7Lqu4o
+3. 闻人听书 《虞兮叹》 【创作MV - Lyrics】 「蔡文姬：以后别让我奶了，我男(澜)朋友回来了」 【王者荣耀】 | 相伴音樂 POP SONG | 3:25 | 45,247,362 | bUjuowPASe0
+4. Zeho傅子豪、Jiaber吴伯滔~ByeBye2024（拼好歌）『Emergency』【动态歌词纯享练唱版带拼音】 | 瑞聲KTV練唱頻道 | 2:41 | 334 | pkz909REjv4
+5. “当你和小老弟洗澡时一起唱拼好歌时”#猫meme #拼好歌 #水手 #音乐分享 | manns una | 0:39 | 1,697 | evDQkw4NWEw
+
+## 稻香
+1. 周杰倫 Jay Chou【稻香 Rice Field】-Official Music Video | 周杰倫 Jay Chou | 3:44 | 71,694,964 | sHD_z90ZKV0
+2. 稻香 周杰伦 (歌词版) | GM Lyric | 3:44 | 3,271,330 | nk7tnvrRyfE
+3. 周杰倫-稻香 Rice Aroma (Jay Chou) HQ 高品质 | fgamefgame | 3:44 | 587,026 | lKjI9ehi3A4
+4. 周杰倫 Jay Chou【稻香 Rice Field】-Official Music Video | Ngọc Luân | 3:46 | 4,737 | 1CehOPhYnJE
+5. 周杰倫 JAY CHOU & 五月天 MAYDAY【稻香 搖滾版】 | 周杰倫 Jay Chou | 2:33 | 2,894,191 | 4dIiSXT8oYk
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:19:07Z)**_
+
+前 5 名大多可唯一確認，但有 4 個不能安全地「取第一名」：`不怕`、`Underground`、`关中王の小曲`、`拼好歌`。我會為這四首再做精準搜尋；其他 12 首已經有高信心來源（官方頻道、Topic 頻道或標題完全吻合）。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:19:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Refine ambiguous YouTube searches
+
+```bash
+for q in \
+  '"不怕" 歌曲' \
+  'Underground official audio song' \
+  '"关中王の小曲"' \
+  '"拼好歌" full song' \
+  '"拼好歌" Zeho Jiaber' \
+  '"万疆" "李玉刚" Topic'; do
+  printf '\n### %s\n' "$q"
+  timeout 120 yt-dlp --flat-playlist --playlist-end 10 --no-warnings \
+    --print '%(id)s\t%(title)s\t%(channel)s\t%(duration_string)s\t%(view_count)s' "ytsearch10:$q" 2>/dev/null
+  sleep 1.5
+done
+```
+
+```text
+### "不怕" 歌曲
+Y34An9RTSgE\t郭美美 Jocie Kok - 不怕不怕 (official官方完整版MV)\tTimeless Music\t3:51\t573387
+iyF8MOPyXXs\tSasablue - 不怕 (原唱: 赵蕾/赵蓓)【我有勇气我都不怕，管它寒冬炎夏。】『動態歌詞Lyrics』♫\tSLV Music Channel\t2:13\t40465
+IWgFXPbiOyA\t不怕\tSasablue - Topic\t2:13\t40009
+P_zj-Cp7ZVQ\t电视剧《我的奇妙男友》片头曲  《不怕》  Just 歌词  My Amazing Boyfriend  Theme Songs  20160425  1080p\t曾怡甄\t4:00\t2214
+SnDzmSGkF7Y\t不怕MV\tbabihutan1990\t2:54\t100890
+3l2jj56YR_s\tDragostea Din Tei #不怕不怕#音樂分享\tHeisonCC\t3:24\t64315
+LZrYZbAn-eM\tJocie 郭美美   《不怕不怕》 Official Karaoke Music Video\tWarner Music Singapore\t3:50\t4113514
+04VXfavbeDs\t郁可唯 Yisa Yu【指望】台視、三立偶像劇「犀利人妻」插曲 Official Music Video\t滾石唱片 ROCK RECORDS\t3:57\t25935800
+siZaVz_YTlY\t命硬 侧田 (歌词版)\tGM Lyric\t3:39\t1303916
+UexVvwzQk2I\t翁素英 人在旅途主題歌\thyl wrx\t3:33\t269397
+
+### Underground official audio song
+fo8uu3VaJU4\tUnderGround\tGeeta Zaildar - Topic\t2:19\t27762161
+JBf-9oiraQY\tJack White - Underground (Official Audio)\tJack White\t3:49\t159713
+TeCsS73JXXw\tNA JERRY - ក្មេង UNDERGROUND (OFFICIAL AUDIO)\tThe HIGHER\t2:36\t42175
+Uf-TWMmHJVY\tAdjustor - Underground [OFFICIAL AUDIO]\tBG LABELS Official\t4:08\t38393
+EJ09pSuA9hw\tLindsey Stirling - Underground (Official Music Video)\tLindsey Stirling\t4:13\t24079224
+8IJlzrswbI4\tAdam Lambert - Underground [Official Audio]\tAdam Lambert\t3:34\t3734614
+NrQSGggiAxM\tUnderground\tCody Fry\t2:51\t1937461
+lhUZQFxs_Jo\tDhanda Nyoliwala - Underground (Official Lyric Video) | VYRL Haryanvi\tVYRL Haryanvi\t3:28\t1054657
+49RDSLVvaFY\tWE ARE UNDERGROUND (Official Audio)\tOut Of The Rule Official\t4:38\t52423
+Qga12-bAS4A\tDavid Bowie - Underground (Official Video)\tDavid Bowie\t4:42\t3174186
+
+### "关中王の小曲"
+_9NoYYfdV-A\t【关中王の小曲】"啊~是关中王来了！"《鸿门宴の小曲》《精卫（dj戏腔版）》\t灯塔下的旋律\t1:47\t72758
+-ayN_Ak6u3E\t来盘点一下最近很火的 4个《精卫》版本 |【MVPの小曲】|【关中王の小曲】\tOishiiKay Music\t12:45\t860
+
+### "拼好歌" full song
+2X8K7EMpr0w\tByeBye2024 (拼好歌) - Zeho傅子豪/Jiaber吳伯滔『ByeBye2024 ( pin hao ge) - Zeho fu zi hao Jiaber wu bo tao』\tOmega music\t2:42\t78
+KHkxkxoBdIk\tKTV 2018 - Wednesday\tKeystone Boys State\t11:42\t306
+f322N4hUCHM\t東Official -  拼好歌DJ | 冰糖葫芦『動態歌詞Lyrics|高音質| video』 Hot抖音\tMusic Yuna 音乐\t1:00:30\t1510
+imp31VfPGrM\t2016.02.06 明日之星【小年夜特輯之金牌評審經典作品】符瓊音-捨不得\tMic Miracle\t1:59\t34
+OLQAvsK0enw\t吳俊宏+一生只有你+我愛桃花鄉\t洪頂天\t4:00\t639
+NvOEVmUPBmU\t⚡【星穹铁道×2024拼好歌】热门串烧全角色盛宴(√) ⚡\t阿魚音樂搬運\t4:10\t227260
+
+### "拼好歌" Zeho Jiaber
+2X8K7EMpr0w\tByeBye2024 (拼好歌) - Zeho傅子豪/Jiaber吳伯滔『ByeBye2024 ( pin hao ge) - Zeho fu zi hao Jiaber wu bo tao』\tOmega music\t2:42\t78
+pkz909REjv4\tZeho傅子豪、Jiaber吴伯滔~ByeBye2024（拼好歌）『Emergency』【动态歌词纯享练唱版带拼音】\t瑞聲KTV練唱頻道\t2:41\t334
+
+### "万疆" "李玉刚" Topic
+M8fhzT3L7XY\t万疆 李玉刚 [动态歌词] Lyircs\tSam Music\t3:55\t825940
+cUT8ruvcaJE\tChang An Xing (The 20th Anniversary of ᐸThe Westward Journeyᐳ Opening Song)\t李玉刚 - Topic\t3:56\t35642
+UdKAPLUdM-s\t万疆 (爱国诗词版)\t祖瑜兄 - Topic\t3:55\t881
+5x4xLYRcT_Q\tTianXiaDaZu\t李玉刚 - Topic\t3:54\t10597
+9YTNzy6Q6JQ\t九州\t李玉刚 - Topic\t3:57\t12857
+plcBYEKkQd4\t万疆\tManr - Topic\t1:28\t16
+Vb5-HOlvtfc\tTianXiaDaZu (Instrumental)\t李玉刚 - Topic\t3:54\t541
+j3oMphf4Zlg\tHua Xia\t李玉刚 - Topic\t3:30\t18473
+LE6qGTOqPL8\t万疆 Wan Jiang [李玉刚 Li Yu Gang] - Chinese, Pinyin & English Translation 歌词英文翻译\tTempest Jun\t3:53\t22357
+K296qkKXu80\t李玉刚的中国风歌曲《万疆》搭配《觉醒年代》太催泪了，请铭记这些革命先烈\t短视频分享Short video sharing\t3:50\t62031
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:20:03Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Planning the process**
+
+I need to add a 5-second interval between tasks. It seems important to start everything sequentially to avoid overlap. Writing a manifest will help structure things better. I also want to ensure there are no quoting issues that might arise, as those can complicate everything further. It feels like taking these small steps now will make everything smoother down the line! Let's keep everything organized and check the details as we go.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:20:04Z)**_
+
+已確定 15 首的來源；`Underground` 沒有作者資訊，搜尋到 David Bowie、Lindsey Stirling、Adam Lambert、Jack White、Cody Fry 等互不相干作品，不能負責任地替你猜。其餘 15 首現在逐首下載到 `~/Music/ytmv`，並在容易誤判的影片上明確指定 artist/track，避免 LRCLIB 配錯歌詞。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:20:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```python
+#!/usr/bin/env python3
+import json
+import subprocess
+import time
+from pathlib import Path
+
+# Resolved from YouTube search results, preferring official/Topic channels and
+# exact-title full-length uploads. Explicit artist/track values prevent noisy
+# upload titles ("4K dynamic lyrics", etc.) from poisoning LRCLIB matching.
+songs = [
+    {"requested": "愛情的訊息", "id": "t7Q-MkGfdHg", "artist": "郭靜", "track": "愛情訊息"},
+    {"requested": "午夜魔法", "id": "XR8Yts9ZYS0", "artist": "酥酥芸", "track": "午夜魔法"},
+    {"requested": "不怕", "id": "IWgFXPbiOyA", "artist": "Sasablue", "track": "不怕"},
+    {"requested": "世界赠与我的", "id": "CwwQvC_JiN4", "artist": "王菲", "track": "世界赠予我的"},
+    {"requested": "第57次取消发送", "id": "gHk8MIx6nfY", "artist": "菲菲公主", "track": "第57次取消发送"},
+    {"requested": "关中王の小曲", "id": "_9NoYYfdV-A", "artist": "灯塔下的旋律", "track": "关中王の小曲"},
+    {"requested": "菊次郎的夏天", "id": "l0GN40EL1VU", "artist": "久石譲", "track": "Summer"},
+    {"requested": "魑魅魍魉", "id": "4u4zmpL1AEo", "artist": "周林枫", "track": "魑魅魍魉"},
+    {"requested": "不管正派反派，吃个年夜饭先！", "id": "1IoPgA8XRoU", "artist": "小鷹", "track": "不管正派反派，吃个年夜饭先！"},
+    {"requested": "达拉崩吧", "id": "RRss5tRfkck", "artist": "ilem / 洛天依 / 言和", "track": "达拉崩吧"},
+    {"requested": "万疆", "id": "M8fhzT3L7XY", "artist": "李玉刚", "track": "万疆"},
+    {"requested": "吉量", "id": "GXMfOPVyvtA", "artist": "周深", "track": "吉量"},
+    {"requested": "巴拉莱卡", "id": "SYLWe09cOjc", "artist": "月島きらり starring 久住小春", "track": "バラライカ"},
+    {"requested": "拼好歌", "id": "2X8K7EMpr0w", "artist": "Zeho傅子豪 / Jiaber吴伯滔", "track": "ByeBye2024（拼好歌）"},
+    {"requested": "稻香", "id": "sHD_z90ZKV0", "artist": "周杰倫", "track": "稻香"},
+]
+
+report = []
+for i, song in enumerate(songs, 1):
+    url = f"https://www.youtube.com/watch?v={song['id']}"
+    cmd = [
+        "ytmv", "get", url,
+        "--profile", "safe",
+        "--artist", song["artist"],
+        "--track", song["track"],
+        "--json",
+    ]
+    print(f"[{i:02d}/{len(songs)}] {song['requested']} -> {url}", flush=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        entry = {
+            **song,
+            "url": url,
+            "returncode": p.returncode,
+            "stdout": p.stdout,
+            "stderr": p.stderr,
+        }
+        report.append(entry)
+        tail = [line for line in p.stderr.splitlines() if line.strip()][-2:]
+        for line in tail:
+            print("  " + line, flush=True)
+    except subprocess.TimeoutExpired as e:
+        report.append({**song, "url": url, "returncode": 124, "stdout": "", "stderr": "timeout"})
+        print("  TIMEOUT", flush=True)
+    if i < len(songs):
+        time.sleep(6)
+
+Path("/private/tmp/ytmv-download-report.json").write_text(
+    json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+)
+
+ok = sum(r["returncode"] == 0 for r in report)
+print(f"DONE: {ok}/{len(report)} commands succeeded; report=/private/tmp/ytmv-download-report.json")
+
+```
+
+```text
+File created successfully at: /private/tmp/ytmv-download-list.py (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Download 15 resolved songs with ytmv
+
+`timeout 10800 python3 /private/tmp/ytmv-download-list.py`
+
+```text
+[01/15] 愛情的訊息 -> https://www.youtube.com/watch?v=t7Q-MkGfdHg
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[02/15] 午夜魔法 -> https://www.youtube.com/watch?v=XR8Yts9ZYS0
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[03/15] 不怕 -> https://www.youtube.com/watch?v=IWgFXPbiOyA
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[04/15] 世界赠与我的 -> https://www.youtube.com/watch?v=CwwQvC_JiN4
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[05/15] 第57次取消发送 -> https://www.youtube.com/watch?v=gHk8MIx6nfY
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[06/15] 关中王の小曲 -> https://www.youtube.com/watch?v=_9NoYYfdV-A
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[07/15] 菊次郎的夏天 -> https://www.youtube.com/watch?v=l0GN40EL1VU
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[08/15] 魑魅魍魉 -> https://www.youtube.com/watch?v=4u4zmpL1AEo
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[09/15] 不管正派反派，吃个年夜饭先！ -> https://www.youtube.com/watch?v=1IoPgA8XRoU
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[10/15] 达拉崩吧 -> https://www.youtube.com/watch?v=RRss5tRfkck
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[11/15] 万疆 -> https://www.youtube.com/watch?v=M8fhzT3L7XY
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[12/15] 吉量 -> https://www.youtube.com/watch?v=GXMfOPVyvtA
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[13/15] 巴拉莱卡 -> https://www.youtube.com/watch?v=SYLWe09cOjc
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[14/15] 拼好歌 -> https://www.youtube.com/watch?v=2X8K7EMpr0w
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+[15/15] 稻香 -> https://www.youtube.com/watch?v=sHD_z90ZKV0
+    x metadata lookup failed
+  ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+DONE: 0/15 commands succeeded; report=/private/tmp/ytmv-download-report.json
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:14Z)**_
+
+15 首全部在 metadata 階段一致失敗，這表示不是個別影片，而是 `ytmv` 目前的 yt-dlp runtime/options 路徑有共同問題；獨立 `yt-dlp ytsearch` 則正常。先抓完整錯誤，找根因後我會修工具再重跑，不會把 15 首逐一當失敗結案。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show full first ytmv failure
+
+```bash
+python3 - <<'PY'
+import json
+r=json.load(open('/private/tmp/ytmv-download-report.json'))
+print(r[0]['stderr'])
+PY
+```
+
+```text
+[1/1] https://www.youtube.com/watch?v=t7Q-MkGfdHg
+WARNING: [youtube] No title found in player responses; falling back to title from initial data. Other metadata may also be missing
+ERROR: [youtube] t7Q-MkGfdHg: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
+  x metadata: ERROR: [youtube] t7Q-MkGfdHg: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dl
+  x metadata lookup failed
+ytmv get: 0 downloaded, 0 skipped, 1 failed → /Users/david/Music/ytmv
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare standalone yt-dlp metadata retrieval
+
+`timeout 120 yt-dlp --skip-download --no-warnings --print '%(id)s\t%(title)s\t%(channel)s\t%(duration_string)s' 'https://www.youtube.com/watch?v=t7Q-MkGfdHg' 2>&1`
+
+```text
+Exit code 1
+ERROR: [youtube] t7Q-MkGfdHg: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Considering file creation options**
+
+I'm thinking about creating a file as operational output. Making it at home feels reversible and seems to fit within the request. I wonder if the user would find it helpful, especially if they want URLs but can't access them. Perhaps a markdown or TSV file would work well? It seems like a solid option to consider, as it could meet the user's needs effectively. I want to make sure I'm being useful!
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Clarifying download expectations**
+
+It seems the user might be expecting just one download after their clarification. I think I might consider running `ytmv doctor --cookies`, but it might fail since none are configured. I don't think that's necessary right now. It could be good to confirm this behavior, but at this point, it feels like enough. I might need to ensure that I use `Write` instead of shell to handle the file properly.
+</details></think>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:46Z)**_
+
+根因已確認：目前 YouTube 對這個 IP 的「搜尋」仍放行，但對實際影片 metadata/download 一律回 `Sign in to confirm you're not a bot`。`doctor` 顯示沒有配置 cookie，而 `ytmv` 的安全設計不允許我偷偷從日常瀏覽器抽取 credentials；依你指定的 fallback，我會把已驗證的 URL 清單保存並貼出。
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:23:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```txt
+# ytmv pending URLs — YouTube bot check blocked metadata/download
+# Generated from yt-dlp ytsearch results. Retry after waiting / changing network,
+# or deliberately configure a safe dedicated cookie source per `ytmv help`.
+
+愛情的訊息 (郭靜《愛情訊息》官方 MV)
+https://www.youtube.com/watch?v=t7Q-MkGfdHg
+
+午夜魔法 (酥酥芸)
+https://www.youtube.com/watch?v=XR8Yts9ZYS0
+
+不怕 (Sasablue Topic；exact title, not 郭美美《不怕不怕》)
+https://www.youtube.com/watch?v=IWgFXPbiOyA
+
+世界赠与我的 (王菲官方《世界赠予我的》)
+https://www.youtube.com/watch?v=CwwQvC_JiN4
+
+第57次取消发送 (菲菲公主 Topic)
+https://www.youtube.com/watch?v=gHk8MIx6nfY
+
+关中王の小曲 (exact-title meme version)
+https://www.youtube.com/watch?v=_9NoYYfdV-A
+
+菊次郎的夏天 (Joe Hisaishi Official — Summer)
+https://www.youtube.com/watch?v=l0GN40EL1VU
+
+# Underground is ambiguous. Pick ONE artist/version:
+Underground — David Bowie (Official Video)
+https://www.youtube.com/watch?v=Qga12-bAS4A
+Underground — Lindsey Stirling (Official Music Video)
+https://www.youtube.com/watch?v=EJ09pSuA9hw
+Underground — Adam Lambert (Official Audio)
+https://www.youtube.com/watch?v=8IJlzrswbI4
+Underground — Jack White (Official Audio)
+https://www.youtube.com/watch?v=JBf-9oiraQY
+Underground — Cody Fry
+https://www.youtube.com/watch?v=NrQSGggiAxM
+Underground — Geeta Zaildar Topic
+https://www.youtube.com/watch?v=fo8uu3VaJU4
+
+魑魅魍魉 (周林枫 Topic)
+https://www.youtube.com/watch?v=4u4zmpL1AEo
+
+不管正派反派，吃个年夜饭先！ (小鷹, exact title)
+https://www.youtube.com/watch?v=1IoPgA8XRoU
+
+达拉崩吧 (ilem / 洛天依 / 言和 original)
+https://www.youtube.com/watch?v=RRss5tRfkck
+
+万疆 (李玉刚)
+https://www.youtube.com/watch?v=M8fhzT3L7XY
+
+吉量 (周深 — Tencent Music official lyric MV)
+https://www.youtube.com/watch?v=GXMfOPVyvtA
+
+巴拉莱卡 (月島きらり「バラライカ」official video clip)
+https://www.youtube.com/watch?v=SYLWe09cOjc
+
+拼好歌 (Zeho傅子豪 / Jiaber吴伯滔 — ByeBye2024 full song)
+https://www.youtube.com/watch?v=2X8K7EMpr0w
+
+稻香 (周杰倫官方 MV)
+https://www.youtube.com/watch?v=sHD_z90ZKV0
+
+```
+
+```text
+File created successfully at: /Users/david/Music/ytmv/pending-youtube-urls.txt (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.6-sol 2026-08-23 03:24:15Z)**_
+
+測試結果：**0/15 成功下載**。
+
+YouTube 目前允許搜尋，但所有實際影片 metadata/download 請求都統一回覆：
+
+```text
+Sign in to confirm you’re not a bot
+```
+
+`ytmv doctor` 顯示未配置 cookies。基於 `ytmv` 的安全規則，我沒有擅自抽取瀏覽器 cookies，也沒有反覆轟炸 YouTube。
+
+已把完整清單寫到：
+
+```text
+~/Music/ytmv/pending-youtube-urls.txt
+```
+
+## 已確認的 URL
+
+| 歌曲 | YouTube |
+|---|---|
+| 愛情的訊息／郭靜《愛情訊息》官方 MV | https://www.youtube.com/watch?v=t7Q-MkGfdHg |
+| 午夜魔法／酥酥芸 | https://www.youtube.com/watch?v=XR8Yts9ZYS0 |
+| 不怕／Sasablue | https://www.youtube.com/watch?v=IWgFXPbiOyA |
+| 世界赠与我的／王菲《世界赠予我的》官方頻道 | https://www.youtube.com/watch?v=CwwQvC_JiN4 |
+| 第57次取消发送／菲菲公主 Topic | https://www.youtube.com/watch?v=gHk8MIx6nfY |
+| 关中王の小曲 | https://www.youtube.com/watch?v=_9NoYYfdV-A |
+| 菊次郎的夏天／久石譲《Summer》官方頻道 | https://www.youtube.com/watch?v=l0GN40EL1VU |
+| 魑魅魍魉／周林枫 Topic | https://www.youtube.com/watch?v=4u4zmpL1AEo |
+| 不管正派反派，吃个年夜饭先！／小鷹 | https://www.youtube.com/watch?v=1IoPgA8XRoU |
+| 达拉崩吧／ilem、洛天依、言和原版 | https://www.youtube.com/watch?v=RRss5tRfkck |
+| 万疆／李玉刚 | https://www.youtube.com/watch?v=M8fhzT3L7XY |
+| 吉量／周深、騰訊音樂官方歌詞版 | https://www.youtube.com/watch?v=GXMfOPVyvtA |
+| 巴拉莱卡／月島きらり官方 MV | https://www.youtube.com/watch?v=SYLWe09cOjc |
+| 拼好歌／Zeho傅子豪、Jiaber吴伯滔《ByeBye2024》完整版 | https://www.youtube.com/watch?v=2X8K7EMpr0w |
+| 稻香／周杰倫官方 MV | https://www.youtube.com/watch?v=sHD_z90ZKV0 |
+
+## `Underground` 無法唯一判定
+
+只給歌名會對應到完全不同的作品：
+
+- David Bowie：https://www.youtube.com/watch?v=Qga12-bAS4A
+- Lindsey Stirling：https://www.youtube.com/watch?v=EJ09pSuA9hw
+- Adam Lambert：https://www.youtube.com/watch?v=8IJlzrswbI4
+- Jack White：https://www.youtube.com/watch?v=JBf-9oiraQY
+- Cody Fry：https://www.youtube.com/watch?v=NrQSGggiAxM
+- Geeta Zaildar：https://www.youtube.com/watch?v=fo8uu3VaJU4
+
+若要立即重試，先按照：
+
+```bash
+ytmv help
+```
+
+設定獨立且安全的 YouTube cookie source，再驗證：
+
+```bash
+ytmv doctor --cookies
+```
+
+之後我可以用同一份已解析清單直接續跑，不必重新搜尋。
