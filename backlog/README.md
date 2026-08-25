@@ -123,5 +123,6 @@ Add new entries here as you create them. Keep alphabetical.
 | [`lean-bundle-init-ux`](lean-bundle-init-ux.md) | P? needs design | "Lean no-brainer bundles + init-CLI UX + decision-tree SSOT" |
 | [`cloud-vm-provision-combo`](cloud-vm-provision-combo.md) | P? idea | "Cloud-VM (az) provision + dotfiles bootstrap combo (fleet?)" |
 | [`opencodebox-wrapper`](opencodebox-wrapper.md) | P? deferred | "opencodebox wrapper for the containerized opencode image" |
+| [`vorssaint-evaluation`](vorssaint-evaluation.md) | P? deferred 2026-08 | "Evaluate Vorssaint on Apple Silicon Macs" |
 | [`yazi-markdown-preview-truecolor`](yazi-markdown-preview-truecolor.md) | P3 deferred | "yazi Markdown preview: glow 256-colour (needs a pty)" |
 | [`yth-semantic-search`](yth-semantic-search.md) | P? deferred | "yth semantic subtitle search" |
