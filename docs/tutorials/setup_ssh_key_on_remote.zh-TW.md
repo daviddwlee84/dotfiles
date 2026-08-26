@@ -250,7 +250,63 @@ ssh-setup-remote user@hostname
 
    > 就地編輯需要 `python3`；若環境中沒有 `python3`，精靈會退回到僅附加（append-only）的行為。
 
-來源：`~/.config/shell/96_ssh_setup.sh`
+來源：`~/.config/shell/96_ssh_setup.sh`。搭配的 `dotfiles-windows` repo 也提供指令名稱與流程完全相同的
+PowerShell 版本。
+
+### ProxyJump (跳板) 鏈
+
+`ssh(1)` 會透明地穿過 `ProxyJump` 主機建立連線，所以如果只對最終目標設定金鑰，跳板 (jump host) 每次連線
+都還是會要求密碼——因為跳板從來沒拿到過金鑰。`ssh-setup-remote` 會先**解析目標完整的跳板鏈**（遞迴解析，
+因為跳板本身也可能有自己的 `ProxyJump`），然後對每一跳都由外而內重跑一次整套流程：
+
+```
+Host zr-windows
+    HostName 61.169.38.122
+    User zhurun
+
+Host zr
+    HostName 10.168.11.54
+    User hongxing
+    ProxyJump zr-windows
+```
+
+```console
+$ ssh-setup-remote zr
+
+=== SSH Key Setup for zr ===
+
+ProxyJump chain detected: zr-windows -> zr
+Each hop needs its own key on its own authorized_keys — ProxyJump only
+forwards TCP, so the jump host never sees your private key.
+
+========================================
+[1/2] zr-windows (jump)
+========================================
+...
+========================================
+[2/2] zr (target)
+========================================
+...
+```
+
+跳板只會執行第 1、3 步（安裝金鑰、接進本機設定）——ProxyJump 的驗證是從你的機器對最終目標**端對端**完成
+的，所以跳板本身完全不需要私鑰；第 2 步（複製金鑰對）只會在最終目標執行。已經免密碼的那一跳會被偵測到，
+並提供跳過的選項。
+
+### 私鑰旁邊缺 `.pub`
+
+如果金鑰的公鑰檔不見了（例如從別台機器只複製了一半，或是只從 agent 匯入過），以前會悄悄通過存在性檢查，
+直到 `ssh-copy-id` 內部才失敗，噴出令人困惑的
+`failed to open ID file '…/key.pub': No such file or directory`。精靈現在會在選好金鑰後立刻發現這個情況
+並主動提議修復：
+
+```console
+No public key next to /Users/you/.ssh/some_key.
+Regenerate it with `ssh-keygen -y`? [Y/n]
+```
+
+公鑰永遠可以從私鑰推導回來，所以這個修復是安全、不會遺失資料的；你也可以自己先手動處理：
+`ssh-keygen -y -f ~/.ssh/some_key > ~/.ssh/some_key.pub`。
 
 ## 疑難排解 (Troubleshooting)
 

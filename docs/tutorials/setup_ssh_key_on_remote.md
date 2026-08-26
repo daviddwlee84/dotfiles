@@ -247,7 +247,65 @@ It will prompt you to:
    > In-place editing uses `python3`; if it is unavailable the wizard falls back to the
    > append-only behavior.
 
-Source: `~/.config/shell/96_ssh_setup.sh`
+Source: `~/.config/shell/96_ssh_setup.sh`. A Windows PowerShell counterpart with the same
+command name and the same flow ships in the companion `dotfiles-windows` repo.
+
+### ProxyJump chains
+
+`ssh(1)` tunnels transparently through a `ProxyJump` host, so a naive setup on the final target
+alone leaves the jump host asking for a password on every connection — the jump host never got a
+key. `ssh-setup-remote` resolves the target's **full jump chain first** (recursively — a jump host
+can have its own `ProxyJump`) and repeats the whole flow for every hop, outermost first:
+
+```
+Host zr-windows
+    HostName 61.169.38.122
+    User zhurun
+
+Host zr
+    HostName 10.168.11.54
+    User hongxing
+    ProxyJump zr-windows
+```
+
+```console
+$ ssh-setup-remote zr
+
+=== SSH Key Setup for zr ===
+
+ProxyJump chain detected: zr-windows -> zr
+Each hop needs its own key on its own authorized_keys — ProxyJump only
+forwards TCP, so the jump host never sees your private key.
+
+========================================
+[1/2] zr-windows (jump)
+========================================
+...
+========================================
+[2/2] zr (target)
+========================================
+...
+```
+
+A jump host only gets steps 1 and 3 (install the key, wire local config) — ProxyJump
+authenticates end-to-end from your machine, so a jump host never needs the private key, and step 2
+(copying the key pair) only runs for the final target. Already-passwordless hops are detected and
+offered a skip.
+
+### A private key with no `.pub`
+
+If a key's public half is missing (a partial copy from another machine, an agent-only import), it
+used to pass the existence check silently and only fail later inside `ssh-copy-id` with
+`failed to open ID file '…/key.pub': No such file or directory`. The wizard now notices this right
+after key selection and offers to regenerate it:
+
+```console
+No public key next to /Users/you/.ssh/some_key.
+Regenerate it with `ssh-keygen -y`? [Y/n]
+```
+
+The public key is always derivable from the private key, so this is a safe, lossless repair — you
+can also do it manually ahead of time: `ssh-keygen -y -f ~/.ssh/some_key > ~/.ssh/some_key.pub`.
 
 ## Troubleshooting
 

@@ -532,7 +532,7 @@
 | `portscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | 透過 rustscan 的快速 port 掃描 *(需要 rustscan)* |
 | `lanscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | 對 LAN 完整掃描裝置 + port，輸出至 `~/.cache/tv/`（餵給 `tv lan-devices`） |
 | `tv-lan` | alias | `dot_config/zsh/tools/50_networking.zsh` | 開啟 `lan-devices` Television 頻道 |
-| `ssh-setup-remote` | function | `dot_config/shell/96_ssh_setup.sh` | 互動式精靈：選擇／建立 SSH 金鑰、`ssh-copy-id`，再把金鑰接進本機 `~/.ssh/config` —— 若別名**已設定過**就**就地編輯既有 `Host` 區塊**（會遞迴沿 `Include config.d/*` 找到正確檔案），否則附加新別名並可補上缺漏的 `Include`。就地編輯需 `python3`，否則退回僅附加。 |
+| `ssh-setup-remote` | function | `dot_config/shell/96_ssh_setup.sh` | 互動式精靈：選擇／建立 SSH 金鑰（若私鑰旁邊缺 `.pub` 會自動修復）、把公鑰裝到遠端（POSIX 遠端用 `ssh-copy-id`；Windows sshd 遠端則走對應的 PowerShell 路徑，管理員帳號會寫入 `administrators_authorized_keys`），再把金鑰接進本機 `~/.ssh/config` —— 若別名**已設定過**就**就地編輯既有 `Host` 區塊**（會遞迴沿 `Include config.d/*` 找到正確檔案），否則附加新別名並可補上缺漏的 `Include`。**會先解析目標完整的 `ProxyJump` 鏈**，由外而內對每一跳都重跑一次整套流程——以前透過跳板連線時，只有最後一跳會設成免密碼。環境變數：`SSH_SETUP_ASSUME_YES=1`（每個提示都取預設值）、`SSH_SETUP_KEY=<path>`（跳過金鑰選擇）、`SSH_SETUP_NO_MUX=1`（停用每次執行的 `ControlMaster`）。就地編輯需 `python3`，否則退回僅附加。 |
 
 ### Proxy 輔助
 

@@ -45,6 +45,17 @@ and the hazard is recorded in `CLAUDE.md`'s in-house-CLI row.
 
 ## Related, also deferred
 
+- **A fourth copy now exists on Windows.** `dotfiles-windows/dot_config/powershell/profile.d/96_ssh_setup.ps1`
+  ships a pure-PowerShell reimplementation of `_ssh_cfg_py`'s semantics
+  (`Find-SshHostBlock` / `Add-SshIdentityFile` / `Test-SshConfigDInclude` /
+  `Add-SshConfigDInclude`) so the Windows `ssh-setup-remote` port doesn't need
+  `python3`. It is a parallel port, not a shared module — the deploy-path
+  blocker below is Unix-specific (`scripts/**` chezmoi-ignored) and doesn't
+  even apply across repos, so unification was never on the table for this one.
+  Kept honest only by hand: same block-matching rules (wildcards skipped,
+  first match wins, recursive `Include`), verified in
+  `dotfiles-windows/tests/SshSetup.Tests.ps1`, not by a cross-implementation
+  test like `tsnet_ssh_block.bats`.
 - **`tsnet sync-fleet`** — reconcile tailnet devices into
   `~/.config/fleet/machines.toml`. Needs a spike on the population mismatch
   first: the tailnet includes iOS handsets and other people's Macs, which are
