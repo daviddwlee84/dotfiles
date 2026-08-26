@@ -162,7 +162,8 @@ The `.chezmoiignore.tmpl` presence-gates the entire `~/.cursor/`, `~/.codex/`, a
 2. Pop `[projects]` and `[marketplaces]` subtrees into `state`.
 3. Read overlay TOML into a `dict`.
 4. Deep-merge: `live_minus_state <- overlay <- state`. Argument order is merge precedence (later wins). State wins last so per-project trust never gets clobbered by an overlay churn.
-5. Emit TOML via a small writer that quotes all non-bareword keys (handles `github@openai-curated` and `/Users/me/foo`-style project keys).
+5. Remove legacy peon-ping inline lifecycle blocks; their managed replacement lives in the sibling hook-aware `modify_hooks.json.tmpl`, avoiding Codex's dual-representation warning.
+6. Emit TOML via a small writer that quotes all non-bareword keys (handles `github@openai-curated` and `/Users/me/foo`-style project keys).
 
 The script falls through to passing the live file untouched if `python3` or `tomllib`/`tomli` are missing; chezmoi will skip the file for that apply.
 
@@ -224,7 +225,8 @@ chezmoi apply
 - Each overlay enforces its declared keys.
 - Live runtime keys outside the overlay are preserved verbatim.
 - Codex `[projects.*]` and `[marketplaces.*]` round-trip unchanged (the round-trip property is the load-bearing invariant — break it and machines start clobbering each other's per-project trust).
-- Codex `[[hooks.*]]` arrays-of-tables (installed by peon-ping) round-trip alongside Codex's own `[hooks.state.*]` table, and empty / mixed arrays stay inline — the regression guard for the `unsupported scalar type for TOML emit: dict` apply failure.
+- Legacy Codex peon-ping arrays-of-tables are pruned from `config.toml` while `[hooks.state.*]` and unrelated foreign arrays round-trip.
+- Codex `hooks.json` preserves Herdr/CodeIsland entries, adds peon by tier without duplicates, prunes only its own disabled entries, and is idempotent.
 - The modify_ scripts are idempotent (running output through the script again produces the same output).
 - The OpenCode migration handles all three input states: legacy-only, both-present, neither-present.
 - The Claude hook-aware merger (see next section): notify.sh added when missing; CodeIsland entries preserved; idempotency on re-apply; non-hook deep-merge preserves user siblings.
@@ -264,24 +266,34 @@ CLIs whose hooks live in a dedicated sidecar (containing nothing but CodeIsland 
 
 | File | CLI | Why unmanaged |
 |------|-----|---------------|
-| `~/.codex/hooks.json` | Codex | Pure CodeIsland sidecar (also extended by Superset's notify.sh in some setups, but that's installed by Superset, not us) |
 | `~/.cursor/hooks.json` | Cursor | Same |
 | `~/.copilot/hooks/codeisland.json` | GitHub Copilot CLI | Pure CodeIsland sidecar |
 | `~/.gemini/settings.json` | Gemini CLI | Currently nothing else to enforce there |
 | `~/.antigravity/settings.json` | AntiGravity (CLI, not the editor) | Currently nothing else to enforce there |
 
-These paths are added to [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) as **always-ignore** so accidentally running `chezmoi add ~/.codex/hooks.json` won't pull a CodeIsland-owned file into the source tree (which would clobber the app's runtime updates and create a ping-pong with its auto-installer).
+These paths are added to [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) as **always-ignore** so accidentally running `chezmoi add` won't pull a CodeIsland-owned file into the source tree (which would clobber the app's runtime updates and create a ping-pong with its auto-installer).
 
 If you later want to manage non-hook prefs in `~/.gemini/settings.json` or `~/.antigravity/settings.json`, write a `modify_` overlay that follows the hook-aware pattern below — and remove the corresponding ignore line.
 
 #### Pattern B — Mixed files (hook-aware merger)
 
-Files where stable user prefs and CodeIsland hooks coexist need a smarter overlay. Currently the only such file is **`~/.claude/settings.json`** — Claude Code stores model selection, plugins, statusLine, and `permissions.defaultMode` in the same file as `hooks.<event>` arrays. A naive `jq '. * $overlay'` deep-merge replaces arrays wholesale: declaring a `hooks.Notification` entry in our overlay would silently delete every CodeIsland entry on each `chezmoi apply`, then CodeIsland would re-install on next launch — endless ping-pong producing diff noise and broken integrations.
+Files where managed and foreign hooks coexist need a smarter overlay. There are
+two: **`~/.claude/settings.json`** and **`~/.codex/hooks.json`**. Claude stores
+preferences and hooks together; Codex's sidecar is shared by Herdr, CodeIsland,
+and managed peon-ping. Naive array replacement would delete foreign entries on
+every apply and trigger an installer ping-pong.
 
 [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) solves this with a hook-aware merger (it is a *template* because the notify.sh / peon-ping entries are gated on the `agentSounds` prompt — see [agent-sounds.md](agent-sounds.md)):
 
 1. **Non-hook keys** (`enabledPlugins`, `extraKnownMarketplaces`, `skipDangerousModePermissionPrompt`, `permissions.defaultMode`, `statusLine`, …) deep-merge normally via `base * overlay_no_hooks`. Note: `permissions.defaultMode = "auto"` is set deliberately to work around Claude Code resetting the active permission mode after every interactive prompt (`AskUserQuestion`, CodeIsland popup, remote-control inject) — the reset lands on `defaultMode`, so pinning it makes the reset invisible. `auto` (classifier-vetted actions) replaced `bypassPermissions` in 2026-07: it fixes the reset equally well without granting a repo-wide blanket bypass. See [`pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md`](../../pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md). The deep-merge writes the `defaultMode` scalar without touching sibling `permissions.allow` / `permissions.deny` arrays — those remain machine-local.
 2. **`hooks.<event>` arrays** are merged additively: for each event the overlay declares, append entries whose `.hooks[0].command` isn't already represented in the live array (string-equality match). Live entries are preserved verbatim, no entry is ever removed.
+
+[`dot_codex/modify_hooks.json.tmpl`](../../dot_codex/modify_hooks.json.tmpl)
+uses the same command-fingerprint rule. It deliberately standardizes the Codex
+user layer on `hooks.json`: Herdr 0.8.0 integration v7 was verified to merge
+into an existing JSON file, and the TOML modifier removes only legacy
+peon-ping inline blocks. This eliminates the startup warning without claiming
+ownership of Herdr or CodeIsland commands.
 
 The full filter (jq):
 

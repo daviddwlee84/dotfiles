@@ -1,0 +1,79 @@
+#!/bin/sh
+# chezmoi modify_ script: hook-aware merge for ~/.codex/hooks.json.
+#
+# Codex accepts hooks.json and inline [[hooks.*]] blocks in config.toml, but
+# warns when both representations exist in the same config layer. Keep the
+# user layer on hooks.json: Herdr and CodeIsland already write this sidecar,
+# while this overlay adds the managed peon-ping hooks when agentSounds enables
+# them. Foreign entries are preserved by command fingerprint.
+#
+# Herdr 0.8.0's Codex integration v7 was tested to merge its SessionStart hook
+# into an existing file and to remain idempotent. The pruning below is limited
+# to peon-ping's own adapter fingerprint; it never removes Herdr, CodeIsland,
+# Superset, or other third-party hooks.
+set -eu
+
+{{- $peon := or (eq .agentSounds "peon") (eq .agentSounds "both") }}
+{{- $peonCmd := `adapter="$HOME/.openpeon/hooks/peon-ping/adapters/codex.sh"; if [ ! -f "$adapter" ] && command -v brew >/dev/null 2>&1; then prefix="$(brew --prefix peon-ping 2>/dev/null || true)"; [ -n "$prefix" ] && adapter="$prefix/libexec/adapters/codex.sh"; fi; if [ -f "$adapter" ]; then CLAUDE_PEON_DIR="${adapter%/adapters/codex.sh}" bash "$adapter" >/dev/null 2>&1 || true; fi` }}
+overlay=$(cat <<'JSON'
+{
+  "hooks": {
+{{- if $peon }}
+    "SessionStart": [
+      { "matcher": "startup|resume|clear", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ],
+    "PermissionRequest": [
+      { "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ],
+    "PreCompact": [
+      { "matcher": "manual|auto", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ],
+    "SubagentStart": [
+      { "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ],
+    "SubagentStop": [
+      { "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 30 } ] }
+    ]
+{{- end }}
+  }
+}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{}'
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_hooks.json: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
+
+printf '%s' "$base" | jq --argjson overlay "$overlay" '
+  def command_of: (.hooks[0].command? // "");
+  def is_managed_peon: (command_of | test("peon-ping[/\\\\]adapters[/\\\\]codex\\.(sh|ps1)"; "i"));
+
+  . as $base
+  | (($base.hooks // {})
+      | with_entries(.value |= map(select(is_managed_peon | not)))
+      | with_entries(select(.value != []))) as $clean_hooks
+  | (reduce (($overlay.hooks // {}) | to_entries[]) as $event (
+      $clean_hooks;
+      .[$event.key] = (
+        (.[$event.key] // []) as $live
+        | ($live | map(command_of)) as $live_commands
+        | $live + ($event.value | map(select((command_of as $cmd | $live_commands | index($cmd)) == null)))
+      )
+    )) as $merged_hooks
+  | $base
+  | if ($merged_hooks | length) == 0
+    then del(.hooks)
+    else .hooks = $merged_hooks
+    end
+'

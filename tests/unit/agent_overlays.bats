@@ -3,6 +3,7 @@
 #   dot_cursor/modify_cli-config.json.tmpl
 #   dot_config/opencode/modify_opencode.json.tmpl
 #   dot_codex/modify_config.toml.tmpl
+#   dot_codex/modify_hooks.json.tmpl
 #   dot_claude/modify_settings.json.tmpl
 #
 # Each script is a chezmoi `modify_` template: chezmoi pipes the live target
@@ -55,6 +56,13 @@ _have_chezmoi() {
 _claude_overlay() {
   local tier="${1:-notify}" out="$RENDER_DIR/claude-$1.sh"
   _render_with_data "$SOURCE_DIR/dot_claude/modify_settings.json.tmpl" \
+    "$out" "{\"agentSounds\":\"$tier\"}"
+  printf '%s' "$out"
+}
+
+_codex_hooks_overlay() {
+  local tier="${1:-peon}" out="$RENDER_DIR/codex-hooks-$1.sh"
+  _render_with_data "$SOURCE_DIR/dot_codex/modify_hooks.json.tmpl" \
     "$out" "{\"agentSounds\":\"$tier\"}"
   printf '%s' "$out"
 }
@@ -268,7 +276,7 @@ websocket_connect_timeout_ms = 5000
   echo "$output" | yq -p toml -e '.model_providers["openai-gfw"].websocket_connect_timeout_ms == 5000' >/dev/null
 }
 
-@test "codex modify_config.toml: peon-ping [[hooks.*]] arrays-of-tables round-trip" {
+@test "codex modify_config.toml: legacy peon inline hooks pruned, trust and foreign hooks preserved" {
   _have_chezmoi || skip "chezmoi not installed"
   command -v yq >/dev/null 2>&1 || skip "yq not installed"
   yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant"
@@ -276,13 +284,9 @@ websocket_connect_timeout_ms = 5000
   local script="$RENDER_DIR/codex-aot.sh"
   _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
 
-  # peon-ping's Codex adapter (hooks/peon-ping/scripts/codex-config.py) writes
-  # [[hooks.<Event>]] / [[hooks.<Event>.hooks]] blocks into this file, and Codex
-  # itself writes a plain [hooks.state."<path>:<event>:0:0"] sibling. The
-  # emitter used to assume "no arrays-of-tables" and died with
-  # `TypeError: unsupported scalar type for TOML emit: dict`, failing the whole
-  # apply. Also covers an empty array and a mixed array (neither has a [[…]]
-  # spelling — both must stay inline).
+  # Legacy peon-ping setup wrote arrays-of-tables here. They now belong in the
+  # sibling hooks.json overlay, because Codex warns when a single layer uses
+  # both hook representations. Trust state and unrelated inline hooks survive.
   local live='[hooks.state."/home/me/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:deadbeef"
 
@@ -298,8 +302,15 @@ timeout = 30
 
 [[hooks.Stop.hooks]]
 type = "command"
-command = "bash /home/me/.openpeon/hooks/peon-ping/adapters/codex.sh"
+command = "powershell C:\\Users\\me\\peon-ping\\adapters\\codex.ps1"
 timeout = 30
+
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "echo foreign-hook"
+timeout = 5
 
 [weird]
 empty_list = []
@@ -309,15 +320,9 @@ mixed = [1, { a = 2 }]
   run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
   [ "$status" -eq 0 ]
 
-  echo "$output" | yq -p toml -e '.hooks.SessionStart | length == 1' >/dev/null
-  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].matcher == "startup|resume|clear"' >/dev/null
-  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].hooks[0].type == "command"' >/dev/null
-  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].hooks[0].timeout == 30' >/dev/null
-  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].hooks[0].command | test("adapters/codex.sh")' >/dev/null
-  # Matcher-less event survives as a one-element array with only .hooks.
-  echo "$output" | yq -p toml -e '.hooks.Stop | length == 1' >/dev/null
-  echo "$output" | yq -p toml -e '.hooks.Stop[0] | has("matcher") | not' >/dev/null
-  echo "$output" | yq -p toml -e '.hooks.Stop[0].hooks[0].timeout == 30' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks | has("SessionStart") | not' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks | has("Stop") | not' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.PreToolUse[0].hooks[0].command == "echo foreign-hook"' >/dev/null
   # Codex's own [hooks.state] table is a plain sibling of the arrays.
   echo "$output" | yq -p toml -e '.hooks.state["/home/me/.codex/hooks.json:session_start:0:0"].trusted_hash == "sha256:deadbeef"' >/dev/null
   # Lists with no [[…]] spelling stay inline.
@@ -333,6 +338,56 @@ mixed = [1, { a = 2 }]
   pass1=$(printf '%s' "$live" | "$script")
   pass2=$(printf '%s' "$pass1" | "$script")
   [ "$pass1" = "$pass2" ]
+}
+
+@test "codex modify_hooks.json: peon added beside Herdr, legacy copy replaced, idempotent" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local script; script="$(_codex_hooks_overlay peon)"
+  local live='{
+    "hooks": {
+      "SessionStart": [
+        {"hooks":[{"type":"command","command":"bash /home/me/.codex/herdr-agent-state.sh session"}]},
+        {"hooks":[{"type":"command","command":"bash /old/.openpeon/hooks/peon-ping/adapters/codex.sh"}]}
+      ]
+    }
+  }'
+
+  local pass1 pass2
+  pass1=$(printf '%s' "$live" | "$script")
+  pass2=$(printf '%s' "$pass1" | "$script")
+
+  printf '%s' "$pass1" | jq -e '.hooks.SessionStart | length == 2' >/dev/null
+  printf '%s' "$pass1" | jq -e '[.hooks.SessionStart[].hooks[0].command | select(test("herdr-agent-state"))] | length == 1' >/dev/null
+  printf '%s' "$pass1" | jq -e '[.hooks.SessionStart[].hooks[0].command | select(test("peon-ping/adapters/codex"))] | length == 1' >/dev/null
+  printf '%s' "$pass1" | jq -e '.hooks.Stop | length == 1' >/dev/null
+  printf '%s' "$pass1" | jq -e '.hooks.PreCompact[0].matcher == "manual|auto"' >/dev/null
+  diff <(printf '%s' "$pass1" | jq -S .) <(printf '%s' "$pass2" | jq -S .)
+}
+
+@test "codex modify_hooks.json: non-peon tier removes only managed peon hooks" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local script; script="$(_codex_hooks_overlay none)"
+  local live='{
+    "hooks": {
+      "SessionStart": [
+        {"hooks":[{"type":"command","command":"bash /home/me/.codex/herdr-agent-state.sh session"}]},
+        {"hooks":[{"type":"command","command":"bash /home/me/.openpeon/hooks/peon-ping/adapters/codex.sh"}]}
+      ],
+      "Stop": [
+        {"hooks":[{"type":"command","command":"bash /home/me/.openpeon/hooks/peon-ping/adapters/codex.sh"}]}
+      ]
+    }
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.hooks.SessionStart | length == 1' >/dev/null
+  echo "$output" | jq -e '.hooks.SessionStart[0].hooks[0].command | test("herdr-agent-state")' >/dev/null
+  echo "$output" | jq -e '.hooks | has("Stop") | not' >/dev/null
 }
 
 @test "opencode migrate: legacy config.json renamed when modern absent" {

@@ -22,11 +22,11 @@
 #     arrays-of-tables, inline tables inside mixed arrays) and quotes every
 #     table key for safety.
 #
-# Comments do NOT survive the round-trip (tomllib discards them). That is safe
-# for peon-ping's `# peon-ping Codex hooks begin` / `# install_dir = …` markers:
-# its uninstaller (`hooks/peon-ping/scripts/codex-config.py`) also matches
-# `[[hooks.<Event>.hooks]]` sections by adapter path, so it still finds and
-# replaces its own block after the markers are stripped.
+# Comments do NOT survive the round-trip (tomllib discards them). Legacy
+# peon-ping inline hooks are removed below because this repo now keeps all
+# user-layer lifecycle hooks in ~/.codex/hooks.json. That avoids Codex's
+# "loading hooks from both ..." warning while the sibling modify_hooks.json
+# merger preserves Herdr/CodeIsland entries and manages peon-ping additively.
 #
 # Merge precedence (later wins):
 #   1. Stripped live (everything except [projects] and [marketplaces.*]).
@@ -139,6 +139,43 @@ def prune_deprecated_features(live: dict) -> None:
         del live["features"]
 
 
+def prune_legacy_peon_inline_hooks(live: dict) -> None:
+    """Remove only peon-ping's old inline lifecycle hooks.
+
+    Codex merges hooks.json with inline [[hooks.*]] blocks but warns when both
+    representations exist in one layer. Peon-ping is now declared by the
+    sibling modify_hooks.json overlay, so retaining installer-written copies
+    here would duplicate sounds and keep the warning alive. Trust records under
+    [hooks.state] and every non-peon foreign hook remain untouched.
+    """
+    hooks = live.get("hooks")
+    if not isinstance(hooks, dict):
+        return
+
+    needles = ("peon-ping/adapters/codex.sh", "peon-ping\\adapters\\codex.ps1")
+    for event, entries in list(hooks.items()):
+        if event == "state" or not isinstance(entries, list):
+            continue
+        kept = []
+        for entry in entries:
+            handlers = entry.get("hooks", []) if isinstance(entry, dict) else []
+            commands = [
+                str(handler.get("command", ""))
+                for handler in handlers
+                if isinstance(handler, dict)
+            ]
+            if any(any(needle.lower() in command.lower() for needle in needles) for command in commands):
+                continue
+            kept.append(entry)
+        if kept:
+            hooks[event] = kept
+        else:
+            del hooks[event]
+
+    if not hooks:
+        del live["hooks"]
+
+
 def prune_stale_managed_model(live: dict) -> None:
     """Drop old model pins previously managed by this dotfiles overlay.
 
@@ -238,6 +275,7 @@ live = parse(os.environ.get("CODEX_LIVE", ""))
 overlay = parse(os.environ.get("CODEX_OVERLAY", ""))
 prune_reserved_builtin_providers(live)
 prune_deprecated_features(live)
+prune_legacy_peon_inline_hooks(live)
 prune_stale_managed_model(live)
 
 # Pull machine-local subtrees out before merge; re-attach last so they win.

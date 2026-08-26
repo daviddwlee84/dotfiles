@@ -78,8 +78,8 @@ follows when a vendor ships in multiple formats:
 | **Google Chrome** | `.deb` from `dl.google.com` (postinst auto-adds `google-chrome.list` + `/usr/share/keyrings/google-chrome.gpg`); **x86_64 only** — Google publishes no arm64 Linux build | ✅ `apt upgrade google-chrome-stable` | same role, "Install Google Chrome via .deb" | `/opt/google/chrome/` |
 | **Discord** | `flatpak` (default, recommended) OR `.deb` (no apt source) — picked by `discordChannel` chezmoi prompt | ✅ via `flatpak update` (default) / ❌ manual on `.deb` | same role | `~/.local/share/flatpak/app/com.discordapp.Discord/` (flatpak) or `/usr/share/discord/` (.deb) |
 | **Steam** | Valve apt repo (`steam-launcher`), gated by `installGamingApps=true` and x86_64 | ✅ via apt for launcher/runtime packages; Steam client self-updates on launch | same role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
-| **Zen Browser** | AppImage in `~/Applications/`, downloaded as `zen.AppImage` but **matched by glob** `zen*.AppImage` (AppImageLauncher renames integrated copies to `zen_<md5>.AppImage`); asset picked from the `zen-browser/desktop` latest release by exact name `zen-<arch>.AppImage` | ❌ — delete every `~/Applications/zen*.AppImage` **then** re-run the role (any surviving copy counts as installed) | same role | wherever the glob currently matches; the `.desktop` is rewritten from it each apply. Profile in `~/.zen/` (shared across versions, upgrade is one-way) |
-| **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
+| **Zen Browser** | AppImage at `~/.local/opt/zen/zen.AppImage`; one-time migration moves the newest legacy `~/Applications/zen*.AppImage` there. The launcher sets `APPIMAGELAUNCHER_DISABLE=1`, so AIL neither renames it nor creates a parallel desktop entry | ❌ — replace the managed AppImage, or remove it and re-run the role | same role | fixed binary path plus stable `zen-browser.desktop`; profile in `~/.zen/` (shared across versions, upgrade is one-way) |
+| **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`gui_apps_linux` role](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) | `~/.cargo/bin/alacritty`; the desktop entry uses the absolute path because GNOME's login-session PATH omits Cargo by default |
 | **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
 | **Bitwarden CLI** (`bw`) | npm via mise (gated by `installBitwarden=true`) | ❌ — `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
 | **Bitwarden Desktop** | Snap (`bitwarden`) → `.deb` fallback if `snap` unavailable; gated by `installBitwarden=true` AND `profile=ubuntu_desktop` | ✅ via `snapd` background refresh (or `apt upgrade` for fallback `.deb`) | same role | `/snap/bitwarden/current/` |
@@ -93,7 +93,7 @@ follows when a vendor ships in multiple formats:
 | **Firefox** | Snap (canonical default since Ubuntu 22.04) | ✅ background | preinstalled with the OS | `snap refresh firefox` |
 | **btop** | Snap (kz6fittycent) | ✅ background | manual | `snap refresh btop` |
 | **Frpc Desktop** | AppImage at `~/Applications/Frpc-Desktop-1.2.1.AppImage` | ❌ — manual re-download | manual drop-in | overwrite the file |
-| **Clash for Windows** | tarball at `~/Documents/ClashForWindows/` ⚠️ | ❌ **DEPRECATED upstream** | extracted manually 2025 | **Migrate** — see below |
+| **Clash Verge Rev** | `.deb` (`clash-verge`) | ❌ unless manually refreshed | installed manually from the upstream release | `/usr/bin/clash-verge` + `/usr/share/applications/Clash Verge.desktop`; the role removes stale user-level launchers that would shadow/duplicate it |
 
 > **Clash for Windows is dead.** The original developer (Fndroid)
 > publicly stopped maintenance in **2023-11** and the GitHub repo is
@@ -230,7 +230,7 @@ versioned `/snap/<app>/<rev>/` layout).
 When upstream ships only an AppImage (Zen Browser, Cursor's old AppImage,
 many indie tools), our convention is:
 
-1. **Download to a stable filename, but never *depend* on it**: write the file
+1. **For AppImageLauncher-owned apps, download to a stable filename, but never *depend* on it**: write the file
    as `~/Applications/<app>.AppImage` (no version or hash), and guard the
    install with a **glob** (`<app>*.AppImage`), not that exact path.
    AppImageLauncher renames integrated AppImages to `<app>_<md5>.AppImage`, so
@@ -265,16 +265,61 @@ many indie tools), our convention is:
    `rescue:` block cannot catch a no-op. Full story:
    [`pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md)
 
-For our managed AppImages we write the `.desktop` entry ourselves in the same
-ansible task so the app is searchable *immediately*, without waiting for a
-first launch — see Zen Browser. This buys instant availability and a stable
-`.desktop` id for `linux_app_register --desktop=`; it does **not** prevent
-AppImageLauncher from integrating and renaming the file later, which is why the
-role re-asserts the entry every apply. For AppImages you drop manually (Frpc
-Desktop), let the modal handle it.
+Zen Browser is the deliberate exception to that AppImageLauncher-owned pattern.
+It lives at `~/.local/opt/zen/zen.AppImage`, outside the daemon's watched
+directories, and its desktop command exports `APPIMAGELAUNCHER_DISABLE=1`.
+AppImageLauncher's own binfmt interpreter documents and honors that variable,
+so launch-time integration is skipped too. This gives the role one stable
+binary path and one stable desktop ID instead of an apply/login writer race.
+For AppImages you drop manually (Frpc Desktop), continue to let AIL own the
+integration.
 
 To check the daemon: `systemctl --user status appimagelauncherd`.
 Manual integration: `ail-cli integrate ~/Applications/foo.AppImage`.
+
+## Understanding and debugging duplicate launcher icons
+
+GNOME does not deduplicate applications by displayed `Name=`. It primarily
+sees a **desktop ID**, derived from the filename relative to an XDG application
+directory. Two files named `Clash Verge.desktop` at user and system scope share
+one ID, so the user copy shadows the system copy; `clash-verge.desktop` is a
+different ID and therefore produces a second visible icon even when both say
+`Name=Clash Verge`. `NoDisplay=true` entries are protocol handlers and should
+not be counted as launcher icons.
+
+Use this inspection loop before deleting anything:
+
+```bash
+for root in ~/.local/share/applications /usr/local/share/applications \
+            /usr/share/applications /var/lib/snapd/desktop/applications; do
+  find "$root" -maxdepth 1 -type f -name '*.desktop' -print0 2>/dev/null
+done | while IFS= read -r -d '' file; do
+  printf '\n[%s]\n' "$file"
+  sed -n '/^\(Name\|Exec\|TryExec\|NoDisplay\|Hidden\|StartupWMClass\)=/p' "$file"
+done
+```
+
+Then check the relevant layer:
+
+```bash
+desktop-file-validate ~/.local/share/applications/example.desktop
+gtk-launch example                         # desktop ID without .desktop
+update-desktop-database ~/.local/share/applications
+gsettings get org.gnome.shell favorite-apps
+tr '\0' '\n' </proc/$(pgrep -n gnome-shell)/environ | grep '^PATH='
+journalctl --user -u appimagelauncherd --since today
+```
+
+The most useful interpretations are:
+
+- missing `TryExec` in the **GNOME Shell process PATH** hides the entry without
+  an error (the Alacritty failure here);
+- same desktop ID at user/system scope means shadowing, not duplication;
+- different IDs with the same `Name=` means two icons (the Clash failure);
+- a new `appimagekit_*` file immediately after login points to
+  AppImageLauncher's daemon (the Zen failure);
+- a favorite that names a nonexistent desktop ID is stale state and should be
+  replaced with the current stable ID.
 
 ## Adding a new GUI app to `gui_apps_linux`
 

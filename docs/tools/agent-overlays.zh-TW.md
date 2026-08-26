@@ -166,8 +166,9 @@ enabled = true
 1. 透過 `tomllib` 將即時檔案讀進 `dict`（Python 3.11+ 內建；3.10 fallback 用 `tomli`）。
 2. 將 `[projects]` 與 `[marketplaces]` 子樹彈出到 `state`。
 3. 將覆寫 TOML 讀進一個 `dict`。
-4. 深層合併：`live_minus_state <- overlay <- state`。引數順序就是合併優先順序（後者勝出）。`state` 最後勝出，使每專案信任永遠不會被覆寫攪動所砍掉。
-5. 透過 30 行的 writer 輸出 TOML，並對所有非 bareword 的 key 加引號（處理 `github@openai-curated` 與 `/Users/me/foo` 風格的專案 key）。
+4. 剪除舊版 peon installer 寫入的 inline `[[hooks.*]]`（只依 peon adapter command fingerprint；`[hooks.state]` 與外部 hooks 保留），避免與 `hooks.json` 雙重載入。
+5. 深層合併：`live_minus_state <- overlay <- state`。引數順序就是合併優先順序（後者勝出）。`state` 最後勝出，使每專案信任永遠不會被覆寫攪動所砍掉。
+6. 透過 writer 輸出 TOML，並對所有非 bareword 的 key 加引號（處理 `github@openai-curated` 與 `/Users/me/foo` 風格的專案 key）。
 
 若 `python3` 或 `tomllib`/`tomli` 都缺失，腳本會 fall through 把即時檔案原封不動傳出；這次 apply 會被 chezmoi 跳過該檔案。
 
@@ -216,6 +217,7 @@ chezmoi apply
 - `modify_` 腳本是 idempotent（將其輸出再餵回腳本會得到同一份輸出）。
 - OpenCode 遷移處理三種輸入狀態：只有舊檔、兩者皆存在、兩者皆無。
 - Claude 的掛鉤感知合併器 (hook-aware merger)（見下節）：notify.sh 在缺失時加入；CodeIsland 條目保留；重新 apply 時 idempotent；非掛鉤的深層合併保留使用者同層 key。
+- Codex `hooks.json` merger：保留 Herdr/CodeIsland 等外部條目、增減 peon 條目，且重跑保持 idempotent；TOML merger 同時清掉舊 peon inline 副本。
 
 執行：`just bats`（或直接：`bats tests/unit/agent_overlays.bats`）。
 
@@ -246,25 +248,24 @@ CodeIsland 的設定面板自稱為「Auto hook install」並標榜「auto-repai
 
 > **附註（2026-04-25）**：CodeIsland v1.0.23 將 `ExitPlanMode` 從預設的 `HookServer.autoApproveTools` 白名單中移除——退出 plan-mode 現在會跳出真正的確認對話框，而 Settings → Behavior → 「Auto-approve Tools」讓使用者可以逐項切換工具。見 [`pitfalls/codeisland-auto-approves-permissionrequest.md`](../../pitfalls/codeisland-auto-approves-permissionrequest.md)。我們的合併器繼續以*累加方式* (additively) 保留每一個 CodeIsland 掛鉤條目——沒有加入扣除式 (subtractive) 邏輯，因為上游修正才是正確路徑，且 `PermissionRequest` 掛鉤現在是瀏海彈出視窗的合法輸入來源，而非繞過機制。
 
-#### Pattern A — 周邊檔案 (sidecar files)（永遠忽略）
+#### Pattern A — 外部擁有的周邊檔案（永遠忽略）
 
 掛鉤位於專屬周邊檔案（除了 CodeIsland 掛鉤外什麼都沒有）的 CLI，直接不讓 chezmoi 管理。具體來說：
 
 | 檔案 | CLI | 不管理的原因 |
 |------|-----|---------------|
-| `~/.codex/hooks.json` | Codex | 純 CodeIsland 周邊檔案（某些設置中也會被 Superset 的 notify.sh 擴展，但那是 Superset 安裝的，不是我們） |
 | `~/.cursor/hooks.json` | Cursor | 同上 |
 | `~/.copilot/hooks/codeisland.json` | GitHub Copilot CLI | 純 CodeIsland 周邊檔案 |
 | `~/.gemini/settings.json` | Gemini CLI | 目前沒有其他內容需要強制 |
 | `~/.antigravity/settings.json` | AntiGravity（CLI，不是編輯器） | 目前沒有其他內容需要強制 |
 
-這些路徑被加到 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) 中作為**永遠忽略**，這樣即使不小心執行 `chezmoi add ~/.codex/hooks.json` 也不會把 CodeIsland 擁有的檔案拉進 source 樹（那會砍掉應用程式的執行期更新，並與其自動安裝器形成乒乓循環）。
+這些路徑被加到 [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) 中作為**永遠忽略**，避免把應用程式擁有的執行期檔案拉進 source tree。
 
 如果你之後想在 `~/.gemini/settings.json` 或 `~/.antigravity/settings.json` 中管理非掛鉤偏好，請寫一個遵循下方掛鉤感知模式的 `modify_` 覆寫——並移除對應的 ignore 行。
 
 #### Pattern B — 混合檔案（掛鉤感知合併器）
 
-當穩定的使用者偏好與 CodeIsland 掛鉤共存於同一檔案時，需要更聰明的覆寫。目前唯一這類檔案是 **`~/.claude/settings.json`**——`Claude Code` 將模型選擇、外掛、statusLine 與 `permissions.defaultMode` 與 `hooks.<event>` 陣列存在同一個檔案。簡單的 `jq '. * $overlay'` 深層合併會整個替換陣列：在覆寫中宣告一個 `hooks.Notification` 條目，會在每次 `chezmoi apply` 時靜默砍掉所有 CodeIsland 條目，然後 CodeIsland 會在下次啟動時重裝——無限乒乓，產生 diff 雜訊與壞掉的整合。
+當受管 hook 與外部工具 hook 共存於同一檔案時，需要更聰明的覆寫。目前有兩個：**`~/.claude/settings.json`** 與 **`~/.codex/hooks.json`**。前者合併 Claude 偏好與事件陣列；後者保留 Herdr/CodeIsland/Superset 等外部條目，只依 command fingerprint 增減 repo 自己的 peon hooks。簡單替換陣列會造成外部安裝器與 chezmoi 互相覆寫。
 
 [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) 透過掛鉤感知合併器解決這個問題：
 

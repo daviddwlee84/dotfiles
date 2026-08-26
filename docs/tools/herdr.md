@@ -26,7 +26,7 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
 
 > **Install is version-blind; upgrades are yours to run.** The Linux ansible task gates on `herdr --version` returning non-zero — *"is it installed at all"*, not *"is it current"* — so a fresh box gets whatever is latest that day and `chezmoi apply` never touches it again. This is the repo's [install-vs-upgrade split](../this_repo/upgrades.md) working as designed, but herdr drifts faster than most because its config can outrun the binary (a `[[keys.command]]` using `type = "popup"`, added in 0.7.4, makes an older herdr reject **the entire keys block** — `reload-config` reports `status: "partial"` + `keeping current keys settings`, and only that one diagnostic line tells you).
 
-> **Every herdr upgrade stales the agent integrations.** `herdr integration status` versions each one (`current (v9)` / `outdated (v7 < v9)`); reinstall with `herdr integration install <agent>`. These files (`~/.claude/hooks/herdr-agent-state.sh`, `~/.codex/herdr-agent-state.sh`, `~/.cursor/herdr-agent-state.sh`, `~/.config/opencode/plugins/herdr-agent-state.js`) are written by herdr and are **not** chezmoi-managed, so `chezmoi apply` will not restore or clobber them. `just upgrade-herdr` reports which went stale but deliberately does not auto-install them.
+> **The app version and integration schema version are separate.** The current binary is **Herdr 0.8.0**; `current (v7)` / `outdated (v6 < v7)` from `herdr integration status` refers to the Codex integration schema, not a downgraded Herdr binary. Reinstall stale integrations with `herdr integration install <agent>`. Herdr owns the generated scripts (`~/.codex/herdr-agent-state.sh`, etc.); Codex's `~/.codex/hooks.json` is a hook-aware chezmoi `modify_` target that preserves Herdr's entry beside peon/CodeIsland hooks. `just upgrade-herdr` reports stale integrations but deliberately does not reinstall them automatically.
 - **Config**: `~/.config/herdr/config.toml` — chezmoi **`modify_` overlay** (`dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`). The overlay enforces our managed tables on every `chezmoi apply` while preserving whatever herdr writes back at runtime (see [Config management](#config-management-why-modify_)).
 
 > **Why a package-managed herdr strands its own server — the reason macOS left Homebrew.** herdr's socket API is protocol-versioned, and a package-manager upgrade cannot restart the server, so after `brew upgrade herdr` every CLI call (and therefore every `tv herdr-*` channel, `hvibe`/`hcode`, and `[[keys.command]]` helper) fails `protocol_mismatch` until the server restarts — which kills all pane processes. `herdr update --handoff`, the live pane-preserving path, is **disabled on Homebrew/mise/Nix installs**, so a brew-installed herdr has no way to avoid that restart. This repo now installs the self-managed release binary on macOS too, which is what closes the gap; the pitfall below is kept because it still describes what happens on any box that has not been migrated (and `just upgrade-herdr` skips with instructions when it detects a package-managed install). Check with `herdr status` (`compatible:` / `restart_needed:`), not `herdr --version`. Full recovery matrix: [`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md).
@@ -274,14 +274,19 @@ For the trial we rely on native detection — the tmux-side workmux 🤖/💬/�
 
 herdr's first-run onboarding offers to **install optional agent integrations** (`herdr integration install <agent>`), so agents report state directly instead of relying on screen heuristics. Pressing *install* sets these up for every detected agent. What it writes (verified on this machine):
 
+The Herdr release and integration schema have separate version numbers. On
+this machine `herdr --version` is **0.8.0**, while that release ships Codex
+integration **v7**; `outdated (v6 < v7)` refers to the integration payload,
+not an older Herdr binary.
+
 | Agent | What `herdr integration install` creates | Touches a repo-managed file? |
 |---|---|---|
 | claude | `~/.claude/hooks/herdr-agent-state.sh` **+ a hook entry in `~/.claude/settings.json`** | Yes — but the repo's hook-aware `modify_settings.json.tmpl` merger **preserves** it (same as it does for CodeIsland). `chezmoi apply` is a no-op; it won't strip the herdr hook. |
-| codex | `~/.codex/herdr-agent-state.sh` only | No — `~/.codex/config.toml` is untouched (identical to the chezmoi-computed target). |
+| codex | `~/.codex/herdr-agent-state.sh` + a `SessionStart` entry in `~/.codex/hooks.json` | Partly — the script remains Herdr-owned; `hooks.json` is a hook-aware chezmoi `modify_` target that preserves Herdr while keeping all user-layer hooks in one JSON representation. Herdr v7 was verified to merge and remain idempotent. |
 | opencode | `~/.config/opencode/plugins/herdr-agent-state.js` (separate plugin) | No — only `workmux-status.ts` is managed; herdr's plugin coexists. |
 | cursor | `~/.cursor/herdr-agent-state.sh` + hook | Script lives outside chezmoi; coexists. |
 
-These integration files are **not** vendored into the repo, so they do **not** reproduce on other machines (press *install* again there, or skip onboarding). They use herdr's own socket and do not interfere with tmux/workmux (different mechanism). To remove: `herdr integration uninstall <agent>` — and for **claude**, rerun `chezmoi apply` afterwards so the merger drops the now-removed hook from `settings.json`.
+The integration scripts are **not** vendored into the repo, so they do **not** reproduce on other machines (press *install* again there, or skip onboarding). Hook-aware modify_ targets preserve their registrations. They use herdr's own socket and do not interfere with tmux/workmux (different mechanism). To remove: `herdr integration uninstall <agent>`.
 
 ### Config management (why `modify_`)
 

@@ -97,11 +97,11 @@ ail-cli integrate ~/Applications/Cursor.AppImage
 
 ### Zen Browser（自動安裝）
 
-[`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) 角色會從 [`zen-browser/desktop`](https://github.com/zen-browser/desktop/releases) 下載最新的 `zen-<arch>.AppImage` 到 `~/Applications/zen.AppImage`，並寫入一個 `~/.local/share/applications/zen-browser.desktop` ＋ SVG 圖示，讓瀏覽器**立即**可在 GNOME／KDE 啟動器中搜尋到 —— 不必等第一次啟動才生出條目。macOS 上的對應為 Arc（Brewfile）。
+[`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) 角色會從 [`zen-browser/desktop`](https://github.com/zen-browser/desktop/releases) 下載最新的 `zen-<arch>.AppImage` 到固定路徑 `~/.local/opt/zen/zen.AppImage`，並寫入 `~/.local/share/applications/zen-browser.desktop` ＋ SVG 圖示。舊的 `~/Applications/zen*.AppImage` 會在固定路徑不存在時遷移一次。macOS 上的對應為 Arc（Brewfile）。
 
-但自己寫 `.desktop` **並不會**讓 Zen 豁免於 AppImageLauncher —— 這份 recipe 過去常被誤讀成這樣。AIL 是透過 `binfmt_misc` 掛在「執行」本身上，所以第一次啟動就會整合並把檔案改名成 `zen_<md5>.AppImage`，此時寫死舊路徑的 `.desktop` 會默默把自己**隱藏**掉。因此 role 改用 glob `zen*.AppImage` 而不是檢查固定路徑，並且每次 apply 都用當下找到的檔案重寫 `.desktop`。細節與實測（包含為什麼 `ask_to_move = false` 沒用）：[`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md)。
+自己寫 `.desktop` 本身**不會**讓 Zen 豁免於 AppImageLauncher：AIL 也透過 `binfmt_misc` 攔截執行。因此這個 launcher 明確使用 `/usr/bin/env APPIMAGELAUNCHER_DISABLE=1 ...`，而 AppImage 又位於 daemon 不監看的 `~/.local/opt/zen/`。兩者合起來才會阻止登入時與執行時重新整合。role 同時清除舊的 `appimagekit_*Zen*.desktop`/icons，只留下穩定 ID `zen-browser.desktop`。細節：[`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md)。
 
-升級方式：刪掉**所有** `~/Applications/zen*.AppImage` —— 不只是穩定檔名那個，因為整合過的副本一樣算已安裝 —— 再重新跑 `just apply-ubuntu_desktop`。或把較新的 AppImage 覆蓋到當下存在的那個檔案上。
+升級方式：以較新的 AppImage 覆寫 `~/.local/opt/zen/zen.AppImage`（保留 executable bit），再重跑 `just apply-ubuntu_desktop` 以重新確立 desktop entry 與清理舊整合檔。
 
 ### Obsidian / Bitwarden Desktop / Joplin
 

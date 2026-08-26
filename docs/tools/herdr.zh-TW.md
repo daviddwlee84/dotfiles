@@ -30,7 +30,7 @@
 
 > **安裝不看版本，升級要自己跑。** Linux 的 ansible task 是用 `herdr --version` 的 rc 當條件 —— 判斷的是「**有沒有裝**」而不是「**是不是最新**」—— 所以新機器拿到的是當天的 latest，之後 `chezmoi apply` 再也不會碰它。這是本 repo [install-vs-upgrade 分離](../this_repo/upgrades.md)的設計，但 herdr 比多數工具更容易出事，因為它的 config 會跑在 binary 前面（`[[keys.command]]` 用了 0.7.4 才有的 `type = "popup"`，舊版 herdr 會拒絕**整個 keys 區塊** —— `reload-config` 回 `status: "partial"` + `keeping current keys settings`，而且只有那一行 diagnostic 會告訴你）。
 
-> **每次 herdr 升級都會讓 agent integration 過期。** `herdr integration status` 會標出各自的版本（`current (v9)` / `outdated (v7 < v9)`），用 `herdr integration install <agent>` 重裝。這些檔案（`~/.claude/hooks/herdr-agent-state.sh`、`~/.codex/herdr-agent-state.sh`、`~/.cursor/herdr-agent-state.sh`、`~/.config/opencode/plugins/herdr-agent-state.js`）是 herdr 自己寫的，**不歸** chezmoi 管，所以 `chezmoi apply` 既不會還原也不會覆蓋它們。`just upgrade-herdr` 會回報哪些過期了，但刻意不自動安裝。
+> **Herdr app 版本與 integration schema 版本是兩件事。** 目前 binary 是 **0.8.0**；`herdr integration status` 顯示的 `v7` 則是 Codex integration 的 schema 版本，不代表 binary 降版。每次 Herdr 升級後若看到 `outdated (v6 < v7)`，執行 `herdr integration install codex`。腳本 sidecar 仍由 Herdr 擁有；`~/.codex/hooks.json` 則透過 chezmoi 的 hook-aware `modify_` merger 與 peon/其他工具共存。
 - **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用我們受管的表 (tables)，同時保留 herdr 在執行期寫回的東西（見 [設定管理](#config-management-modify_)）。
 
 > **為什麼套件管理器裝的 herdr 會擱淺自己的 server —— 這就是 macOS 離開 Homebrew 的原因。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 brew 裝的 herdr 沒辦法迴避這次重啟。本 repo 現在在 macOS 上也改裝自管的 release binary，正是為了補掉這個缺口；下面那篇 pitfall 仍然保留，因為它描述的是任何**尚未遷移**的機器上會發生的事（而且 `just upgrade-herdr` 偵測到套件管理器安裝時會跳過並印出指示）。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
@@ -281,7 +281,7 @@ herdr 首次執行的 onboarding 會提議**安裝可選的 agent 整合**（`he
 | Agent | `herdr integration install` 建立什麼 | 會碰到 repo 管理的檔案嗎？ |
 |---|---|---|
 | claude | `~/.claude/hooks/herdr-agent-state.sh` **+ `~/.claude/settings.json` 裡一個 hook 項目** | 會——但 repo 的 hook-aware `modify_settings.json.tmpl` merger 會**保留**它（跟它對待 CodeIsland 一樣）。`chezmoi apply` 是 no-op；不會把 herdr hook 拔掉。 |
-| codex | 只有 `~/.codex/herdr-agent-state.sh` | 不會——`~/.codex/config.toml` 不動（與 chezmoi 計算出的目標相同）。 |
+| codex | `~/.codex/herdr-agent-state.sh` + `~/.codex/hooks.json` 的 `SessionStart` hook（0.8.0 integration v7） | `hooks.json` 是 hook-aware `modify_` 目標：Herdr 條目會保留，peon 條目會加法合併；`config.toml` 不再放 lifecycle hooks。 |
 | opencode | `~/.config/opencode/plugins/herdr-agent-state.js`（獨立 plugin） | 不會——只有 `workmux-status.ts` 受管；herdr 的 plugin 共存。 |
 | cursor | `~/.cursor/herdr-agent-state.sh` + hook | 腳本在 chezmoi 之外；共存。 |
 

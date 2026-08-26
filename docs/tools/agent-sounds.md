@@ -97,21 +97,20 @@ finds packs there via its packs-anchored fallback.
 |---|---|---|
 | **Claude Code** | Hook entries in the hook-aware merger | It's a Pattern B "mixed file" — see [agent-overlays.md](agent-overlays.md) |
 | **OpenCode** | Ansible symlinks the plugin from peon-ping's `libexec` | OpenCode uses plugins, not hooks. Upstream ships it as a symlink, so linking (not vendoring a copy) keeps it current across upgrades |
-| **Codex** | peon-ping's own adapter | `~/.codex/hooks.json` is an always-ignored CodeIsland sidecar |
+| **Codex** | peon-ping adapter declared by the hook-aware `modify_hooks.json.tmpl` | Shares `~/.codex/hooks.json` with Herdr/CodeIsland; foreign entries are preserved |
 | **Cursor** | peon-ping's own adapter | `~/.cursor/hooks.json`, same |
 
-Codex/Cursor `hooks.json` files are *deliberately unmanaged* by chezmoi
-([`.chezmoiignore.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoiignore.tmpl)),
-so peon-ping's adapter writing them conflicts with nothing.
+Cursor's `hooks.json` remains deliberately unmanaged. Codex is different:
+official Codex warns when one config layer contains both `hooks.json` and
+inline `[[hooks.*]]` blocks, so the repo now uses a hook-aware
+`dot_codex/modify_hooks.json.tmpl` merger. It preserves Herdr/CodeIsland hooks,
+adds or prunes only peon-ping's own entries according to `agentSounds`, and the
+TOML modifier removes legacy peon inline blocks.
 
-`~/.codex/config.toml` is the exception: the Codex adapter *also* appends
-`[[hooks.<Event>]]` blocks there, and that file **is** a `modify_` target. It
-round-trips fine, but only because the overlay's TOML writer explicitly handles
-arrays-of-tables — it did not at first, and the whole file failed to apply with
-`TypeError: unsupported scalar type for TOML emit: dict`. If peon-ping (or any
-other installer) starts writing a TOML construct the writer doesn't know, that
-apply breaks again; see
-[agent-overlays.md](agent-overlays.md#the-writer-must-cover-every-construct-a-foreign-writer-can-inject).
+Older peon-ping setup runs appended `[[hooks.<Event>]]` blocks to
+`~/.codex/config.toml`. The TOML modifier recognizes and removes only those
+legacy peon commands after the JSON overlay has taken ownership; Codex trust
+records under `[hooks.state]` and unrelated foreign config remain intact.
 
 ## The one place we subtract
 

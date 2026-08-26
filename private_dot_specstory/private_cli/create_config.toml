@@ -62,6 +62,13 @@
 # Include user prompt text in telemetry spans (default: true)
 # prompts = false
 
+[redaction]
+# Redact secrets and API keys from saved markdown history and cloud-synced
+# session data. (default: true)
+# Detection uses the betterleaks ruleset, covering API keys, tokens, private
+# keys, and other credentials for many providers.
+# enabled = false # equivalent to --no-redact-secrets
+
 [providers]
 # Agent execution commands by provider (used by `specstory run`)
 # Pass custom flags (e.g. `claude_cmd = "claude --allow-dangerously-skip-permissions"`).

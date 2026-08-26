@@ -51,8 +51,8 @@ Ubuntu 對桌面應用 (desktop apps) 有**五種**打包機制 (packaging mecha
 | **Google Chrome** | 來自 `dl.google.com` 的 `.deb`（postinst 自動加入 `google-chrome.list` ＋ `/usr/share/keyrings/google-chrome.gpg`）；**僅限 x86_64** —— Google 沒有發佈 arm64 的 Linux 版 | ✅ `apt upgrade google-chrome-stable` | 同 role，"Install Google Chrome via .deb" | `/opt/google/chrome/` |
 | **Discord** | `flatpak`（預設、推薦）或 `.deb`（無 apt source）—— 由 `discordChannel` chezmoi prompt 挑選 | ✅ 透過 `flatpak update`（預設）/ ❌ `.deb` 為手動 | 同 role | `~/.local/share/flatpak/app/com.discordapp.Discord/`（flatpak）或 `/usr/share/discord/`（.deb） |
 | **Steam** | Valve apt repo（`steam-launcher`），由 `installGamingApps=true` 與 x86_64 控制 | ✅ launcher/runtime 套件透過 apt；Steam client 啟動時自我更新 | 同 role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
-| **Zen Browser** | AppImage 在 `~/Applications/`，下載時叫 `zen.AppImage`，但用 glob `zen*.AppImage` **比對**（AppImageLauncher 會把整合過的改名成 `zen_<md5>.AppImage`）；從 `zen-browser/desktop` latest release 以精確名稱 `zen-<arch>.AppImage` 挑 asset | ❌ —— 先刪掉所有 `~/Applications/zen*.AppImage` **再**重跑 role（任何殘留的副本都算已安裝） | 同 role | glob 當下命中的那個；`.desktop` 每次 apply 都據此重寫。profile 在 `~/.zen/`（跨版本共用，升級不可逆） |
-| **Alacritty** | `cargo install alacritty` | ❌ —— `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
+| **Zen Browser** | AppImage 固定放在 `~/.local/opt/zen/zen.AppImage`（不在 AppImageLauncher 監看目錄）；launcher 用 `APPIMAGELAUNCHER_DISABLE=1` 避免執行時再次整合 | ❌ —— 覆寫固定 AppImage 後重跑 role | 同 role | `~/.local/opt/zen/zen.AppImage`；舊的 `~/Applications/zen*.AppImage` 會遷移一次。profile 在 `~/.zen/` |
+| **Alacritty** | `cargo install alacritty`；desktop entry 的 `TryExec`/`Exec` 使用絕對路徑，避免 GNOME 登入環境沒有 cargo PATH 時隱藏它 | ❌ —— `just upgrade-cargo` | [`gui_apps_linux` role](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb`（22.04 用 PPA、24.04 用 GitHub release） | ✅ 透過 apt | 同 role | system + `appimagelauncherd.service`（user） |
 | **Bitwarden CLI** (`bw`) | 透過 mise 用 npm 安裝（由 `installBitwarden=true` 控制） | ❌ —— `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
 | **Bitwarden Desktop** | Snap (`bitwarden`) → 若 `snap` 不可用則退回 `.deb`；由 `installBitwarden=true` AND `profile=ubuntu_desktop` 控制 | ✅ 透過 `snapd` 背景重整（後備 `.deb` 則 `apt upgrade`） | 同 role | `/snap/bitwarden/current/` |
@@ -65,7 +65,7 @@ Ubuntu 對桌面應用 (desktop apps) 有**五種**打包機制 (packaging mecha
 | **Firefox** | Snap（自 Ubuntu 22.04 起 canonical 預設） | ✅ 背景 | OS 預先安裝 | `snap refresh firefox` |
 | **btop** | Snap（kz6fittycent） | ✅ 背景 | 手動 | `snap refresh btop` |
 | **Frpc Desktop** | AppImage 在 `~/Applications/Frpc-Desktop-1.2.1.AppImage` | ❌ —— 手動重新下載 | 手動丟入 | 覆寫該檔案 |
-| **Clash for Windows** | tarball 在 `~/Documents/ClashForWindows/` ⚠️ | ❌ **上游已棄用** | 2025 手動解壓 | **遷移** —— 見下方 |
+| **Clash Verge Rev** | 官方 `.deb` (`clash-verge`) | 依套件來源；目前以 `.deb` 升級 | 手動安裝套件；role 負責移除舊的 user-level 重複 launcher | `dpkg -L clash-verge`；canonical entry 是 `/usr/share/applications/Clash Verge.desktop` |
 
 > **Clash for Windows 已死。** 原作者 (Fndroid) 於 **2023-11** 公開停止維護，GitHub repo 已封存。沒有新版本、沒有 CVE 修補。請遷移到任一個有維護的 fork：
 >
@@ -154,15 +154,37 @@ Ubuntu App Center 是 `snapd` 的 GTK 前端 —— Canonical 的通用套件管
 
 當上游只發佈 AppImage（Zen Browser、Cursor 的舊 AppImage、許多獨立工具）時，我們的慣例是：
 
-1. **下載用穩定檔名，但永遠不要*依賴*它**：檔案寫成 `~/Applications/<app>.AppImage`（無版本或雜湊），但安裝 guard 要用 **glob**（`<app>*.AppImage`），不是那個確切路徑。AppImageLauncher 會把整合過的 AppImage 改名成 `<app>_<md5>.AppImage`，所以確切路徑的 guard 會讓每次 apply 都重新下載幾百 MB。像 `zen-x86_64_fe71259e...AppImage` 這種也會一直累積 —— glob 命中超過一個時要警告，而不是默默挑一個。
+1. **先決定誰擁有桌面整合**：手動 AppImage 可放在 `~/Applications/` 交給 AppImageLauncher；由 role 管理且需要穩定 desktop ID 的 AppImage（Zen）則放在監看目錄外，並使用上游支援的 `APPIMAGELAUNCHER_DISABLE=1` 啟動。
 2. **執行位元 (executable bit)**：在 ansible 任務中用 `mode: '0755'`。
-3. **AppImageLauncher 整合**：`appimagelauncherd.service`（使用者 systemd unit、由我們的 role 設定）監看 `~/Applications/`。新的 AppImage 會觸發首次執行對話框：*"Integrate or Run once?"* —— integrate 會擷取圖示、在 `~/.local/share/applications/` 下產生 `.desktop` 條目，並**把檔案改成 AppImageLauncher 的標準檔名**。自己寫 `.desktop` **並不能**讓我們豁免：AIL 是透過 `binfmt_misc` 掛在「執行」這件事本身上，任何啟動方式都會先經過它。`ask_to_move = false` 只壓掉對話框、壓不掉搬移（實測過 —— 見下方 pitfall），把檔案移出 `~/Applications` 也只是把改名換成「要不要搬進去」的提示。
-4. **每次 apply 都要重新確立桌面整合**，不是只在下載時做。把當前的 AppImage 路徑解析成一個 fact，每次都據此重寫 `.desktop`，這樣改名會自動自癒，而不是留下一個懸空的 `TryExec=` —— 啟動器對此是**隱藏**條目而不是報錯。如果你也要刪掉 AIL 那份 `appimagekit_*.desktop` 以維持單一權威，記得它和 `ail-cli deintegrate` 都要加 `failed_when: false`：AppImageLauncher **Lite**（noRoot）下沒有 `ail-cli`。[`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md)
+3. **AppImageLauncher 有兩條路徑**：`appimagelauncherd` 監看 `~/Applications/`，而 `binfmt_misc` 也會攔截 AppImage 的執行。只有移出監看目錄還不夠；role-owned launcher 還必須在 `Exec=` 設定 `APPIMAGELAUNCHER_DISABLE=1`。
+4. **維持單一 desktop ID**：Zen 只保留 `zen-browser.desktop`，並刪除 AIL 曾產生的 `appimagekit_*Zen*.desktop` 與 icon。因為輸入檔已移出監看目錄，登入後不會再生回來。[`pitfalls/appimagelauncher-renames-managed-appimage.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appimagelauncher-renames-managed-appimage.md)
 5. **桌面整合任務要 gate 在 `is not skipped`**，不能只用 `is succeeded`。被 `when:` 跳過的任務一樣通過 `is succeeded`，所以下載失敗／被跳過時，後續任務仍會照寫圖示與 `.desktop`，而其 `TryExec=` 指向不存在的檔案 —— 結果是啟動器把該條目**隱藏**而不是報錯，apply log 裡還是 `failed=0`。同時要為下載配一個明確的「沒有符合的 asset」`debug` 警告；`rescue:` 區塊接不住 no-op。完整記錄：[`pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md)
 
-對於我們管理的 AppImage，我們在同一個 ansible 任務中自己寫 `.desktop` 條目，讓 app **立刻**可被搜尋、不必等第一次啟動 —— 見 Zen Browser。這換來的是即時可用，以及一個穩定的 `.desktop` id 給 `linux_app_register --desktop=` 用；它**不會**阻止 AppImageLauncher 之後整合並改名，所以 role 每次 apply 都會重新確立那個條目。對於你手動丟入的 AppImage（Frpc Desktop），讓對話框處理。
+對於我們管理的 AppImage，我們在同一個 ansible 任務中自己寫 `.desktop` 條目，讓 app **立刻**可被搜尋，也提供 `linux_app_register --desktop=` 一個穩定 ID。Zen 的固定路徑加上 `APPIMAGELAUNCHER_DISABLE=1` 會阻止 AIL 再產生第二份整合；對於你手動丟入的 AppImage（Frpc Desktop），則讓 AIL 對話框處理。
 
 要檢查常駐程式：`systemctl --user status appimagelauncherd`。手動整合：`ail-cli integrate ~/Applications/foo.AppImage`。
+
+## 理解與除錯重複的 app icon
+
+GNOME 不是用顯示名稱 `Name=` 識別 app，而是用 **desktop ID**（通常就是 `.desktop` 的檔名）。因此兩個都叫「Clash Verge」的檔案，只要 basename 不同，通常就是兩個 app：
+
+```sh
+find ~/.local/share/applications /usr/share/applications \
+  /var/lib/snapd/desktop/applications -maxdepth 1 -type f -name '*.desktop' \
+  -print 2>/dev/null | sort
+rg -il '^(Name=.*(Zen|Clash)|Exec=.*(zen|clash))' \
+  ~/.local/share/applications /usr/share/applications 2>/dev/null
+rg -n '^(Name|Exec|TryExec|Icon|NoDisplay|StartupWMClass)=' <file.desktop>
+desktop-file-validate <file.desktop>
+gtk-launch <desktop-id-without-.desktop>
+```
+
+- user 與 system scope 有相同 basename：user entry **shadow** system entry，不一定會顯示兩個。
+- basename 不同：desktop ID 不同，通常會顯示兩個 icon。
+- `NoDisplay=true`：通常是 protocol handler，不是可見 launcher；Clash 的 `clash-verge-handler.desktop` 應保留。
+- `TryExec` 指向不存在的檔案：launcher 會直接隱藏；這正是 Alacritty 在 GNOME 登入 PATH 沒有 `~/.cargo/bin` 時消失的原因。
+- AIL 產生的 `appimagekit_*` 登入後復活：看 `journalctl --user -u appimagelauncherd --since today`，只刪輸出不會解決可再次被監看的輸入。
+- package ownership：`dpkg -S /usr/share/applications/'Clash Verge.desktop'`；GNOME favorites 則可用 `gsettings get org.gnome.shell favorite-apps` 查是否留著不存在的舊 ID。
 
 ## 將新 GUI 應用加入 `gui_apps_linux`
 
@@ -199,9 +221,9 @@ Does upstream publish a .deb?
 **AppImage 模式** —— 見同檔的 "Install Zen Browser AppImage"。三步：
 
 1. `ansible.builtin.uri` —— GitHub releases API（或廠商等價物）解析資產 URL。
-2. 用 `selectattr('name', 'match', '^<prefix>-<arch>\\.AppImage$')` 過濾器挑出 `target_architecture` 對應的資產（已由 [`linux.yml`](../../dot_ansible/playbooks/linux.yml) 中的 `Set target_architecture from dpkg` 任務正規化為 `x86_64` / `aarch64`）。
-3. `ansible.builtin.get_url` 到 `~/Applications/<app>.AppImage`，使用 `mode: '0755'` 與穩定檔名。
-4. 用 `ansible.builtin.copy` 加 `content:` 字面值在 `~/.local/share/applications/` 下寫一個 `.desktop` 條目 —— 該檔案會透過 `update-desktop-database` 合併進系統選單。
+2. 用精確 asset name（`equalto`）挑出 `target_architecture` 對應檔案，避免 YAML folded scalar 的 regex 反斜線陷阱。
+3. `ansible.builtin.get_url` 到監看目錄外的固定路徑（例如 `~/.local/opt/<app>/<app>.AppImage`），使用 `mode: '0755'`。
+4. 在 `~/.local/share/applications/` 寫單一 `.desktop`；若 AIL 攔截執行，`Exec=` 加 `APPIMAGELAUNCHER_DISABLE=1`，並清除舊的 `appimagekit_*` entry/icon。
 
 **Snap 模式** —— 本 repo 還沒有。範本：
 

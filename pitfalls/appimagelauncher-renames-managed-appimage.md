@@ -1,124 +1,85 @@
-# Zen's launcher entry dangles again right after you launch it once — and every `chezmoi apply` re-downloads 125 MB
+# Zen has two launcher icons, or its managed launcher disappears after login
 
 **Symptoms** (grep this section):
 
-- A `chezmoi apply` installs Zen correctly, the launcher entry works — then you
-  launch the browser **once** and the entry disappears from the GNOME/KDE menu
-  again. `applaunch Zen` goes dead. `appquit Zen` / `appactivate Zen` still work
-  (they key off `--pkill` / `--wm-class`, not the `.desktop`).
-- `~/Applications/zen.AppImage` is gone; in its place:
-  ```console
-  $ ls ~/Applications/
-  zen_c97bf8b89d9e9fdba22107dcbef2a835.AppImage
-  ```
-- `~/.local/share/applications/zen-browser.desktop` still says
-  `TryExec=/home/you/Applications/zen.AppImage`, which no longer exists — so
-  the entry is **hidden**, not broken-on-click, and nothing logs an error.
-- Two Zen entries in the launcher: ours plus
-  `appimagekit_<hash>-Zen_Browser.desktop`.
-- Every subsequent `chezmoi apply` re-downloads the full 125 MB AppImage,
-  because the install guard looks for the stable filename that no longer
-  exists. Then you launch it, it gets renamed, and the next apply downloads it
-  again — forever.
-- `pgrep -af zen` shows the process was started through AppImageLauncher even
-  though you launched the AppImage directly:
-  ```
-  /opt/appimagelauncher.AppDir/usr/lib/x86_64-linux-gnu/appimagelauncher/binfmt-bypass /home/you/Applications/zen_c97bf8b8….AppImage
-  ```
+- GNOME shows both `zen-browser.desktop` and an
+  `appimagekit_<hash>-Zen_Browser.desktop` entry.
+- Deleting the `appimagekit_*` entry works only until the next login;
+  `appimagelauncherd` creates it again.
+- An older setup loses Zen from search after first launch because
+  `TryExec=~/Applications/zen.AppImage` dangles after AppImageLauncher renames
+  the file to `zen_<md5>.AppImage`.
+- A fixed-path install outside `~/Applications` still shows an integration
+  prompt when executed normally.
 
 ## Root cause
 
-AppImageLauncher hooks **execution itself** via `binfmt_misc` (the
-`binfmt-bypass` helper above), not merely the `~/Applications` directory watch.
-So "we write our own `.desktop` entry in the ansible task, therefore the
-first-run integration modal never matters" — the convention this repo used to
-document — is simply false. Launching the AppImage by any route hands control
-to AppImageLauncher first.
+AppImageLauncher has two independent integration paths:
 
-On integration it **moves the file into the integration directory and appends
-an md5 checksum to the filename**. That is upstream behaviour by design: the
-maintainer added the checksum so AIL can recognise an already-integrated
-AppImage ([#7](https://github.com/TheAssassin/AppImageLauncher/issues/7),
-[#547](https://github.com/TheAssassin/AppImageLauncher/issues/547)).
+1. `appimagelauncherd` watches `~/Applications` and can recreate
+   `appimagekit_*.desktop` entries at login.
+2. Its `binfmt_misc` interpreter intercepts AppImage **execution itself**. On
+   integration it moves the file to the integration directory and appends an
+   md5 checksum. Therefore writing a second `.desktop` file, or merely moving
+   the AppImage outside the watched directory, does not opt the app out.
 
-Two things that are easy to get wrong when diagnosing this:
+`ask_to_move = false` only suppresses the question; it does not disable the
+move. This was measured with `ail-cli integrate`, and is not a stable-file-name
+control.
 
-- **The daemon is not the culprit.** `appimagelauncherd` watching
-  `~/Applications` only writes the `appimagekit_*.desktop` entry — measured: it
-  left the filename untouched. The rename comes from the *integrate* action.
-- **Headless execution does not reproduce it.**
-  `zen.AppImage --headless --screenshot …` runs without triggering the modal, so
-  you cannot reproduce or test this with a scripted launch. Use
-  `ail-cli integrate` instead, which drives the same code path non-interactively.
-
-### `ask_to_move = false` does NOT fix it (measured)
-
-The obvious-looking lever in `~/.config/appimagelauncher.cfg` does not work. It
-suppresses the *dialog*, not the *move*. Measured on this repo's Ubuntu 24.04
-box with a hardlink of the real AppImage, using `ail-cli integrate` as a
-non-interactive stand-in for the modal:
-
-```console
-$ grep ask_to_move ~/.config/appimagelauncher.cfg
-ask_to_move = true
-$ ail-cli integrate /tmp/ailtest1.AppImage
-Processing /tmp/ailtest1.AppImage
-Moving AppImage to integration directory          # <-- moved + hash-renamed
-$ ls ~/Applications | grep ailtest
-ailtest1_c97bf8b89d9e9fdba22107dcbef2a835.AppImage
-
-$ sed -i 's/^ask_to_move = true/ask_to_move = false/' ~/.config/appimagelauncher.cfg
-$ ail-cli integrate /tmp/ailtest2.AppImage
-Processing /tmp/ailtest2.AppImage
-Moving AppImage to integration directory          # <-- SAME. still moved.
-$ ls ~/Applications | grep ailtest
-ailtest2_c97bf8b89d9e9fdba22107dcbef2a835.AppImage
-```
-
-So do not manage `appimagelauncher.cfg` hoping to pin the filename. It was
-evaluated and rejected.
-
-Relocating the AppImage outside `~/Applications` does not help either — because
-the hook is on exec, a file elsewhere just gets the *"move into
-~/Applications?"* treatment instead.
+The missing piece is AppImageLauncher's supported per-process escape hatch:
+its binfmt interpreter checks `APPIMAGELAUNCHER_DISABLE` and launches the
+AppImage directly when the variable is set. See the upstream
+[`APPIMAGELAUNCHER_DISABLE` discussion](https://github.com/TheAssassin/AppImageLauncher/discussions/679).
 
 ## Fix
 
-Stop depending on the filename. In
-`dot_ansible/roles/gui_apps_linux/tasks/main.yml`:
+The `gui_apps_linux` role now gives Zen one owner and one desktop ID:
 
-1. **Guard with a glob, not a fixed path** — `ansible.builtin.find` over
-   `~/Applications` with `patterns: 'zen*.AppImage'`. A renamed (integrated)
-   AppImage still counts as installed, which is what kills the re-download loop.
-   Network calls (release metadata + download) are gated on `matched == 0`, so a
-   steady-state apply touches the network zero times.
-2. **Resolve the current path into a fact** (`zen_appimage_path` = newest match
-   by `mtime`) and warn when more than one `zen*.AppImage` exists rather than
-   silently picking.
-3. **Re-assert desktop integration on every apply**, not only on download —
-   the `.desktop` is rewritten from `zen_appimage_path` each run, so a rename
-   self-heals on the next `chezmoi apply`. `copy` is content-idempotent, so this
-   reports `changed` only when the path actually moved.
-4. **Remove AIL's parallel entry** so `zen-browser.desktop` stays the single
-   authority that `linux_app_register Zen --desktop=zen-browser` can rely on.
-   `ail-cli deintegrate` + delete any `appimagekit_*Zen*.desktop`. Both must be
-   `failed_when: false` — `ail-cli` ships only with the system AppImageLauncher
-   package, never with **Lite** (noRoot), where a bare `command` would abort the
-   play with "Unable to find executable".
+1. Migrate the newest legacy `~/Applications/zen*.AppImage` once to the fixed
+   path `~/.local/opt/zen/zen.AppImage` (outside AIL's watched directory).
+2. Write only `~/.local/share/applications/zen-browser.desktop`.
+3. Launch it as
+   `/usr/bin/env APPIMAGELAUNCHER_DISABLE=1 ~/.local/opt/zen/zen.AppImage %U`,
+   preventing execution-time reintegration as well as login-time discovery.
+4. Remove stale `appimagekit_*Zen*.desktop` files and their generated icons.
+5. Migrate the obsolete GNOME favorite ID `ZenBrowser.desktop` to the stable
+   `zen-browser.desktop` ID without otherwise changing the favorites list.
 
-Accepted trade-off: launching Zen still re-integrates and re-renames, and the
-next apply cleans it up again. The state churns; it is never *broken*. Pinning
-the filename is not achievable (see above), so self-healing is the design.
+This reaches a genuinely steady state: the daemon cannot see the managed
+AppImage and the launcher bypasses the binfmt integration path. A later login
+does not recreate a second icon, and repeated role runs are idempotent.
+
+## Debugging desktop-entry identity
+
+The launcher groups and shadows applications by **desktop file ID**, not only
+by the visible `Name=`. First inventory all candidate files, then inspect their
+identity and ownership:
+
+```sh
+find ~/.local/share/applications /usr/share/applications \
+  /var/lib/snapd/desktop/applications -maxdepth 1 -type f -name '*.desktop' \
+  -print 2>/dev/null | sort
+rg -il '^(Name=.*(Zen|Clash)|Exec=.*(zen|clash))' \
+  ~/.local/share/applications /usr/share/applications 2>/dev/null
+rg -n '^(Name|Exec|TryExec|Icon|NoDisplay|StartupWMClass)=' <file.desktop>
+dpkg -S /usr/share/applications/'Clash Verge.desktop'
+journalctl --user -u appimagelauncherd --since today
+```
+
+Two different basenames mean two desktop IDs and normally two icons. The same
+basename at user and system scope means the user entry shadows the system one.
+`NoDisplay=true` usually marks a protocol handler and should not be mistaken
+for a visible duplicate. A missing `TryExec` target makes an entry disappear
+rather than producing an on-click error.
 
 ## Generalisable lesson
 
-For any tool that a **daemon or shell hook can rename or relocate behind your
-back**, an install guard keyed to an exact path is a re-download loop waiting to
-happen, and any file you generate that embeds that path will dangle. Key the
-guard on a glob, store the resolved path in a fact, and re-assert the derived
-files every run instead of only at install time.
+For an app managed by a desktop-integration daemon, deleting generated output
+is not a fix while the daemon can rediscover the input. Establish one owner,
+put its executable outside watched directories, use the tool's explicit opt-out
+when execution is intercepted, and keep one stable desktop ID.
 
 Related: [`ansible-folded-scalar-regex-empty-url-silent-skip.md`](ansible-folded-scalar-regex-empty-url-silent-skip.md)
-— the previous Zen failure, with the same end symptom (a `.desktop` whose
-`TryExec` dangles and a launcher entry that hides itself) reached by a
-completely different route.
+— the earlier Zen failure had the same visible result (a hidden launcher caused
+by dangling `TryExec`) but a different Ansible templating cause.

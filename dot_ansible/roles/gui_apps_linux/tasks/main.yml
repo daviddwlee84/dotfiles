@@ -117,6 +117,7 @@
   delay: 5
 
 - name: Install Alacritty .desktop entry
+  tags: [desktop_hygiene]
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture != 'armv7l'
@@ -126,8 +127,8 @@
     content: |
       [Desktop Entry]
       Type=Application
-      TryExec=alacritty
-      Exec=alacritty
+      TryExec={{ ansible_facts['env']['HOME'] }}/.cargo/bin/alacritty
+      Exec={{ ansible_facts['env']['HOME'] }}/.cargo/bin/alacritty
       Icon=alacritty
       Terminal=false
       Categories=System;TerminalEmulator;
@@ -143,6 +144,88 @@
   ansible.builtin.command: update-desktop-database "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
   changed_when: false
   failed_when: false
+
+# GNOME's default Super_L overlay opens the Overview (Super+A opens the full
+# application grid). Repair only the empty override: a non-empty custom key is
+# a deliberate user choice and must survive apply.
+- name: Read GNOME overlay key
+  tags: [desktop_hygiene]
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.command: gsettings get org.gnome.mutter overlay-key
+  register: gnome_overlay_key
+  changed_when: false
+  failed_when: false
+
+- name: Restore GNOME Windows/Super key when disabled
+  tags: [desktop_hygiene]
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gnome_overlay_key.rc == 0
+    - (gnome_overlay_key.stdout | trim) in ["''", '""']
+  ansible.builtin.command: gsettings set org.gnome.mutter overlay-key Super_L
+  changed_when: true
+
+# Clash Verge Rev's .deb owns /usr/share/applications/Clash Verge.desktop.
+# Older manual installs on this fleet left two user-level launchers behind:
+# an exact copy (which shadows the package by desktop ID) and a lowercase-ID
+# wrapper into ~/.local/opt (which appears as a second visible icon). Keep the
+# package entry as the single authority when it exists. The app-created
+# clash-verge-handler.desktop is intentionally retained: NoDisplay=true makes
+# it a protocol handler, not a launcher icon.
+- name: Check for packaged Clash Verge desktop entry
+  tags: [desktop_hygiene]
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.stat:
+    path: /usr/share/applications/Clash Verge.desktop
+  register: clash_verge_packaged_desktop
+
+- name: Remove user launchers superseded by packaged Clash Verge
+  tags: [desktop_hygiene]
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - clash_verge_packaged_desktop.stat.exists
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ ansible_facts['env']['HOME'] }}/.local/share/applications/Clash Verge.desktop"
+    - "{{ ansible_facts['env']['HOME'] }}/.local/share/applications/clash-verge.desktop"
+  register: clash_verge_duplicate_launchers_removed
+
+- name: Refresh desktop application database after Clash Verge cleanup
+  tags: [desktop_hygiene]
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - clash_verge_duplicate_launchers_removed is changed
+  ansible.builtin.command: update-desktop-database "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
+  changed_when: false
+  failed_when: false
+
+# A previous hand-written Zen launcher used the desktop ID ZenBrowser.desktop.
+# Migrate that exact stale favorite to the role-owned stable ID without
+# changing the order of, or otherwise normalizing, the user's favorites.
+- name: Read GNOME favorite application IDs
+  tags: [desktop_hygiene]
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.command: gsettings get org.gnome.shell favorite-apps
+  register: gnome_favorite_apps
+  changed_when: false
+  failed_when: false
+
+- name: Migrate stale Zen favorite desktop ID
+  tags: [desktop_hygiene]
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gnome_favorite_apps.rc == 0
+    - "'ZenBrowser.desktop' in gnome_favorite_apps.stdout"
+  ansible.builtin.command:
+    argv:
+      - gsettings
+      - set
+      - org.gnome.shell
+      - favorite-apps
+      - "{{ gnome_favorite_apps.stdout | replace('ZenBrowser.desktop', 'zen-browser.desktop') }}"
+  changed_when: true
 
 # =============================================================================
 # libfuse2 — AppImage runtime on Ubuntu 22.04+
@@ -830,32 +913,22 @@
 # =============================================================================
 # Zen Browser — Firefox-based browser, shipped as an AppImage
 #
-# User-level install under ~/Applications/. We write the icon + .desktop entry
-# ourselves so the browser is searchable in GNOME/KDE launchers immediately.
+# This role, not AppImageLauncher, owns Zen's desktop integration. Keeping the
+# AppImage under ~/Applications caused two writers to race forever: AIL's
+# daemon re-generated appimagekit_*Zen*.desktop on every login, while this role
+# removed it only on apply. The stable solution is:
+#   - store managed Zen outside AIL's watched dirs, at ~/.local/opt/zen;
+#   - launch with APPIMAGELAUNCHER_DISABLE=1, an upstream-supported escape hatch
+#     checked by the binfmt interpreter, so execution does not re-integrate it;
+#   - migrate the newest legacy ~/Applications/zen*.AppImage in place once;
+#   - remove AIL's stale desktop/icon resources, leaving zen-browser.desktop as
+#     the single stable ID for favorites and linux_app_register.
 #
-# IMPORTANT — the filename is NOT stable, and writing our own .desktop does NOT
-# opt us out of AppImageLauncher. AIL hooks *execution* itself (binfmt_misc →
-# binfmt-bypass, visible in `pgrep -af zen`), not just the ~/Applications
-# watch, so the first launch integrates the file and renames it to
-# `zen_<md5-of-path>.AppImage`. That is upstream by design — the checksum is how
-# AIL recognises an already-integrated AppImage (TheAssassin/AppImageLauncher#547).
-# Consequences encoded below:
-#   - the "is it installed?" guard globs `zen*.AppImage`; a fixed name made
-#     every apply re-download 125 MB and then get renamed again, forever;
-#   - desktop integration is re-asserted on EVERY apply (not only on download)
-#     so a rename self-heals instead of leaving a dangling TryExec, which the
-#     launcher hides silently rather than reporting;
-#   - AIL's parallel appimagekit_* entry is removed so `zen-browser.desktop`
-#     stays the single authority that `linux_app_register Zen --desktop=` and
-#     `applaunch Zen` can rely on.
-# See pitfalls/appimagelauncher-renames-managed-appimage.md
-#
-# noRoot-friendly: the whole block is user-level, no `become: true`, no
-# `tags: [sudo]`. `ail-cli` is absent under AppImageLauncher Lite, so every
-# deintegration task must stay non-fatal.
+# noRoot-friendly: the whole block is user-level and needs no ail-cli.
 # =============================================================================
 
-- name: Find any installed Zen AppImage
+- name: Find legacy Zen AppImages managed by AppImageLauncher
+  tags: [zen]
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture in ['x86_64', 'aarch64']
@@ -863,23 +936,54 @@
     paths: "{{ ansible_facts['env']['HOME'] }}/Applications"
     patterns: 'zen*.AppImage'
     file_type: file
-  register: zen_appimage_found
+  register: zen_legacy_appimages
 
 - name: Install / refresh Zen Browser AppImage + desktop integration
+  tags: [zen]
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture in ['x86_64', 'aarch64']
   block:
-    - name: Ensure ~/Applications exists (Zen)
+    - name: Ensure managed Zen directory exists
       ansible.builtin.file:
-        path: "{{ ansible_facts['env']['HOME'] }}/Applications"
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/opt/zen"
         state: directory
         mode: '0755'
 
-    # Only hit the network when there is genuinely no Zen on disk. A renamed
-    # (integrated) AppImage still counts as installed.
+    - name: Check for managed Zen AppImage
+      ansible.builtin.stat:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage"
+      register: zen_managed_before
+
+    - name: Warn about multiple legacy Zen AppImages
+      when: zen_legacy_appimages.matched | default(0) > 1
+      ansible.builtin.debug:
+        msg: >-
+          {{ zen_legacy_appimages.matched }} legacy Zen AppImages remain in
+          ~/Applications ({{ zen_legacy_appimages.files | map(attribute='path') | map('basename') | join(', ') }}).
+          Migrating the newest one; inspect and remove older copies after
+          confirming they are no longer needed.
+
+    - name: Migrate newest legacy Zen AppImage outside AppImageLauncher watch dirs
+      when:
+        - not zen_managed_before.stat.exists
+        - zen_legacy_appimages.matched | default(0) > 0
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ (zen_legacy_appimages.files | sort(attribute='mtime') | last).path }}"
+          - "{{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage"
+      register: zen_legacy_migrated
+
+    - name: Check Zen AppImage after legacy migration
+      ansible.builtin.stat:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage"
+      register: zen_managed_after_migration
+
+    # Only hit the network when neither the managed path nor a migratable
+    # legacy AppImage exists.
     - name: Get latest Zen Browser release metadata
-      when: zen_appimage_found.matched | default(0) == 0
+      when: not zen_managed_after_migration.stat.exists
       ansible.builtin.uri:
         url: https://api.github.com/repos/zen-browser/desktop/releases/latest
         return_content: true
@@ -893,7 +997,7 @@
     # removes the escaping hazard entirely.
     # See pitfalls/ansible-folded-scalar-regex-empty-url-silent-skip.md
     - name: Resolve Zen AppImage asset URL
-      when: zen_appimage_found.matched | default(0) == 0
+      when: not zen_managed_after_migration.stat.exists
       ansible.builtin.set_fact:
         zen_appimage_url: >-
           {{ (zen_release.json.assets
@@ -906,7 +1010,7 @@
     # Without this the whole block degrades to a no-op with zero output.
     - name: Warn that no Zen AppImage asset matched
       when:
-        - zen_appimage_found.matched | default(0) == 0
+        - not zen_managed_after_migration.stat.exists
         - zen_appimage_url | default('') | length == 0
       ansible.builtin.debug:
         msg: >-
@@ -918,11 +1022,11 @@
 
     - name: Download Zen AppImage
       when:
-        - zen_appimage_found.matched | default(0) == 0
+        - not zen_managed_after_migration.stat.exists
         - zen_appimage_url | default('') | length > 0
       ansible.builtin.get_url:
         url: "{{ zen_appimage_url }}"
-        dest: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage"
         mode: '0755'
         timeout: 300
       register: zen_appimage_dl
@@ -930,31 +1034,9 @@
       retries: 3
       delay: 5
 
-    # Copies accumulate when AIL integrates a file we later re-download under
-    # the stable name. Say so rather than silently picking one.
-    - name: Warn about multiple Zen AppImages
-      when: zen_appimage_found.matched | default(0) > 1
-      ansible.builtin.debug:
-        msg: >-
-          {{ zen_appimage_found.matched }} Zen AppImages in ~/Applications
-          ({{ zen_appimage_found.files | map(attribute='path') | map('basename') | join(', ') }}).
-          Using the newest; delete the others once you have confirmed which one
-          you launch.
-
-    # Newest by mtime when one is already on disk, otherwise the file we just
-    # downloaded under the stable name.
-    - name: Resolve which Zen AppImage to integrate
-      ansible.builtin.set_fact:
-        zen_appimage_path: >-
-          {{ (zen_appimage_found.files | sort(attribute='mtime') | last).path
-             if (zen_appimage_found.matched | default(0)) > 0
-             else ansible_facts['env']['HOME'] + '/Applications/zen.AppImage' }}
-
-    # Guards every integration task below: covers "download skipped because the
-    # asset vanished" without depending on the download result at all.
-    - name: Check the resolved Zen AppImage exists
+    - name: Check the final managed Zen AppImage
       ansible.builtin.stat:
-        path: "{{ zen_appimage_path }}"
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage"
       register: zen_appimage_stat
 
     - name: Check whether the Zen icon is already present
@@ -976,8 +1058,9 @@
       delay: 5
       ignore_errors: true
 
-    # Re-written every apply against the CURRENT path — this is the self-heal.
-    # `copy` is content-idempotent, so it only reports changed after a rename.
+    # APPIMAGELAUNCHER_DISABLE is consumed by AIL's binfmt interpreter before
+    # it dispatches the AppImage. Combined with the unwatched path above, this
+    # prevents both login-time daemon integration and launch-time integration.
     - name: Install Zen Browser .desktop entry
       when: zen_appimage_stat.stat.exists
       ansible.builtin.copy:
@@ -989,8 +1072,8 @@
           Name=Zen Browser
           GenericName=Web Browser
           Comment=Experience tranquillity while browsing the web without people tracking you
-          Exec={{ zen_appimage_path }} %U
-          TryExec={{ zen_appimage_path }}
+          Exec=/usr/bin/env APPIMAGELAUNCHER_DISABLE=1 {{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage %U
+          TryExec={{ ansible_facts['env']['HOME'] }}/.local/opt/zen/zen.AppImage
           Icon=zen-browser
           Terminal=false
           StartupNotify=true
@@ -1008,18 +1091,6 @@
         file_type: file
       register: zen_ail_entries
 
-    # `failed_when: false` is load-bearing: ail-cli ships only with the system
-    # AppImageLauncher package, never with Lite (noRoot), where `command` would
-    # otherwise abort the play on "Unable to find executable".
-    - name: Deintegrate AppImageLauncher's Zen entry
-      when:
-        - zen_appimage_stat.stat.exists
-        - zen_ail_entries.matched | default(0) > 0
-      ansible.builtin.command: ail-cli deintegrate "{{ zen_appimage_path }}"
-      register: zen_deintegrate
-      changed_when: zen_deintegrate.rc == 0
-      failed_when: false
-
     - name: Remove leftover AppImageLauncher Zen desktop entries
       when:
         - zen_appimage_stat.stat.exists
@@ -1032,10 +1103,32 @@
         label: "{{ item.path | basename }}"
       register: zen_ail_removed
 
+    - name: Find leftover AppImageLauncher Zen icons
+      when: zen_appimage_stat.stat.exists
+      ansible.builtin.find:
+        paths: "{{ ansible_facts['env']['HOME'] }}/.local/share/icons"
+        patterns: 'appimagekit_*_zen.*'
+        file_type: file
+        recurse: true
+      register: zen_ail_icons
+
+    - name: Remove leftover AppImageLauncher Zen icons
+      when:
+        - zen_appimage_stat.stat.exists
+        - zen_ail_icons.matched | default(0) > 0
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ zen_ail_icons.files | default([]) }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      register: zen_ail_icons_removed
+
     - name: Refresh desktop application database (Zen)
       when: >-
         zen_desktop_entry is changed
         or zen_ail_removed is changed
+        or zen_ail_icons_removed is changed
         or zen_icon_dl is changed
       ansible.builtin.command: update-desktop-database "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
       changed_when: false
@@ -1046,7 +1139,8 @@
         msg: >-
           Zen Browser install failed — you can fall back to downloading the
           AppImage manually from https://github.com/zen-browser/desktop/releases/latest
-          into ~/Applications/ and re-running `update-desktop-database ~/.local/share/applications`.
+          into ~/.local/opt/zen/zen.AppImage and re-running
+          `update-desktop-database ~/.local/share/applications`.
 
 # =============================================================================
 # Antigravity (placeholder)

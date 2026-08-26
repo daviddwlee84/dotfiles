@@ -87,20 +87,19 @@ workmux `wm setup` 的既有規則一樣。
 |---|---|---|
 | **Claude Code** | hook 條目寫進 hook-aware merger | 它是 Pattern B「混合檔」—— 見 [agent-overlays.md](agent-overlays.md) |
 | **OpenCode** | ansible 從 peon-ping 的 `libexec` 建 symlink | OpenCode 用 plugin 不是 hook。上游本來就是用 symlink 出貨，所以用連結（而不是複製一份）才能跟著升級 |
-| **Codex** | 交給 peon-ping 自己的 adapter | `~/.codex/hooks.json` 是被永久忽略的 CodeIsland sidecar |
+| **Codex** | peon hook 寫進 `~/.codex/hooks.json` 的 hook-aware merger | 與 Herdr 0.8.0 integration v7、CodeIsland 等外部條目加法共存 |
 | **Cursor** | 交給 peon-ping 自己的 adapter | `~/.cursor/hooks.json`，同上 |
 
-Codex/Cursor 的 `hooks.json` 是**刻意不被 chezmoi 管**的
-（[`.chezmoiignore.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoiignore.tmpl)），
-所以 peon-ping 的 adapter 去寫它們不會跟任何東西衝突。
+Cursor 的 `hooks.json` 仍刻意不被 chezmoi 管；Codex 不同：
+[`dot_codex/modify_hooks.json.tmpl`](../../dot_codex/modify_hooks.json.tmpl)
+會只辨認並替換 peon 自己的 command fingerprint，完整保留 Herdr、CodeIsland、
+Superset 與其他外部 hook。
 
-`~/.codex/config.toml` 是例外：Codex adapter **也**會往那裡追加
-`[[hooks.<Event>]]` 區塊，而那個檔案**是** `modify_` 目標。它能正常 round-trip，
-但前提是 overlay 的 TOML writer 有明確處理 array-of-tables —— 一開始並沒有，
-於是整個檔案 apply 失敗並噴出
-`TypeError: unsupported scalar type for TOML emit: dict`。往後只要 peon-ping
-（或其他安裝器）開始寫 writer 不認得的 TOML 結構，apply 就會再壞一次；見
-[agent-overlays.md](agent-overlays.md#the-writer-must-cover-every-construct-a-foreign-writer-can-inject)。
+舊版 peon adapter 也可能把 `[[hooks.<Event>]]` 寫進
+`~/.codex/config.toml`。Codex 會同時載入 TOML inline hooks 與 `hooks.json`，但同一層
+兩種表示法會印出警告且可能重複觸發。`modify_config.toml.tmpl` 因此只剪除 command
+指向 peon adapter 的舊 inline 條目，保留 `[hooks.state]` 與所有非 peon hook；實際
+lifecycle hooks 統一由 `hooks.json` merger 管理。
 
 ## 唯一一處我們會「減」的地方
 
