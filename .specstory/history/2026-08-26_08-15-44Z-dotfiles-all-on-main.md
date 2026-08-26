@@ -3261,3 +3261,3218 @@ Check status before commit
 ?? pitfalls/copilot-proxy-stale-package-lock-integrity.md
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:45:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage all changes
+
+`git add -A && git status --short && echo "--- staged ---"`
+
+```text
+A  .specstory/history/2026-08-26_08-15-44Z-dotfiles-all-on-main.md
+M  .specstory/statistics.json
+M  docs/tools/copilot-claude-proxy.md
+M  docs/tools/copilot-claude-proxy.zh-TW.md
+M  dot_config/shell/43_copilot_proxy.sh
+M  pitfalls/README.md
+A  pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md
+A  pitfalls/copilot-proxy-stale-package-lock-integrity.md
+M  tests/unit/copilot_proxy.bats
+--- staged ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the fix
+
+```bash
+git commit -F - <<'EOF'
+fix(copilot-proxy): unwedge start — version-gate the lock, reclaim the shim port
+
+Two independent regressions stacked into one dead proxy: every `start` refused
+at the integrity guard, and every managed launcher then failed closed on a shim
+that was in fact running.
+
+1. `installed package integrity does not match the trusted pin.` on every start
+
+   The guard added in e0836c1 read `package-lock.json` unconditionally. That
+   prefix is mixed-manager by design: `bun add` writes `bun.lock` and never
+   touches `package-lock.json`, while the npm CA-stack fallback writes the
+   latter and nothing ever removes it. One npm fallback months ago left a lock
+   pinned to 2.1.0; bun then installed 2.3.0. The guard compared 2.1.0's
+   genuine hash against 2.3.0's genuine hash, called it tampering, and refused
+   — before writing `.installed-spec`, so every retry re-failed identically.
+
+   Read the lock only when its `version` matches the installed one; otherwise
+   fall back to registry metadata for the *installed* version. Both refusal
+   messages now print `on disk:` and `pinned:`.
+
+2. `shim did not come up` + a flood of `GET /_shim/health 404` in the proxy log
+
+   `_copilot_shim_alive` probes `/_shim/health` so an older build can't pass as
+   a healthy metrics shim — but an older build proxies that path upstream, so
+   :4141 answers 404 and the probe says "dead" while the OS says "occupied".
+   Startup read "dead" as "port free" and spawned a process that died instantly
+   with EADDRINUSE.
+
+   `_copilot_shim_start` now reads the port directly (`lsof -tiTCP`): reclaim a
+   listener whose command line is `copilot-throttle-shim.js`, name any other
+   squatter and refuse. Failure also tails the shim log inline.
+
+Verified: start/restart/status/doctor green; copilot_proxy.bats 55/55 (4 new
+regression tests); full `just bats` at the 5-failure clean-HEAD baseline.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EbifMc3APLNcF3FBuA96iY
+EOF
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1787733972-64518.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..........................................................(no files to check)Skipped
+check json..............................................................................Passed
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/**/*.sh)........................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)......................................Passed
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1787733972-64518.
+[main c5a40d8] fix(copilot-proxy): unwedge start — version-gate the lock, reclaim the shim port
+ 9 files changed, 3711 insertions(+), 14 deletions(-)
+ create mode 100644 .specstory/history/2026-08-26_08-15-44Z-dotfiles-all-on-main.md
+ create mode 100644 pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md
+ create mode 100644 pitfalls/copilot-proxy-stale-package-lock-integrity.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:21Z)**_
+
+Committed as `c5a40d8`. Now the Windows repo comparison:
+
+_**Agent (claude-opus-5 2026-08-26 08:46:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find copilot files in the Windows dotfiles repo
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -rln "copilot-run\|Copilot-Run\|copilot-proxy\|Copilot-Proxy\|COPILOT_SHIM" --include="*.ps1" --include="*.psm1" --include="*.tmpl" --include="*.md" . 2>/dev/null | grep -v "^./.specstory\|^./site/" | head -30`
+
+```text
+README.md
+TODO.md
+AGENTS.md
+backlog/copilot-proxy-global-apply-mode-for-claude-code-and-codex.md
+backlog/README.md
+tests/Copilot.Tests.ps1
+.specstory/history/2026-07-09_13-02-08Z.md
+.specstory/history/2026-07-11_05-49-14Z-irm-https-raw-githubusercontent.md
+.specstory/history/2026-07-10_23-32-51Z-yazi-https-yazi-rs.md
+.specstory/history/2026-07-11_00-15-23Z-powershell-starship-dos-cmd.md
+.specstory/history/2026-07-11_06-53-53Z-docker-desktop-wsl-not.md
+.specstory/history/2026-07-09_16-08-55Z-at-bootstrap-ps1-vs.md
+.specstory/history/2026-07-12_10-02-50Z.md
+.specstory/history/2026-07-10_07-28-40Z-shell-administrator-https-github.md
+.specstory/history/2026-07-29_08-08-58Z-unix-rime-windows-https.md
+.specstory/history/2026-07-11_10-39-19Z-at-dot-config-powershell.md
+.specstory/history/2026-07-13_10-00-24Z.md
+.specstory/history/2026-07-29_09-56-55Z-help-me-solve-the.md
+.specstory/history/2026-07-12_04-55-17Z-herdr-alias-at-users.md
+.specstory/history/2026-07-10_15-43-21Z-ps1-irm-https-raw.md
+.specstory/history/2026-07-11_00-08-14Z-herdr.md
+.specstory/history/2026-07-12_08-49-45Z-gst-gp-git-alias.md
+.specstory/history/2026-07-12_12-10-01Z-apprise-windows-https-appriseit.md
+.specstory/history/2026-08-17_07-21-27Z-1-did-my-specstory.md
+.specstory/history/2026-08-12_03-23-36Z-administrator-in-chezmoi-on.md
+.specstory/history/2026-07-29_11-03-07Z-administrator-in-chezmoi-on.md
+.specstory/history/2026-07-10_23-36-14Z-wezterm-dos-pwsh-exe.md
+.specstory/history/2026-07-10_06-25-00Z-at-users-david-local.md
+.specstory/history/2026-08-13_10-02-30Z-chezmoi-and-copilot-proxy.md
+.specstory/history/2026-07-12_08-26-14Z-nvim-treesitter-c-compiler.md
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find copilot implementation files
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && find . -path ./.specstory -prune -o -path ./site -prune -o -path ./.git -prune -o -type f -iname "*copilot*" -print 2>/dev/null`
+
+```text
+./backlog/copilot-proxy-global-apply-mode-for-claude-code-and-codex.md
+./tests/Copilot.Tests.ps1
+./docs/copilot-proxy.zh-TW.md
+./docs/copilot-proxy.md
+./pitfalls/copilot-proxy-npm-etarget-but-doctor-says-installed.md
+./pitfalls/copilot-api-connectionrefused-stale-bun-only-module.md
+./pitfalls/codex-copilot-empty-mcp-tool-description-400.md
+./dot_config/powershell/copilot-throttle-shim.js
+./dot_config/powershell/profile.d/40_copilot.ps1
+./dot_config/powershell/modules/Copilot/Copilot.psd1
+./dot_config/powershell/modules/Copilot/Copilot.psm1
+./dot_config/nvim/lua/exact_plugins/copilot.lua
+./.claude/worktrees/wf_391dc8f4-80a-2/backlog/copilot-proxy-global-apply-mode-for-claude-code-and-codex.md
+./.claude/worktrees/wf_391dc8f4-80a-2/tests/Copilot.Tests.ps1
+./.claude/worktrees/wf_391dc8f4-80a-1/backlog/copilot-proxy-global-apply-mode-for-claude-code-and-codex.md
+./.claude/worktrees/wf_391dc8f4-80a-1/tests/Copilot.Tests.ps1
+./.claude/worktrees/wf_391dc8f4-80a-2/docs/copilot-proxy.zh-TW.md
+./.claude/worktrees/wf_391dc8f4-80a-2/docs/copilot-proxy.md
+./.claude/worktrees/wf_391dc8f4-80a-2/pitfalls/copilot-api-connectionrefused-stale-bun-only-module.md
+./.claude/worktrees/wf_391dc8f4-80a-2/pitfalls/codex-copilot-empty-mcp-tool-description-400.md
+./.claude/worktrees/wf_391dc8f4-80a-1/docs/copilot-proxy.zh-TW.md
+./.claude/worktrees/wf_391dc8f4-80a-1/docs/copilot-proxy.md
+./.claude/worktrees/wf_391dc8f4-80a-1/pitfalls/copilot-api-connectionrefused-stale-bun-only-module.md
+./.claude/worktrees/wf_391dc8f4-80a-1/pitfalls/codex-copilot-empty-mcp-tool-description-400.md
+./.claude/worktrees/wf_391dc8f4-80a-2/dot_config/powershell/copilot-throttle-shim.js
+./.claude/worktrees/wf_391dc8f4-80a-1/dot_config/powershell/copilot-throttle-shim.js
+./.claude/worktrees/wf_391dc8f4-80a-2/dot_config/powershell/profile.d/40_copilot.ps1
+./.claude/worktrees/wf_391dc8f4-80a-2/dot_config/powershell/modules/Copilot/Copilot.psd1
+./.claude/worktrees/wf_391dc8f4-80a-2/dot_config/powershell/modules/Copilot/Copilot.psm1
+./.claude/worktrees/wf_391dc8f4-80a-1/dot_config/powershell/profile.d/40_copilot.ps1
+./.claude/worktrees/wf_391dc8f4-80a-1/dot_config/powershell/modules/Copilot/Copilot.psd1
+./.claude/worktrees/wf_391dc8f4-80a-1/dot_config/powershell/modules/Copilot/Copilot.psm1
+./.claude/worktrees/wf_391dc8f4-80a-2/dot_config/nvim/lua/exact_plugins/copilot.lua
+./.claude/worktrees/wf_391dc8f4-80a-1/dot_config/nvim/lua/exact_plugins/copilot.lua
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare sizes and exported surface
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+wc -l $W/dot_config/powershell/modules/Copilot/Copilot.psm1 $W/dot_config/powershell/profile.d/40_copilot.ps1 $W/dot_config/powershell/copilot-throttle-shim.js /Users/david/.local/share/chezmoi/dot_config/shell/copilot-throttle-shim.js
+echo "=== exported functions ==="
+grep -n "FunctionsToExport\|AliasesToExport" -A15 $W/dot_config/powershell/modules/Copilot/Copilot.psd1 | head -40
+```
+
+```text
+    2220 /Users/david/src/tries/2026-07-09-windows-dotfiles/dot_config/powershell/modules/Copilot/Copilot.psm1
+      14 /Users/david/src/tries/2026-07-09-windows-dotfiles/dot_config/powershell/profile.d/40_copilot.ps1
+     482 /Users/david/src/tries/2026-07-09-windows-dotfiles/dot_config/powershell/copilot-throttle-shim.js
+     861 /Users/david/.local/share/chezmoi/dot_config/shell/copilot-throttle-shim.js
+    3577 total
+=== exported functions ===
+8:    FunctionsToExport = @(
+9-        'copilot-proxy', 'copilot-run', 'claude-copilot', 'claude-copilot-once',
+10-        'codex-copilot', 'codex-copilot-once',
+11-        'copilot-here', 'copilot-model', 'copilot-embed', 'semsearch'
+12-    )
+13-    CmdletsToExport   = @()
+14-    VariablesToExport = @()
+15:    AliasesToExport   = @()
+16-}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Windows copilot-run
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+awk '/^function copilot-run/,/^}$/' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+function copilot-run {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments)] [string[]] $Argv)
+    if (-not $Argv -or $Argv.Count -eq 0) { Write-Error 'Usage: copilot-run <cmd> [args...]'; return }
+    if (-not (Test-CopilotAlive)) { copilot-proxy start; if (-not (Test-CopilotAlive)) { return } }
+    if ((Get-CopilotShimEnabled) -and -not (Test-CopilotShimAlive)) { Start-CopilotShim | Out-Null }
+
+    # Single source of truth — see Get-CopilotEnvBlock.
+    $inject = Get-CopilotEnvBlock
+    # Scope env to the child process: set, run, restore (equivalent to `env VAR=..`).
+    $saved = @{}
+    foreach ($k in $inject.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k); Set-Item "env:$k" $inject[$k] }
+    try {
+        $exe = $Argv[0]; $rest = if ($Argv.Count -gt 1) { $Argv[1..($Argv.Count - 1)] } else { @() }
+        & $exe @rest
+    } finally {
+        foreach ($k in $inject.Keys) {
+            if ($null -eq $saved[$k]) { Remove-Item "env:$k" -ErrorAction SilentlyContinue }
+            else { Set-Item "env:$k" $saved[$k] }
+        }
+    }
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the Windows env block SSOT
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+awk '/^function Get-CopilotEnvBlock/,/^}$/' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate env block function
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "Get-CopilotEnvBlock" $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+1021:function script:Get-CopilotEnvBlock {
+1588:    # Single source of truth — see Get-CopilotEnvBlock.
+1589:    $inject = Get-CopilotEnvBlock
+1907:# computed by diffing the live file against Get-CopilotEnvBlock — not a hand-picked
+1918:    $want = Get-CopilotEnvBlock -Pinned
+1938:            $envSet = Get-CopilotEnvBlock -Pinned
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Get-CopilotEnvBlock
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '1000,1070p' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+            }
+        } catch { $null = $_ }
+    }
+    if ($env:COPILOT_CLAUDE_MODEL) { return "$($env:COPILOT_CLAUDE_MODEL)|`$COPILOT_CLAUDE_MODEL" }
+    $sf = Get-CopilotModelState
+    if (Test-Path $sf) { return "$(Get-Content -First 1 $sf)|state file: $sf" }
+    "$(Get-CopilotDefaultModel)|built-in default"
+}
+
+# The EXACT env block `copilot-here on` / `copilot-run` would apply right now.
+#
+# SINGLE SOURCE OF TRUTH for three callers: copilot-run (process env),
+# `copilot-here on` (what it merges into settings.local.json) and
+# Get-CopilotHereDrift (what it compares against). These used to be hand-maintained
+# copies and they diverged — the drift check compared 4 of the 8 keys `on` writes,
+# so a pin missing ANTHROPIC_DEFAULT_HAIKU_MODEL / ANTHROPIC_SMALL_FAST_MODEL /
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC reported "no drift" while `on` would
+# still have changed it. Add a key here and all three follow.
+#
+# -Pinned uses the shim base when the shim is enabled but not yet up (what a
+# written-to-disk pin should say); copilot-run wants the live base instead.
+function script:Get-CopilotEnvBlock {
+    param([switch] $Pinned, [string] $Model = (Get-CopilotDefaultModel), $Catalog)
+    $modelProfile = if ($PSBoundParameters.ContainsKey('Catalog')) {
+        Get-CopilotModelProfile -Model $Model -Catalog $Catalog
+    } else {
+        Get-CopilotModelProfile -Model $Model
+    }
+    $block = [ordered]@{
+        ANTHROPIC_BASE_URL             = if ($Pinned) { Get-CopilotPinnedBase } else { Get-CopilotClientBase }
+        ANTHROPIC_AUTH_TOKEN           = 'dummy'
+        ANTHROPIC_MODEL                = $modelProfile.main
+        ANTHROPIC_DEFAULT_FABLE_MODEL  = $modelProfile.fable
+        ANTHROPIC_DEFAULT_OPUS_MODEL   = $modelProfile.opus
+        ANTHROPIC_DEFAULT_SONNET_MODEL = $modelProfile.sonnet
+        ANTHROPIC_DEFAULT_HAIKU_MODEL  = $modelProfile.haiku
+        ANTHROPIC_SMALL_FAST_MODEL     = $modelProfile.haiku
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
+    }
+    if ($env:COPILOT_PROXY_QUIET -eq '1') {
+        $block.CLAUDE_CODE_ATTRIBUTION_HEADER = '0'
+        $block.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION = 'false'
+        $block.CLAUDE_CODE_ENABLE_AWAY_SUMMARY = '0'
+        $block.DISABLE_NON_ESSENTIAL_MODEL_CALLS = '1'
+    }
+    $block
+}
+
+# --- shim start/stop ---
+function script:Start-CopilotShim {
+    if (Test-CopilotShimAlive) { return $true }
+    if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+        Write-Error "copilot-proxy: shim needs 'bun' (scoop install bun)"; return $false
+    }
+    $script = Get-CopilotShimScript
+    if (-not (Test-Path $script)) { Write-Error "copilot-proxy: shim script not found at $script"; return $false }
+    $env:COPILOT_SHIM_PORT = Get-CopilotShimPort
+    $env:COPILOT_SHIM_UPSTREAM = Get-CopilotBase
+    $p = Start-Process -FilePath 'bun' -ArgumentList @($script) -PassThru -WindowStyle Hidden `
+        -RedirectStandardOutput (Get-CopilotShimLog) -RedirectStandardError "$(Get-CopilotShimLog).err"
+    $p.Id | Set-Content -Path (Get-CopilotShimPid)
+    for ($i = 0; $i -lt 10; $i++) { if (Test-CopilotShimAlive) { return $true }; Start-Sleep 1 }
+    Write-Error "copilot-proxy: shim did not come up — check $(Get-CopilotShimLog)"; $false
+}
+function script:Stop-CopilotShim {
+    $pidf = Get-CopilotShimPid
+    if (Test-Path $pidf) {
+        $pid_ = Get-Content -First 1 $pidf -ErrorAction SilentlyContinue
+        if ($pid_) { Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue }
+        Remove-Item $pidf -ErrorAction SilentlyContinue
+    }
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Windows package install/integrity
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "integrity\|Integrity\|package-lock\|bun.lock\|InstalledSpec\|Ensure-CopilotPkg\|Install-Copilot" $W/dot_config/powershell/modules/Copilot/Copilot.psm1 | head -40
+```
+
+```text
+399:function script:Install-CopilotPkgDependencies {
+407:        $npmArgs = @('install', '--omit=dev', '--ignore-scripts', '--no-save', '--package-lock=false', '--no-audit', '--no-fund')
+420:function script:Install-CopilotPkgFromCdn {
+445:        if (-not (Install-CopilotPkgDependencies -PackageDir $packageDir)) {
+459:function script:Install-CopilotPkg {
+503:            if (-not (Install-CopilotPkgFromCdn)) {
+523:    if (-not (Install-CopilotPkg)) {
+1105:            if (-not (Install-CopilotPkg)) { return }
+1233:            if (-not (Install-CopilotPkg)) { return }
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:46:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the macOS env-block SSOT
+
+`grep -n "_copilot_env_json" dot_config/shell/43_copilot_proxy.sh | head; echo "==="; awk '/^_copilot_env_json\(\)/,/^}$/' dot_config/shell/43_copilot_proxy.sh`
+
+```text
+1906:_copilot_env_json_for_model() {
+1935:_copilot_env_json() {
+1936:  _copilot_env_json_for_model "$(_copilot_default_model)"
+1961:      want_env="$(_copilot_env_json)" || return 1
+2152:# computed by diffing the live file against _copilot_env_json — not a hand-picked
+2163:  want="$(_copilot_env_json)" || return 1
+===
+_copilot_env_json() {
+  _copilot_env_json_for_model "$(_copilot_default_model)"
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:47:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read _copilot_env_json_for_model
+
+`sed -n '1895,1940p' dot_config/shell/43_copilot_proxy.sh`
+
+```text
+# The EXACT env object `copilot-here on` would write right now, as JSON.
+#
+# SINGLE SOURCE OF TRUTH for both `copilot-here on` (what it merges in) and
+# _copilot_here_drift (what it compares against). These were two hand-maintained
+# copies and they had already diverged: `on` wrote 8 keys while the drift check
+# compared only 4, so a pin written by an older `on` — current models but no
+# ANTHROPIC_DEFAULT_HAIKU_MODEL / ANTHROPIC_SMALL_FAST_MODEL /
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC — reported "no drift" while `on`
+# would still have changed it. Add a key here and BOTH sides follow.
+#
+# Needs jq; every caller already requires it.
+_copilot_env_json_for_model() {
+  local selected="$1" catalog="${2:-}" profile
+  if [ "$#" -ge 2 ]; then
+    profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
+  else
+    profile="$(_copilot_model_profile_json "$selected")" || return 1
+  fi
+  jq -n \
+    --arg base_url "$(_copilot_pinned_base)" \
+    --argjson profile "$profile" \
+    --arg quiet "${COPILOT_PROXY_QUIET:-0}" '
+    {
+      ANTHROPIC_BASE_URL: $base_url,
+      ANTHROPIC_AUTH_TOKEN: "dummy",
+      ANTHROPIC_MODEL: $profile.main,
+      ANTHROPIC_DEFAULT_FABLE_MODEL: $profile.fable,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: $profile.opus,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: $profile.sonnet,
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: $profile.haiku,
+      ANTHROPIC_SMALL_FAST_MODEL: $profile.haiku,
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    } + (if $quiet == "1" then {
+      CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "false",
+      CLAUDE_CODE_ENABLE_AWAY_SUMMARY: "0",
+      DISABLE_NON_ESSENTIAL_MODEL_CALLS: "1"
+    } else {} end)'
+}
+
+_copilot_env_json() {
+  _copilot_env_json_for_model "$(_copilot_default_model)"
+}
+
+# Pin THIS project to the Copilot proxy via ./.claude/settings.local.json —
+# the gitignored local layer that overrides the committed .claude/settings.json
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:47:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare shim liveness + fail-closed logic
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+echo "=== Windows: shim alive / client base / require ==="
+awk '/^function script:Test-CopilotShimAlive/,/^}$/' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+awk '/^function script:Get-CopilotClientBase/,/^}$/' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+echo "=== require-shim equivalent? ==="
+grep -n "refused to bypass\|Require-CopilotShim" $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+=== Windows: shim alive / client base / require ===
+function script:Test-CopilotShimAlive {
+    try { $null = Invoke-WebRequest -Uri "$(Get-CopilotShimBase)/v1/models" -TimeoutSec 2 -SkipHttpErrorCheck -ErrorAction Stop; $true }
+    catch { $false }
+}
+function script:Get-CopilotClientBase {
+    if ((Get-CopilotShimEnabled) -and (Test-CopilotShimAlive)) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+=== require-shim equivalent? ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:47:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare shim JS feature surface
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+echo "=== windows shim.js exports/features ==="
+grep -nE "^export function|^function |_shim/(health|metrics|stats)|keepalive|STALL|normalizeResponsesToolDescriptions|zstd" $W/dot_config/powershell/copilot-throttle-shim.js | head -30
+echo
+echo "=== macOS shim.js features ==="
+grep -nE "^export function|_shim/(health|metrics|stats|events)|keepalive|STALL_MS|normalizeResponsesToolDescriptions|zstd" dot_config/shell/copilot-throttle-shim.js | head -40
+```
+
+```text
+=== windows shim.js exports/features ===
+21://                    └─ SSE keepalive + stall watchdog: an OpenAI reasoning
+27:// The silent socket (why the keepalive exists)
+53://   COPILOT_SHIM_PING_MS    keepalive interval, 0=off      (default 15000)
+56://   COPILOT_SHIM_STALL_MS   silence that counts as a wedged upstream: the
+67:const STALL_MS = Math.max(0, Number(process.env.COPILOT_SHIM_STALL_MS ?? 240000));
+70:// Ceiling for the keepalive path's own patience. It must outlast the WHOLE
+71:// pipeline — every attempt's STALL_MS plus the backoffs between them — or it
+74:const GIVEUP_MS = STALL_MS ? (RETRIES + 1) * (STALL_MS + 30000) : 0;
+79:const PING_FRAME = new TextEncoder().encode(": copilot-shim keepalive\n\n");
+86:function timeoutToken(ms) {
+95:function acquire() {
+99:function release() {
+105:function backoffMs(attempt, retryAfter) {
+111:function buildUpstream(req, bodyBuf, bodyWasDecoded = false) {
+123:function blankDescription(value) {
+127:function toolLabel(tool) {
+141:export function normalizeResponsesToolDescriptions(payload) {
+173:export function normalizeRequestBody(pathname, bodyBuf, contentEncoding = "") {
+179:    const decodedBody = encoding === "zstd" ? Bun.zstdDecompressSync(new Uint8Array(bodyBuf)) : bodyBuf;
+181:    const result = normalizeResponsesToolDescriptions(payload);
+183:    return { body: JSON.stringify(payload), ...result, parseError: null, decoded: encoding === "zstd" };
+194:// back to `false`, i.e. to the pre-keepalive behaviour.
+195:export function wantsStream(body) {
+205:function fetchAttempt(target, init, clientSignal) {
+206:  if (!STALL_MS) return fetch(target, { ...init, signal: clientSignal });
+212:  const timer = setTimeout(() => { stalled = true; ctl.abort(); }, STALL_MS);
+221:      throw stalled ? new Error(`upstream sent no response headers in ${STALL_MS}ms`) : err;
+227:// keepalive frame once the upstream has been silent for PING_MS, or fail the
+228:// stream when that silence reaches STALL_MS.
+237:  if (!state.keepalive) {
+
+=== macOS shim.js features ===
+24://                    └─ SSE keepalive + stall watchdog: an OpenAI reasoning
+30:// The silent socket (why the keepalive exists)
+56://   COPILOT_SHIM_PING_MS    keepalive interval, 0=off      (default 15000)
+59://   COPILOT_SHIM_STALL_MS   silence that counts as a wedged upstream: the
+73:const STALL_MS = Math.max(0, Number(process.env.COPILOT_SHIM_STALL_MS ?? 240000));
+85:export function metricsDbPath() {
+89:export function tokenDbPath() {
+95:export function openMetricsDb(path = metricsDbPath()) {
+122:export function pruneMetrics(db, now = Date.now()) {
+149:export function createMetricTracker(meta, db = getMetricsDb(), clock = () => performance.now()) {
+261:export function queryEvents(options = {}) {
+265:export function queryStats(options = {}) {
+293:// Ceiling for the keepalive path's own patience. It must outlast the WHOLE
+294:// pipeline — every attempt's STALL_MS plus the backoffs between them — or it
+297:const GIVEUP_MS = STALL_MS ? (RETRIES + 1) * (STALL_MS + 30000) : 0;
+302:const PING_FRAME = new TextEncoder().encode(": copilot-shim keepalive\n\n");
+365:export function normalizeResponsesToolDescriptions(payload) {
+397:export function normalizeRequestBody(pathname, bodyBuf, contentEncoding = "") {
+403:    const decodedBody = encoding === "zstd" ? Bun.zstdDecompressSync(new Uint8Array(bodyBuf)) : bodyBuf;
+405:    const result = normalizeResponsesToolDescriptions(payload);
+408:    return { body, inspectBody: body, ...result, parseError: null, decoded: encoding === "zstd" };
+419:// back to `false`, i.e. to the pre-keepalive behaviour.
+420:export function wantsStream(body) {
+431:  if (!STALL_MS) return fetch(target, { ...init, signal: clientSignal });
+437:  const timer = setTimeout(() => { stalled = true; ctl.abort(); }, STALL_MS);
+446:      throw stalled ? new Error(`upstream sent no response headers in ${STALL_MS}ms`) : err;
+452:// keepalive frame once the upstream has been silent for PING_MS, or fail the
+453:// stream when that silence reaches STALL_MS.
+462:  if (!state.keepalive) {
+485:  if (STALL_MS && state.idleMs >= STALL_MS) {
+516:    keepalive: PING_MS > 0 && (headers.get("content-type") ?? "").includes("text/event-stream"),
+546:function keepaliveThenForward(pipeline, releaseOnce, label, tracker) {
+547:  const state = { reader: null, pending: null, idleMs: 0, keepalive: true, status: 200 };
+605:export function startServer() {
+608:    // Seconds; 255 is Bun's ceiling. With PING_MS keepalives the client socket
+616:    if (method === "GET" && url.pathname === "/_shim/health") {
+619:    if (method === "GET" && url.pathname === "/_shim/stats") {
+628:    if (method === "GET" && url.pathname === "/_shim/events") {
+667:    // the client socket too, so the keepalive below has to be able to cover it.
+740:    log(`${label} silent for ${PING_AFTER_MS}ms; committing SSE early and sending keepalives`);
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:47:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare subcommand surface
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+echo "=== Windows copilot-proxy subcommands ==="
+awk '/^function copilot-proxy/,0' $W/dot_config/powershell/modules/Copilot/Copilot.psm1 | grep -oE "^\s+'[a-z|-]+'\s*\{" | head -30
+echo "=== macOS copilot-proxy subcommands ==="
+sed -n '788,1000p' dot_config/shell/43_copilot_proxy.sh | grep -oE "^    [a-z|_-]+\)" | head -30
+```
+
+```text
+=== Windows copilot-proxy subcommands ===
+        'start' {
+        'stop' {
+        'restart' {
+        'status' {
+        'logs' {
+        'auth' {
+        'reinstall' {
+        'shim' {
+                'on' {
+                'off' {
+        'on' {
+        'off' {
+        'status' {
+=== macOS copilot-proxy subcommands ===
+    start)
+    stop)
+    restart)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:47:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full macOS subcommand list
+
+`grep -oE "^    [a-z|_'\"-]+\)" dot_config/shell/43_copilot_proxy.sh | sed -n '1,40p' | tr '\n' ' '; echo; echo "=== usage block ==="; sed -n '113,145p' docs/tools/copilot-claude-proxy.md`
+
+```text
+    "")     direct)     start)     stop)     restart)     status)     doctor|test)     logs)     auth)     update)     reinstall)     stats|events)     bench)     quota|whoami|usage)     shim)     -h|--help|help)     --no-specstory)     --specstory)     -h|--help)     --no-specstory)     --specstory)     -h|--help)     on)     off)     status)     -h|--help|help)     -h|--help)     -l|--list)     -c|--current)     -h|--help) 
+=== usage block ===
+### `copilot-proxy [start|stop|status|stats|events|quota|bench|update|...]`
+
+Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
+| `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
+| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.3.0` pin. While set, `update VERSION` refuses to change persisted state. |
+| `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
+| `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
+| `COPILOT_INSTALL_NOPROXY` | `0` | `1` = install the package with the proxy env stripped, skipping the 45s stall on a host where bun cannot resolve through the proxy |
+
+Set these in `~/.shellrc.adhoc` (or the per-shell secrets files). `start` refuses
+to run until `copilot-proxy auth` has stored a token, and waits up to ~20s for the
+proxy to answer before returning. `start` detects the package flavor from
+`COPILOT_API_PKG`: only the exact original `copilot-api` gets
+`--rate-limit`/`--wait` (the fork's `start` doesn't have those flags).
+
+The **first** `start` installs the pinned package into
+`~/.local/share/copilot-api/pkg` (stamped with the spec) and every later start
+just execs the resulting binary — no registry round-trip, no per-launch resolve.
+The install tries your ambient env first (needed where the registry is only
+reachable *through* the proxy) and retries with the proxy stripped if that stalls;
+either attempt is killed on a timeout, so a stalled install can never keep bun's
+global cache lock and wedge the next one. If `start` times out it now also **kills
+the server it spawned**, instead of leaving an orphan behind for every retry.
+
+`copilot-proxy quota [--json]` (also `whoami`) is the real live plan/quota check.
+On the fork it reads `/usage`, the same payload used by `/usage-viewer`; it
+requires the proxy to be running. Use it instead of opening the plaintext token.
+
+### Traffic statistics and safe benchmarks
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:47:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Windows repo backlog for known gaps
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+echo "=== TODO ==="; grep -n -i "copilot" $W/TODO.md | head -20
+echo "=== backlog note ==="; head -30 $W/backlog/copilot-proxy-global-apply-mode-for-claude-code-and-codex.md
+```
+
+```text
+=== TODO ===
+34:- [ ] **[S] just test is red: -CI enables code coverage and breaks Copilot mocks** — justfile:104 runs `Invoke-Pester -CI -Path .`, and .github/workflows/windows.yml does the same. `-CI` turns on code coverage, which instruments the Copilot module and breaks its mocks: 28 failures, all `Copilot module.*`. The identical 129 tests under `Invoke-Pester -Path ./tests` (what AGENTS.md documents) give 127 passed / 2 failed, the 2 being pre-existing `try` worktree cases. Fix by dropping `-CI`, scoping `CodeCoverage.Path`, or making the Copilot tests coverage-safe.
+55:- [ ] **[?/L] copilot-proxy global apply mode for Claude Code and Codex** — Design an explicit reversible global switch only after proxy supervision exists; require atomic snapshots, ownership markers, drift detection, exact restore, and platform parity. → [research](backlog/copilot-proxy-global-apply-mode-for-claude-code-and-codex.md)
+=== backlog note ===
+# copilot-proxy global apply mode for Claude Code and Codex
+
+**Status**: deferred (2026-08-12)
+**Effort**: L
+**Related**: `TODO.md` · `dot_config/powershell/modules/Copilot/Copilot.psm1`
+
+## Context
+
+A user-wide mode would make ordinary `claude` and `codex` convenient, but also
+couple both to a local daemon and mutate runtime-owned settings. Today the
+one-shot launchers are intentionally zero-persistence.
+
+## Investigation
+
+Proposed command: `copilot-global on|off|status claude|codex|all`. `on` must
+require a healthy login-start supervisor, snapshot exact files/keys with hashes,
+write validated temp files atomically, and mark ownership. Claude receives the
+full role profile; Codex preserves all unrelated TOML. `off` restores exactly
+but stops on manual drift. Operations must be idempotent and crash-safe.
+
+Test fresh/existing config, repeated cycles, interruption between stages,
+malformed input, manual drift, state migration, and supervised-proxy failure.
+Keep the Windows implementation native PowerShell.
+
+## Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| Keep one-shot/project launchers | Safe and shipped | Repeated opt-in |
+| Chezmoi-managed permanent provider | Declarative | Fights runtime state; dead-daemon risk |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:48:22Z)**_
+
+Committed as `c5a40d8` (pre-commit hooks green, transcript + statistics included). Now the Windows comparison.
+
+## `copilot-run` itself: aligned — Windows is actually the better factoring
+
+Same public surface (`copilot-proxy`/`copilot-run`/`claude-copilot{,-once}`/`codex-copilot{,-once}`/`copilot-here`/`copilot-model`/`copilot-embed`), same 9 injected keys, same 4 `COPILOT_PROXY_QUIET` extras, same per-process scoping (PowerShell save→set→`finally` restore ≈ `command env`).
+
+One genuine advantage on the Windows side worth porting back:
+
+| | macOS | Windows |
+|---|---|---|
+| env-block SSOT | `_copilot_env_json_for_model` — **2 callers** (`copilot-here on`, drift) | `Get-CopilotEnvBlock` — **3 callers** (+ `copilot-run`) |
+
+`copilot-run` on macOS (`43_copilot_proxy.sh:1508-1518`) hand-rolls its own copy of the same key list. That's the exact duplication the SSOT comment says already bit you once ("`on` wrote 8 keys while the drift check compared only 4"). Windows solved it with a `-Pinned` switch selecting `Get-CopilotPinnedBase` vs `Get-CopilotClientBase` — the only thing that differs between the two call sites.
+
+## Three real divergences, all in the shim layer
+
+**1. Windows fails *open* where macOS fails *closed*.** `Get-CopilotClientBase` returns `Get-CopilotBase` (:4141 direct) when the shim is enabled but not alive; `copilot-run` then discards `Start-CopilotShim`'s result (`| Out-Null`) and runs anyway. macOS makes this a hard fault (`_copilot_require_shim` → "managed client refused to bypass the enabled metrics shim").
+
+This isn't just a metrics question on Windows — bypassing the shim also silently drops the SSE keepalive/stall watchdog **and** `normalizeResponsesToolDescriptions`, which is the fix for the Windows repo's own `pitfalls/codex-copilot-empty-mcp-tool-description-400.md`. So a down shim silently reintroduces a documented 400.
+
+**2. The Windows shim is one generation behind** — 482 lines vs 861. It has the `ee5612c` keepalive/stall/zstd/tool-normalization layer but none of the `e0836c1` metrics layer: no SQLite DB, and no `/_shim/health`, `/_shim/stats`, `/_shim/events` routes. Correspondingly `copilot-proxy` there has no `stats`/`events`/`bench`/`quota`/`update`/`doctor` subcommands (Windows: start/stop/restart/status/logs/auth/reinstall/shim/on/off; macOS adds 7 more).
+
+That's why `Test-CopilotShimAlive` probes `/v1/models` — `/_shim/health` doesn't exist. Consistent internally, but it means **the Windows shim is precisely the "older passthrough build" that the fix I just committed reclaims.** If you ever port the metrics shim to Windows without porting the reclaim, you'll hit today's EADDRINUSE wedge there.
+
+Also note `-SkipHttpErrorCheck` makes *any* HTTP response count as alive — a 404 or 500 from an unrelated process on 4142 passes. And since `/v1/models` proxies to :4141, a live shim in front of a dead proxy reports "shim dead" → it'll try to spawn a second one → EADDRINUSE on Windows too, no reclaim path.
+
+**3. `Start-CopilotShim` leaks env into the caller's session.** `$env:COPILOT_SHIM_PORT` / `$env:COPILOT_SHIM_UPSTREAM` are set process-wide and never restored, unlike the macOS per-command prefix. Low severity (values usually match), but every later `bun copilot-throttle-shim.js` in that session inherits them.
+
+## Not a divergence
+
+Bug 1 (the stale lock) **cannot occur on Windows** — different install architecture (`Install-CopilotPkgFromCdn` + `npm install --package-lock=false`), no lockfile read. The flip side is Windows has no integrity/pin verification at all, so the supply-chain guard macOS gained in `e0836c1` is simply absent there.
+
+None of this is in the Windows `TODO.md` or `backlog/` (only the deferred `copilot-proxy global apply mode` note is). Want me to open the repo and file these — or fix the fail-open + env leak directly? Those two are small and independent of the larger metrics-shim port.
+
+---
+
+_**User (2026-08-26 08:50:16Z)**_
+
+是可以順便都fix一下 然後也是commit on main
+
+---
+
+_**Agent (claude-opus-5 2026-08-26 08:50:24Z)**_
+
+I'll fix all of them. Starting with the Windows repo — first its contract and current state.
+
+_**Agent (claude-opus-5 2026-08-26 08:50:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Windows repo state
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+cd $W && git status --short | head && git log --oneline -3 && echo "=== branch ===" && git branch --show-current
+```
+
+```text
+af2f32e fix: stop lazygit config migration drift
+6d274c8 fix: bootstrap pueued and harden package apply
+78b8809 feat: install pueue
+=== branch ===
+main
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:50:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Windows repo test contract
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n -i "pester\|test\|shellcheck\|PSScriptAnalyzer" $W/AGENTS.md | head -25
+```
+
+```text
+18:render/parse pattern below; the `windows-latest` CI is the real gate.
+29:- Lint: `pwsh -NoProfile -c "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1"` (fails only on Error; the excludes are deliberate — see the settings file header)
+30:- Tests: `pwsh -NoProfile -c "Invoke-Pester -Path ./tests"` (single file: `Invoke-Pester -Path ./tests/Copilot.Tests.ps1`)
+33:Isolated apply + template render (the core idiom for testing without a Windows
+57:- **git config** — `~/.gitconfig` is a **`modify_` overlay** (`modify_dot_gitconfig.ps1.tmpl`), never a plain managed file: Git Credential Manager writes `[credential "azrepos:*"]` blocks into it out of band and a plain file would clobber them every apply. The baseline body is `.chezmoitemplates/git/gitconfig` (identity from the existing `.name`/`.email` init prompts); the merge engine is `scripts/gitconfig-merge.ps1`, inlined via `{{ include }}` (the `editors/` idiom) and dot-sourced by `tests/GitConfig.Tests.ps1`. The model is **key-level pull-through**: the baseline owns a fixed set of `section.key` pairs and every other live key is carried over untouched — the inverse of the parent repo's allowlist, which would silently drop `[otel]` and future corp sections. Two hard rules: `core.hooksPath` is **never** emitted (git honours it *instead of* `.git/hooks/`, silently disarming `pre-commit`), and the carry dictionary is **case-sensitive** (`[ordered]@{}` collapses `azrepos:org/O365Exchange` into `azrepos:org/o365exchange`, merging two credential contexts).
+59:- **CI** — `.github/workflows/windows.yml` on `windows-latest` is the real gate: PSScriptAnalyzer, non-interactive `chezmoi init --apply`, render+parse of every `.ps1.tmpl`, and Pester.
+63:1. **A new/renamed init prompt must update the CI flags in the same commit.** `chezmoi init --promptBool/--promptChoice "<text>=value"` matches the prompt's exact TEXT (3rd arg to `promptXOnce` in `.chezmoi.toml.tmpl`), used non-interactively by `.github/workflows/windows.yml`. Forget it → CI's init hangs/EOFs (`error calling promptChoiceOnce: EOF`; this broke three consecutive pushes when `agentSounds` was added). Corollary: **never put `=` in a prompt's text** — the `name=value` parser splits on the first `=` (this broke the `role` prompt once). Enforced by `tests/InitPrompts.Tests.ps1` (missing flag, stale flag, wrong flag kind, `=` in text), which CI runs *before* `chezmoi init` so the failure names the missing flag instead of EOF-ing — run `Invoke-Pester -Path ./tests/InitPrompts.Tests.ps1` locally after touching either file.
+69:7. **PSScriptAnalyzer exclusions are intentional** (`PSScriptAnalyzerSettings.psd1`): hyphenated command names, `Write-Host`, `Invoke-Expression` for tool init, no-BOM UTF-8. Don't "fix" these; do fix real Errors.
+77:- `dot_config/powershell/copilot-throttle-shim.js` is copied verbatim from the parent repo's `dot_config/shell/copilot-throttle-shim.js`. Update both in the same maintenance session, then update the reviewed Unix source commit + SHA-256 contract in `tests/Copilot.Tests.ps1`; the Windows test must remain runnable without a sibling checkout.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:50:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check the shim SHA contract test
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n -i "sha256\|verbatim\|parent repo\|reviewed" $W/tests/Copilot.Tests.ps1 | head -20
+```
+
+```text
+156:        It 'exposes the CDN manifest only for the reviewed default pin' {
+171:                    $sha = [Security.Cryptography.SHA256]::Create()
+1143:        It 'matches the reviewed Unix shim artifact without a sibling checkout' {
+1146:                Sha256 = '8FBADA960E5A06E62F4B81CD873574DB85129C2FB7C7156E96CD5BDCE5F0E8BA'
+1150:            (Get-FileHash -Algorithm SHA256 $windowsShim).Hash |
+1151:                Should -BeExactly $shimContract.Sha256
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:50:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the shim contract test body
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '1135,1160p' $W/tests/Copilot.Tests.ps1
+```
+
+```text
+            $exported = (Get-Command -Module Copilot).Name
+            foreach ($c in 'copilot-proxy', 'copilot-run', 'claude-copilot', 'claude-copilot-once', 'codex-copilot', 'codex-copilot-once', 'copilot-here', 'copilot-model', 'copilot-embed', 'semsearch') {
+                $exported | Should -Contain $c
+            }
+        }
+    }
+
+    Context 'Responses compatibility shim' {
+        It 'matches the reviewed Unix shim artifact without a sibling checkout' {
+            $shimContract = [ordered]@{
+                UnixSourceCommit = 'ee5612c57278df5540ac80ad28ede91b57c3f09c'
+                Sha256 = '8FBADA960E5A06E62F4B81CD873574DB85129C2FB7C7156E96CD5BDCE5F0E8BA'
+            }
+            $windowsShim = Join-Path $PSScriptRoot '..' 'dot_config' 'powershell' 'copilot-throttle-shim.js'
+            $shimContract.UnixSourceCommit | Should -Match '^[0-9a-f]{40}$'
+            (Get-FileHash -Algorithm SHA256 $windowsShim).Hash |
+                Should -BeExactly $shimContract.Sha256
+        }
+
+        It 'fills blank MCP descriptions without adding one to a native tool' {
+            if (-not (Get-Command bun -ErrorAction SilentlyContinue)) { Set-ItResult -Skipped -Because 'bun is unavailable'; return }
+            $env:COPILOT_SHIM_TEST_PATH = (Resolve-Path (Join-Path $PSScriptRoot '..' 'dot_config' 'powershell' 'copilot-throttle-shim.js')).Path
+            try {
+                $json = & bun -e @'
+import { pathToFileURL } from "node:url";
+const { normalizeResponsesToolDescriptions: n } = await import(pathToFileURL(process.env.COPILOT_SHIM_TEST_PATH));
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:51:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Map all shim call sites
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "Get-CopilotShimPort\|Get-CopilotShimBase\|Get-CopilotShimEnabled\|Get-CopilotPinnedBase\|Get-CopilotClientBase\|Test-CopilotShimAlive\|Start-CopilotShim\|Stop-CopilotShim\|Get-CopilotShimLog\|Get-CopilotShimPid\|Get-CopilotShimScript" $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+555:function script:Get-CopilotShimPort   { if ($env:COPILOT_SHIM_PORT) { $env:COPILOT_SHIM_PORT } else { '4142' } }
+556:function script:Get-CopilotShimBase   { "http://localhost:$(Get-CopilotShimPort)" }
+557:function script:Get-CopilotShimScript { Join-Path (Get-XdgConfig) 'powershell/copilot-throttle-shim.js' }
+558:function script:Get-CopilotShimLog    { Join-Path (Get-CopilotTmp) "copilot-shim-$(Get-CopilotShimPort).log" }
+559:function script:Get-CopilotShimPid    { Join-Path (Get-CopilotTmp) "copilot-shim-$(Get-CopilotShimPort).pid" }
+700:function script:Test-CopilotShimAlive {
+701:    try { $null = Invoke-WebRequest -Uri "$(Get-CopilotShimBase)/v1/models" -TimeoutSec 2 -SkipHttpErrorCheck -ErrorAction Stop; $true }
+704:function script:Get-CopilotShimEnabled {
+712:function script:Get-CopilotClientBase {
+713:    if ((Get-CopilotShimEnabled) -and (Test-CopilotShimAlive)) { Get-CopilotShimBase } else { Get-CopilotBase }
+715:function script:Get-CopilotPinnedBase {
+716:    if (Get-CopilotShimEnabled) { Get-CopilotShimBase } else { Get-CopilotBase }
+1029:        ANTHROPIC_BASE_URL             = if ($Pinned) { Get-CopilotPinnedBase } else { Get-CopilotClientBase }
+1049:function script:Start-CopilotShim {
+1050:    if (Test-CopilotShimAlive) { return $true }
+1054:    $script = Get-CopilotShimScript
+1056:    $env:COPILOT_SHIM_PORT = Get-CopilotShimPort
+1059:        -RedirectStandardOutput (Get-CopilotShimLog) -RedirectStandardError "$(Get-CopilotShimLog).err"
+1060:    $p.Id | Set-Content -Path (Get-CopilotShimPid)
+1061:    for ($i = 0; $i -lt 10; $i++) { if (Test-CopilotShimAlive) { return $true }; Start-Sleep 1 }
+1062:    Write-Error "copilot-proxy: shim did not come up — check $(Get-CopilotShimLog)"; $false
+1064:function script:Stop-CopilotShim {
+1065:    $pidf = Get-CopilotShimPid
+1159:                    if (Get-CopilotShimEnabled) {
+1160:                        if (Start-CopilotShim) { Write-Host "copilot-proxy: throttle shim up -> $(Get-CopilotShimBase) (-> $(Get-CopilotBase))" }
+1162:                    Write-Host "copilot-proxy: up -> $(Get-CopilotClientBase)  (logs: copilot-proxy logs)"
+1180:            Stop-CopilotShim
+1202:                if (Get-CopilotShimEnabled) {
+1203:                    if (Test-CopilotShimAlive) { Write-Host "  shim:   ON, up on $(Get-CopilotShimBase)  -> clients use this" }
+1213:                $lf = Get-CopilotShimLog; $n = if ($Argv.Count -ge 3) { [int]$Argv[2] } else { 40 }
+1263:                    if (Test-CopilotAlive) { if (Start-CopilotShim) { Write-Host "copilot-proxy: shim ON -> $(Get-CopilotShimBase) (-> $(Get-CopilotBase))" } }
+1265:                    Write-Host "  NOTE: restart Claude Code so it picks up ANTHROPIC_BASE_URL=$(Get-CopilotShimBase)"
+1268:                    'off' | Set-Content $sf; Stop-CopilotShim
+1272:                    if (Get-CopilotShimEnabled) {
+1273:                        $st = if (Test-CopilotShimAlive) { 'up' } else { 'down' }
+1274:                        Write-Host "copilot-proxy: shim ON ($st) on $(Get-CopilotShimBase)"
+1376:    if (Get-CopilotShimEnabled) {
+1377:        if (Test-CopilotShimAlive) { OK 'throttle shim' "up on $(Get-CopilotShimBase)" } else { BAD 'throttle shim' 'enabled but DOWN'; HINT 'copilot-proxy shim on' }
+1586:    if ((Get-CopilotShimEnabled) -and -not (Test-CopilotShimAlive)) { Start-CopilotShim | Out-Null }
+1695:    if (-not (Test-CopilotShimAlive)) {
+1696:        if (-not (Start-CopilotShim)) { return }
+1713:    $base = Get-CopilotShimBase
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:51:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read codex-copilot shim handling
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '1688,1720p' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+echo "=== function containing 1376 ==="; awk 'NR<=1376 && /^function /{f=$0} END{}' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+awk 'NR<=1376 && /^function /{f=$2} NR==1376{print f}' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+        Write-Host '  Alias: codex-copilot-once'
+        return
+    }
+
+    if (-not (Test-CopilotAlive)) { copilot-proxy start; if (-not (Test-CopilotAlive)) { return } }
+    # Codex always needs the shim's Responses compatibility normalization even
+    # when persistent burst throttling is disabled. This does not change state.
+    if (-not (Test-CopilotShimAlive)) {
+        if (-not (Start-CopilotShim)) { return }
+    }
+    $catalog = Get-CopilotModelCatalog
+    if (-not $catalog) { Write-Error 'codex-copilot: could not read the live gateway model catalog'; return }
+
+    $explicitModel = Test-CopilotExplicitCodexModel -Argv $Argv
+    $model = $null
+    if (-not $explicitModel) {
+        $models = Get-CopilotSelectableModelIds $catalog
+        $model = Select-CopilotBestCodexModel -Model $models
+        if (-not $model) { Write-Error 'codex-copilot: no usable chat model in the live gateway catalog'; return }
+        $Argv = @('-m', $model) + @($Argv)
+        if ($model -like 'claude-*' -or $model -like 'gemini-*') {
+            Write-Warning "codex-copilot: --auto -> $model (Responses Lite; tool_search unavailable)"
+        } else { Write-Host "codex-copilot: --auto -> $model" }
+    }
+
+    $base = Get-CopilotShimBase
+    $providerArgs = @(
+        '-c', 'model_provider="copilot_api"',
+        '-c', 'model_providers.copilot_api.name="OpenAI"',
+        '-c', "model_providers.copilot_api.base_url=`"$base`"",
+        '-c', 'model_providers.copilot_api.env_key="GITHUB_COPILOT_API_KEY"',
+        '-c', 'model_providers.copilot_api.requires_openai_auth=true',
+        '-c', 'model_providers.copilot_api.supports_websockets=false',
+=== function containing 1376 ===
+script:Invoke-CopilotDoctor
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:51:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+macOS shim call sites
+
+`grep -n "_copilot_require_shim\|_copilot_shim_base\|_copilot_shim_alive\|_copilot_shim_start" dot_config/shell/43_copilot_proxy.sh | sed -n '1,40p'`
+
+```text
+452:_copilot_shim_base()    { printf 'http://localhost:%s' "$(_copilot_shim_port)"; }
+471:_copilot_shim_alive() {
+472:  command curl -fsS -o /dev/null --max-time 2 "$(_copilot_shim_base)/_shim/health" >/dev/null 2>&1
+478:  if _copilot_shim_enabled; then _copilot_shim_base; else _copilot_base; fi
+481:_copilot_require_shim() {
+483:  _copilot_shim_alive || _copilot_shim_start || {
+494:  if _copilot_shim_enabled; then _copilot_shim_base; else _copilot_base; fi
+506:# The reclaim step is load-bearing. `_copilot_shim_alive` probes /_shim/health,
+514:_copilot_shim_start() {
+515:  if _copilot_shim_alive; then return 0; fi
+556:    _copilot_shim_alive && return 0
+869:        _copilot_require_shim || return 1
+952:            if ! _copilot_shim_start; then
+958:            printf '%s\n' "copilot-proxy: throttle/metrics shim up → $(_copilot_shim_base) (→ $(_copilot_base))"
+1012:          if _copilot_shim_alive; then
+1013:            printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)  → clients use this"
+1115:        if _copilot_shim_alive; then _ok "throttle shim" "up on $(_copilot_shim_base) → clients use this"
+1431:      _copilot_require_shim || return 1
+1437:        _copilot_metrics_cli bench --base "$(_copilot_shim_base)" "$@"
+1439:        _copilot_metrics_cli bench --base "$(_copilot_shim_base)" --model "$_bench_model" "$@"
+1482:            _copilot_shim_start && printf '%s\n' "copilot-proxy: shim ON → $(_copilot_shim_base) (→ $(_copilot_base))"
+1486:          printf '%s\n' "  NOTE: restart Claude Code so it picks up ANTHROPIC_BASE_URL=$(_copilot_shim_base)"
+1496:            printf '%s\n' "copilot-proxy: shim ON ($(_copilot_shim_alive && echo up || echo down)) on $(_copilot_shim_base)"
+1548:  _copilot_require_shim || return 1
+1708:  _copilot_require_shim || return 1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:51:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+macOS codex-copilot shim + base
+
+`sed -n '1700,1715p' dot_config/shell/43_copilot_proxy.sh; echo "=== codex base ==="; grep -n 'base="\$(_copilot' dot_config/shell/43_copilot_proxy.sh`
+
+```text
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "codex-copilot: jq is required for live model selection" >&2
+    return 1
+  fi
+  if ! _copilot_alive; then copilot-proxy start || return 1; fi
+  # Normal mode requires the shim for metrics and Responses normalization.
+  # Explicit `shim off` is the only break-glass route around it.
+  _copilot_require_shim || return 1
+
+  catalog="$(_copilot_model_catalog)" || {
+    printf '%s\n' "codex-copilot: could not read the live gateway model catalog" >&2
+    return 1
+  }
+  for arg in "$@"; do
+    case "$arg" in -m|--model|-m=*|--model=*) explicit_model=1 ;; esac
+=== codex base ===
+1740:  base="$(_copilot_client_base)"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:51:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read exact regions to patch
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '694,720p' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+echo "----- 1046-1075 -----"
+sed -n '1046,1075p' $W/dot_config/powershell/modules/Copilot/Copilot.psm1
+```
+
+```text
+function script:Test-CopilotAlive {
+    try { $null = Invoke-RestMethod -Uri "$(Get-CopilotBase)/v1/models" -TimeoutSec 2 -ErrorAction Stop; $true }
+    catch { $false }
+}
+function script:Test-CopilotShimAlive {
+    try { $null = Invoke-WebRequest -Uri "$(Get-CopilotShimBase)/v1/models" -TimeoutSec 2 -SkipHttpErrorCheck -ErrorAction Stop; $true }
+    catch { $false }
+}
+function script:Get-CopilotShimEnabled {
+    switch ($env:COPILOT_PROXY_SHIM) {
+        { $_ -in '1', 'on', 'true', 'yes' } { return $true }
+        { $_ -in '0', 'off', 'false', 'no' } { return $false }
+    }
+    $sf = Get-CopilotShimState
+    (Test-Path $sf) -and ((Get-Content -First 1 $sf -ErrorAction SilentlyContinue) -eq 'on')
+}
+function script:Get-CopilotClientBase {
+    if ((Get-CopilotShimEnabled) -and (Test-CopilotShimAlive)) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+function script:Get-CopilotPinnedBase {
+    if (Get-CopilotShimEnabled) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+
+# Resolve the model: $COPILOT_CLAUDE_MODEL > state file > default.
+#
+----- 1046-1075 -----
+}
+
+# --- shim start/stop ---
+function script:Start-CopilotShim {
+    if (Test-CopilotShimAlive) { return $true }
+    if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+        Write-Error "copilot-proxy: shim needs 'bun' (scoop install bun)"; return $false
+    }
+    $script = Get-CopilotShimScript
+    if (-not (Test-Path $script)) { Write-Error "copilot-proxy: shim script not found at $script"; return $false }
+    $env:COPILOT_SHIM_PORT = Get-CopilotShimPort
+    $env:COPILOT_SHIM_UPSTREAM = Get-CopilotBase
+    $p = Start-Process -FilePath 'bun' -ArgumentList @($script) -PassThru -WindowStyle Hidden `
+        -RedirectStandardOutput (Get-CopilotShimLog) -RedirectStandardError "$(Get-CopilotShimLog).err"
+    $p.Id | Set-Content -Path (Get-CopilotShimPid)
+    for ($i = 0; $i -lt 10; $i++) { if (Test-CopilotShimAlive) { return $true }; Start-Sleep 1 }
+    Write-Error "copilot-proxy: shim did not come up — check $(Get-CopilotShimLog)"; $false
+}
+function script:Stop-CopilotShim {
+    $pidf = Get-CopilotShimPid
+    if (Test-Path $pidf) {
+        $pid_ = Get-Content -First 1 $pidf -ErrorAction SilentlyContinue
+        if ($pid_) { Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue }
+        Remove-Item $pidf -ErrorAction SilentlyContinue
+    }
+    Get-CimInstance Win32_Process -Filter "Name = 'bun.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like '*copilot-throttle-shim.js*' } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:53:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tests + analyzer rules
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "Get-CopilotClientBase\|Start-CopilotShim\|Test-CopilotShimAlive\|Get-CopilotPinnedBase" $W/tests/Copilot.Tests.ps1 | head -20
+echo "=== analyzer settings ==="; cat $W/PSScriptAnalyzerSettings.psd1
+```
+
+```text
+1107:                Mock Test-CopilotShimAlive { $true }
+=== analyzer settings ===
+# PSScriptAnalyzer configuration for this repo.
+#
+# Rationale for the exclusions (all deliberate for a PowerShell 7 target):
+#   PSAvoidUsingWriteHost                 - user-facing status output is intended
+#   PSAvoidUsingInvokeExpression          - tool init: `iex (&starship init ...)`
+#   PSUseShouldProcessForStateChangingFunctions - these are shell helpers, not cmdlets
+#   PSUseApprovedVerbs                    - hyphenated names (copilot-proxy) are the
+#                                           public API, kept for muscle memory
+#   PSUseBOMForUnicodeEncodedFile         - we target pwsh 7 (UTF-8 by default); no BOM
+#   PSUseSingularNouns                    - a few private helpers return collections
+@{
+    Severity     = @('Error', 'Warning')
+    ExcludeRules = @(
+        'PSAvoidUsingWriteHost',
+        'PSAvoidUsingInvokeExpression',
+        'PSUseShouldProcessForStateChangingFunctions',
+        'PSUseApprovedVerbs',
+        'PSUseBOMForUnicodeEncodedFile',
+        'PSUseSingularNouns'
+    )
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:53:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the test that mocks the shim
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '1090,1130p' $W/tests/Copilot.Tests.ps1
+```
+
+```text
+                    [pscustomobject]@{
+                        id = 'gpt-5.6-sol'; claude_model_id = 'gpt-5.6-sol[1m]'
+                        capabilities = $limits
+                    }
+                ) }
+
+                Mock Get-Command { [pscustomobject]@{ Source = [string]$Name } }
+                Mock Test-CopilotPkgReady { $true }
+                Mock Get-CopilotPkgMetadata { [pscustomobject]@{ Name = '@jeffreycao/copilot-api'; Version = '2.1.0' } }
+                Mock Get-CopilotPkgStampMetadata {
+                    [pscustomobject]@{ RequestedSpec = '@jeffreycao/copilot-api@2.1.0'; Name = '@jeffreycao/copilot-api'; Version = '2.1.0' }
+                }
+                Mock Get-CopilotPkgLaunch { @{ Exe = 'copilot-api.cmd'; Pre = @(); Cwd = $null } }
+                Mock Get-CopilotToken { $token }
+                Mock Test-CopilotAlive { $true }
+                Mock Get-CopilotStaleInstaller { @() }
+                Mock Get-CopilotShimEnabled { $true }
+                Mock Test-CopilotShimAlive { $true }
+                Mock Get-CopilotShimBase { 'http://localhost:4999' }
+                Mock Resolve-CopilotHttpProxy { $null }
+                Mock Get-CopilotUpstreamModel { @('gpt-5.6-sol') }
+                Mock Get-CopilotModelCatalog { $catalog }
+                Mock Get-CopilotEffectiveModel { 'gpt-5.6-sol[1m]|test pin' }
+                Mock Invoke-WebRequest {
+                    if ($Uri -like '*/v1/messages?beta=true') {
+                        return [pscustomobject]@{
+                            StatusCode = 402
+                            Content = '{"error":{"code":"billing_not_configured","message":"No billing"}}'
+                        }
+                    }
+                    [pscustomobject]@{ StatusCode = 401; Content = '' }
+                }
+
+                Invoke-CopilotDoctor -Live
+
+                $directMessagesUri = "$(Get-CopilotBase)/v1/messages?beta=true"
+                Should -Invoke Get-CopilotModelCatalog -Times 1 -Exactly
+                Should -Invoke Invoke-WebRequest -Times 1 -Exactly -ParameterFilter { $Uri -eq $directMessagesUri }
+                Should -Invoke Invoke-WebRequest -Times 0 -Exactly -ParameterFilter { $Uri -like 'http://localhost:4999/*' }
+            }
+        }
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:53:12Z)**_
+
+Now applying the Windows fixes:
+
+_**Agent (claude-opus-5 2026-08-26 08:53:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Patch client base + add port owner and assert helpers
+
+```bash
+cat > /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/win1.py <<'PYEOF'
+import io
+p="/Users/david/src/tries/2026-07-09-windows-dotfiles/dot_config/powershell/modules/Copilot/Copilot.psm1"
+s=io.open(p,encoding="utf-8").read()
+
+old = '''function script:Get-CopilotClientBase {
+    if ((Get-CopilotShimEnabled) -and (Test-CopilotShimAlive)) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+function script:Get-CopilotPinnedBase {
+    if (Get-CopilotShimEnabled) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+'''
+
+new = '''# Base URL managed clients should use. An enabled-but-down shim is a HARD FAULT,
+# never a silent fallback to the bare proxy: bypassing the shim quietly drops the
+# SSE keepalive + stall watchdog AND the Responses tool-description normalization
+# that is the whole fix for
+# pitfalls/codex-copilot-empty-mcp-tool-description-400.md — so a down shim would
+# reintroduce a documented 400 with no message anywhere. Callers gate on
+# Assert-CopilotShim first; this only picks the URL.
+#
+# Deliberately identical in body to Get-CopilotPinnedBase but kept separate (as
+# on Unix): they answer different questions and only one of them is allowed to
+# start depending on liveness later. Do not collapse them.
+function script:Get-CopilotClientBase {
+    if (Get-CopilotShimEnabled) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+# Base URL for PERSISTENT pins (copilot-here settings.local.json). Not gated on
+# currently-alive since the file outlives this session.
+function script:Get-CopilotPinnedBase {
+    if (Get-CopilotShimEnabled) { Get-CopilotShimBase } else { Get-CopilotBase }
+}
+
+# What is holding $Port right now:
+#   'free'     nothing is listening
+#   'ours'     every listener is a copilot-throttle-shim.js process
+#   'foreign'  something else is listening
+#   'unknown'  the port could not be inspected — callers MUST NOT infer 'free'
+#
+# 'unknown' (no Get-NetTCPConnection, e.g. pwsh on a non-Windows host) degrades
+# to the pre-check behaviour rather than falsely accusing a squatter.
+function script:Get-CopilotPortOwner {
+    param([Parameter(Mandatory)] [int] $Port)
+    $free = [pscustomobject]@{ Owner = 'free'; Pids = @(); Labels = @() }
+    if (-not (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Owner = 'unknown'; Pids = @(); Labels = @() }
+    }
+    $listenPids = @(
+        Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ }
+    )
+    if (-not $listenPids) { return $free }
+    $labels = @()
+    foreach ($procId in $listenPids) {
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue
+        if ($proc -and $proc.CommandLine -like '*copilot-throttle-shim.js*') { continue }
+        $name = if ($proc) { $proc.Name } else { 'unknown' }
+        $labels += "$procId($name)"
+    }
+    [pscustomobject]@{
+        Owner  = if ($labels.Count -gt 0) { 'foreign' } else { 'ours' }
+        Pids   = $listenPids
+        Labels = $labels
+    }
+}
+
+# Managed clients must not silently bypass an enabled shim. Mirrors the Unix
+# `_copilot_require_shim`.
+#
+# Unlike Unix this goes straight through Start-CopilotShim instead of short-
+# circuiting on Test-CopilotShimAlive: this shim build has no /_shim/health, so
+# liveness cannot prove IDENTITY here (any HTTP listener on the port answers).
+# Start-CopilotShim owns the ownership check and is idempotent.
+function script:Assert-CopilotShim {
+    if (-not (Get-CopilotShimEnabled)) { return $true }
+    if (Start-CopilotShim) { return $true }
+    Write-Error 'copilot-proxy: managed client refused to bypass the enabled metrics shim.'
+    Write-Error "  use 'copilot-proxy shim off' only for an intentional direct-mode escape."
+    $false
+}
+'''
+assert s.count(old)==1
+s=s.replace(old,new)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+python3 /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/win1.py
+```
+
+```text
+ok
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Patch Start-CopilotShim, copilot-run, codex-copilot
+
+```bash
+cat > /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/win2.py <<'PYEOF'
+import io
+p="/Users/david/src/tries/2026-07-09-windows-dotfiles/dot_config/powershell/modules/Copilot/Copilot.psm1"
+s=io.open(p,encoding="utf-8").read()
+
+old = '''function script:Start-CopilotShim {
+    if (Test-CopilotShimAlive) { return $true }
+    if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+        Write-Error "copilot-proxy: shim needs 'bun' (scoop install bun)"; return $false
+    }
+    $script = Get-CopilotShimScript
+    if (-not (Test-Path $script)) { Write-Error "copilot-proxy: shim script not found at $script"; return $false }
+    $env:COPILOT_SHIM_PORT = Get-CopilotShimPort
+    $env:COPILOT_SHIM_UPSTREAM = Get-CopilotBase
+    $p = Start-Process -FilePath 'bun' -ArgumentList @($script) -PassThru -WindowStyle Hidden `
+        -RedirectStandardOutput (Get-CopilotShimLog) -RedirectStandardError "$(Get-CopilotShimLog).err"
+    $p.Id | Set-Content -Path (Get-CopilotShimPid)
+    for ($i = 0; $i -lt 10; $i++) { if (Test-CopilotShimAlive) { return $true }; Start-Sleep 1 }
+    Write-Error "copilot-proxy: shim did not come up — check $(Get-CopilotShimLog)"; $false
+}'''
+
+new = '''# Start the shim (idempotent). Points it at the proxy; scopes COPILOT_SHIM_* to
+# the child.
+#
+# The port inspection is load-bearing twice over, because Test-CopilotShimAlive
+# can only prove that SOMETHING answers HTTP on the port (this build has no
+# /_shim/health, and -SkipHttpErrorCheck accepts a 404 or 500 as an answer):
+#
+#   * a FOREIGN listener would otherwise pass as a healthy shim and silently
+#     become the gateway every managed client talks to;
+#   * one of OUR shims that is stale or too old to answer would otherwise be
+#     read as "port free", and the spawn below dies instantly with EADDRINUSE —
+#     leaving every managed client failing closed against a shim that is in fact
+#     running. That wedge is unrecoverable by retrying.
+#
+# See pitfalls/copilot-proxy-shim-port-held-by-another-process.md
+function script:Start-CopilotShim {
+    $port = [int] (Get-CopilotShimPort)
+    $holder = Get-CopilotPortOwner -Port $port
+    if ($holder.Owner -eq 'foreign') {
+        Write-Error "copilot-proxy: port $port is held by another process: $($holder.Labels -join ' ')"
+        Write-Error '  free it, or pick a different port with COPILOT_SHIM_PORT.'
+        return $false
+    }
+    if (Test-CopilotShimAlive) { return $true }
+    if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+        Write-Error "copilot-proxy: shim needs 'bun' (scoop install bun)"; return $false
+    }
+    $script = Get-CopilotShimScript
+    if (-not (Test-Path $script)) { Write-Error "copilot-proxy: shim script not found at $script"; return $false }
+    if ($holder.Owner -eq 'ours') {
+        foreach ($procId in $holder.Pids) { Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue }
+        # Give the reclaimed listener a moment to release the socket.
+        for ($w = 0; $w -lt 5; $w++) {
+            if ((Get-CopilotPortOwner -Port $port).Owner -eq 'free') { break }
+            Start-Sleep 1
+        }
+    }
+    # `$env:X = ...` is PROCESS-wide in PowerShell, not scoped to the function,
+    # so assigning these used to leak into the caller's session for good — and
+    # every later `bun copilot-throttle-shim.js` inherited them. Set, spawn,
+    # restore (the same idiom copilot-run uses for the ANTHROPIC_* block).
+    $shimEnv = @{ COPILOT_SHIM_PORT = "$port"; COPILOT_SHIM_UPSTREAM = Get-CopilotBase }
+    $saved = @{}
+    foreach ($k in $shimEnv.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k) }
+    try {
+        foreach ($k in $shimEnv.Keys) { Set-Item "env:$k" $shimEnv[$k] }
+        $p = Start-Process -FilePath 'bun' -ArgumentList @($script) -PassThru -WindowStyle Hidden `
+            -RedirectStandardOutput (Get-CopilotShimLog) -RedirectStandardError "$(Get-CopilotShimLog).err"
+    } finally {
+        foreach ($k in $shimEnv.Keys) {
+            if ($null -eq $saved[$k]) { Remove-Item "env:$k" -ErrorAction SilentlyContinue }
+            else { Set-Item "env:$k" $saved[$k] }
+        }
+    }
+    $p.Id | Set-Content -Path (Get-CopilotShimPid)
+    for ($i = 0; $i -lt 10; $i++) { if (Test-CopilotShimAlive) { return $true }; Start-Sleep 1 }
+    Write-Error "copilot-proxy: shim did not come up — check $(Get-CopilotShimLog)"
+    # Surface the reason inline; Start-Process detaches, so EADDRINUSE and friends
+    # otherwise land only in a file nobody opens.
+    foreach ($logPath in @((Get-CopilotShimLog), "$(Get-CopilotShimLog).err")) {
+        if (Test-Path $logPath) { Get-Content -Tail 5 $logPath | ForEach-Object { Write-Host "  $_" } }
+    }
+    $false
+}'''
+assert s.count(old)==1
+s=s.replace(old,new)
+
+# copilot-run: fail closed instead of ignoring the shim start result
+old2 = '''    if ((Get-CopilotShimEnabled) -and -not (Test-CopilotShimAlive)) { Start-CopilotShim | Out-Null }
+'''
+new2 = '''    # Fail CLOSED: an enabled-but-down shim must not be silently bypassed — see
+    # Get-CopilotClientBase. This used to be `Start-CopilotShim | Out-Null`,
+    # which discarded the failure and then ran against the bare proxy.
+    if (-not (Assert-CopilotShim)) { return }
+'''
+assert s.count(old2)==1
+s=s.replace(old2,new2)
+
+# codex-copilot: route through the idempotent starter so the ownership check runs
+old3 = '''    if (-not (Test-CopilotShimAlive)) {
+        if (-not (Start-CopilotShim)) { return }
+    }
+'''
+new3 = '''    # Unconditional (not gated on Test-CopilotShimAlive): that probe cannot tell
+    # our shim from any other HTTP listener on the port, and Start-CopilotShim —
+    # which does the ownership check — is idempotent and returns fast when the
+    # shim is already up.
+    if (-not (Start-CopilotShim)) { return }
+'''
+assert s.count(old3)==1
+s=s.replace(old3,new3)
+
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+python3 /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/win2.py
+```
+
+```text
+ok
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Parse-check the module
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+pwsh -NoProfile -c "
+\$null = [System.Management.Automation.Language.Parser]::ParseFile('$W/dot_config/powershell/modules/Copilot/Copilot.psm1', [ref]\$null, [ref]\$errs)
+if (\$errs) { \$errs | ForEach-Object { Write-Host \$_.Message }; exit 1 } else { Write-Host 'parse OK' }
+" 2>&1 | tail -5
+```
+
+```text
+Line |
+   2 |  $null = [System.Management.Automation.Language.Parser]::ParseFile('/U …
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | [ref] cannot be applied to a variable that does not exist.
+parse OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Parse-check the module properly
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+pwsh -NoProfile -c "
+\$errs = \$null
+\$null = [System.Management.Automation.Language.Parser]::ParseFile('$W/dot_config/powershell/modules/Copilot/Copilot.psm1', [ref]\$null, [ref]\$errs)
+if (\$errs) { \$errs | ForEach-Object { Write-Host \$_.Message }; exit 1 } else { Write-Host 'parse OK' }
+"
+```
+
+```text
+parse OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run PSScriptAnalyzer on the module
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && pwsh -NoProfile -c "Invoke-ScriptAnalyzer -Path ./dot_config/powershell/modules/Copilot/Copilot.psm1 -Settings ./PSScriptAnalyzerSettings.psd1" 2>&1 | head -30`
+
+```text
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run Copilot Pester tests
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && pwsh -NoProfile -c "Invoke-Pester -Path ./tests/Copilot.Tests.ps1" 2>&1 | tail -25`
+
+```text
+  ✗ role haiku       gpt-5.6-luna[1m] is not served
+                     -> copilot-model --auto   # rewrite main + every Claude Code role alias
+
+Upstream (GitHub Copilot API)
+  ✓ api.enterprise.githubcopilot.com HTTP 401 in 0.01s
+  ✓ api.githubcopilot.com HTTP 401 in 0.01s
+  ·                  HTTP 400/401 = reached (an unauthenticated probe is expected to be rejected)
+
+Codex Apps (ChatGPT MCP)
+  · route            https://chatgpt.com/backend-api/wham/apps — independent of localhost Copilot inference and Codex.app
+  ✓ direct           HTTP 401 in 0.01s (an auth rejection still proves reachability)
+  · via proxy        no explicit/system HTTP proxy detected; TUN may still carry direct traffic
+
+Live probe
+  · target           gpt-5.6-sol [ConfiguredMain: configured main is advertised by the live catalog]
+  ✗ round-trip       gpt-5.6-sol -> HTTP 402: account-wide GitHub Copilot billing is not configured: billing_not_configured: No billing
+                     -> https://github.com/settings/copilot/features
+                     -> Select an organization or enterprise in GitHub's "Usage billed to" setting. Changing the model, using --auto, or enabling the shim cannot fix this account-wide failure.
+  · retry            not attempted — doctor sends exactly one inference request
+
+3 failed, 2 warning(s)
+
+[+] /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1 10.69s
+Tests completed in 10.71s
+Tests Passed: 101, Failed: 0, Skipped: 0, Inconclusive: 0, NotRun: 0
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:46Z)**_
+
+101 passed. Now regression tests:
+
+_**Agent (claude-opus-5 2026-08-26 08:54:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Map the test file structure
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "Describe \|    Context " $W/tests/Copilot.Tests.ps1 | head -40
+```
+
+```text
+11:Describe 'Copilot module' {
+13:    Context 'profile module loading' {
+20:    Context 'package flavor detection' {
+36:    Context 'default model resolution' {
+53:    Context 'package name parsing (the scoped-spec trap)' {
+88:    Context 'installed package metadata and verified stamps' {
+326:    Context 'shared OpenAI model ordering' {
+360:    Context 'best-model picker (--auto)' {
+393:    Context 'Codex model picker' {
+435:    Context 'catalog eligibility policy' {
+463:    Context 'catalog metadata and Claude Code role profiles' {
+561:    Context 'copilot-model writes' {
+633:    Context 'package command authentication' {
+702:    Context 'copilot-here drift (env block is the single source of truth)' {
+747:    Context 'specstory claude_cmd resolution' {
+791:    Context 'specstory -c argument quoting' {
+800:    Context 'specstory Claude command policy' {
+832:    Context 'claude-copilot launch routing' {
+893:    Context 'http proxy resolution' {
+909:    Context 'optional ChatGPT Apps probe classification' {
+928:    Context 'served-model parsing (includes claude_model_id alias)' {
+945:    Context 'effective-model precedence' {
+975:    Context 'doctor live-target selection' {
+1015:    Context 'doctor inference error parsing and classification' {
+1082:    Context 'doctor catalog snapshot and single inference attempt' {
+1133:    Context 'public surface' {
+1142:    Context 'Responses compatibility shim' {
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:54:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read test harness + an InModuleScope example
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '1,20p' $W/tests/Copilot.Tests.ps1; echo "..."; sed -n '702,750p' $W/tests/Copilot.Tests.ps1
+```
+
+```text
+# Pester tests for the Copilot module. Runtime behaviour (proxy start, live
+# HTTP) can't be exercised without Windows + copilot-api, so these cover the
+# pure logic: package-flavor detection, model resolution/normalisation, served-
+# model parsing, and the effective-model precedence — with HTTP mocked.
+
+BeforeAll {
+    $ModulePath = Join-Path $PSScriptRoot '..' 'dot_config' 'powershell' 'modules' 'Copilot' 'Copilot.psd1'
+    Import-Module $ModulePath -Force
+}
+
+Describe 'Copilot module' {
+
+    Context 'profile module loading' {
+        It 'forces a fresh module import so reload picks up deployed fixes' {
+            $loader = Get-Content -Raw (Join-Path $PSScriptRoot '..' 'dot_config' 'powershell' 'profile.d' '40_copilot.ps1')
+            $loader | Should -Match 'Import-Module\s+Copilot\s+-Force\b'
+        }
+    }
+
+    Context 'package flavor detection' {
+...
+    Context 'copilot-here drift (env block is the single source of truth)' {
+        BeforeEach {
+            $script:tmp = Join-Path ([System.IO.Path]::GetTempPath()) "copilot-drift-$([guid]::NewGuid())"
+            New-Item -ItemType Directory -Force -Path (Join-Path $tmp '.claude') | Out-Null
+            Push-Location $tmp
+        }
+        AfterEach { Pop-Location; Remove-Item -Recurse -Force $script:tmp -ErrorAction SilentlyContinue }
+
+        It 'reports no drift for a pin that matches the current block' {
+            InModuleScope Copilot {
+                $want = Get-CopilotEnvBlock -Pinned
+                @{ env = $want } | ConvertTo-Json -Depth 5 | Set-Content '.claude/settings.local.json'
+                Get-CopilotHereDrift | Should -BeNullOrEmpty
+            }
+        }
+        It 'reports the model key when the pin is stale' {
+            InModuleScope Copilot {
+                $want = Get-CopilotEnvBlock -Pinned
+                $want.ANTHROPIC_MODEL = 'claude-opus-4-8[1m]'
+                @{ env = $want } | ConvertTo-Json -Depth 5 | Set-Content '.claude/settings.local.json'
+                $drift = Get-CopilotHereDrift
+                $drift | Should -Not -BeNullOrEmpty
+                ($drift -join "`n") | Should -Match 'ANTHROPIC_MODEL : claude-opus-4-8\[1m\] ->'
+            }
+        }
+        It 'catches keys missing from an older pin (the 4-of-8 bug)' {
+            InModuleScope Copilot {
+                $want = Get-CopilotEnvBlock -Pinned
+                $partial = [ordered]@{}
+                foreach ($k in 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL') {
+                    $partial[$k] = $want[$k]
+                }
+                @{ env = $partial } | ConvertTo-Json -Depth 5 | Set-Content '.claude/settings.local.json'
+                ($drift = Get-CopilotHereDrift) | Should -Not -BeNullOrEmpty
+                ($drift -join "`n") | Should -Match 'ANTHROPIC_SMALL_FAST_MODEL : \(unset\) ->'
+            }
+        }
+        It 'reports nothing when the pin is off (no ANTHROPIC_BASE_URL)' {
+            InModuleScope Copilot {
+                '{"env":{"FOO":"bar"}}' | Set-Content '.claude/settings.local.json'
+                Get-CopilotHereDrift | Should -BeNullOrEmpty
+            }
+        }
+    }
+
+    Context 'specstory claude_cmd resolution' {
+        BeforeEach {
+            $script:tmp = Join-Path ([System.IO.Path]::GetTempPath()) "copilot-ss-$([guid]::NewGuid())"
+            New-Item -ItemType Directory -Force -Path (Join-Path $tmp '.specstory/cli') | Out-Null
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:55:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Add Windows regression tests and run
+
+```bash
+cat > /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/wintests.py <<'PYEOF'
+import io
+p="/Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1"
+s=io.open(p,encoding="utf-8").read()
+
+anchor = "    Context 'public surface' {"
+assert s.count(anchor)==1
+
+new = '''    # The shim has no /_shim/health on this build, so Test-CopilotShimAlive only
+    # proves that SOMETHING answers HTTP on the port (-SkipHttpErrorCheck accepts
+    # a 404 too). Everything below is about not letting that weak signal decide
+    # port state or client routing.
+    # pitfalls/copilot-proxy-shim-port-held-by-another-process.md
+    Context 'shim port ownership' {
+        It 'refuses to spawn when the port is held by a foreign process' {
+            InModuleScope Copilot {
+                Mock Get-CopilotPortOwner {
+                    [pscustomobject]@{ Owner = 'foreign'; Pids = @(4242); Labels = @('4242(python.exe)') }
+                }
+                # Alive on purpose: a foreign HTTP listener passes this probe, and
+                # that is exactly the case the ownership check has to catch.
+                Mock Test-CopilotShimAlive { $true }
+                Mock Stop-Process {}
+                Mock Start-Process { throw 'must not spawn' }
+                $err = $null
+                Start-CopilotShim -ErrorVariable err -ErrorAction SilentlyContinue |
+                    Should -BeFalse
+                ($err -join "`n") | Should -Match 'held by another process.*4242\\(python\\.exe\\)'
+                Should -Invoke Stop-Process -Times 0 -Exactly
+                Should -Invoke Start-Process -Times 0 -Exactly
+            }
+        }
+        It 'reclaims the port from one of our own stale shims' {
+            InModuleScope Copilot {
+                $script:ownerCalls = 0
+                Mock Get-CopilotPortOwner {
+                    $script:ownerCalls++
+                    if ($script:ownerCalls -eq 1) {
+                        [pscustomobject]@{ Owner = 'ours'; Pids = @(4242); Labels = @() }
+                    } else {
+                        [pscustomobject]@{ Owner = 'free'; Pids = @(); Labels = @() }
+                    }
+                }
+                # Not alive: an OLDER shim build answers nothing we recognise, which
+                # is what used to be misread as "port free" -> EADDRINUSE forever.
+                Mock Test-CopilotShimAlive { $script:ownerCalls -gt 1 }
+                Mock Get-Command { [pscustomobject]@{ Source = 'bun' } } -ParameterFilter { $Name -eq 'bun' }
+                Mock Test-Path { $true }
+                Mock Stop-Process {}
+                Mock Start-Process { [pscustomobject]@{ Id = 9001 } }
+                Mock Set-Content {}
+                Start-CopilotShim | Should -BeTrue
+                Should -Invoke Stop-Process -Times 1 -Exactly -ParameterFilter { $Id -eq 4242 }
+                Should -Invoke Start-Process -Times 1 -Exactly
+            }
+        }
+        It 'scopes COPILOT_SHIM_* to the child instead of leaking into the session' {
+            InModuleScope Copilot {
+                Mock Get-CopilotPortOwner { [pscustomobject]@{ Owner = 'free'; Pids = @(); Labels = @() } }
+                Mock Test-CopilotShimAlive { $script:spawned -eq $true }
+                Mock Get-Command { [pscustomobject]@{ Source = 'bun' } } -ParameterFilter { $Name -eq 'bun' }
+                Mock Test-Path { $true }
+                Mock Set-Content {}
+                $script:spawned = $false
+                $script:seenPort = $null
+                Mock Start-Process {
+                    # The child would inherit these; assert they are set AT spawn time.
+                    $script:seenPort = $env:COPILOT_SHIM_PORT
+                    $script:seenUpstream = $env:COPILOT_SHIM_UPSTREAM
+                    $script:spawned = $true
+                    [pscustomobject]@{ Id = 9002 }
+                }
+                $before = $env:COPILOT_SHIM_UPSTREAM
+                Start-CopilotShim | Should -BeTrue
+                $script:seenPort | Should -Be (Get-CopilotShimPort)
+                $script:seenUpstream | Should -Be (Get-CopilotBase)
+                # ...and are gone again afterwards.
+                $env:COPILOT_SHIM_UPSTREAM | Should -Be $before
+            }
+        }
+        It 'treats an uninspectable port as unknown, not as free-and-foreign' {
+            InModuleScope Copilot {
+                Mock Get-Command { $null } -ParameterFilter { $Name -eq 'Get-NetTCPConnection' }
+                $holder = Get-CopilotPortOwner -Port 4142
+                $holder.Owner | Should -Be 'unknown'
+            }
+        }
+    }
+
+    Context 'managed clients fail closed on an enabled shim' {
+        It 'Assert-CopilotShim is a no-op when the shim is switched off' {
+            InModuleScope Copilot {
+                Mock Get-CopilotShimEnabled { $false }
+                Mock Start-CopilotShim { throw 'must not start a disabled shim' }
+                Assert-CopilotShim | Should -BeTrue
+            }
+        }
+        It 'Assert-CopilotShim refuses rather than silently using the bare proxy' {
+            InModuleScope Copilot {
+                Mock Get-CopilotShimEnabled { $true }
+                Mock Start-CopilotShim { $false }
+                $err = $null
+                Assert-CopilotShim -ErrorVariable err -ErrorAction SilentlyContinue | Should -BeFalse
+                ($err -join "`n") | Should -Match 'refused to bypass the enabled metrics shim'
+            }
+        }
+        It 'client base stays on the shim when it is enabled but down' {
+            InModuleScope Copilot {
+                Mock Get-CopilotShimEnabled { $true }
+                Mock Test-CopilotShimAlive { $false }
+                # Pre-fix this fell back to Get-CopilotBase, silently dropping the
+                # keepalive AND the Responses tool-description normalisation.
+                Get-CopilotClientBase | Should -Be (Get-CopilotShimBase)
+                Get-CopilotClientBase | Should -Be (Get-CopilotPinnedBase)
+            }
+        }
+        It 'copilot-run aborts instead of running against a bypassed shim' {
+            InModuleScope Copilot {
+                Mock Test-CopilotAlive { $true }
+                Mock Assert-CopilotShim { $false }
+                Mock Get-CopilotEnvBlock { throw 'must not build an env block' }
+                { copilot-run 'cmd-that-must-not-run' } | Should -Not -Throw
+                Should -Invoke Assert-CopilotShim -Times 1 -Exactly
+            }
+        }
+    }
+
+'''
+
+s=s.replace(anchor, new + anchor)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+python3 /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/wintests.py
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && pwsh -NoProfile -c "Invoke-Pester -Path ./tests/Copilot.Tests.ps1" 2>&1 | tail -30
+```
+
+```text
+ok
+
+Write-Error: /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1:1150
+Line |
+1150 |  …             Start-CopilotShim -ErrorVariable err -ErrorAction Silentl …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | copilot-proxy: port 4142 is held by another process: 4242(python.exe)
+Write-Error: /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1:1150
+Line |
+1150 |  …             Start-CopilotShim -ErrorVariable err -ErrorAction Silentl …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |   free it, or pick a different port with COPILOT_SHIM_PORT.
+[-] Copilot module.shim port ownership.refuses to spawn when the port is held by a foreign process 477ms
+ Expected regular expression 'held by another process.*4242\(python\.exe\)' to match <empty>, but it did not match.
+ at ($err -join "`n") | Should -Match 'held by another process.*4242\(python\.exe\)', /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1:1152
+Write-Error: /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1:1227
+Line |
+1227 |  …             Assert-CopilotShim -ErrorVariable err -ErrorAction Silent …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | copilot-proxy: managed client refused to bypass the enabled metrics shim.
+Write-Error: /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1:1227
+Line |
+1227 |  …             Assert-CopilotShim -ErrorVariable err -ErrorAction Silent …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |   use 'copilot-proxy shim off' only for an intentional direct-mode
+     | escape.
+[-] Copilot module.managed clients fail closed on an enabled shim.Assert-CopilotShim refuses rather than silently using the bare proxy 253ms
+ Expected regular expression 'refused to bypass the enabled metrics shim' to match <empty>, but it did not match.
+ at ($err -join "`n") | Should -Match 'refused to bypass the enabled metrics shim', /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1:1228
+Tests completed in 11.97s
+Tests Passed: 107, Failed: 2, Skipped: 0, Inconclusive: 0, NotRun: 0
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:56:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Fix error capture in tests and rerun
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && python3 - <<'PYEOF'
+import io
+p="tests/Copilot.Tests.ps1"
+s=io.open(p,encoding="utf-8").read()
+
+# script: functions have no [CmdletBinding()], so -ErrorVariable is not bound —
+# capture the merged stream instead.
+old1 = '''                $err = $null
+                Start-CopilotShim -ErrorVariable err -ErrorAction SilentlyContinue |
+                    Should -BeFalse
+                ($err -join "`n") | Should -Match 'held by another process.*4242\\(python\\.exe\\)\''''
+new1 = '''                # These helpers are plain `script:` functions (no [CmdletBinding()]),
+                # so -ErrorVariable is never bound — merge the streams instead.
+                $captured = @(Start-CopilotShim 2>&1)
+                $captured[-1] | Should -BeFalse
+                ($captured -join "`n") | Should -Match 'held by another process.*4242\\(python\\.exe\\)\''''
+assert s.count(old1)==1, "old1"
+s=s.replace(old1,new1)
+
+old2 = '''                $err = $null
+                Assert-CopilotShim -ErrorVariable err -ErrorAction SilentlyContinue | Should -BeFalse
+                ($err -join "`n") | Should -Match 'refused to bypass the enabled metrics shim\''''
+new2 = '''                $captured = @(Assert-CopilotShim 2>&1)
+                $captured[-1] | Should -BeFalse
+                ($captured -join "`n") | Should -Match 'refused to bypass the enabled metrics shim\''''
+assert s.count(old2)==1, "old2"
+s=s.replace(old2,new2)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+pwsh -NoProfile -c "Invoke-Pester -Path ./tests/Copilot.Tests.ps1" 2>&1 | tail -6
+```
+
+```text
+ok
+
+3 failed, 2 warning(s)
+
+[+] /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Copilot.Tests.ps1 11.47s
+Tests completed in 11.49s
+Tests Passed: 109, Failed: 0, Skipped: 0, Inconclusive: 0, NotRun: 0
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:57:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full Pester + analyzer
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && pwsh -NoProfile -c "Invoke-Pester -Path ./tests" 2>&1 | tail -8
+echo "=== analyzer (whole repo) ==="
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && pwsh -NoProfile -c "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 | Where-Object { \$_.Severity -eq 'Error' }" 2>&1 | tail -10
+```
+
+```text
+done.
+/var/folders/dq/zbxks7r975j049mj8jk19wtw0000gp/T/try-t-51cc4556/2026-07-12-seed
+Using git worktree.
+/var/folders/dq/zbxks7r975j049mj8jk19wtw0000gp/T/try-t-24ca546b/2026-07-12-wt
+/var/folders/dq/zbxks7r975j049mj8jk19wtw0000gp/T/try-t-1c30ca1e/tries/2026-08-26-e2e
+[+] /Users/david/src/tries/2026-07-09-windows-dotfiles/tests/Try.Tests.ps1 2.75s
+Tests completed in 56.78s
+Tests Passed: 281, Failed: 1, Skipped: 2, Inconclusive: 0, NotRun: 0
+=== analyzer (whole repo) ===
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:59:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Identify the one failing test
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && pwsh -NoProfile -c "Invoke-Pester -Path ./tests" 2>&1 | grep -E "^\[91m\[-\]|\[-\] " | head -5`
+
+```text
+[-] Claude settings and HUD overlays.preserves Windows attributes when atomically replacing an existing file 2.31s
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:59:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Windows pitfalls README
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+head -20 $W/pitfalls/README.md; echo "..."; grep -n "copilot" $W/pitfalls/README.md | cut -c1-120
+```
+
+```text
+# Pitfalls
+
+Past traps we've stepped on. **Symptoms-first** knowledge base — when a
+problem recurs (on a new machine, after an upgrade, with a new tool combo),
+grepping the symptom here lands you on the root cause and workaround in
+seconds, instead of re-debugging from scratch.
+
+This folder is excluded from <DEPLOYMENT/PACKAGING MECHANISM, e.g. chezmoi via
+.chezmoiignore.tmpl, Python via MANIFEST.in, npm via .npmignore> — it is repo
+metadata for maintainers, not user-facing config to deploy.
+
+## Pitfalls vs the rest
+
+| Surface | Time direction | Question it answers | Access pattern |
+|---|---|---|---|
+| `docs/<tool>.md` | Present | "How does this tool work / how do I configure it?" | Read top to bottom |
+| `pitfalls/<slug>.md` | **Past** | **"I see error X — has this happened before?"** | **Grep symptoms** |
+| `backlog/<slug>.md` | Future | "We thought about doing Y — what was the analysis?" | Index in `TODO.md` |
+| `AGENTS.md` Hard invariants | Present | "What rules MUST agents follow?" | Read top to bottom |
+
+...
+94:| [`copilot-api-connectionrefused-stale-bun-only-module`](copilot-api-connectionrefused-stale-bun-only-module.md) | `
+95:| [`copilot-proxy-npm-etarget-but-doctor-says-installed`](copilot-proxy-npm-etarget-but-doctor-says-installed.md) | `
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:59:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Write the Windows pitfall note
+
+````bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && cat > pitfalls/copilot-proxy-shim-port-held-by-another-process.md <<'EOF'
+# Managed Copilot clients run against the bare proxy, or the shim never comes up on a busy port
+
+**Symptoms** (grep this section):
+- `copilot-run <cmd>` works, but the Responses tool-description normalization is
+  clearly not applied — Codex-style calls come back
+  `400 ... tool description ... empty`, the exact failure
+  [`codex-copilot-empty-mcp-tool-description-400.md`](codex-copilot-empty-mcp-tool-description-400.md)
+  says the shim fixes. Nothing warns you.
+- Long OpenAI reasoning turns go silent again and get reaped, as if the SSE
+  keepalive were not there — because it isn't; the shim was bypassed.
+- `copilot-proxy status` says `shim: ON but DOWN` while clients keep working.
+  That combination is the tell: they are talking to `:4141` directly.
+- Or the opposite failure: `copilot-proxy: shim did not come up — check
+  ...\copilot-shim-4142.log`, with `EADDRINUSE` / `Failed to start server. Is
+  port 4142 in use?` only inside that log.
+- After `Start-CopilotShim` runs once, `$env:COPILOT_SHIM_UPSTREAM` is set in
+  your session forever and every later `bun copilot-throttle-shim.js` inherits it.
+
+**First seen**: 2026-08-26
+**Affects**: `dot_config/powershell/modules/Copilot/Copilot.psm1`
+**Status**: fixed 2026-08-26
+
+## Root cause
+
+`Test-CopilotShimAlive` is a **reachability** probe, not an identity probe:
+
+```powershell
+Invoke-WebRequest -Uri "$(Get-CopilotShimBase)/v1/models" -TimeoutSec 2 -SkipHttpErrorCheck
+```
+
+`-SkipHttpErrorCheck` means a `404` or `500` counts as alive, and the Unix shim's
+`/_shim/health` route does not exist in this build (the shim here is pinned to
+Unix commit `ee5612c`, one generation before the metrics layer — see the SHA-256
+contract in `tests/Copilot.Tests.ps1`). So the probe answers *"something on this
+port speaks HTTP"* and nothing more. Three separate bugs grew out of trusting it:
+
+**1. Fail-open routing.** `Get-CopilotClientBase` returned the bare proxy when
+the shim was enabled but not alive, and `copilot-run` discarded the start result
+outright:
+
+```powershell
+if ((Get-CopilotShimEnabled) -and -not (Test-CopilotShimAlive)) { Start-CopilotShim | Out-Null }
+```
+
+A down shim therefore degraded silently instead of failing. On Unix the same
+situation is a hard fault (`managed client refused to bypass the enabled metrics
+shim`) — and the degradation matters more here than the name "metrics" suggests,
+because the shim also carries the keepalive **and** the tool-description
+normalization.
+
+**2. A foreign listener passed as the shim.** Any unrelated HTTP server on 4142
+answers the probe, so it silently became the gateway every managed client used.
+
+**3. "Not alive" was read as "port free".** An older or stale
+`copilot-throttle-shim.js` that does not answer the probe made
+`Start-CopilotShim` spawn a replacement that died instantly with `EADDRINUSE` —
+ten one-second retries, then failure, with the reason only ever written to a
+detached log file.
+
+Separately, `$env:COPILOT_SHIM_PORT = ...` inside `Start-CopilotShim` is
+**process-wide** in PowerShell — function scope does not apply to `$env:` — so
+it leaked into the caller's session permanently.
+
+## Fix
+
+- `Get-CopilotPortOwner -Port` classifies the port as `free` / `ours` /
+  `foreign` / `unknown` via `Get-NetTCPConnection` + `Win32_Process.CommandLine`.
+  `unknown` (no `Get-NetTCPConnection`) degrades to the old behaviour rather
+  than falsely accusing a squatter.
+- `Start-CopilotShim` refuses on `foreign` (naming PID + process), reclaims on
+  `ours`, and only then spawns. Failure tails 5 lines of both log files inline.
+- `Get-CopilotClientBase` returns the shim base whenever the shim is *enabled*,
+  and `Assert-CopilotShim` (mirroring Unix `_copilot_require_shim`) is the gate
+  every managed client goes through. `copilot-run` now returns instead of
+  bypassing.
+- `COPILOT_SHIM_*` is set, spawned against, and restored in a `finally`.
+
+`Assert-CopilotShim` deliberately calls `Start-CopilotShim` directly rather than
+short-circuiting on `Test-CopilotShimAlive`: liveness cannot prove identity here,
+and the starter is idempotent and returns fast when the shim is already ours.
+
+## Generalisable
+
+**A reachability probe must never decide port state, and must never decide
+identity.** When "is it healthy?" is weaker than "is the port mine?", every gap
+between the two becomes either a silent bypass (probe too permissive) or an
+unrecoverable `EADDRINUSE` wedge (probe too strict). Read the port from the OS
+and the owner from the process table; keep the HTTP probe for what it can
+actually answer.
+
+**In PowerShell, `$env:X = ...` is not scoped.** Any helper that sets one for a
+child process must save and restore it, exactly as `copilot-run` already did for
+the `ANTHROPIC_*` block.
+
+## See also
+
+- [`codex-copilot-empty-mcp-tool-description-400.md`](codex-copilot-empty-mcp-tool-description-400.md) — what a bypassed shim silently reintroduces
+- Unix counterpart: `pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md` in the parent dotfiles repo
+EOF
+echo ok
+````
+
+```text
+ok
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 08:59:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read pitfalls index rows for format
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '92,97p' $W/pitfalls/README.md | cut -c1-200
+```
+
+```text
+| [`clickfix-defender-flags-cmd-irm-iex`](clickfix-defender-flags-cmd-irm-iex.md) | `Trojan:Win32/ClickFix.R!ml`, cmd `powershell -c "irm\|iex"` blocked, VirusTotal clean but Defender blocks | workaro
+| [`codex-modify-config-empty-key-line-1-col-0`](codex-modify-config-empty-key-line-1-col-0.md) | `modify_config.toml: invalid TOML`, `Empty key at line 1 col 0`, valid/empty-looking `.codex/config.to
+| [`copilot-api-connectionrefused-stale-bun-only-module`](copilot-api-connectionrefused-stale-bun-only-module.md) | `error: ConnectionRefused downloading package manifest @jeffreycao/copilot-api`, `Re
+| [`copilot-proxy-npm-etarget-but-doctor-says-installed`](copilot-proxy-npm-etarget-but-doctor-says-installed.md) | `npm error code ETARGET`, `No matching version found`, proxy still starts, doctor th
+| [`git-add-fatal-crlf-would-be-replaced-by-lf`](git-add-fatal-crlf-would-be-replaced-by-lf.md) | `fatal: CRLF would be replaced by LF in .specstory/history/*.md`, `git add -A` stages nothing, `core.s
+| [`herdr-keybind-failed-to-read-pane-protocol-mismatch`](herdr-keybind-failed-to-read-pane-protocol-mismatch.md) | `url-pick: failed to read pane <id>`, `protocol_mismatch`, `client protocol 17 is ne
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Index the Windows pitfall
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && python3 - <<'PYEOF'
+import io
+p="pitfalls/README.md"
+lines=io.open(p,encoding="utf-8").read().split("\n")
+idx=next(i for i,l in enumerate(lines) if l.startswith("| [`git-add-fatal-crlf-would-be-replaced-by-lf`]"))
+row=("| [`copilot-proxy-shim-port-held-by-another-process`](copilot-proxy-shim-port-held-by-another-process.md) | "
+ "managed clients silently run against `:4141` while `copilot-proxy status` says `shim: ON but DOWN` — Responses "
+ "`400 ... tool description ... empty` and the SSE keepalive both come back; or the inverse, `shim did not come up` "
+ "with `EADDRINUSE` / `Is port 4142 in use?` only inside the detached log; plus `$env:COPILOT_SHIM_UPSTREAM` stuck in "
+ "the session after one start | fixed (`Test-CopilotShimAlive` is reachability, not identity — this build has no "
+ "`/_shim/health` and `-SkipHttpErrorCheck` accepts a 404. `Get-CopilotPortOwner` now classifies the port free/ours/"
+ "foreign/unknown, `Start-CopilotShim` reclaims or refuses and tails the log inline, `Assert-CopilotShim` gates every "
+ "managed client, and `COPILOT_SHIM_*` is restored in a `finally`) |")
+lines[idx:idx]=[row]
+io.open(p,"w",encoding="utf-8").write("\n".join(lines))
+print("ok")
+PYEOF
+grep -c "copilot-proxy-shim-port-held" pitfalls/README.md
+```
+
+```text
+ok
+1
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:08Z)**_
+
+Now the Windows docs (both language variants):
+
+_**Agent (claude-opus-5 2026-08-26 09:00:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Outline the Windows doc
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "^## \|^### " $W/docs/copilot-proxy.md | head -30; echo "=== shim mentions ==="; grep -n -i "shim" $W/docs/copilot-proxy.md | head -20
+```
+
+```text
+11:## Commands
+32:## Quick start
+48:## How routing works
+93:## Model selection and role profile
+127:### Selection, retry and failover are different
+154:## Claude Code feature compatibility
+172:## Network, entitlement and diagnostics
+229:## Codex through the gateway
+274:### Experimental direct configuration
+=== shim mentions ===
+20:| `copilot-proxy shim [on\|off]` | toggle the throttle shim (port 4142) |
+133:- **Same-model transport retry** is the shim resending the same buffered request
+195:  `copilot-model --auto`, and shim toggles cannot repair that account setting.
+207:- The throttle shim is pinned byte-for-byte to the reviewed macOS/Linux artifact.
+212:- For an inspectable literal `stream: true` JSON request, the shim waits through a
+220:  has emitted bytes, the HTTP status is already spent, so the shim emits a standard
+221:  SSE `error` event. Tune these boundaries with `COPILOT_SHIM_PING_AFTER_MS`,
+222:  `COPILOT_SHIM_PING_MS` and `COPILOT_SHIM_STALL_MS`; setting ping to `0` also
+224:  remains controlled by `COPILOT_SHIM_STALL_MS`.
+232:gateway/shim and pass a `copilot_api` Responses provider through one-invocation
+239:Codex always uses the shim on `localhost:4142`, even when the persisted
+243:servers and the native Codex path may omit them. The shim fills only those tool
+245:Codex currently zstd-compresses these requests; the shim decodes only a Responses
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the shim doc section
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+sed -n '200,228p' $W/docs/copilot-proxy.md
+```
+
+```text
+  `--dangerously-skip-permissions` and optional SpecStory behavior. On the
+  SpecStory path they resolve the project/user `claude_cmd` as the base, enforce
+  one bypass flag, quote all user arguments, and always pass the complete command
+  through `specstory run claude -c` (including zero-argument sessions). The
+  create-seeded `~/.specstory/cli/config.toml` remains user-owned, and direct
+  `specstory run claude` still follows that user/project configuration. Plain
+  `claude` is unaffected.
+- The throttle shim is pinned byte-for-byte to the reviewed macOS/Linux artifact.
+  It limits concurrent requests and retries the **same buffered request and model**
+  on network errors or HTTP 403/429/502/503/504 before any upstream body is exposed.
+  It never substitutes a model, and deliberately passes HTTP 402 through once;
+  billing configuration is not a throttle failure.
+- For an inspectable literal `stream: true` JSON request, the shim waits through a
+  10-second grace period, then enters its slow SSE path. The first comment frame—and
+  therefore the first bytes/headers visible through Bun—arrives on the next
+  15-second keepalive tick; later comments continue at that interval while the
+  request is queued or the model is silently reasoning. The 240-second watchdog
+  bounds pre-header silence and, while pings are enabled, mid-stream silence. Fast
+  streams and every non-streaming response remain transparent, including their real
+  status code and body. If an upstream error arrives only after the early SSE path
+  has emitted bytes, the HTTP status is already spent, so the shim emits a standard
+  SSE `error` event. Tune these boundaries with `COPILOT_SHIM_PING_AFTER_MS`,
+  `COPILOT_SHIM_PING_MS` and `COPILOT_SHIM_STALL_MS`; setting ping to `0` also
+  disables the current mid-stream watchdog loop, while the pre-header watchdog
+  remains controlled by `COPILOT_SHIM_STALL_MS`.
+
+State lives under `~/.local/state/copilot-proxy/`; device login stores the GitHub
+token at `~/.local/share/copilot-api/github_token` without printing it by default.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update the English Windows doc
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && python3 - <<'PYEOF'
+import io
+p="docs/copilot-proxy.md"
+s=io.open(p,encoding="utf-8").read()
+a = """- The throttle shim is pinned byte-for-byte to the reviewed macOS/Linux artifact.
+"""
+assert s.count(a)==1
+s=s.replace(a, """- **Managed clients fail closed on an enabled shim.** `copilot-run`, the
+  `claude-copilot*` launchers and `codex-copilot*` all pass through
+  `Assert-CopilotShim`; if the shim is enabled and cannot be started, they refuse
+  rather than quietly falling back to `localhost:4141`. Bypassing the shim drops
+  the SSE keepalive *and* the Responses tool-description normalization, so a
+  silent fallback reintroduces a documented `400` with no message anywhere.
+  `copilot-proxy shim off` is the only intentional direct-mode route.
+- **The shim port is read from the OS, not inferred from the health probe.**
+  `Test-CopilotShimAlive` can only prove that *something* answers HTTP on 4142
+  (this shim build has no `/_shim/health`, and the probe accepts a 404), so
+  `Start-CopilotShim` classifies the port with `Get-NetTCPConnection` +
+  `Win32_Process`: a stale or older `copilot-throttle-shim.js` of ours is
+  reclaimed, any other process is named and the start refuses — move out of its
+  way with `COPILOT_SHIM_PORT`. Without that, an unrelated HTTP server silently
+  becomes the gateway, and one of our own stale shims wedges every start with
+  `EADDRINUSE`. See
+  [pitfalls/copilot-proxy-shim-port-held-by-another-process.md](https://github.com/daviddwlee84/windows-dotfiles/blob/main/pitfalls/copilot-proxy-shim-port-held-by-another-process.md).
+""" + a)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+grep -n "fail closed on an enabled shim" docs/copilot-proxy.md
+```
+
+```text
+ok
+207:- **Managed clients fail closed on an enabled shim.** `copilot-run`, the
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the zh-TW anchor
+
+```bash
+W=/Users/david/src/tries/2026-07-09-windows-dotfiles
+grep -n "throttle shim is pinned\|節流 shim\|逐位元組\|byte-for-byte" $W/docs/copilot-proxy.zh-TW.md | head
+```
+
+```text
+20:| `copilot-proxy shim [on\|off]` | 切換節流 shim（port 4142） |
+186:- Throttle shim 以 byte-for-byte 方式固定到已 review 的 macOS/Linux artifact。它會限制
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update zh-TW doc and build the Windows docs site
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && python3 - <<'PYEOF'
+import io
+p="docs/copilot-proxy.zh-TW.md"
+s=io.open(p,encoding="utf-8").read()
+a = "- Throttle shim 以 byte-for-byte 方式固定到已 review 的 macOS/Linux artifact。它會限制"
+assert s.count(a)==1
+s=s.replace(a, """- **Managed client 對啟用中的 shim 一律 fail closed。** `copilot-run`、
+  `claude-copilot*` 與 `codex-copilot*` 全部經過 `Assert-CopilotShim`；shim 已啟用但起不來時
+  它們會直接放棄，而不是默默退回 `localhost:4141`。繞過 shim 會同時失去 SSE keepalive
+  **與** Responses tool-description 正規化，所以那種靜默 fallback 等於把一個已記錄在案的
+  `400` 重新放回來，而且哪裡都不會有訊息。`copilot-proxy shim off` 是唯一刻意的 direct-mode 路徑。
+- **Shim 的 port 狀態改由作業系統讀取，不再從健康探測推論。**
+  `Test-CopilotShimAlive` 只能證明 4142 上「有東西在講 HTTP」（這版 shim 沒有 `/_shim/health`，
+  而且探測連 404 都接受），所以 `Start-CopilotShim` 改用 `Get-NetTCPConnection` + `Win32_Process`
+  判定 port 歸屬：是我們自己的舊版或殘留 `copilot-throttle-shim.js` 就回收；其他程序則印出名稱後
+  拒絕啟動 —— 要讓路請用 `COPILOT_SHIM_PORT`。少了這一步，無關的 HTTP server 會默默變成所有
+  managed client 的閘道，而自己的殘留 shim 則會用 `EADDRINUSE` 卡死每一次啟動。詳見
+  [pitfalls/copilot-proxy-shim-port-held-by-another-process.md](https://github.com/daviddwlee84/windows-dotfiles/blob/main/pitfalls/copilot-proxy-shim-port-held-by-another-process.md)。
+""" + a)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+uv run mkdocs build --strict 2>&1 | grep -iE "ERROR|copilot-proxy" | head
+```
+
+```text
+ok
+error: Failed to spawn: `mkdocs`
+  Caused by: No such file or directory (os error 2)
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the docs build recipe
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && grep -n "docs\|mkdocs" justfile | head -10`
+
+```text
+111:# serve the docs site locally
+112:docs-serve:
+113:    uv run --with mkdocs-material --with mkdocs-static-i18n mkdocs serve
+115:# build the docs site (strict)
+116:docs-build:
+117:    uv run --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build the Windows docs site strictly
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && just docs-build 2>&1 | tail -12`
+
+```text
+ │
+ │  Our full analysis:
+ │
+ │  https://squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0/
+
+INFO    -  mkdocs_static_i18n: Building 'en' documentation to directory: /Users/david/src/tries/2026-07-09-windows-dotfiles/site
+INFO    -  Cleaning site directory
+INFO    -  Building documentation to directory: /Users/david/src/tries/2026-07-09-windows-dotfiles/site
+INFO    -  mkdocs_static_i18n: Building 'zh-TW' documentation to directory: /Users/david/src/tries/2026-07-09-windows-dotfiles/site/zh-TW
+INFO    -  mkdocs_static_i18n: Language 'zh-TW' is not supported by lunr.js, not setting it in the 'plugins.search.lang' option
+INFO    -  mkdocs_static_i18n: Translated 11 navigation elements to 'zh-TW'
+INFO    -  Documentation built in 1.81 seconds
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Windows repo status
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git status --short | head -20`
+
+```text
+ M docs/copilot-proxy.md
+ M docs/copilot-proxy.zh-TW.md
+ M dot_config/powershell/modules/Copilot/Copilot.psm1
+ M pitfalls/README.md
+ M tests/Copilot.Tests.ps1
+?? pitfalls/copilot-proxy-shim-port-held-by-another-process.md
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:00:59Z)**_
+
+Now the macOS side — collapsing `copilot-run`'s duplicated env list into the existing SSOT:
+
+_**Agent (claude-opus-5 2026-08-26 09:01:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-read copilot-run for the SSOT refactor
+
+`sed -n '1540,1560p' dot_config/shell/43_copilot_proxy.sh`
+
+```text
+    printf '%s\n' "copilot-run: jq is required to build the model role profile" >&2
+    return 1
+  fi
+  if ! _copilot_alive; then
+    copilot-proxy start || return 1
+  fi
+  # If the shim is enabled but not up (e.g. toggled on after the proxy started),
+  # bring it up now so ANTHROPIC_BASE_URL below resolves to it.
+  _copilot_require_shim || return 1
+  local profile model fable opus sonnet haiku
+  profile="$(_copilot_model_profile_json "$(_copilot_default_model)")" || return 1
+  model="$(printf '%s' "$profile" | jq -r '.main')"
+  fable="$(printf '%s' "$profile" | jq -r '.fable')"
+  opus="$(printf '%s' "$profile" | jq -r '.opus')"
+  sonnet="$(printf '%s' "$profile" | jq -r '.sonnet')"
+  haiku="$(printf '%s' "$profile" | jq -r '.haiku')"
+  # Opt-in quota savers (COPILOT_PROXY_QUIET=1): prepended as NAME=VALUE args
+  # to `env`. Off by default — they degrade the Claude Code UX a little.
+  if [ "${COPILOT_PROXY_QUIET:-0}" = "1" ]; then
+    set -- \
+      CLAUDE_CODE_ATTRIBUTION_HEADER="0" \
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:02:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Refactor copilot-run onto the env SSOT
+
+```bash
+cat > /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/mac_ssot.py <<'PYEOF'
+import io
+p="dot_config/shell/43_copilot_proxy.sh"
+s=io.open(p,encoding="utf-8").read()
+
+# 1. Give the SSOT a --live switch (mirrors the Windows -Pinned switch, inverted
+#    default so the two existing callers keep their behaviour).
+old = '''# Needs jq; every caller already requires it.
+_copilot_env_json_for_model() {
+  local selected="$1" catalog="${2:-}" profile
+  if [ "$#" -ge 2 ]; then
+    profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
+  else
+    profile="$(_copilot_model_profile_json "$selected")" || return 1
+  fi
+  jq -n \\
+    --arg base_url "$(_copilot_pinned_base)" \\'''
+new = '''# `--live` (first arg) resolves ANTHROPIC_BASE_URL with _copilot_client_base —
+# what THIS process should talk to right now — instead of the _copilot_pinned_base
+# a settings file records. copilot-run passes it; the two on-disk callers don't.
+# The Windows port spells the same switch `-Pinned`, opted in from the other side.
+#
+# Needs jq; every caller already requires it.
+_copilot_env_json_for_model() {
+  local base_fn=_copilot_pinned_base
+  if [ "${1:-}" = "--live" ]; then base_fn=_copilot_client_base; shift; fi
+  local selected="$1" catalog="${2:-}" profile
+  if [ "$#" -ge 2 ]; then
+    profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
+  else
+    profile="$(_copilot_model_profile_json "$selected")" || return 1
+  fi
+  jq -n \\
+    --arg base_url "$("$base_fn")" \\'''
+assert s.count(old)==1, "ssot"
+s=s.replace(old,new)
+
+# 2. copilot-run stops hand-maintaining a second copy of the key list.
+old2 = '''  local profile model fable opus sonnet haiku
+  profile="$(_copilot_model_profile_json "$(_copilot_default_model)")" || return 1
+  model="$(printf '%s' "$profile" | jq -r '.main')"
+  fable="$(printf '%s' "$profile" | jq -r '.fable')"
+  opus="$(printf '%s' "$profile" | jq -r '.opus')"
+  sonnet="$(printf '%s' "$profile" | jq -r '.sonnet')"
+  haiku="$(printf '%s' "$profile" | jq -r '.haiku')"
+  # Opt-in quota savers (COPILOT_PROXY_QUIET=1): prepended as NAME=VALUE args
+  # to `env`. Off by default — they degrade the Claude Code UX a little.
+  if [ "${COPILOT_PROXY_QUIET:-0}" = "1" ]; then
+    set -- \\
+      CLAUDE_CODE_ATTRIBUTION_HEADER="0" \\
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION="false" \\
+      CLAUDE_CODE_ENABLE_AWAY_SUMMARY="0" \\
+      DISABLE_NON_ESSENTIAL_MODEL_CALLS="1" \\
+      "$@"
+  fi
+  # `command env` (not bare var-prefix) so the vars are strictly per-process:
+  # POSIX var-prefix on a *function* call would leak into the current shell.
+  command env \\
+    ANTHROPIC_BASE_URL="$(_copilot_client_base)" \\
+    ANTHROPIC_AUTH_TOKEN="dummy" \\
+    ANTHROPIC_MODEL="$model" \\
+    ANTHROPIC_DEFAULT_FABLE_MODEL="$fable" \\
+    ANTHROPIC_DEFAULT_OPUS_MODEL="$opus" \\
+    ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet" \\
+    ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku" \\
+    ANTHROPIC_SMALL_FAST_MODEL="$haiku" \\
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1" \\
+    "$@"
+}'''
+new2 = '''  # Inject the SAME block `copilot-here on` writes — _copilot_env_json_for_model
+  # is the single source of truth, and --live swaps the pinned base for the one
+  # this process should use right now. The COPILOT_PROXY_QUIET quota-savers come
+  # from that block too.
+  #
+  # This was a hand-maintained SECOND copy of the key list, i.e. exactly the
+  # drift that function's comment warns about: `copilot-here on` and `copilot-run`
+  # could inject different env on the same machine, and only one of them was
+  # covered by the drift check.
+  local env_json _kv
+  env_json="$(_copilot_env_json_for_model --live "$(_copilot_default_model)")" || return 1
+  # Prepend each NAME=VALUE as an `env` argument; order is irrelevant to env(1).
+  # A here-doc rather than a pipe: the loop MUST run in this shell or every
+  # `set --` is discarded with the subshell.
+  while IFS= read -r _kv; do
+    [ -n "$_kv" ] || continue
+    set -- "$_kv" "$@"
+  done <<EOF
+$(printf '%s\\n' "$env_json" | jq -r 'to_entries[] | "\\(.key)=\\(.value)"')
+EOF
+  # `command env` (not bare var-prefix) so the vars are strictly per-process:
+  # POSIX var-prefix on a *function* call would leak into the current shell.
+  command env "$@"
+}'''
+assert s.count(old2)==1, "run"
+s=s.replace(old2,new2)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+python3 /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/mac_ssot.py
+bash -n dot_config/shell/43_copilot_proxy.sh && zsh -n dot_config/shell/43_copilot_proxy.sh && echo "syntax OK both shells"
+```
+
+```text
+ok
+syntax OK both shells
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:02:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify copilot-run injects exactly the SSOT block
+
+```bash
+cd ~ && zsh -c '
+source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh
+# Prove copilot-run now injects EXACTLY the copilot-here block.
+copilot-run env | grep -E "^(ANTHROPIC|CLAUDE_CODE|DISABLE_NON)" | sort > /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/run.env
+_copilot_env_json_for_model --live "$(_copilot_default_model)" | jq -r "to_entries[] | \"\(.key)=\(.value)\"" | sort > /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/ssot.env
+diff /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/{run,ssot}.env && echo "MATCH: copilot-run == SSOT block"
+cat /tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad/run.env
+' 2>&1 | tail -20
+```
+
+```text
+< CLAUDE_CODE_EXECPATH=/Users/david/.local/share/claude/versions/2.1.246
+< CLAUDE_CODE_MESSAGING_SOCKET=/tmp/cc-socks/13021.sock
+< CLAUDE_CODE_MESSAGING_TOKEN=[REDACTED:generic-api-key]
+< CLAUDE_CODE_SESSION_ID=9b3bee50-7af9-48f2-a82f-6e14eff9769c
+ANTHROPIC_AUTH_TOKEN=dummy
+ANTHROPIC_BASE_URL=http://localhost:4142
+ANTHROPIC_DEFAULT_FABLE_MODEL=gpt-5.6-sol[1m]
+ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.6-luna[1m]
+ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5.6-sol[1m]
+ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.6-terra[1m]
+ANTHROPIC_MODEL=gpt-5.6-sol[1m]
+ANTHROPIC_SMALL_FAST_MODEL=gpt-5.6-luna[1m]
+CLAUDE_CODE_BRIDGE_SESSION_ID=session_01EbifMc3APLNcF3FBuA96iY
+CLAUDE_CODE_CHILD_SESSION=1
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+CLAUDE_CODE_ENTRYPOINT=cli
+CLAUDE_CODE_EXECPATH=/Users/david/.local/share/claude/versions/2.1.246
+CLAUDE_CODE_MESSAGING_SOCKET=/tmp/cc-socks/13021.sock
+CLAUDE_CODE_MESSAGING_TOKEN=[REDACTED:generic-api-key]
+CLAUDE_CODE_SESSION_ID=9b3bee50-7af9-48f2-a82f-6e14eff9769c
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:02:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify SSOT match and QUIET behavior
+
+```bash
+SP=/tmp/claude-502/-Users-david--local-share-chezmoi/9b3bee50-7af9-48f2-a82f-6e14eff9769c/scratchpad
+cd ~ && zsh -c "
+source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh
+_copilot_env_json_for_model --live \"\$(_copilot_default_model)\" | jq -r 'keys[]' | sort > $SP/keys
+copilot-run env | grep -Ff $SP/keys | grep -E '^(ANTHROPIC_|CLAUDE_CODE_DISABLE|DISABLE_NON)' | sort > $SP/run.env
+_copilot_env_json_for_model --live \"\$(_copilot_default_model)\" | jq -r 'to_entries[] | \"\(.key)=\(.value)\"' | sort > $SP/ssot.env
+diff $SP/run.env $SP/ssot.env && echo 'MATCH: copilot-run injects exactly the SSOT block'
+echo '--- QUIET=1 adds the 4 savers ---'
+COPILOT_PROXY_QUIET=1 copilot-run env | grep -cE '^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)='
+echo '--- QUIET unset omits them ---'
+copilot-run env | grep -cE '^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=' || echo 0
+" 2>&1 | tail -12
+```
+
+```text
+MATCH: copilot-run injects exactly the SSOT block
+--- QUIET=1 adds the 4 savers ---
+4
+--- QUIET unset omits them ---
+0
+0
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:02:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check arg passthrough and the pinned default
+
+```bash
+cd ~ && zsh -c '
+source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh
+echo "--- args with spaces survive ---"
+copilot-run sh -c "printf %s\\\\n \"\$@\"" _ "two words" "a|b" 2>&1
+echo "--- pinned (default) is unchanged for copilot-here ---"
+_copilot_env_json | jq -r ".ANTHROPIC_BASE_URL"
+' 2>&1 | tail -8
+```
+
+```text
+--- args with spaces survive ---
+two words
+a|b
+--- pinned (default) is unchanged for copilot-here ---
+http://localhost:4142
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:02:28Z)**_
+
+Now a regression test for the macOS refactor, then verify both suites:
+
+_**Agent (claude-opus-5 2026-08-26 09:02:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Add macOS SSOT regression tests
+
+```bash
+python3 - <<'PYEOF'
+import io
+p="tests/unit/copilot_proxy.bats"
+s=io.open(p,encoding="utf-8").read()
+anchor = '''@test "explicit shim off is a direct-mode break-glass route" {'''
+assert s.count(anchor)==1
+
+new = '''# --- copilot-run injects the SAME block copilot-here writes ---------------------
+#
+# copilot-run used to hand-maintain a second copy of the key list, so it could
+# inject different env than `copilot-here on` on the same machine — and only the
+# copilot-here copy was covered by the drift check.
+
+@test "copilot-run injects exactly the copilot-here env block, nothing else" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local catalog='{"data":[{"id":"gpt-5.6-sol"}]}'
+  run env TEST_CATALOG="$catalog" bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' \\"\\$TEST_CATALOG\\"; }
+    _copilot_client_base() { printf '%s' 'http://localhost:4242'; }
+    _copilot_pinned_base() { printf '%s' 'http://pinned.invalid'; }
+    want=\\"\\$(_copilot_env_json_for_model --live \\"\\$(_copilot_default_model)\\" \\"\\$TEST_CATALOG\\" | jq -r 'keys[]' | sort)\\"
+    got=\\"\\$(copilot-run env | grep -Ff <(printf '%s\\n' \\"\\$want\\") | cut -d= -f1 | sort -u)\\"
+    [ \\"\\$want\\" = \\"\\$got\\" ] || { printf 'want:\\n%s\\ngot:\\n%s\\n' \\"\\$want\\" \\"\\$got\\"; exit 1; }
+    copilot-run env | grep '^ANTHROPIC_BASE_URL='"
+  [ "$status" -eq 0 ]
+  # --live must win over the pinned base copilot-here would write to disk.
+  [[ "$output" == *"ANTHROPIC_BASE_URL=http://localhost:4242"* ]]
+  [[ "$output" != *"pinned.invalid"* ]]
+}
+
+@test "copilot-run passes multi-word argv through untouched" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  run bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' '{\\"data\\":[{\\"id\\":\\"gpt-5.6-sol\\"}]}'; }
+    copilot-run sh -c 'for a in \\"\\\\$@\\"; do printf \\"<%s>\\n\\" \\"\\\\$a\\"; done' _ 'two words' 'a|b'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<two words>"* ]]
+  [[ "$output" == *"<a|b>"* ]]
+}
+
+@test "copilot-run adds the four quota savers only under COPILOT_PROXY_QUIET=1" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local body="
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' '{\\"data\\":[{\\"id\\":\\"gpt-5.6-sol\\"}]}'; }
+    copilot-run env | grep -cE '^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=' || true"
+  run bash -c "$body"
+  [ "$output" = "0" ]
+  run env COPILOT_PROXY_QUIET=1 bash -c "$body"
+  [ "$output" = "4" ]
+}
+
+'''
+s=s.replace(anchor, new+anchor)
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+bats tests/unit/copilot_proxy.bats --filter "copilot-run" 2>&1 | tail -20
+```
+
+```text
+ok
+1..3
+ok 1 copilot-run injects exactly the copilot-here env block, nothing else
+not ok 2 copilot-run passes multi-word argv through untouched
+# (in test file tests/unit/copilot_proxy.bats, line 628)
+#   `[ "$status" -eq 0 ]' failed
+ok 3 copilot-run adds the four quota savers only under COPILOT_PROXY_QUIET=1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:03:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Fix the argv test and run the full copilot suite
+
+```bash
+python3 - <<'PYEOF'
+import io
+p="tests/unit/copilot_proxy.bats"
+s=io.open(p,encoding="utf-8").read()
+old = '''@test "copilot-run passes multi-word argv through untouched" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  run bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' '{\\"data\\":[{\\"id\\":\\"gpt-5.6-sol\\"}]}'; }
+    copilot-run sh -c 'for a in \\"\\\\$@\\"; do printf \\"<%s>\\n\\" \\"\\\\$a\\"; done' _ 'two words' 'a|b'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<two words>"* ]]
+  [[ "$output" == *"<a|b>"* ]]
+}'''
+new = '''@test "copilot-run passes multi-word argv through untouched" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  # A fake binary rather than a nested `sh -c`: the point is that prepending the
+  # env block to "$@" must not re-split the caller's own arguments.
+  mkdir -p "$TMP/bin"
+  printf '%s\\n' '#!/bin/sh' 'for a do printf "<%s>\\n" "$a"; done' > "$TMP/bin/argecho"
+  chmod +x "$TMP/bin/argecho"
+  run bash -c "
+    export PATH='$TMP/bin':\\"\\$PATH\\"
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' '{\\"data\\":[{\\"id\\":\\"gpt-5.6-sol\\"}]}'; }
+    copilot-run argecho 'two words' 'a|b' ''"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<two words>"* ]]
+  [[ "$output" == *"<a|b>"* ]]
+  [[ "$output" == *"<>"* ]]
+}'''
+assert s.count(old)==1
+io.open(p,"w",encoding="utf-8").write(s.replace(old,new))
+print("ok")
+PYEOF
+bats tests/unit/copilot_proxy.bats 2>&1 | grep -E "^not ok|^1\.\." 
+```
+
+```text
+ok
+1..58
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:03:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Deploy and smoke-test the refactor
+
+`chezmoi apply --exclude=scripts ~/.config/shell/43_copilot_proxy.sh && cd ~ && zsh -ic 'copilot-proxy status && copilot-run env | grep ANTHROPIC_BASE_URL' 2>&1 | grep -v "can't change option"`
+
+```text
+copilot-proxy: RUNNING on http://localhost:4141
+  models: 19 served; Claude: none
+  shim:   ON, up on http://localhost:4142  → clients use this
+ANTHROPIC_BASE_URL=http://localhost:4142
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:03:38Z)**_
+
+Now updating the macOS docs to note the shared SSOT, then committing both repos:
+
+_**Agent (claude-opus-5 2026-08-26 09:03:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update the English doc, find zh-TW anchor
+
+```bash
+python3 - <<'PYEOF'
+import io
+for p, ins in [
+ ("docs/tools/copilot-claude-proxy.md",
+  ("""The building block under `claude-copilot`: auto-starts the proxy and runs *any*
+command with the proxy env. Useful for other Anthropic-compatible tools or a
+custom specstory invocation:""",
+   """The building block under `claude-copilot`: auto-starts the proxy and runs *any*
+command with the proxy env. Useful for other Anthropic-compatible tools or a
+custom specstory invocation:""",
+   """
+
+The injected block comes from `_copilot_env_json_for_model --live` — the same
+single source of truth `copilot-here on` writes and `_copilot_here_drift`
+compares against, so the two can no longer disagree about which keys exist.
+`--live` is the only difference: it resolves `ANTHROPIC_BASE_URL` with
+`_copilot_client_base` (what this process should talk to now) instead of the
+pinned base a settings file records.""")),
+ ("docs/tools/copilot-claude-proxy.zh-TW.md", None),
+]:
+    if ins is None: continue
+    s=io.open(p,encoding="utf-8").read()
+    anchor=ins[0]
+    assert s.count(anchor)==1, p
+    s=s.replace(anchor, anchor+ins[2])
+    io.open(p,"w",encoding="utf-8").write(s)
+    print("ok", p)
+PYEOF
+grep -n "zh-TW anchor" /dev/null; grep -n "泛用環境變數注入器" -A6 docs/tools/copilot-claude-proxy.zh-TW.md | head -12
+```
+
+```text
+ok docs/tools/copilot-claude-proxy.md
+258:### `copilot-run <cmd...>` —— 泛用環境變數注入器
+259-
+260-`claude-copilot` 底下的積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令。
+261-適合其他 Anthropic 相容工具或自訂的 specstory 呼叫：
+262-
+263-```sh
+264-copilot-run specstory run claude    # 等同 claude-copilot 做的事
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:04:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update zh-TW doc and rebuild macOS docs
+
+```bash
+python3 - <<'PYEOF'
+import io
+p="docs/tools/copilot-claude-proxy.zh-TW.md"
+s=io.open(p,encoding="utf-8").read()
+a="""`claude-copilot` 底下的積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令。
+適合其他 Anthropic 相容工具或自訂的 specstory 呼叫："""
+assert s.count(a)==1
+s=s.replace(a, a+"""
+
+注入的 env 區塊來自 `_copilot_env_json_for_model --live` —— 和 `copilot-here on` 寫入、
+`_copilot_here_drift` 比對的是同一份 single source of truth，兩邊不可能再對「有哪些 key」
+產生分歧。`--live` 是唯一差別：它用 `_copilot_client_base`（此刻這個 process 該連的位址）
+解析 `ANTHROPIC_BASE_URL`，而不是設定檔會記錄的 pinned base。""")
+io.open(p,"w",encoding="utf-8").write(s)
+print("ok")
+PYEOF
+uv run mkdocs build --strict 2>&1 | grep -icE "^ERROR" ; echo "(0 = clean)"
+```
+
+```text
+ok
+0
+(0 = clean)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:04:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Final macOS check before commit
+
+`git status --short; echo "=== bats copilot ==="; bats tests/unit/copilot_proxy.bats 2>&1 | grep -E "^not ok|^1\.\."`
+
+```text
+ M .specstory/history/2026-08-26_08-15-44Z-dotfiles-all-on-main.md
+ M .specstory/statistics.json
+ M docs/tools/copilot-claude-proxy.md
+ M docs/tools/copilot-claude-proxy.zh-TW.md
+ M dot_config/shell/43_copilot_proxy.sh
+ M tests/unit/copilot_proxy.bats
+=== bats copilot ===
+1..58
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:04:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the macOS refactor
+
+```bash
+git add -A && git commit -F - <<'EOF'
+refactor(copilot-run): inject the copilot-here env block instead of a second copy
+
+`copilot-run` hand-maintained its own copy of the ANTHROPIC_* key list plus the
+COPILOT_PROXY_QUIET savers, while `copilot-here on` and `_copilot_here_drift`
+shared `_copilot_env_json_for_model`. That is exactly the drift that function's
+own comment warns about — the two paths could inject different env on the same
+machine, and only the copilot-here copy was covered by the drift check.
+
+`_copilot_env_json_for_model` gains a leading `--live` switch that resolves
+ANTHROPIC_BASE_URL with `_copilot_client_base` (what this process should talk to
+now) rather than `_copilot_pinned_base` (what a settings file records); the two
+on-disk callers keep the pinned default. The Windows port already had this as
+`Get-CopilotEnvBlock -Pinned`, opted in from the other side.
+
+3 new tests: copilot-run's injected keys equal the SSOT block exactly and --live
+beats the pinned base; multi-word and empty argv survive the prepend; the four
+quota savers appear only under COPILOT_PROXY_QUIET=1. copilot_proxy.bats 58/58.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EbifMc3APLNcF3FBuA96iY
+EOF
+```
+
+```text
+Exit code 128
+fatal: unable to stat '.specstory/statistics.json.lock': No such file or directory
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:04:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry staging after the specstory lock race
+
+`git status --short; git add -A && git status --short`
+
+```text
+ M .specstory/history/2026-08-26_08-15-44Z-dotfiles-all-on-main.md
+ M .specstory/statistics.json
+ M docs/tools/copilot-claude-proxy.md
+ M docs/tools/copilot-claude-proxy.zh-TW.md
+ M dot_config/shell/43_copilot_proxy.sh
+ M tests/unit/copilot_proxy.bats
+M  .specstory/history/2026-08-26_08-15-44Z-dotfiles-all-on-main.md
+M  .specstory/statistics.json
+M  docs/tools/copilot-claude-proxy.md
+M  docs/tools/copilot-claude-proxy.zh-TW.md
+M  dot_config/shell/43_copilot_proxy.sh
+M  tests/unit/copilot_proxy.bats
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:05:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the macOS refactor
+
+```bash
+git commit -F - <<'EOF'
+refactor(copilot-run): inject the copilot-here env block instead of a second copy
+
+`copilot-run` hand-maintained its own copy of the ANTHROPIC_* key list plus the
+COPILOT_PROXY_QUIET savers, while `copilot-here on` and `_copilot_here_drift`
+shared `_copilot_env_json_for_model`. That is exactly the drift that function's
+own comment warns about — the two paths could inject different env on the same
+machine, and only the copilot-here copy was covered by the drift check.
+
+`_copilot_env_json_for_model` gains a leading `--live` switch that resolves
+ANTHROPIC_BASE_URL with `_copilot_client_base` (what this process should talk to
+now) rather than `_copilot_pinned_base` (what a settings file records); the two
+on-disk callers keep the pinned default. The Windows port already had this as
+`Get-CopilotEnvBlock -Pinned`, opted in from the other side.
+
+3 new tests: copilot-run's injected keys equal the SSOT block exactly and --live
+beats the pinned base; multi-word and empty argv survive the prepend; the four
+quota savers appear only under COPILOT_PROXY_QUIET=1. copilot_proxy.bats 58/58.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EbifMc3APLNcF3FBuA96iY
+EOF
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1787735105-79097.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..........................................................(no files to check)Skipped
+check json..............................................................................Passed
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/**/*.sh)........................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)......................................Passed
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1787735105-79097.
+[main 732dc89] refactor(copilot-run): inject the copilot-here env block instead of a second copy
+ 6 files changed, 3104 insertions(+), 34 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:05:15Z)**_
+
+Now the Windows repo commit:
+
+_**Agent (claude-opus-5 2026-08-26 09:05:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage the Windows changes
+
+`cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git add -A && git status --short`
+
+```text
+M  docs/copilot-proxy.md
+M  docs/copilot-proxy.zh-TW.md
+M  dot_config/powershell/modules/Copilot/Copilot.psm1
+M  pitfalls/README.md
+A  pitfalls/copilot-proxy-shim-port-held-by-another-process.md
+M  tests/Copilot.Tests.ps1
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:05:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the Windows fixes
+
+```bash
+cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git commit -F - <<'EOF'
+fix(copilot): fail closed on an enabled shim and own the shim port
+
+Test-CopilotShimAlive is a REACHABILITY probe, not an identity one: this shim
+build has no /_shim/health (pinned to Unix ee5612c) and -SkipHttpErrorCheck
+accepts a 404, so it only answers "something on 4142 speaks HTTP". Three bugs
+grew out of trusting it, plus one unrelated env leak.
+
+1. Fail-open routing. Get-CopilotClientBase fell back to the bare proxy when the
+   shim was enabled but down, and copilot-run discarded the start result outright
+   (`Start-CopilotShim | Out-Null`). Bypassing the shim silently drops the SSE
+   keepalive AND the Responses tool-description normalization — i.e. it
+   reintroduces the documented 400 in
+   pitfalls/codex-copilot-empty-mcp-tool-description-400.md with no message
+   anywhere. Added Assert-CopilotShim (mirrors Unix _copilot_require_shim);
+   copilot-run now returns instead of bypassing, and the client base stays on the
+   shim whenever the shim is enabled.
+
+2. A foreign HTTP listener on 4142 passed as the shim and silently became the
+   gateway every managed client used.
+
+3. "Not alive" was read as "port free": a stale or older copilot-throttle-shim.js
+   made Start-CopilotShim spawn a replacement that died instantly with
+   EADDRINUSE, with the reason only ever written to a detached log.
+
+   Get-CopilotPortOwner classifies the port free/ours/foreign/unknown via
+   Get-NetTCPConnection + Win32_Process.CommandLine. Start-CopilotShim refuses on
+   foreign (naming PID + process), reclaims on ours, and tails both logs inline
+   on failure. 'unknown' degrades to the previous behaviour rather than falsely
+   accusing a squatter. codex-copilot now calls the idempotent starter
+   unconditionally so the ownership check actually runs.
+
+4. `$env:X = ...` is process-wide in PowerShell, so Start-CopilotShim leaked
+   COPILOT_SHIM_PORT/UPSTREAM into the caller's session for good. Set, spawn,
+   restore in a finally — the idiom copilot-run already used for ANTHROPIC_*.
+
+Verified: Copilot.Tests.ps1 109/109 (7 new), full ./tests 281 passed with the one
+pre-existing macOS-host failure (Windows file attributes), PSScriptAnalyzer clean,
+`just docs-build` strict clean.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EbifMc3APLNcF3FBuA96iY
+EOF
+```
+
+```text
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+[main ae6b0f8] fix(copilot): fail closed on an enabled shim and own the shim port
+ 6 files changed, 373 insertions(+), 10 deletions(-)
+ create mode 100644 pitfalls/copilot-proxy-shim-port-held-by-another-process.md
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:05:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm both repos committed
+
+```bash
+echo "=== macOS dotfiles ==="; git log --oneline -3
+echo "=== windows dotfiles ==="; cd /Users/david/src/tries/2026-07-09-windows-dotfiles && git log --oneline -3 && git status --short && echo "(clean)"
+```
+
+```text
+=== macOS dotfiles ===
+732dc89 refactor(copilot-run): inject the copilot-here env block instead of a second copy
+c5a40d8 fix(copilot-proxy): unwedge start — version-gate the lock, reclaim the shim port
+d3555ad feat(ssh): walk ProxyJump chains and repair a missing .pub in ssh-setup-remote
+=== windows dotfiles ===
+ae6b0f8 fix(copilot): fail closed on an enabled shim and own the shim port
+af2f32e fix: stop lazygit config migration drift
+6d274c8 fix: bootstrap pueued and harden package apply
+(clean)
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-08-26 09:05:50Z)**_
+
+Both repos committed on `main`.
+
+## macOS — `732dc89`
+
+`copilot-run` no longer hand-maintains a second copy of the env key list. `_copilot_env_json_for_model` gained a leading `--live` switch (resolves `ANTHROPIC_BASE_URL` with `_copilot_client_base` instead of `_copilot_pinned_base`); the two on-disk callers keep the pinned default. The `COPILOT_PROXY_QUIET` savers now come from the same block too — that was a second duplicate.
+
+Verified `copilot-run`'s injected keys are byte-identical to the SSOT block, `--live` beats the pinned base, and multi-word/empty argv survive the prepend. `copilot_proxy.bats` 58/58, docs strict-clean.
+
+## Windows — `ae6b0f8`
+
+Root cause tying three of the four together: `Test-CopilotShimAlive` is a *reachability* probe, not an identity one — no `/_shim/health` on that build, and `-SkipHttpErrorCheck` accepts a 404.
+
+1. **Fail-open → fail-closed.** Added `Assert-CopilotShim` (mirrors `_copilot_require_shim`); `Get-CopilotClientBase` now stays on the shim whenever the shim is *enabled*, and `copilot-run` returns instead of the old `Start-CopilotShim | Out-Null`.
+2. **Foreign listener accepted as the shim** — closed by the new `Get-CopilotPortOwner` (free/ours/foreign/unknown via `Get-NetTCPConnection` + `Win32_Process.CommandLine`). Foreign → named and refused; ours → reclaimed. `unknown` degrades to the old behaviour rather than falsely accusing a squatter, so pwsh on a non-Windows host is unaffected.
+3. **Pre-emptive EADDRINUSE fix** — the same wedge I hit on macOS today can't land there, since `Start-CopilotShim` now reads the port from the OS. Failure tails both logs inline. `codex-copilot` calls the idempotent starter unconditionally so the ownership check actually runs.
+4. **Env leak** — `$env:X` is process-wide in PowerShell; `COPILOT_SHIM_PORT`/`UPSTREAM` are now set/spawned/restored in a `finally`.
+
+7 new Pester tests (109/109 in `Copilot.Tests.ps1`; full `./tests` 281 passed, 1 pre-existing failure — a Windows-file-attributes test that can't pass on a macOS host). PSScriptAnalyzer clean, `just docs-build --strict` clean. Pitfall note + index row + both doc languages updated.
+
+## One divergence I did *not* touch
+
+`codex-copilot` disagrees across platforms on whether `copilot-proxy shim off` applies to it, and **both sides have a written rationale**:
+
+- macOS uses `_copilot_client_base` — "Explicit `shim off` is the only break-glass route around it", so Codex honours the toggle and loses the normalization.
+- Windows uses `Get-CopilotShimBase` unconditionally — "Codex always needs the shim's Responses compatibility normalization even when persistent burst throttling is disabled", so the toggle is ignored for Codex.
+
+Picking a winner is a product call, not a bug fix. My read is Windows is right — the normalization fixes a hard 400, and "throttling off" shouldn't imply "protocol compatibility off" — which would mean changing macOS's `codex-copilot` to `_copilot_shim_base` and narrowing what `shim off` means. Say the word and I'll align it either direction.

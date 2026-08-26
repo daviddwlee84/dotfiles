@@ -591,6 +591,66 @@ SH
   [[ "$output" == *"=<model_providers.copilot_api.base_url=\"http://localhost:4242\">"* ]]
 }
 
+# --- copilot-run injects the SAME block copilot-here writes ---------------------
+#
+# copilot-run used to hand-maintain a second copy of the key list, so it could
+# inject different env than `copilot-here on` on the same machine — and only the
+# copilot-here copy was covered by the drift check.
+
+@test "copilot-run injects exactly the copilot-here env block, nothing else" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local catalog='{"data":[{"id":"gpt-5.6-sol"}]}'
+  run env TEST_CATALOG="$catalog" bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+    _copilot_client_base() { printf '%s' 'http://localhost:4242'; }
+    _copilot_pinned_base() { printf '%s' 'http://pinned.invalid'; }
+    want=\"\$(_copilot_env_json_for_model --live \"\$(_copilot_default_model)\" \"\$TEST_CATALOG\" | jq -r 'keys[]' | sort)\"
+    got=\"\$(copilot-run env | grep -Ff <(printf '%s\n' \"\$want\") | cut -d= -f1 | sort -u)\"
+    [ \"\$want\" = \"\$got\" ] || { printf 'want:\n%s\ngot:\n%s\n' \"\$want\" \"\$got\"; exit 1; }
+    copilot-run env | grep '^ANTHROPIC_BASE_URL='"
+  [ "$status" -eq 0 ]
+  # --live must win over the pinned base copilot-here would write to disk.
+  [[ "$output" == *"ANTHROPIC_BASE_URL=http://localhost:4242"* ]]
+  [[ "$output" != *"pinned.invalid"* ]]
+}
+
+@test "copilot-run passes multi-word argv through untouched" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  # A fake binary rather than a nested `sh -c`: the point is that prepending the
+  # env block to "$@" must not re-split the caller's own arguments.
+  mkdir -p "$TMP/bin"
+  printf '%s\n' '#!/bin/sh' 'for a do printf "<%s>\n" "$a"; done' > "$TMP/bin/argecho"
+  chmod +x "$TMP/bin/argecho"
+  run bash -c "
+    export PATH='$TMP/bin':\"\$PATH\"
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\"}]}'; }
+    copilot-run argecho 'two words' 'a|b' ''"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<two words>"* ]]
+  [[ "$output" == *"<a|b>"* ]]
+  [[ "$output" == *"<>"* ]]
+}
+
+@test "copilot-run adds the four quota savers only under COPILOT_PROXY_QUIET=1" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local body="
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\"}]}'; }
+    copilot-run env | grep -cE '^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=' || true"
+  run bash -c "$body"
+  [ "$output" = "0" ]
+  run env COPILOT_PROXY_QUIET=1 bash -c "$body"
+  [ "$output" = "4" ]
+}
+
 @test "explicit shim off is a direct-mode break-glass route" {
   run bash -c "export XDG_STATE_HOME='$TMP/state'; mkdir -p '$TMP/state/copilot-proxy'; printf 'off\n' >'$TMP/state/copilot-proxy/shim'; source '$SHELL_LIB';
     _copilot_shim_alive() { return 1; }

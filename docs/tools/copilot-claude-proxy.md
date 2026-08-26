@@ -310,6 +310,13 @@ The building block under `claude-copilot`: auto-starts the proxy and runs *any*
 command with the proxy env. Useful for other Anthropic-compatible tools or a
 custom specstory invocation:
 
+The injected block comes from `_copilot_env_json_for_model --live` — the same
+single source of truth `copilot-here on` writes and `_copilot_here_drift`
+compares against, so the two can no longer disagree about which keys exist.
+`--live` is the only difference: it resolves `ANTHROPIC_BASE_URL` with
+`_copilot_client_base` (what this process should talk to now) instead of the
+pinned base a settings file records.
+
 ```sh
 copilot-run specstory run claude    # exactly what claude-copilot does
 copilot-run claude --resume         # raw claude, no specstory

@@ -260,6 +260,11 @@ ChatGPT MCP，不是只供 Apple Silicon Codex Desktop 使用的 bridge。
 `claude-copilot` 底下的積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令。
 適合其他 Anthropic 相容工具或自訂的 specstory 呼叫：
 
+注入的 env 區塊來自 `_copilot_env_json_for_model --live` —— 和 `copilot-here on` 寫入、
+`_copilot_here_drift` 比對的是同一份 single source of truth，兩邊不可能再對「有哪些 key」
+產生分歧。`--live` 是唯一差別：它用 `_copilot_client_base`（此刻這個 process 該連的位址）
+解析 `ANTHROPIC_BASE_URL`，而不是設定檔會記錄的 pinned base。
+
 ```sh
 copilot-run specstory run claude    # 等同 claude-copilot 做的事
 copilot-run claude --resume         # 裸 claude，不經 specstory

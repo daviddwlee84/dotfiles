@@ -1546,36 +1546,29 @@ copilot-run() {
   # If the shim is enabled but not up (e.g. toggled on after the proxy started),
   # bring it up now so ANTHROPIC_BASE_URL below resolves to it.
   _copilot_require_shim || return 1
-  local profile model fable opus sonnet haiku
-  profile="$(_copilot_model_profile_json "$(_copilot_default_model)")" || return 1
-  model="$(printf '%s' "$profile" | jq -r '.main')"
-  fable="$(printf '%s' "$profile" | jq -r '.fable')"
-  opus="$(printf '%s' "$profile" | jq -r '.opus')"
-  sonnet="$(printf '%s' "$profile" | jq -r '.sonnet')"
-  haiku="$(printf '%s' "$profile" | jq -r '.haiku')"
-  # Opt-in quota savers (COPILOT_PROXY_QUIET=1): prepended as NAME=VALUE args
-  # to `env`. Off by default — they degrade the Claude Code UX a little.
-  if [ "${COPILOT_PROXY_QUIET:-0}" = "1" ]; then
-    set -- \
-      CLAUDE_CODE_ATTRIBUTION_HEADER="0" \
-      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION="false" \
-      CLAUDE_CODE_ENABLE_AWAY_SUMMARY="0" \
-      DISABLE_NON_ESSENTIAL_MODEL_CALLS="1" \
-      "$@"
-  fi
+  # Inject the SAME block `copilot-here on` writes — _copilot_env_json_for_model
+  # is the single source of truth, and --live swaps the pinned base for the one
+  # this process should use right now. The COPILOT_PROXY_QUIET quota-savers come
+  # from that block too.
+  #
+  # This was a hand-maintained SECOND copy of the key list, i.e. exactly the
+  # drift that function's comment warns about: `copilot-here on` and `copilot-run`
+  # could inject different env on the same machine, and only one of them was
+  # covered by the drift check.
+  local env_json _kv
+  env_json="$(_copilot_env_json_for_model --live "$(_copilot_default_model)")" || return 1
+  # Prepend each NAME=VALUE as an `env` argument; order is irrelevant to env(1).
+  # A here-doc rather than a pipe: the loop MUST run in this shell or every
+  # `set --` is discarded with the subshell.
+  while IFS= read -r _kv; do
+    [ -n "$_kv" ] || continue
+    set -- "$_kv" "$@"
+  done <<EOF
+$(printf '%s\n' "$env_json" | jq -r 'to_entries[] | "\(.key)=\(.value)"')
+EOF
   # `command env` (not bare var-prefix) so the vars are strictly per-process:
   # POSIX var-prefix on a *function* call would leak into the current shell.
-  command env \
-    ANTHROPIC_BASE_URL="$(_copilot_client_base)" \
-    ANTHROPIC_AUTH_TOKEN="dummy" \
-    ANTHROPIC_MODEL="$model" \
-    ANTHROPIC_DEFAULT_FABLE_MODEL="$fable" \
-    ANTHROPIC_DEFAULT_OPUS_MODEL="$opus" \
-    ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet" \
-    ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku" \
-    ANTHROPIC_SMALL_FAST_MODEL="$haiku" \
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1" \
-    "$@"
+  command env "$@"
 }
 
 # Pick the best model for Codex from the raw gateway catalog. This is
@@ -1902,8 +1895,15 @@ _copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODE
 # CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC — reported "no drift" while `on`
 # would still have changed it. Add a key here and BOTH sides follow.
 #
+# `--live` (first arg) resolves ANTHROPIC_BASE_URL with _copilot_client_base —
+# what THIS process should talk to right now — instead of the _copilot_pinned_base
+# a settings file records. copilot-run passes it; the two on-disk callers don't.
+# The Windows port spells the same switch `-Pinned`, opted in from the other side.
+#
 # Needs jq; every caller already requires it.
 _copilot_env_json_for_model() {
+  local base_fn=_copilot_pinned_base
+  if [ "${1:-}" = "--live" ]; then base_fn=_copilot_client_base; shift; fi
   local selected="$1" catalog="${2:-}" profile
   if [ "$#" -ge 2 ]; then
     profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
@@ -1911,7 +1911,7 @@ _copilot_env_json_for_model() {
     profile="$(_copilot_model_profile_json "$selected")" || return 1
   fi
   jq -n \
-    --arg base_url "$(_copilot_pinned_base)" \
+    --arg base_url "$("$base_fn")" \
     --argjson profile "$profile" \
     --arg quiet "${COPILOT_PROXY_QUIET:-0}" '
     {
