@@ -330,6 +330,122 @@ SH
   [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.0" ]
 }
 
+# --- integrity guard: the lock is evidence only about ITS OWN version ----------
+#
+# `bun add` writes bun.lock and never touches package-lock.json, so one npm
+# CA-stack fallback leaves a package-lock.json pinned to that version forever.
+# Reading it unconditionally compared 2.1.0's real hash to the 2.3.0 pin and
+# wedged every start. pitfalls/copilot-proxy-stale-package-lock-integrity.md
+
+# Installs the pinned version into the prefix and writes a package-lock.json
+# claiming $1 (version) / $2 (integrity) — the mixed-manager prefix shape.
+write_stale_lock_fixture() {
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/bun" <<SH
+#!/bin/sh
+mkdir -p node_modules/.bin node_modules/@jeffreycao/copilot-api
+printf '#!/bin/sh\n' > node_modules/.bin/copilot-api
+chmod +x node_modules/.bin/copilot-api
+printf '{"version":"2.3.0"}\n' > node_modules/@jeffreycao/copilot-api/package.json
+SH
+  chmod +x "$TMP/bin/bun"
+  mkdir -p "$TMP/data/copilot-api/pkg"
+  printf '{"packages":{"node_modules/@jeffreycao/copilot-api":{"version":"%s","integrity":"%s"}}}\n' \
+    "$1" "$2" > "$TMP/data/copilot-api/pkg/package-lock.json"
+}
+
+@test "integrity guard: a stale npm lock for ANOTHER version does not block install" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  # 2.1.0's genuine hash, left by a months-old npm fallback; pin is 2.3.0.
+  write_stale_lock_fixture 2.1.0 \
+    'sha512-9/Ro1UzrYT/erB7eR/rf61XHFyc5TOwQ94B6ij/Wu91TD1hnmbuqYu/PavKGUQ7YDBVCXFENRRvQSpTkS0X3eA=='
+  run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
+    source '$SHELL_LIB'
+    _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"'\"\$(_copilot_builtin_integrity)\"'\"}}'; }
+    _copilot_ensure_pkg >/dev/null"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"does not match the trusted pin"* ]]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.0" ]
+}
+
+@test "integrity guard: a lock for the INSTALLED version with a bad hash still refuses" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  write_stale_lock_fixture 2.3.0 'sha512-tampered'
+  run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
+    source '$SHELL_LIB'; _copilot_ensure_pkg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"does not match the trusted pin"* ]]
+  # The message must name both sides, or the next occurrence needs a bisect.
+  [[ "$output" == *"@2.3.0"* ]]
+  [ ! -e "$TMP/data/copilot-api/pkg/.installed-spec" ]
+}
+
+# --- shim start: port state must be read from the PORT, not from health -------
+#
+# An older shim build proxies /_shim/health upstream (4141 answers 404), so the
+# liveness probe says "dead" while the OS says "occupied" — and the spawn dies
+# with EADDRINUSE forever. pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md
+
+# Fakes lsof + ps so the port looks occupied by PID 4242 running $1. lsof reports
+# the PID only on its FIRST call, so the reclaim branch's release-wait converges
+# instead of spinning its full 5s budget.
+write_shim_port_fixture() {
+  mkdir -p "$TMP/bin"
+  cat > "$TMP/bin/lsof" <<SH
+#!/bin/sh
+[ -f "$TMP/lsof-called" ] && exit 1
+: > "$TMP/lsof-called"
+echo 4242
+SH
+  cat > "$TMP/bin/ps" <<SH
+#!/bin/sh
+printf '%s\n' "$1"
+SH
+  cat > "$TMP/bin/bun" <<'SH'
+#!/bin/sh
+printf '%s
+' "$@" > "$SHIM_SPAWN_LOG"
+SH
+  chmod +x "$TMP/bin/lsof" "$TMP/bin/ps" "$TMP/bin/bun"
+}
+
+# `kill` is a bash BUILTIN, so a $PATH fake is never consulted — the only way to
+# observe the reclaim is a shell function of the same name, declared after the
+# library is sourced.
+@test "shim start: reclaims the port from a stale copilot-throttle-shim build" {
+  write_shim_port_fixture "bun /home/u/.config/shell/copilot-throttle-shim.js"
+  run env SHIM_SPAWN_LOG="$TMP/spawned" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\"
+    source '$SHELL_LIB'
+    kill() { printf 'killed %s\n' \"\$@\" >> '$TMP/killed'; }
+    _copilot_shim_script() { printf '%s' '$SHELL_LIB'; }
+    _copilot_shim_logfile() { printf '%s' '$TMP/shim.log'; }
+    _copilot_shim_pidfile() { printf '%s' '$TMP/shim.pid'; }
+    _copilot_shim_alive() { [ -f '$TMP/spawned' ]; }
+    _copilot_shim_start"
+  [ "$status" -eq 0 ]
+  [ -f "$TMP/killed" ]
+  [[ "$(cat "$TMP/killed")" == *4242* ]]
+  [[ "$(cat "$TMP/spawned")" == *"$SHELL_LIB"* ]]
+  [[ "$output" != *"held by another process"* ]]
+}
+
+@test "shim start: names a foreign squatter instead of killing it" {
+  write_shim_port_fixture "/usr/bin/python3 -m http.server"
+  run env SHIM_SPAWN_LOG="$TMP/spawned" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\"
+    source '$SHELL_LIB'
+    kill() { printf 'killed %s\n' \"\$@\" >> '$TMP/killed'; }
+    _copilot_shim_script() { printf '%s' '$SHELL_LIB'; }
+    _copilot_shim_alive() { return 1; }
+    _copilot_shim_start"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"held by another process"* ]]
+  [[ "$output" == *4242* ]]
+  [ ! -f "$TMP/killed" ]
+  [ ! -f "$TMP/spawned" ]
+}
+
 @test "effective_model: a settings.local.json WITHOUT our base_url is not a pin" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   mkdir -p "$TMP/proj/.claude" "$TMP/state/copilot-proxy"

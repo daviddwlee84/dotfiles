@@ -160,6 +160,15 @@ warm start 只執行已安裝 binary，不接觸 npm，因此 registry 下架只
 啟動失敗，會還原舊 prefix 與 selection 並重啟。selection JSON 位於
 `$XDG_STATE_HOME/copilot-proxy/package.json`。
 
+**一般安裝**（非 `update`）時，會把釘選的 selection 與 prefix 內實際落地的版本互相驗證。
+`package-lock.json` 只在它記錄的 `version` 與已安裝版本相同時才採信：這個 prefix 天生是
+mixed-manager —— `bun add` 只寫 `bun.lock`，npm CA-stack fallback 才寫 `package-lock.json`
+而且沒有任何路徑會刪掉它 —— 所以舊 lock 描述的往往是早就不在的版本。少了這道版本閘門，
+檢查等於拿兩個不同版本各自「真實」的 hash 互比，於是每次 start 都被擋下
+（[pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-stale-package-lock-integrity.md)）。
+沒有可用 lock 時，退回比對 npm registry 上**已安裝版本**的 metadata。兩種拒絕訊息都會印出
+`on disk:` 與 `pinned:`。
+
 ### `copilot-proxy doctor [--live]`（別名：`test`）
 
 診斷整條路徑，任何一項失敗就以非零狀態結束。預設**唯讀**；加上 `--live` 會多送一個真實的
@@ -527,6 +536,20 @@ SSE `error` event 送出，所以不要把 `COPILOT_SHIM_PING_AFTER_MS` 調成 0
 FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器只在 agent 結束時才
 回填。先去看 `agent-<id>.jsonl` 的 `assistant` 筆數有沒有在長。完整診斷：
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md)。
+
+### 舊版 shim 會卡住 port，而不是被換掉
+
+`_copilot_shim_alive` 探測的是 `/_shim/health` 而不是單純連得上，這樣任意程序 ——
+或**舊版本的 shim** —— 才不會被誤認成健康的 metrics shim。但舊版 shim 會把這個路徑
+轉發到上游，於是 `:4141` 回 `404`，探測正確地判定「死了」，而作業系統仍然認為
+「port 被佔用」。過去啟動流程把「死了」當成「port 是空的」，spawn 出來的程序立刻
+`EADDRINUSE` 死掉，結果每個 managed launcher 都對著一個其實正在跑的 shim fail closed。
+
+現在 `_copilot_shim_start` 直接讀 port（`lsof -tiTCP -sTCP:LISTEN`）：command line 命中
+`copilot-throttle-shim.js` 的就是我們自己的，直接回收；其他一律印出 PID 與 command 後
+拒絕啟動 —— 在一個眾所周知的 port 上砍掉無關程序不是它該做的決定，要讓路請改用
+`COPILOT_SHIM_PORT`。判讀特徵是**代理**的 log 裡一整片 `GET /_shim/health 404`
+（[pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md)）。
 
 ### fork 沒有速率限制器
 

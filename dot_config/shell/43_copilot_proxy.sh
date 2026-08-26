@@ -268,25 +268,42 @@ _copilot_ensure_pkg() {
     printf '%s\n' "copilot-proxy: install finished but $bin is missing." >&2
     return 1
   fi
-  # For the built-in or persisted pin, require the package manager's recorded
-  # npm integrity (when available) to match the trusted selection. Bun verifies
-  # registry integrity itself; the metadata comparison covers a Bun-only lock.
-  local expected_integrity actual_integrity selected_version integrity_meta
+  # For the built-in or persisted pin, cross-check the version that is actually
+  # ON DISK against the trusted selection. Bun verifies registry integrity itself;
+  # this covers the npm fallback path and a Bun-only lock.
+  #
+  # The `package-lock.json` entry is evidence ONLY when its `version` matches the
+  # installed one. npm writes that lock and never removes it, while a later `bun
+  # add` writes `bun.lock` and leaves package-lock.json untouched — so a prefix
+  # that once took the npm fallback keeps a lock pinning the OLD version's
+  # integrity forever. Comparing that against the new pin fails 100% of the time
+  # and wedges every start with "integrity does not match the trusted pin", even
+  # though the correct version is installed. Version-gate it, or don't read it.
+  # See pitfalls/copilot-proxy-stale-package-lock-integrity.md
+  local expected_integrity actual_integrity installed_version lock_version integrity_meta
   expected_integrity="$(_copilot_expected_integrity)"
-  if [ -n "$expected_integrity" ]; then
+  if [ -n "$expected_integrity" ] && command -v jq >/dev/null 2>&1; then
+    installed_version="$(_copilot_pkg_actual_version 2>/dev/null || true)"
     actual_integrity=""
-    if [ -f "$prefix/package-lock.json" ] && command -v jq >/dev/null 2>&1; then
-      actual_integrity="$(jq -r --arg p "node_modules/$(_copilot_pkg_name)" '.packages[$p].integrity // empty' "$prefix/package-lock.json" 2>/dev/null)"
+    if [ -f "$prefix/package-lock.json" ] && [ -n "$installed_version" ]; then
+      lock_version="$(jq -r --arg p "node_modules/$(_copilot_pkg_name)" '.packages[$p].version // empty' "$prefix/package-lock.json" 2>/dev/null)"
+      if [ "$lock_version" = "$installed_version" ]; then
+        actual_integrity="$(jq -r --arg p "node_modules/$(_copilot_pkg_name)" '.packages[$p].integrity // empty' "$prefix/package-lock.json" 2>/dev/null)"
+      fi
     fi
-    if [ -n "$actual_integrity" ] && [ "$actual_integrity" != "$expected_integrity" ]; then
-      printf '%s\n' "copilot-proxy: installed package integrity does not match the trusted pin." >&2
-      return 1
-    elif [ -z "$actual_integrity" ] && command -v jq >/dev/null 2>&1; then
-      selected_version="${spec##*@}"
-      integrity_meta="$(_copilot_registry_metadata "$selected_version" 2>/dev/null || true)"
+    if [ -n "$actual_integrity" ]; then
+      if [ "$actual_integrity" != "$expected_integrity" ]; then
+        printf '%s\n' "copilot-proxy: installed package integrity does not match the trusted pin." >&2
+        printf '%s\n' "  on disk: $(_copilot_pkg_name)@$installed_version   pinned: $spec" >&2
+        return 1
+      fi
+    else
+      # No usable lock entry — verify the INSTALLED version against the registry.
+      integrity_meta="$(_copilot_registry_metadata "${installed_version:-${spec##*@}}" 2>/dev/null || true)"
       actual_integrity="$(printf '%s' "$integrity_meta" | jq -r '.dist.integrity // empty' 2>/dev/null)"
       if [ -z "$actual_integrity" ] || [ "$actual_integrity" != "$expected_integrity" ]; then
         printf '%s\n' "copilot-proxy: could not verify the installed package against trusted npm integrity." >&2
+        printf '%s\n' "  on disk: $(_copilot_pkg_name)@${installed_version:-unknown}   pinned: $spec" >&2
         return 1
       fi
     fi
@@ -477,7 +494,23 @@ _copilot_pinned_base() {
   if _copilot_shim_enabled; then _copilot_shim_base; else _copilot_base; fi
 }
 
+# PIDs listening on $1, newest last. Empty when nothing holds the port (or when
+# lsof is unavailable, in which case callers must not treat it as "port free").
+_copilot_port_pids() {
+  command -v lsof >/dev/null 2>&1 || return 1
+  command lsof -nP -tiTCP:"$1" -sTCP:LISTEN 2>/dev/null
+}
+
 # Start the shim (idempotent). Points it at the fork; inherits COPILOT_SHIM_*.
+#
+# The reclaim step is load-bearing. `_copilot_shim_alive` probes /_shim/health,
+# which an OLDER passthrough build of this script does not serve — it forwards
+# the path upstream, so :4141 answers 404 and the probe reports "not alive".
+# Without the reclaim we then spawn a doomed process that dies instantly with
+# EADDRINUSE, and every managed launcher fails closed against a shim that is in
+# fact running. Symptom: "shim did not come up" plus a wall of
+# `GET /_shim/health 404` in the PROXY's log.
+# See pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md
 _copilot_shim_start() {
   if _copilot_shim_alive; then return 0; fi
   if ! command -v bun >/dev/null 2>&1; then
@@ -489,7 +522,33 @@ _copilot_shim_start() {
     printf '%s\n' "copilot-proxy: shim script not found at $script" >&2
     return 1
   fi
-  COPILOT_SHIM_PORT="$(_copilot_shim_port)" COPILOT_SHIM_UPSTREAM="$(_copilot_base)" \
+  # Port occupied but not answering /_shim/health: reclaim it when it is one of
+  # our own shims (stale or old-build), otherwise name the squatter and bail —
+  # killing an unrelated process on a well-known port is not ours to do.
+  local port pids pid squatters=""
+  port="$(_copilot_shim_port)"
+  if pids="$(_copilot_port_pids "$port")" && [ -n "$pids" ]; then
+    for pid in $pids; do
+      if command ps -o command= -p "$pid" 2>/dev/null | command grep -q 'copilot-throttle-shim\.js'; then
+        kill "$pid" 2>/dev/null
+      else
+        squatters="$squatters $pid($(command ps -o comm= -p "$pid" 2>/dev/null))"
+      fi
+    done
+    if [ -n "$squatters" ]; then
+      printf '%s\n' "copilot-proxy: port $port is held by another process:$squatters" >&2
+      printf '%s\n' "  free it, or pick a different port with COPILOT_SHIM_PORT." >&2
+      return 1
+    fi
+    # Give the reclaimed listener a moment to release the socket.
+    local w=0
+    while [ "$w" -lt 5 ]; do
+      pids="$(_copilot_port_pids "$port" || true)"
+      [ -z "$pids" ] && break
+      sleep 1; w=$((w + 1))
+    done
+  fi
+  COPILOT_SHIM_PORT="$port" COPILOT_SHIM_UPSTREAM="$(_copilot_base)" \
     nohup bun "$script" >"$(_copilot_shim_logfile)" 2>&1 &
   printf '%s\n' "$!" >"$(_copilot_shim_pidfile)"
   local i=0
@@ -498,6 +557,7 @@ _copilot_shim_start() {
     sleep 1; i=$((i + 1))
   done
   printf '%s\n' "copilot-proxy: shim did not come up — check $(_copilot_shim_logfile)" >&2
+  [ -s "$(_copilot_shim_logfile)" ] && command tail -n 5 "$(_copilot_shim_logfile)" >&2
   return 1
 }
 

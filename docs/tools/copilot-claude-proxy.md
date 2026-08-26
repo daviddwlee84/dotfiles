@@ -191,6 +191,17 @@ running proxy fails to start after the swap, the old package selection and
 prefix are restored and restarted. The selected `{spec, integrity, registry,
 selected_at}` lives in `$XDG_STATE_HOME/copilot-proxy/package.json`.
 
+On a **normal install** (not `update`), the pinned selection is cross-checked
+against what actually landed in the prefix. `package-lock.json` is consulted
+only when its recorded `version` matches the installed one: the install prefix
+is mixed-manager by design — `bun add` writes `bun.lock`, while the npm CA-stack
+fallback writes `package-lock.json` and nothing ever removes it — so an old lock
+routinely describes a version that is no longer installed. Without that gate the
+check compares two different versions' genuine hashes and refuses every start
+([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-stale-package-lock-integrity.md)).
+When no lock applies, the fallback compares npm registry metadata for the
+**installed** version. Both refusal messages print `on disk:` and `pinned:`.
+
 ### `copilot-proxy doctor [--live]` (alias: `test`)
 
 Diagnoses the whole path and exits non-zero on any failure. Read-only by default;
@@ -627,6 +638,24 @@ don't shrink `COPILOT_SHIM_PING_AFTER_MS` to zero.
 filled in when an agent finishes. Check `agent-<id>.jsonl` for growing
 `assistant` entries first. Full diagnosis:
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md).
+
+### An old shim build wedges the port instead of being replaced
+
+`_copilot_shim_alive` probes `/_shim/health` rather than merely connecting, so
+an arbitrary process — or an **older build of the shim** — cannot pass as a
+healthy metrics shim. An older build proxies that path upstream, so `:4141`
+answers `404` and the probe correctly says "dead" while the OS still says
+"occupied". Startup used to read "dead" as "port free" and spawn a process that
+died instantly with `EADDRINUSE`, leaving every managed launcher failing closed
+against a shim that was in fact running.
+
+`_copilot_shim_start` now reads the port directly (`lsof -tiTCP -sTCP:LISTEN`):
+a listener whose command line matches `copilot-throttle-shim.js` is ours and
+gets reclaimed; anything else is named (PID + command) and the start refuses,
+because killing an unrelated process on a well-known port is not its call. Use
+`COPILOT_SHIM_PORT` to move out of the way instead. The fingerprint to look for
+is a flood of `GET /_shim/health 404` in the **proxy's** log
+([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-shim-eaddrinuse-stale-build.md)).
 
 ### The fork has no rate limiter
 
