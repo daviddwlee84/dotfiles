@@ -78,7 +78,7 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 
 | 層 | 擁有者 | 為什麼代理設定「不能」放這裡 |
 |---|---|---|
-| `~/.claude/settings.json` | chezmoi（`dot_claude/modify_settings.json.tmpl`） | 會讓 *每個* 專案永遠走代理；還會跟 chezmoi 的合併打架 |
+| `~/.claude/settings.json` | chezmoi（`dot_claude/modify_settings.json.tmpl`） | 會讓 *每個* 專案永遠走代理；還會跟 chezmoi 的合併打架。頂層 `model` 不得保留只供代理使用的 GPT/Gemini id。 |
 | `./.claude/settings.json` | `claude-plans-here`（`plansDirectory`） | 會 commit 進 git —— 代理設定會外洩給整個團隊 |
 
 所以代理使用沒人佔用的兩層：
@@ -93,6 +93,13 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 ~/.claude/settings.json          .claude/settings.json         .claude/settings.local.json      shell env
 (chezmoi: hooks/plugins)    <    (git: plansDirectory)     <   (copilot-here on/off)        <   (claude-copilot)
 ```
+
+上游有一個 UI 動作會跨越這個 ownership：在 Claude Code `/model` 選單按 **Enter**
+代表「設為預設」，會把 custom id 寫進 `~/.claude/settings.json`。這個寫入不會隨
+per-process launcher 結束，也不會被原本的 `copilot-here off` 移除。因此 launcher 現在只
+guard 頂層 `model`：結束時移除 proxy-only 值，或還原原本的 native 值；hooks/plugins/
+permissions 與 session 中其他合法設定變更全部保留。即使 local pin 檔本來就不存在，
+`copilot-here off` 也會清除殘留的 proxy-only user model。
 
 ## Shell helpers
 
@@ -271,7 +278,9 @@ ChatGPT MCP，不是只供 Apple Silicon Codex Desktop 使用的 bridge。
   生效的原因 —— 這兩者以前行為並不一致，詳見
   [`pitfalls/specstory-custom-command-drops-configured-flags.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-custom-command-drops-configured-flags.md)。
   `--no-specstory` 刻意不繼承（既然退出 specstory，就一併退出它的設定）。
-- 還原 = 不用還原；下次直接跑 `claude` 完全不受影響。
+- 還原 = 不用手動還原；下次直接跑 `claude` 完全不受影響。Claude Code 自己仍可能在
+  `/model` + **Enter** 時寫入一個全域 key；EXIT guard 會在正常、非零或 Ctrl-C 結束時
+  移除 proxy-only 值或還原先前的 native default，session 中其他設定變更不回滾。
 
 ### `claude-copilot-once [--no-specstory] [claude args...]` —— 一次性釘選 session
 
@@ -394,8 +403,12 @@ host 不具可攜性。因此正式 helper 沿用已認證的 localhost gateway�
   *它自己* 建立的檔案）。會 commit 的 `.claude/settings.json`（`plansDirectory`
   等）完全不碰。
 - `off` —— 只移除 `on` 加入的那些 env key；你自己放進 `settings.local.json`
-  的其他內容會保留，檔案清空時才刪除。
-- `status` —— 有沒有釘選？base URL / 模型是什麼？代理沒在跑時會警告。
+  的其他內容會保留，檔案清空時才刪除。也會清掉 `~/.claude/settings.json` 中意外持久化的
+  proxy-only 頂層 `model`，包含「local pin 本來就已經 off」的情況。
+- `status` —— 有沒有釘選？base URL / 模型是什麼？代理沒在跑時會警告；接著列出唯讀的
+  **plain Claude launch audit**：user/project/local settings、繼承的 model/base env，以及現在
+  啟動會採用的 backend/model；也會列出仍在跑、必須重啟才會重讀磁碟設定的 Claude PID。
+  若是 native Anthropic backend 搭配 proxy-only user model，會直接標出問題與清理指令。
 
 ### `copilot-model [<id>|-l|-c|--auto]`
 
@@ -625,16 +638,23 @@ GPT-5.6 path 會壓掉這個不相容欄位，改依 Responses reasoning/context
 
 ### 不要使用 Claude Code 內建的 `/model` 選單
 
-它送出的是 Anthropic 的 *官方* 帶日期 id（例如 `claude-opus-4-8-YYYYMMDD`），會被 Copilot
-後端拒絕：
+這裡其實有兩個不同陷阱：
+
+1. 按 **Enter** 代表「設為預設」，不是「只用於本 session」（後者是 `s`）。Claude Code
+   會把 custom proxy id 寫入 `~/.claude/settings.json` 的頂層 `model`。沒有 guard 時，之後
+   即使 `copilot-here off`、也沒有 `ANTHROPIC_*` env，`specstory run claude` 仍會顯示
+   GPT/Terra/Luna。
+2. 選內建 Anthropic 項目時可能送出 *官方* 帶日期 id（例如
+   `claude-opus-4-8-YYYYMMDD`），會被 Copilot 後端拒絕：
 
 ```
 API Error: 400 {"error":{"message":"The requested model is not supported.",
 "code":"model_not_supported", ...}}
 ```
 
-改用 `copilot-model` 釘選模型 —— 不帶日期的連字號 id（`claude-opus-4-8`）可以正常運作，
-只有選單送出的帶日期 id 會失敗。
+改用 `copilot-model` 釘選代理模型 —— 不帶日期的連字號 id（`claude-opus-4-8`）可以正常
+運作，只有選單送出的帶日期 id 會失敗。不用啟動 Claude Code，也可以用
+`copilot-here status` 看目前各層與實際生效的 backend/model。
 
 ### 點號 id 會造成「Opus 4 retired」警告與 >100% 的 context HUD
 

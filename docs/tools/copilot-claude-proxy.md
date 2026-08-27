@@ -89,7 +89,7 @@ Two of those layers are already owned by other tooling and must stay clean:
 
 | Layer | Owner | Why proxy config must NOT go here |
 |---|---|---|
-| `~/.claude/settings.json` | chezmoi (`dot_claude/modify_settings.json.tmpl`) | always-on for *every* project; fights the chezmoi merge |
+| `~/.claude/settings.json` | chezmoi (`dot_claude/modify_settings.json.tmpl`) | always-on for *every* project; fights the chezmoi merge. Its top-level `model` must not hold a proxy-only GPT/Gemini id. |
 | `./.claude/settings.json` | `claude-plans-here` (`plansDirectory`) | committed to git — proxy config would leak to the team |
 
 So the proxy uses the two layers nobody else owns:
@@ -108,6 +108,15 @@ So the proxy uses the two layers nobody else owns:
 (Shell env still beats the user- and project-level settings files, so
 `claude-copilot` works everywhere `copilot-here` is off — it just cannot
 *override* an active `copilot-here` pin.)
+
+One upstream UI action crosses those ownership boundaries: pressing **Enter**
+in Claude Code's `/model` picker means "set as default" and writes the selected
+custom id to `~/.claude/settings.json`. That write survives both a per-process
+launcher and `copilot-here off`. The launchers therefore guard only the
+top-level `model` key: a proxy-only value is removed (or the previous native
+value restored) on exit, while hooks/plugins/permissions and every other live
+setting are preserved. `copilot-here off` also cleans a stale proxy-only user
+model even when no local pin file exists.
 
 ## Shell helpers
 
@@ -323,6 +332,10 @@ project-level settings files — but **not** an active `copilot-here` pin in
   `--no-specstory` deliberately does *not* inherit it (opting out of specstory
   opts out of its config too).
 - Revert = nothing to revert; plain `claude` next time is untouched.
+- Claude Code itself can still write one global key: `/model` + **Enter** saves
+  the highlighted custom id to `~/.claude/settings.json`. An EXIT guard removes
+  that proxy-only value or restores the prior native default, including on a
+  non-zero/Ctrl-C exit. Other settings changed during the session are retained.
 
 ### `claude-copilot-once [--no-specstory] [claude args...]` — one-shot pinned session
 
@@ -465,9 +478,16 @@ so plain `claude` (and `scode`/`svibe` panes, which just run
   `.claude/settings.json` (`plansDirectory` etc.) is never touched.
 - `off` — removes exactly the env keys `on` added; other content you put in
   `settings.local.json` survives, and the file is deleted if it becomes empty.
+  It also removes a proxy-only top-level `model` accidentally persisted in
+  `~/.claude/settings.json`, including the "already off" case.
 - `status` — pinned? which base URL / model? Flags a **stale** pin (model/base
   drifted from the current defaults) with the exact diff and a `copilot-here on`
-  refresh hint, and warns when the proxy isn't running.
+  refresh hint, and warns when the proxy isn't running. It then prints a
+  read-only **plain Claude launch audit**: user/project/local settings, inherited
+  model/base env, the effective backend/model, and any already-running Claude
+  PIDs that must restart before they can see disk changes. A native Anthropic
+  backend paired with a proxy-only user model is called out with the cleanup
+  command.
 
 ### `copilot-model [<id>|-l|-c|--auto]`
 
@@ -750,16 +770,24 @@ behavior remains a compatibility surface to watch.
 
 ### Do not use Claude Code's `/model` picker
 
-It sends Anthropic's *official* dated ids (e.g. `claude-opus-4-8-YYYYMMDD`),
-which the Copilot backend rejects:
+There are two separate traps:
+
+1. Pressing **Enter** means "set as default", not "this session only" (`s`).
+   Claude Code writes the custom proxy id to the top-level `model` in
+   `~/.claude/settings.json`. Without the launcher guard, later
+   `specstory run claude` sessions keep showing GPT/Terra/Luna even after
+   `copilot-here off` and with no `ANTHROPIC_*` env.
+2. Picking a built-in Anthropic entry can send an *official* dated id (e.g.
+   `claude-opus-4-8-YYYYMMDD`), which the Copilot backend rejects:
 
 ```
 API Error: 400 {"error":{"message":"The requested model is not supported.",
 "code":"model_not_supported", ...}}
 ```
 
-Pin the model with `copilot-model` instead — undated hyphenated ids
-(`claude-opus-4-8`) work; only the picker's dated ids fail.
+Pin the proxy model with `copilot-model` instead — undated hyphenated ids
+(`claude-opus-4-8`) work; only the picker's dated ids fail. Diagnose the current
+launch without opening Claude Code via `copilot-here status`.
 
 ### Dotted ids cause the "[Opus 4] retired" warning and a >100% context HUD
 

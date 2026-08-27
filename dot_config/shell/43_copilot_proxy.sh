@@ -1665,7 +1665,177 @@ EOF
   esac
 }
 
-# --- session wrapper (Layer 1: one-off, zero file writes) ------------------------
+# --- session wrapper (Layer 1: one-off, guarded user-model state) ----------------
+
+# Claude Code's `/model` picker says "Enter to set as default" and writes the
+# selected custom model to ~/.claude/settings.json. That user-level key outlives
+# both the per-process env used by claude-copilot and the settings.local.json pin
+# removed by copilot-here off. The result is a plain/native Claude session whose
+# model menu still says `gpt-*` even though no proxy env remains.
+#
+# Guard only the single foreign-written `.model` key. Hooks, plugins, permissions,
+# and every other user setting may legitimately change while Claude is running and
+# must survive. A pre-existing proxy-only value is treated as stale (no baseline),
+# while a native value such as `sonnet` is restored if `/model` overwrites it.
+_copilot_claude_settings_file() {
+  printf '%s' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+}
+
+_copilot_model_value_is_proxy_only() {
+  local value="${1:-}" state_value=""
+  [ -n "$value" ] || return 1
+
+  # The state file is the durable source used by copilot-run / copilot-here.
+  # Compare with and without Claude Code's display-only [1m] suffix.
+  if [ -f "$(_copilot_model_state)" ]; then
+    state_value="$(command head -n 1 "$(_copilot_model_state)" 2>/dev/null)"
+    if [ "$value" = "$state_value" ] \
+       || [ "${value%\[1m\]}" = "${state_value%\[1m\]}" ]; then
+      return 0
+    fi
+  fi
+
+  # OpenAI/Gemini ids are custom-provider values, not valid native Anthropic
+  # defaults. Do NOT classify every [1m] suffix as proxy-only: native Claude
+  # subscriptions also expose explicit 1M model choices. A Claude id is cleaned
+  # only when it exactly matches the proxy state-file pin above.
+  case "$value" in
+    gpt-*|gemini-*) return 0 ;;
+  esac
+  return 1
+}
+
+_copilot_model_guard_begin() {
+  _copilot_model_guard_file="$(_copilot_claude_settings_file)"
+  _copilot_model_guard_had_native=0
+  _copilot_model_guard_native_json=''
+  _copilot_model_guard_changed=0
+
+  [ -f "$_copilot_model_guard_file" ] || return 0
+  jq -e 'has("model")' "$_copilot_model_guard_file" >/dev/null 2>&1 || return 0
+
+  local value
+  value="$(jq -r '.model | strings' "$_copilot_model_guard_file" 2>/dev/null)"
+  if ! _copilot_model_value_is_proxy_only "$value"; then
+    _copilot_model_guard_native_json="$(jq -c '.model' "$_copilot_model_guard_file" 2>/dev/null)" || return 1
+    _copilot_model_guard_had_native=1
+  fi
+}
+
+_copilot_model_guard_restore() {
+  local settings="${_copilot_model_guard_file:-$(_copilot_claude_settings_file)}"
+  [ -f "$settings" ] || return 0
+  jq -e 'has("model")' "$settings" >/dev/null 2>&1 || return 0
+
+  local current tmp
+  current="$(jq -r '.model | strings' "$settings" 2>/dev/null)"
+  _copilot_model_value_is_proxy_only "$current" || return 0
+
+  tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-claude-model.XXXXXX")" || return 1
+  if [ "${_copilot_model_guard_had_native:-0}" = "1" ]; then
+    if jq --argjson model "$_copilot_model_guard_native_json" '.model = $model' "$settings" >"$tmp"; then
+      command mv -- "$tmp" "$settings"
+      _copilot_model_guard_changed=1
+      printf '%s\n' "copilot-proxy: restored native user model in $settings"
+      return 0
+    fi
+  else
+    if jq 'del(.model)' "$settings" >"$tmp"; then
+      command mv -- "$tmp" "$settings"
+      _copilot_model_guard_changed=1
+      printf '%s\n' "copilot-proxy: removed stale proxy model from $settings"
+      return 0
+    fi
+  fi
+
+  command rm -f -- "$tmp"
+  printf '%s\n' "copilot-proxy: could not restore $settings; model key left unchanged" >&2
+  return 1
+}
+
+_copilot_clean_stale_user_model() {
+  _copilot_model_guard_begin || return 1
+  _copilot_model_guard_restore
+}
+
+# Explain the launch that would result from running plain `claude` in the
+# current directory, without exposing auth tokens. This keeps the four relevant
+# sources in one diagnostic instead of making the user inspect user/project/local
+# JSON plus inherited env by hand.
+_copilot_claude_launch_report() {
+  local user_settings project_settings local_settings
+  local user_model user_base user_env_model
+  local project_model project_base project_env_model
+  local local_model local_base local_env_model
+  local shell_base shell_model effective_base effective_base_source
+  local effective_model effective_model_source backend running_count
+
+  user_settings="$(_copilot_claude_settings_file)"
+  project_settings=".claude/settings.json"
+  local_settings=".claude/settings.local.json"
+
+  user_model=''; user_base=''; user_env_model=''
+  project_model=''; project_base=''; project_env_model=''
+  local_model=''; local_base=''; local_env_model=''
+  if [ -f "$user_settings" ]; then
+    user_model="$(jq -r '.model | strings' "$user_settings" 2>/dev/null)"
+    user_base="$(jq -r '.env.ANTHROPIC_BASE_URL | strings' "$user_settings" 2>/dev/null)"
+    user_env_model="$(jq -r '.env.ANTHROPIC_MODEL | strings' "$user_settings" 2>/dev/null)"
+  fi
+  if [ -f "$project_settings" ]; then
+    project_model="$(jq -r '.model | strings' "$project_settings" 2>/dev/null)"
+    project_base="$(jq -r '.env.ANTHROPIC_BASE_URL | strings' "$project_settings" 2>/dev/null)"
+    project_env_model="$(jq -r '.env.ANTHROPIC_MODEL | strings' "$project_settings" 2>/dev/null)"
+  fi
+  if [ -f "$local_settings" ]; then
+    local_model="$(jq -r '.model | strings' "$local_settings" 2>/dev/null)"
+    local_base="$(jq -r '.env.ANTHROPIC_BASE_URL | strings' "$local_settings" 2>/dev/null)"
+    local_env_model="$(jq -r '.env.ANTHROPIC_MODEL | strings' "$local_settings" 2>/dev/null)"
+  fi
+  shell_base="${ANTHROPIC_BASE_URL:-}"
+  shell_model="${ANTHROPIC_MODEL:-}"
+
+  # Verified Claude Code precedence for env blocks on this setup:
+  # user settings < project settings < inherited shell env < settings.local.
+  if [ -n "$local_base" ]; then effective_base="$local_base"; effective_base_source="$local_settings env"
+  elif [ -n "$shell_base" ]; then effective_base="$shell_base"; effective_base_source="shell env"
+  elif [ -n "$project_base" ]; then effective_base="$project_base"; effective_base_source="$project_settings env"
+  elif [ -n "$user_base" ]; then effective_base="$user_base"; effective_base_source="$user_settings env"
+  else effective_base=''; effective_base_source="Anthropic default"; fi
+
+  if [ -n "$local_env_model" ]; then effective_model="$local_env_model"; effective_model_source="$local_settings env"
+  elif [ -n "$shell_model" ]; then effective_model="$shell_model"; effective_model_source="shell env"
+  elif [ -n "$project_env_model" ]; then effective_model="$project_env_model"; effective_model_source="$project_settings env"
+  elif [ -n "$user_env_model" ]; then effective_model="$user_env_model"; effective_model_source="$user_settings env"
+  elif [ -n "$local_model" ]; then effective_model="$local_model"; effective_model_source="$local_settings model"
+  elif [ -n "$project_model" ]; then effective_model="$project_model"; effective_model_source="$project_settings model"
+  elif [ -n "$user_model" ]; then effective_model="$user_model"; effective_model_source="$user_settings model"
+  else effective_model="account/default"; effective_model_source="no explicit model"; fi
+
+  if [ -z "$effective_base" ]; then backend="Anthropic"
+  elif printf '%s' "$effective_base" | command grep -Eq 'localhost|127\.0\.0\.1'; then backend="local/custom proxy"
+  else backend="custom Anthropic-compatible endpoint"; fi
+
+  printf '\n%s\n' "Plain Claude launch audit (cwd: $PWD)"
+  printf '  %-16s model=%s  env-model=%s  base=%s\n' "user settings" \
+    "${user_model:-unset}" "${user_env_model:-unset}" "${user_base:-unset}"
+  printf '  %-16s model=%s  env-model=%s  base=%s\n' "project settings" \
+    "${project_model:-unset}" "${project_env_model:-unset}" "${project_base:-unset}"
+  printf '  %-16s model=%s  env-model=%s  base=%s\n' "local settings" \
+    "${local_model:-unset}" "${local_env_model:-unset}" "${local_base:-unset}"
+  printf '  %-16s model=%s  base=%s\n' "shell env" "${shell_model:-unset}" "${shell_base:-unset}"
+  printf '  %-16s %s (%s)\n' "effective backend" "$backend" "$effective_base_source"
+  printf '  %-16s %s (%s)\n' "effective model" "$effective_model" "$effective_model_source"
+
+  running_count="$(command pgrep -x claude 2>/dev/null | command wc -l | command tr -d ' ')"
+  if [ "${running_count:-0}" -gt 0 ] 2>/dev/null; then
+    printf '  %-16s %s process(es) (restart relevant sessions to apply changes)\n' "running Claude" "$running_count"
+  fi
+
+  if [ -z "$effective_base" ] && _copilot_model_value_is_proxy_only "$effective_model"; then
+    printf '%s\n' "  ⚠ native Anthropic backend with a proxy-only model default; run: copilot-here off"
+  fi
+}
 
 # Run any command with the copilot-proxy env injected (per-process only —
 # nothing is written to disk). Auto-starts the proxy when it isn't answering.
@@ -1982,8 +2152,10 @@ _copilot_shquote() {
   printf "'%s'" "$(printf '%s' "${1:-}" | command sed "s/'/'\\\\''/g")"
 }
 
-# One-off Claude Code session backed by the Copilot proxy. Nothing on disk
-# changes — revert is just running plain `claude` next time.
+# One-off Claude Code session backed by the Copilot proxy. The launcher itself
+# writes no user config; if Claude Code's `/model` picker writes its custom model
+# to ~/.claude/settings.json, a subshell EXIT guard restores only that `.model`
+# key (including Ctrl-C/non-zero exits) while preserving every unrelated change.
 # Wraps in `specstory run` when specstory is installed (markdown auto-save,
 # same convention as scode/svibe); opt out with --no-specstory. Extra args go
 # to the claude CLI via specstory's -c "custom command" passthrough, appended to
@@ -2004,22 +2176,27 @@ claude-copilot() {
       printf '%s\n' "  Sticky per-project instead: copilot-here on"
       return 0 ;;
   esac
-  if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
-    if [ "$#" -gt 0 ]; then
-      # Rebuild what `-c` clobbers: the configured base command (ITS flags left
-      # unquoted so specstory splits them normally) + each of our args quoted.
-      local _cc_cmd _cc_arg
-      _cc_cmd="$(_copilot_specstory_claude_cmd)"
-      for _cc_arg in "$@"; do
-        _cc_cmd="$_cc_cmd $(_copilot_shquote "$_cc_arg")"
-      done
-      copilot-run specstory run claude -c "$_cc_cmd"
+  (
+    _copilot_model_guard_begin || exit 1
+    trap '_copilot_model_guard_restore' EXIT
+
+    if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
+      if [ "$#" -gt 0 ]; then
+        # Rebuild what `-c` clobbers: the configured base command (ITS flags left
+        # unquoted so specstory splits them normally) + each of our args quoted.
+        local _cc_cmd _cc_arg
+        _cc_cmd="$(_copilot_specstory_claude_cmd)"
+        for _cc_arg in "$@"; do
+          _cc_cmd="$_cc_cmd $(_copilot_shquote "$_cc_arg")"
+        done
+        copilot-run specstory run claude -c "$_cc_cmd"
+      else
+        copilot-run specstory run claude
+      fi
     else
-      copilot-run specstory run claude
+      copilot-run claude "$@"
     fi
-  else
-    copilot-run claude "$@"
-  fi
+  )
 }
 
 # --- per-project toggle (Layer 2: sticky, gitignored settings.local.json) --------
@@ -2135,6 +2312,7 @@ copilot-here() {
       ;;
     off)
       if [ ! -f "$settings" ]; then
+        _copilot_clean_stale_user_model || return 1
         printf '%s\n' "copilot-here: already off (no $settings)"
         return 0
       fi
@@ -2151,6 +2329,7 @@ copilot-here() {
           command mv -- "$tmp" "$settings"
           printf '%s\n' "copilot-here: OFF — proxy env removed from $settings (other content kept)"
         fi
+        _copilot_clean_stale_user_model || return 1
         printf '%s\n' "  plain \`claude\` is back on the real Anthropic backend (restart any running session)"
       else
         command rm -f -- "$tmp"
@@ -2159,6 +2338,7 @@ copilot-here() {
       fi
       ;;
     status)
+      local _status_rc=0
       if [ -f "$settings" ] && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" != "" ]; then
         printf '%s\n' "copilot-here: ON  (base: $(jq -r '.env.ANTHROPIC_BASE_URL' "$settings"), model: $(jq -r '.env.ANTHROPIC_MODEL // "(unset)"' "$settings"))"
         local _drift; _drift="$(_copilot_here_drift)"
@@ -2166,8 +2346,10 @@ copilot-here() {
         _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
       else
         printf '%s\n' "copilot-here: off  (enable: copilot-here on; one-off: claude-copilot)"
-        return 1
+        _status_rc=1
       fi
+      _copilot_claude_launch_report
+      return "$_status_rc"
       ;;
     -h|--help|help)
       printf '%s\n' "Usage: copilot-here [on|off|status]   (toggles ./.claude/settings.local.json)"

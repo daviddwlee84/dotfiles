@@ -241,3 +241,4 @@ if their original location stops being a natural reading flow.
 | fleet-apply process substitution + sentinel ordering | `AGENTS.md` Hard invariant → "fleet-apply semantics" | Graduated to invariant |
 | Sudo session `sudo -k` invalidates shared cache | `AGENTS.md` Hard invariant → "Sudo session" | Graduated to invariant |
 | chezmoi `modify_settings.json` overlay vs Claude live edits | `docs/tools/agent-overlays.md` | Part of overlay design rationale |
+| `copilot-here off` says already off but `/model` still shows `gpt-5.6-sol[1m]` / Terra / Luna | `docs/tools/copilot-claude-proxy.md` → "Do not use Claude Code's `/model` picker" | The launcher guard and four-layer launch audit are part of the proxy's normal settings design |

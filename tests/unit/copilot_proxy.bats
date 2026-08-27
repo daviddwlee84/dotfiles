@@ -666,6 +666,140 @@ SH
   [ "$output" = "4" ]
 }
 
+# Claude Code's `/model` picker writes its selection to the user-level
+# settings.json even when the proxy itself was injected only for one process.
+# The launchers must clean that one key without rolling back unrelated settings.
+
+@test "claude-copilot removes a proxy model persisted by the model picker" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
+  printf '%s\n' '{"pluginState":"before"}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' 'gpt-test[1m]' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    source '$SHELL_LIB'
+    copilot-run() {
+      tmp=\"\$(mktemp)\"
+      jq '.model = \"gpt-test[1m]\" | .pluginState = \"changed-during-session\"' \
+        \"\$HOME/.claude/settings.json\" >\"\$tmp\" && mv \"\$tmp\" \"\$HOME/.claude/settings.json\"
+    }
+    claude-copilot --no-specstory"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r 'has("model")' "$TMP/home/.claude/settings.json")" = "false" ]
+  [ "$(jq -r '.pluginState' "$TMP/home/.claude/settings.json")" = "changed-during-session" ]
+  [[ "$output" == *"removed stale proxy model"* ]]
+}
+
+@test "claude-copilot restores a native default after proxy model persistence and keeps exit status" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
+  printf '%s\n' '{"model":"sonnet","other":1}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    source '$SHELL_LIB'
+    copilot-run() {
+      tmp=\"\$(mktemp)\"
+      jq '.model = \"gpt-test\" | .other = 2' \"\$HOME/.claude/settings.json\" \
+        >\"\$tmp\" && mv \"\$tmp\" \"\$HOME/.claude/settings.json\"
+      return 7
+    }
+    claude-copilot --no-specstory"
+  [ "$status" -eq 7 ]
+  [ "$(jq -r '.model' "$TMP/home/.claude/settings.json")" = "sonnet" ]
+  [ "$(jq -r '.other' "$TMP/home/.claude/settings.json")" = "2" ]
+  [[ "$output" == *"restored native user model"* ]]
+}
+
+@test "claude-copilot leaves a native model deliberately selected during the session" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
+  printf '%s\n' '{"model":"sonnet","other":1}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    source '$SHELL_LIB'
+    copilot-run() {
+      tmp=\"\$(mktemp)\"
+      jq '.model = \"opus\" | .other = 2' \"\$HOME/.claude/settings.json\" \
+        >\"\$tmp\" && mv \"\$tmp\" \"\$HOME/.claude/settings.json\"
+    }
+    claude-copilot --no-specstory"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.model' "$TMP/home/.claude/settings.json")" = "opus" ]
+  [ "$(jq -r '.other' "$TMP/home/.claude/settings.json")" = "2" ]
+  [ -z "$output" ]
+}
+
+@test "copilot-here off cleans stale user model even when no local pin exists" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy" "$TMP/proj"
+  printf '%s\n' '{"model":"gpt-test","other":1}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    cd '$TMP/proj'
+    source '$SHELL_LIB'
+    copilot-here off"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r 'has("model")' "$TMP/home/.claude/settings.json")" = "false" ]
+  [ "$(jq -r '.other' "$TMP/home/.claude/settings.json")" = "1" ]
+  [[ "$output" == *"removed stale proxy model"* ]]
+  [[ "$output" == *"already off"* ]]
+}
+
+@test "copilot-here off preserves an explicit native Claude 1M user model" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy" "$TMP/proj"
+  printf '%s\n' '{"model":"claude-opus-5[1m]","other":1}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    cd '$TMP/proj'
+    source '$SHELL_LIB'
+    copilot-here off"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.model' "$TMP/home/.claude/settings.json")" = "claude-opus-5[1m]" ]
+  [ "$(jq -r '.other' "$TMP/home/.claude/settings.json")" = "1" ]
+  [[ "$output" != *"removed stale proxy model"* ]]
+}
+
+@test "copilot-here status audits every Claude settings layer and effective launch" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy" "$TMP/proj/.claude"
+  printf '%s\n' '{"model":"sonnet"}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' '{"plansDirectory":"./.claude/plans"}' > "$TMP/proj/.claude/settings.json"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    cd '$TMP/proj'
+    source '$SHELL_LIB'
+    copilot-here status"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Plain Claude launch audit"* ]]
+  [[ "$output" == *"user settings"*"model=sonnet"* ]]
+  [[ "$output" == *"project settings"*"model=unset"* ]]
+  [[ "$output" == *"local settings"*"model=unset"* ]]
+  [[ "$output" == *"effective backend Anthropic"* ]]
+  [[ "$output" == *"effective model  sonnet"* ]]
+}
+
+@test "Claude launch audit warns on a native backend with proxy-only user model" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy" "$TMP/proj"
+  printf '%s\n' '{"model":"gpt-test"}' > "$TMP/home/.claude/settings.json"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    cd '$TMP/proj'
+    source '$SHELL_LIB'
+    _copilot_claude_launch_report"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"effective backend Anthropic"* ]]
+  [[ "$output" == *"effective model  gpt-test"* ]]
+  [[ "$output" == *"native Anthropic backend with a proxy-only model default"* ]]
+}
+
 @test "explicit shim off is a direct-mode break-glass route" {
   run bash -c "export XDG_STATE_HOME='$TMP/state'; mkdir -p '$TMP/state/copilot-proxy'; printf 'off\n' >'$TMP/state/copilot-proxy/shim'; source '$SHELL_LIB';
     _copilot_shim_alive() { return 1; }
