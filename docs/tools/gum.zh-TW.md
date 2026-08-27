@@ -11,7 +11,8 @@
   - macOS — Homebrew（由 `dot_ansible/roles/devtools/tasks/main.yml` 的 macOS 列表管理）
   - Linux — 從 GitHub release tarball 安裝到 `~/.local/bin/gum`（由 `dot_ansible/roles/devtools/tasks/main.yml` 的 `# --- gum (Charm) ---` 區塊管理）
 - **驗證**：`gum --version`
-- **目前在這個 repo 的狀態**：已安裝、尚未接到既有腳本。詳見下方「[未來改造可放的位置](#-future-refactors)」。
+- **目前在這個 repo 的狀態**：已接進 `ssh-setup-remote`（`dot_config/shell/96_ssh_setup.sh`）與 `media-pick`
+  （`dot_config/shell/29_media.sh`），其餘仍在清單上。詳見下方「[未來改造可放的位置](#-future-refactors)」。
 
 ---
 
@@ -123,6 +124,13 @@ ZLE 鍵綁定（`Ctrl+T`、`Ctrl+R`）還是用 `fzf` 比較對 — 它的 previ
 | `dot_config/tmux/executable_menu.sh` | tier-based `display-menu`（~14 列上限） | `gum choose --height N` |
 | `dot_config/tmux/executable_menu-theme.sh` | 2 列 `display-menu` | `gum choose "catppuccin" "tmux2k"` |
 | `scripts/import_ssh_to_bw.sh` | `read -r choice` + 手動解析 | `gum choose --no-limit` + `gum confirm` |
+
+已經換過的，可以直接照抄：
+
+| 檔案 | 做法 |
+|---|---|
+| `dot_config/shell/96_ssh_setup.sh` | 金鑰選擇用 `gum choose`，其餘提示用 `gum confirm` / `gum input`。三層防護：只有在有終端機時才用 gum、`SSH_SETUP_NO_GUM=1` 可停用、沒有 gum 時退回 bash `read -e` / zsh `vared`，方向鍵一樣能用。必須保持選用性——`tsnet --setup-remote` 會用單純的 `bash -c` source 這個檔案。 |
+| `dot_config/shell/29_media.sh` | 用 `command -v gum` 包住 `gum file` / `gum choose` / `gum input`。 |
 | `scripts/upgrade_tools.sh` | 只接 CLI 參數 | 沒帶參時 `gum choose --no-limit` 多選類別 |
 
 不要批次重構 — 既有腳本都能用，且 tmux 整合有微妙的 invariant（見 `CLAUDE.md` →「Tmux ≥ 3.3 required for popup menu」）。一次改一個，且當你已因其他原因進到那個檔案時再做。

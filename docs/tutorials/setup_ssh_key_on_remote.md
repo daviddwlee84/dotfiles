@@ -309,6 +309,26 @@ can also do it manually ahead of time: `ssh-keygen -y -f ~/.ssh/some_key > ~/.ss
 
 ## Troubleshooting
 
+### The wizard says "Could not identify the remote OS" and then fails
+
+Almost always a **transport** failure being reported as a remote-OS problem.
+The usual cause on macOS is a `ControlPath` that overflows the 104-byte
+`sockaddr_un` limit, which makes `ssh` exit 255 before it opens a socket:
+
+```console
+ControlPath too long ('/var/folders/…/ssh-setup.XXXXXX/03d4906e…' >= 104 bytes)
+```
+
+Current `ssh-setup-remote` bounds the socket path and prints ssh's real stderr
+instead of swallowing it, so the message above appears directly. To rule
+multiplexing out entirely:
+
+```bash
+SSH_SETUP_NO_MUX=1 ssh-setup-remote <host>
+```
+
+See `pitfalls/ssh-controlpath-too-long-macos-tmpdir.md` for the full story.
+
 ### Remote Host Identification Has Changed
 
 If you see `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` when connecting, the server's host key no longer matches what's stored in `~/.ssh/known_hosts`. This commonly happens after reinstalling the OS or reprovisioning a server at the same IP.

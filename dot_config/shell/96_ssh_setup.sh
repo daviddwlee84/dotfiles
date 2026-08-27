@@ -13,6 +13,7 @@
 #   SSH_SETUP_ASSUME_YES=1  take every prompt's default (scripted re-runs, tests)
 #   SSH_SETUP_KEY=~/.ssh/x  skip the key picker and use this key
 #   SSH_SETUP_NO_MUX=1      do not open a ControlMaster per host
+#   SSH_SETUP_NO_GUM=1      plain prompts even where gum is installed
 #
 # Walks through: pick/create key → install the public key → copy the key pair to
 # the remote → add SSH config entries. It resolves the target's FULL ProxyJump
@@ -274,6 +275,155 @@ _ssh_setup_read() {
   IFS= read -r _SSH_SETUP_REPLY || _SSH_SETUP_REPLY=""
 }
 
+# ── Prompting ──────────────────────────────────────────────────────────────
+#
+# A bare `read -r` gives no line editing: pressing Left inserts a literal ^[[D
+# instead of moving the cursor, which makes fixing a typo in a long key path
+# impossible. Three layers, best first:
+#
+#   1. gum        -- arrow keys, editable defaults, a real picker for the key
+#                    list. Already installed and repo-managed here (ansible
+#                    devtools role, docs/tools/gum.md); strictly optional.
+#   2. readline / ZLE -- bash `read -e` (readline; works in a NON-interactive
+#                    bash as long as stdin is a tty, which is exactly how
+#                    `tsnet --setup-remote` invokes this file) or zsh `vared`
+#                    (needs an interactive shell for ZLE, hence the guard).
+#   3. plain `read` -- pipes, SSH_SETUP_ASSUME_YES, no tty.
+#
+# Opt out of gum with SSH_SETUP_NO_GUM=1.
+
+_ssh_setup_have_tty() { [ -t 0 ] && [ -t 1 ]; }
+
+_ssh_setup_use_gum() {
+  [ "${SSH_SETUP_ASSUME_YES:-0}" = "1" ] && return 1
+  [ "${SSH_SETUP_NO_GUM:-0}" = "1" ] && return 1
+  _ssh_setup_have_tty || return 1
+  command -v gum >/dev/null 2>&1
+}
+
+# Read one line into $_SSH_SETUP_REPLY with editing when available.
+# $1 prompt, $2 optional default (pre-filled and editable under gum/ZLE/bash>=4,
+# shown in brackets otherwise).
+_ssh_setup_edit_read() {
+  local prompt="$1" default="${2:-}"
+
+  if _ssh_setup_use_gum; then
+    _SSH_SETUP_REPLY="$(gum input --prompt "$prompt " --value "$default")" \
+      || _SSH_SETUP_REPLY="$default"
+    return 0
+  fi
+
+  if _ssh_setup_have_tty; then
+    if [ -n "${ZSH_VERSION:-}" ]; then
+      # vared drives ZLE, which only exists in an interactive zsh.
+      if [[ -o interactive ]]; then
+        _SSH_SETUP_REPLY="$default"
+        vared -p "$prompt " -c _SSH_SETUP_REPLY || _SSH_SETUP_REPLY="$default"
+        return 0
+      fi
+    elif [ -n "${BASH_VERSION:-}" ]; then
+      # `read -i` is bash >= 4; macOS still ships bash 3.2 as /bin/bash, where
+      # -i is a hard "invalid option" error, so fall back to a bracketed hint.
+      if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] && [ -n "$default" ]; then
+        IFS= read -e -r -p "$prompt " -i "$default" _SSH_SETUP_REPLY \
+          || _SSH_SETUP_REPLY="$default"
+        return 0
+      fi
+      local hint="$prompt "
+      [ -n "$default" ] && hint="$prompt [$default] "
+      IFS= read -e -r -p "$hint" _SSH_SETUP_REPLY || _SSH_SETUP_REPLY=""
+      [ -n "$_SSH_SETUP_REPLY" ] || _SSH_SETUP_REPLY="$default"
+      return 0
+    fi
+  fi
+
+  printf '%s ' "$prompt"
+  [ -n "$default" ] && printf '[%s] ' "$default"
+  _ssh_setup_read
+  [ -n "$_SSH_SETUP_REPLY" ] || _SSH_SETUP_REPLY="$default"
+}
+
+# Yes/no. $1 question, $2 default (yes|no, default yes). Returns 0 for yes.
+_ssh_setup_confirm() {
+  local q="$1" def="${2:-yes}"
+
+  if [ "${SSH_SETUP_ASSUME_YES:-0}" = "1" ]; then
+    printf '%s (%s)\n' "$q" "$def"
+    [ "$def" = "yes" ]
+    return
+  fi
+
+  if _ssh_setup_use_gum; then
+    if [ "$def" = "yes" ]; then
+      gum confirm --default "$q"
+    else
+      gum confirm --default=false "$q"
+    fi
+    return
+  fi
+
+  local hint="[Y/n]"
+  [ "$def" = "yes" ] || hint="[y/N]"
+  _ssh_setup_edit_read "$q $hint"
+  case "$_SSH_SETUP_REPLY" in
+    [Yy]*) return 0 ;;
+    [Nn]*) return 1 ;;
+    *)     [ "$def" = "yes" ] ;;
+  esac
+}
+
+# Free text with a default. $1 label, $2 default. Result in $_SSH_SETUP_REPLY.
+_ssh_setup_input() {
+  local label="$1" default="${2:-}"
+  if [ "${SSH_SETUP_ASSUME_YES:-0}" = "1" ]; then
+    _SSH_SETUP_REPLY="$default"
+    printf '%s: %s (default)\n' "$label" "$default"
+    return 0
+  fi
+  _ssh_setup_edit_read "$label:" "$default"
+}
+
+# Pick one of a list. $1 header, $2 default value, rest are the options.
+# Result in $_SSH_SETUP_REPLY.
+_ssh_setup_choose() {
+  local header="$1" default="$2"
+  shift 2
+
+  if [ "${SSH_SETUP_ASSUME_YES:-0}" = "1" ]; then
+    _SSH_SETUP_REPLY="$default"
+    printf '%s: %s (default)\n' "$header" "$default"
+    return 0
+  fi
+
+  if _ssh_setup_use_gum; then
+    local sel
+    sel="$(printf '%s\n' "$@" | gum choose --header "$header" --height 12 \
+             ${default:+--selected "$default"})" || sel=""
+    _SSH_SETUP_REPLY="${sel:-$default}"
+    return 0
+  fi
+
+  printf '%s\n' "$header"
+  local i=1 o
+  for o in "$@"; do
+    printf '  %d) %s\n' "$i" "$o"
+    i=$((i + 1))
+  done
+  _ssh_setup_edit_read "Choice [1-$#]"
+  case "$_SSH_SETUP_REPLY" in
+    ''|*[!0-9]*) _SSH_SETUP_REPLY="$default" ;;
+    *)
+      if [ "$_SSH_SETUP_REPLY" -ge 1 ] && [ "$_SSH_SETUP_REPLY" -le "$#" ]; then
+        # Index into the positional parameters -- uniform across bash (0-based
+        # arrays) and zsh (1-based arrays), which $@ indexing is not.
+        eval "_SSH_SETUP_REPLY=\${$_SSH_SETUP_REPLY}"
+      else
+        _SSH_SETUP_REPLY="$default"
+      fi
+      ;;
+  esac
+}
+
 # Split a ProxyJump hop spec ([user@]host[:port], possibly an [IPv6] literal)
 # into $_SSH_HOP_DEST + $_SSH_HOP_PORT. ssh-copy-id and scp reject "host:port",
 # so the port has to travel as a separate -p/-P flag.
@@ -349,17 +499,49 @@ _ssh_setup_chain() {
 # Walking a chain multiplies password prompts: probe + ssh-copy-id + scp +
 # chmod + config append is up to six connections PER HOP, and none of them can
 # use a key yet -- that is the whole point of the exercise. One ControlMaster
-# per host collapses that to a single password. %C (a hash) keeps the socket
-# path short enough for the ~104-byte sockaddr_un limit on macOS.
+# per host collapses that to a single password.
+#
+# The socket path is bounded, and that bound is load-bearing: it goes into a
+# sockaddr_un, which holds 104 bytes on macOS/BSD and 108 on Linux. %C expands
+# to a 40-char hash, and $TMPDIR on macOS is already ~49 bytes
+# (/var/folders/<2>/<26>/T/), so the obvious "$TMPDIR/ssh-setup.XXXXXX/%C" is
+# 107 bytes -- over the limit. ssh then fails EVERY connection with
+# `ControlPath too long` before it opens a socket, which reads downstream as
+# "the remote is unreachable/unidentifiable". See
+# pitfalls/ssh-controlpath-too-long-macos-tmpdir.md.
+#
+# So: try short bases first and verify the length rather than assuming it.
 # Opt out with SSH_SETUP_NO_MUX=1.
+
+# Longest directory we accept: dir + "/" + 40-char %C must stay under 104.
+_SSH_SETUP_MUX_MAXDIR=55
+
 _ssh_setup_mux_start() {
   _SSH_SETUP_MUX_PATH=""
   _SSH_SETUP_MUX_DIR=""
   _SSH_SETUP_MUX_HOSTS=""
   [ "${SSH_SETUP_NO_MUX:-0}" = "1" ] && return 0
   [ "${SSH_SETUP_ASSUME_YES:-0}" = "1" ] && return 0
-  _SSH_SETUP_MUX_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ssh-setup.XXXXXX")" || return 0
-  _SSH_SETUP_MUX_PATH="$_SSH_SETUP_MUX_DIR/%C"
+
+  local base dir
+  for base in /tmp "${TMPDIR:-/tmp}" "$HOME/.ssh"; do
+    [ -d "$base" ] && [ -w "$base" ] || continue
+    # Cheap pre-check so we do not create a directory we are going to reject.
+    [ "${#base}" -le "$_SSH_SETUP_MUX_MAXDIR" ] || continue
+    dir="$(mktemp -d "${base%/}/sshmux.XXXXXX" 2>/dev/null)" || continue
+    if [ "${#dir}" -le "$_SSH_SETUP_MUX_MAXDIR" ]; then
+      _SSH_SETUP_MUX_DIR="$dir"
+      _SSH_SETUP_MUX_PATH="$dir/%C"
+      return 0
+    fi
+    rmdir "$dir" 2>/dev/null
+  done
+
+  # Degrade rather than break: without a mux every step asks for the password
+  # again, which is annoying but works. A too-long ControlPath does not.
+  printf '%s\n' "Note: no short enough ControlPath under 104 bytes; running without" >&2
+  printf '%s\n' "connection multiplexing (expect a password prompt per step)." >&2
+  return 0
 }
 
 _ssh_setup_mux_stop() {
@@ -442,9 +624,7 @@ _ssh_setup_ensure_pubkey() {
   fi
 
   printf '\nNo public key next to %s.\n' "$key"
-  printf 'Regenerate it with `ssh-keygen -y`? [Y/n] '
-  _ssh_setup_read
-  if [[ "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
+  if ! _ssh_setup_confirm 'Regenerate it with `ssh-keygen -y`?' yes; then
     printf '%s\n' "ssh-copy-id needs ${key}.pub — aborting." >&2
     return 1
   fi
@@ -481,12 +661,71 @@ _ssh_setup_ps_encode() {
   fi
 }
 
+# Run a command, keeping its stderr instead of throwing it away: stdout is
+# echoed (CR-stripped), stderr lands in $_SSH_SETUP_LAST_ERR, and the real exit
+# status is returned. Every ssh in this wizard used to 2>/dev/null, which is
+# how a hard transport failure (rc=255, e.g. `ControlPath too long`) came out
+# looking like "the remote said nothing" -- see
+# pitfalls/ssh-controlpath-too-long-macos-tmpdir.md.
+#
+# The stderr sink is a FILE keyed on $$, not a variable: callers use
+# `out="$(_ssh_setup_capture ssh ...)"`, and a command substitution runs in a
+# subshell, so any variable this set there would be discarded before the caller
+# could read it. $$ stays the main shell's pid inside $( ) in both bash and zsh.
+_ssh_setup_errfile() {
+  printf '%s\n' "${TMPDIR:-/tmp}/sshsetup-err.$$"
+}
+
+# Start a fresh error record. Capture APPENDS, so a sequence of attempts
+# (uname probe, then PowerShell probe, then the install) accumulates into one
+# diagnosis instead of each attempt erasing the last one's reason.
+_ssh_setup_err_reset() {
+  local errf
+  errf="$(_ssh_setup_errfile)"
+  : >"$errf" 2>/dev/null || return 0
+}
+
+_ssh_setup_capture() {
+  local errf out rc
+  errf="$(_ssh_setup_errfile)"
+  [ -e "$errf" ] || : >"$errf" 2>/dev/null || errf="/dev/null"
+  out="$("$@" 2>>"$errf")"; rc=$?
+  printf '%s\n' "${out//$'\r'/}"
+  return "$rc"
+}
+
+# Print whatever the last captured command wrote to stderr, indented, if any.
+_ssh_setup_show_err() {
+  local errf
+  errf="$(_ssh_setup_errfile)"
+  [ -s "$errf" ] || return 0
+  sed 's/^/    /' <"$errf" >&2
+}
+
+# First non-empty line of the last captured stderr, for one-line messages.
+_ssh_setup_err_summary() {
+  local errf
+  errf="$(_ssh_setup_errfile)"
+  [ -s "$errf" ] || return 0
+  grep -v '^[[:space:]]*$' "$errf" 2>/dev/null | head -n 1
+}
+
+_ssh_setup_err_cleanup() {
+  local errf
+  errf="$(_ssh_setup_errfile)"
+  [ "$errf" = "/dev/null" ] || rm -f "$errf" 2>/dev/null
+}
+
 # stdin: PowerShell source. $1: destination, rest: ssh options.
+# Returns the ssh exit status; stderr is kept in $_SSH_SETUP_LAST_ERR.
 _ssh_setup_ps_run() {
   local dest="$1"; shift
   local enc
   enc="$(_ssh_setup_ps_encode)" || return 127
-  ssh "$@" "$dest" "powershell -NoProfile -NonInteractive -EncodedCommand $enc" 2>/dev/null | tr -d '\r'
+  # </dev/null: stdin is the (already drained) heredoc pipe; ssh must not try
+  # to forward it to the remote.
+  _ssh_setup_capture ssh "$@" "$dest" \
+    "powershell -NoProfile -NonInteractive -EncodedCommand $enc" </dev/null
 }
 
 # Escape a value for embedding in a PowerShell single-quoted string.
@@ -496,19 +735,29 @@ _ssh_setup_ps_quote() {
 }
 
 # What is at the far end? Echoes "posix", "windows admin=0", "windows admin=1",
-# or "unknown". `uname -s` is the cheap probe; it fails on a pwsh/cmd
-# DefaultShell, and only then do we pay for the PowerShell round trip.
+# "unreachable", or "unknown". `uname -s` is the cheap probe; it fails on a
+# pwsh/cmd DefaultShell, and only then do we pay for the PowerShell round trip.
 # whoami /groups rather than IsInRole(): a non-elevated admin token carries the
 # Administrators SID as deny-only, which IsInRole reports as false, while sshd
 # still routes that session through the administrators_authorized_keys rule.
+#
+# "unreachable" (ssh exited 255 -- it never reached a remote shell) is kept
+# distinct from "unknown" (we got a shell, it just did not identify itself).
+# Conflating them is what produced the misleading "Is this a Windows machine?"
+# question in front of a connection that was never going to work.
 _ssh_setup_probe_kind() {
   local dest="$1"; shift
-  local out
-  out="$(ssh "$@" -o ConnectTimeout=15 "$dest" 'uname -s' 2>/dev/null | tr -d '\r')"
+  local out rc
+  _ssh_setup_err_reset
+  out="$(_ssh_setup_capture ssh "$@" -o ConnectTimeout=15 "$dest" 'uname -s' </dev/null)"
   case "$out" in
     Linux*|Darwin*|*BSD*|SunOS*|AIX*|CYGWIN*|MINGW*|MSYS*) printf 'posix\n'; return 0 ;;
   esac
 
+  # Deliberately NOT short-circuiting on rc 255 here: a Windows box can fail
+  # `uname` that way too (it depends on the sshd DefaultShell), and calling
+  # such a host unreachable is the very confusion this function exists to
+  # avoid. Only give up once the PowerShell probe has also failed.
   out="$(_ssh_setup_ps_run "$dest" "$@" <<'PS'
 $ErrorActionPreference = 'SilentlyContinue'
 $g = (whoami /groups | Out-String)
@@ -516,9 +765,11 @@ $a = if ($g -match 'S-1-5-32-544') { '1' } else { '0' }
 Write-Output ("windows admin=" + $a + " user=" + $env:USERNAME)
 PS
 )"
+  rc=$?
   case "$out" in
     *windows*) printf '%s\n' "$out"; return 0 ;;
   esac
+  [ "$rc" -eq 255 ] && { printf 'unreachable\n'; return 0; }
   printf 'unknown\n'
 }
 
@@ -628,27 +879,54 @@ _ssh_setup_pick_key() {
     return 0
   fi
 
-  printf '\nExisting keys in ~/.ssh/:\n'
   local listing
   listing="$(_ssh_setup_list_keys)"
-  if [ -n "$listing" ]; then
-    printf '%s\n' "$listing" | sed 's/^/  /'
-    printf '\nUse an existing key? [Y/n] '
-    _ssh_setup_read
-    if [[ "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
-      create_new="yes"
-    else
-      printf 'Enter key path (without .pub): '
-      _ssh_setup_read
-      key_path="${_SSH_SETUP_REPLY/#\~/$HOME}"
+
+  if [ -z "$listing" ]; then
+    printf '\nNo usable keys in ~/.ssh/.\n'
+    create_new="yes"
+  else
+    # The picker is a menu, not a "now type the full path" prompt: under gum
+    # this is an arrow-key list, and the listing already flags keys whose
+    # public half is missing so a repair is a deliberate choice.
+    local -a menu
+    menu=()
+    local line first=""
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      [ -n "$first" ] || first="$line"   # bash/zsh disagree on array index 1
+      menu+=("$line")
+    done <<EOF
+$listing
+EOF
+    local opt_new="+ create a new key"
+    local opt_path="+ enter a path manually"
+    menu+=("$opt_new" "$opt_path")
+
+    _ssh_setup_choose 'Which SSH key?' "$first" "${menu[@]}"
+    local picked="$_SSH_SETUP_REPLY"
+
+    case "$picked" in
+      "$opt_new")
+        create_new="yes"
+        ;;
+      "$opt_path")
+        _ssh_setup_input 'Key path (without .pub)' "$HOME/.ssh/"
+        key_path="${_SSH_SETUP_REPLY/#\~/$HOME}"
+        ;;
+      *)
+        # Strip the "  (no .pub)" annotation the listing adds. The paren is
+        # escaped because zsh treats it as a pattern metacharacter here.
+        key_path="${picked%%  \(*}"
+        ;;
+    esac
+
+    if [ "$create_new" != "yes" ]; then
       if [ ! -f "$key_path" ] && [ ! -f "${key_path}.pub" ]; then
         printf '%s\n' "Key not found: $key_path" >&2
         return 1
       fi
     fi
-  else
-    printf '  (none found)\n'
-    create_new="yes"
   fi
 
   # ── Step 0b: create a new key ────────────────────────────────────────────
@@ -656,13 +934,11 @@ _ssh_setup_pick_key() {
     printf '\n--- Create new SSH key ---\n'
 
     local algo="ed25519"
-    printf 'Algorithm [ed25519] (ed25519/ed25519-sk/rsa): '
-    _ssh_setup_read
+    _ssh_setup_choose 'Algorithm' 'ed25519' 'ed25519' 'ed25519-sk' 'rsa'
     [ -n "$_SSH_SETUP_REPLY" ] && algo="$_SSH_SETUP_REPLY"
 
     local key_name="id_${algo}_${host_hint}"
-    printf 'Key name [%s]: ' "$key_name"
-    _ssh_setup_read
+    _ssh_setup_input 'Key name' "$key_name"
     [ -n "$_SSH_SETUP_REPLY" ] && key_name="$_SSH_SETUP_REPLY"
     key_path="$HOME/.ssh/$key_name"
 
@@ -672,15 +948,12 @@ _ssh_setup_pick_key() {
     fi
 
     local comment="${USER}@$(hostname -s) -> ${host_hint}"
-    printf 'Comment [%s]: ' "$comment"
-    _ssh_setup_read
+    _ssh_setup_input 'Comment' "$comment"
     [ -n "$_SSH_SETUP_REPLY" ] && comment="$_SSH_SETUP_REPLY"
 
     local -a passphrase_flag
     passphrase_flag=()
-    printf 'Set a passphrase? [y/N] '
-    _ssh_setup_read
-    if [[ "$_SSH_SETUP_REPLY" =~ ^[Yy] ]]; then
+    if _ssh_setup_confirm 'Set a passphrase?' no; then
       # Let ssh-keygen prompt for it
       passphrase_flag=()
     else
@@ -709,7 +982,16 @@ _ssh_setup_pick_key() {
 # A jump host only needs steps 1 and 3: ProxyJump authenticates end-to-end from
 # THIS machine, so the jump never handles the private key and copying it there
 # would be a gratuitous secret spill.
+# The wrapper exists so a failed step 1 can still run step 3 and STILL report
+# failure: step 3 is full of `return 0` early exits, so the status has to
+# travel in a variable rather than in the worker's exit code.
 _ssh_setup_one() {
+  _SSH_SETUP_STEP1_OK=1
+  _ssh_setup_one_impl "$@" || return 1
+  [ "$_SSH_SETUP_STEP1_OK" = "1" ]
+}
+
+_ssh_setup_one_impl() {
   if [ -n "$ZSH_VERSION" ]; then
     emulate -L zsh
     setopt localoptions pipefail
@@ -733,11 +1015,16 @@ _ssh_setup_one() {
   fi
 
   # ── Step 1: install the public key ─────────────────────────────────────
+  #
+  # A failure here is recorded, not fatal. Step 2 is skipped (there is no point
+  # pushing a key pair to a host we could not authenticate to) but step 3 still
+  # runs: the local ~/.ssh/config edit is purely local, it is useful even when
+  # the remote is unreachable, and silently skipping it was the most confusing
+  # part of the original failure.
   printf '\n--- Copy public key to %s ---\n' "$hop"
-  printf 'Install the key for passwordless login? [Y/n] '
-  _ssh_setup_read
+  local step1_ok=1
   local kind="posix" admin="0"
-  if [[ ! "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
+  if _ssh_setup_confirm "Install the key for passwordless login?" yes; then
     printf 'Probing %s ...\n' "$dest"
     local probe
     probe="$(_ssh_setup_probe_kind "$dest" "${_SSH_HOP_OPTS[@]}")"
@@ -747,15 +1034,22 @@ _ssh_setup_one() {
         case "$probe" in *admin=1*) admin="1" ;; esac
         case "$probe" in *user=*) remote_user="${probe##*user=}" ;; esac
         ;;
+      unreachable)
+        # ssh never reached a remote shell. Say why instead of asking a
+        # question the user has no way to answer usefully.
+        printf '%s\n' "Cannot connect to $dest:" >&2
+        _ssh_setup_show_err
+        step1_ok=0
+        ;;
       unknown)
-        printf 'Could not identify the remote OS.\n'
-        printf 'Is %s a Windows (OpenSSH sshd) machine? [y/N] ' "$dest"
-        _ssh_setup_read
-        [[ "$_SSH_SETUP_REPLY" =~ ^[Yy] ]] && kind="windows"
+        printf 'Connected, but could not identify the remote OS.\n'
+        if _ssh_setup_confirm "Is $dest a Windows (OpenSSH sshd) machine?" no; then
+          kind="windows"
+        fi
         ;;
     esac
 
-    if [ "$kind" = "windows" ]; then
+    if [ "$step1_ok" = "1" ] && [ "$kind" = "windows" ]; then
       local use_admin="0"
       if [ "$admin" = "1" ]; then
         printf '\n%s is in the remote Administrators group.\n' "${remote_user:-The remote account}"
@@ -763,29 +1057,42 @@ _ssh_setup_one() {
         printf 'C:\\ProgramData\\ssh\\administrators_authorized_keys for such accounts —\n'
         printf 'a key in ~/.ssh/authorized_keys would be ignored. That file is shared\n'
         printf 'by every administrator on the box.\n'
-        printf 'Use administrators_authorized_keys? [Y/n] '
-        _ssh_setup_read
-        [[ ! "$_SSH_SETUP_REPLY" =~ ^[Nn] ]] && use_admin="1"
+        _ssh_setup_confirm "Use administrators_authorized_keys?" yes && use_admin="1"
       fi
       local pub_line
       pub_line="$(cat "${key_path}.pub")"
       printf '\n> ssh %s (PowerShell: append to %s)\n' "$dest" \
         "$([ "$use_admin" = "1" ] && printf 'administrators_authorized_keys' || printf '~/.ssh/authorized_keys')"
-      local out
+      local out ins_rc
+      _ssh_setup_err_reset
       out="$(_ssh_setup_ps_install_src "$pub_line" "$use_admin" | _ssh_setup_ps_run "$dest" "${_SSH_HOP_OPTS[@]}")"
-      if [ -n "$out" ]; then
+      ins_rc=$?
+      # Decide on the exit status plus the markers the payload emits, not on
+      # "was stdout empty" -- empty stdout is what a dead transport looks like.
+      if [ "$ins_rc" -eq 0 ] && [[ "$out" == *added:* || "$out" == *present:* ]]; then
         printf '%s\n' "$out"
       else
-        printf '%s\n' "Key install on $dest produced no output — verify manually." >&2
-        return 1
+        printf '%s\n' "Key install on $dest failed (ssh exit $ins_rc)." >&2
+        _ssh_setup_show_err
+        [ -n "$out" ] && printf '%s\n' "$out" >&2
+        step1_ok=0
       fi
-    else
+    elif [ "$step1_ok" = "1" ]; then
       printf '\n> ssh-copy-id -i %s.pub %s\n' "$key_path" "$dest"
       ssh-copy-id "${_SSH_HOP_OPTS[@]}" -i "${key_path}.pub" "$dest" || {
         printf '%s\n' "ssh-copy-id failed. You may need to enter the remote password." >&2
-        return 1
+        step1_ok=0
       }
     fi
+  fi
+
+  if [ "$step1_ok" != "1" ]; then
+    _SSH_SETUP_STEP1_OK=0
+    printf '\nCould not install the key on %s.\n' "$hop" >&2
+    if ! _ssh_setup_confirm "Still update the LOCAL ~/.ssh/config for $hop?" yes; then
+      return 1
+    fi
+    role="localonly"
   fi
 
   # ── Step 2: copy the key pair (final target only) ──────────────────────
@@ -793,10 +1100,8 @@ _ssh_setup_one() {
   if [ "$role" = "target" ]; then
     printf '\n--- Copy key pair to remote ---\n'
     printf 'This lets the remote machine use the same key (e.g. for GitHub).\n'
-    printf 'Copy private+public key to %s:~/.ssh/? [y/N] ' "$dest"
-    _ssh_setup_read
-    do_scp="$_SSH_SETUP_REPLY"
-    if [[ "$do_scp" =~ ^[Yy] ]]; then
+    if _ssh_setup_confirm "Copy private+public key to $dest:~/.ssh/?" no; then
+      do_scp="yes"
       local key_basename="${key_path##*/}"
       _ssh_setup_scp_opts
       printf '\n> scp %s %s.pub %s:~/.ssh/\n' "$key_path" "$key_path" "$dest"
@@ -810,9 +1115,7 @@ _ssh_setup_one() {
       fi
       printf 'Key copied and permissions set.\n'
 
-      printf '\nAdd GitHub SSH config on remote? [y/N] '
-      _ssh_setup_read
-      if [[ "$_SSH_SETUP_REPLY" =~ ^[Yy] ]]; then
+      if _ssh_setup_confirm 'Add GitHub SSH config on remote?' no; then
         if [ "$kind" = "windows" ]; then
           _ssh_setup_ps_github_src "$key_basename" | _ssh_setup_ps_run "$dest" "${_SSH_HOP_OPTS[@]}"
         else
@@ -834,9 +1137,7 @@ EOF
   # ── Step 3: local SSH config ───────────────────────────────────────────
   printf '\n--- Local SSH config ---\n'
   _SSH_SETUP_HOST_ALIAS=""
-  printf 'Add/update host alias in local ~/.ssh/config? [Y/n] '
-  _ssh_setup_read
-  if [[ "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
+  if ! _ssh_setup_confirm 'Add/update host alias in local ~/.ssh/config?' yes; then
     return 0
   fi
 
@@ -876,11 +1177,11 @@ EOF
 
     local action="insert"
     if [ "$has_idf" = "1" ]; then
-      printf '\nThis host already has an IdentityFile. [r]eplace / [a]dd another / [s]kip? [r] '
-      _ssh_setup_read
+      _ssh_setup_choose 'This host already has an IdentityFile.' \
+        'replace' 'replace' 'add another' 'skip'
       case "$_SSH_SETUP_REPLY" in
-        [Aa]*) action="add" ;;
-        [Ss]*) action="" ;;
+        add*)  action="add" ;;
+        skip*) action="" ;;
         *)     action="replace" ;;
       esac
     fi
@@ -889,9 +1190,8 @@ EOF
 
     local ido_flag=""
     if [ "$has_ido" != "1" ]; then
-      printf 'Also add `IdentitiesOnly yes` so only this key is offered? [y/N] '
-      _ssh_setup_read
-      [[ "$_SSH_SETUP_REPLY" =~ ^[Yy] ]] && ido_flag="--identities-only"
+      _ssh_setup_confirm 'Also add `IdentitiesOnly yes` so only this key is offered?' no \
+        && ido_flag="--identities-only"
     fi
     if _ssh_cfg_py insert "$cfg_file" "$alias" "$key_path" "$action" $ido_flag; then
       printf 'Updated %s.\n' "$cfg_file"
@@ -908,25 +1208,21 @@ EOF
 
   # ── Mode A: new host (not found, or no python3) — append a fresh block ──
   local host_alias="$remote_host"
-  printf 'Host alias [%s]: ' "$host_alias"
-  _ssh_setup_read
+  _ssh_setup_input 'Host alias' "$host_alias"
   [ -n "$_SSH_SETUP_REPLY" ] && host_alias="$_SSH_SETUP_REPLY"
   _SSH_SETUP_HOST_ALIAS="$host_alias"
 
   local hostname="$remote_host"
-  printf 'HostName (IP or FQDN) [%s]: ' "$hostname"
-  _ssh_setup_read
+  _ssh_setup_input 'HostName (IP or FQDN)' "$hostname"
   [ -n "$_SSH_SETUP_REPLY" ] && hostname="$_SSH_SETUP_REPLY"
 
   local config_user="${remote_user:-$USER}"
-  printf 'User [%s]: ' "$config_user"
-  _ssh_setup_read
+  _ssh_setup_input 'User' "$config_user"
   [ -n "$_SSH_SETUP_REPLY" ] && config_user="$_SSH_SETUP_REPLY"
 
-  printf 'Add IdentitiesOnly yes? [y/N] '
-  _ssh_setup_read
   local identonly_line=""
-  [[ "$_SSH_SETUP_REPLY" =~ ^[Yy] ]] && identonly_line=$'\n    IdentitiesOnly yes'
+  _ssh_setup_confirm 'Add IdentitiesOnly yes?' no \
+    && identonly_line=$'\n    IdentitiesOnly yes'
 
   local port_line=""
   [ -n "${_SSH_HOP_PORT:-}" ] && port_line=$'\n    Port '"$_SSH_HOP_PORT"
@@ -935,12 +1231,9 @@ EOF
   local config_file="$HOME/.ssh/config"
   local wrote_configd=0
   if [ -d "$HOME/.ssh/config.d" ]; then
-    printf 'Write to ~/.ssh/config.d/ instead of ~/.ssh/config? [Y/n] '
-    _ssh_setup_read
-    if [[ ! "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
+    if _ssh_setup_confirm 'Write to ~/.ssh/config.d/ instead of ~/.ssh/config?' yes; then
       config_file="$HOME/.ssh/config.d/host_${host_alias}"
-      printf 'Config file [%s]: ' "$config_file"
-      _ssh_setup_read
+      _ssh_setup_input 'Config file' "$config_file"
       [ -n "$_SSH_SETUP_REPLY" ] && config_file="$_SSH_SETUP_REPLY"
       wrote_configd=1
     fi
@@ -954,9 +1247,7 @@ Host $host_alias
 
   printf '\nWill append to %s:\n' "$config_file"
   printf '%s\n' "$config_block"
-  printf '\nConfirm? [Y/n] '
-  _ssh_setup_read
-  if [[ "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
+  if ! _ssh_setup_confirm 'Confirm?' yes; then
     return 0
   fi
 
@@ -969,9 +1260,7 @@ Host $host_alias
   if [ "$wrote_configd" = "1" ] && command -v python3 >/dev/null 2>&1; then
     if ! _ssh_cfg_py ensure-include; then
       printf '\nNote: ~/.ssh/config has no `Include` for config.d/* — this entry will not load.\n'
-      printf 'Add `Include ~/.ssh/config.d/*` to ~/.ssh/config now? [Y/n] '
-      _ssh_setup_read
-      if [[ ! "$_SSH_SETUP_REPLY" =~ ^[Nn] ]]; then
+      if _ssh_setup_confirm 'Add `Include ~/.ssh/config.d/*` to ~/.ssh/config now?' yes; then
         _ssh_cfg_py add-include && printf 'Include directive added.\n'
       fi
     fi
@@ -1045,35 +1334,49 @@ EOF
 
     # Skip hops that already work without a password. BatchMode makes this a
     # non-blocking probe: it fails immediately rather than prompting.
+    #
+    # The question is "did ssh AUTHENTICATE", not "did the remote command
+    # succeed": ssh reserves 255 for its own failures (auth, DNS, refused) and
+    # passes anything else through from the remote. `true` is not a cmd.exe
+    # builtin, so a working Windows hop answers 1 -- treating that as failure
+    # meant a Windows jump host could never be recognised as already set up.
     _ssh_setup_split_hop "$h"
     _ssh_setup_hop_opts
-    if ssh "${_SSH_HOP_OPTS[@]}" -o BatchMode=yes -o ConnectTimeout=8 \
-        "$_SSH_HOP_DEST" true >/dev/null 2>&1; then
+    ssh "${_SSH_HOP_OPTS[@]}" -o BatchMode=yes -o ConnectTimeout=10 \
+      "$_SSH_HOP_DEST" true >/dev/null 2>&1
+    if [ "$?" -ne 255 ]; then
       printf '%s already accepts key-based login.\n' "$h"
-      printf 'Set it up anyway? [y/N] '
-      _ssh_setup_read
-      if [[ ! "$_SSH_SETUP_REPLY" =~ ^[Yy] ]]; then
+      if ! _ssh_setup_confirm 'Set it up anyway?' no; then
         printf 'Skipped.\n'
         continue
       fi
     fi
 
-    if _ssh_setup_one "$h" "$key_path" "$role"; then
-      [ "$role" = "target" ] && last_alias="$_SSH_SETUP_HOST_ALIAS" && did_scp="$_SSH_SETUP_DID_SCP"
-    else
-      rc=1
-      printf '\n%s\n' "Setup for $h failed." >&2
+    _ssh_setup_one "$h" "$key_path" "$role" || rc=1
+
+    # Capture the alias/scp answers even on failure: step 3 may well have run
+    # and written the local config, and the closing hint should reflect that.
+    if [ "$role" = "target" ]; then
+      last_alias="$_SSH_SETUP_HOST_ALIAS"
+      did_scp="$_SSH_SETUP_DID_SCP"
+    fi
+
+    if [ "$rc" = "1" ] && [ "${_SSH_SETUP_STEP1_OK:-1}" != "1" ]; then
+      printf '\n%s\n' "Key install for $h did not succeed." >&2
       if [ "$role" = "jump" ]; then
-        printf 'Continue with the rest of the chain? [y/N] '
-        _ssh_setup_read
-        [[ "$_SSH_SETUP_REPLY" =~ ^[Yy] ]] || break
+        _ssh_setup_confirm 'Continue with the rest of the chain?' no || break
       fi
     fi
   done
 
   _ssh_setup_mux_stop
+  _ssh_setup_err_cleanup
 
-  printf '\n=== Done! ===\n'
+  if [ "$rc" = "0" ]; then
+    printf '\n=== Done! ===\n'
+  else
+    printf '\n=== Done, with errors ===\n'
+  fi
   printf 'Test with: ssh %s\n' "${last_alias:-$target}"
   if [[ "$did_scp" =~ ^[Yy] ]]; then
     printf "Test GitHub: ssh %s 'ssh -T git@github.com'\n" "${last_alias:-$target}"

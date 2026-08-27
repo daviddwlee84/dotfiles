@@ -6,7 +6,9 @@
   - macOS — Homebrew (managed by `dot_ansible/roles/devtools/tasks/main.yml` macOS list)
   - Linux — GitHub release tarball into `~/.local/bin/gum` (managed by `dot_ansible/roles/devtools/tasks/main.yml` `# --- gum (Charm) ---` block)
 - **Verify**: `gum --version`
-- **Status in this repo**: installed, not yet wired into existing scripts. See [Where it would fit](#where-it-would-fit-future-refactors) below.
+- **Status in this repo**: wired into `ssh-setup-remote` (`dot_config/shell/96_ssh_setup.sh`) and `media-pick`
+  (`dot_config/shell/29_media.sh`); the rest is still on the list. See
+  [Where it would fit](#where-it-would-fit-future-refactors) below.
 
 ---
 
@@ -118,6 +120,13 @@ These spots in the repo are documented as gum candidates but were intentionally 
 | `dot_config/tmux/executable_menu.sh` | tier-based `display-menu` (~14-row cap) | `gum choose --height N` |
 | `dot_config/tmux/executable_menu-theme.sh` | 2-row `display-menu` | `gum choose "catppuccin" "tmux2k"` |
 | `scripts/import_ssh_to_bw.sh` | `read -r choice` + manual parse | `gum choose --no-limit` + `gum confirm` |
+
+Already swapped — use these as the pattern:
+
+| File | What it does |
+|---|---|
+| `dot_config/shell/96_ssh_setup.sh` | `gum choose` for the SSH key picker, `gum confirm` / `gum input` for the rest. Guarded three ways: gum is used only with a tty, `SSH_SETUP_NO_GUM=1` opts out, and the fallback is bash `read -e` / zsh `vared` so arrow keys still work without gum. It must stay optional — `tsnet --setup-remote` sources the file under a bare `bash -c`. |
+| `dot_config/shell/29_media.sh` | `gum file` / `gum choose` / `gum input` behind a `command -v gum` guard. |
 | `scripts/upgrade_tools.sh` | CLI args only | `gum choose --no-limit` for category multi-select when called with no args |
 
 Don't bulk-refactor — the existing scripts work, and tmux integration in particular has subtle invariants (see `CLAUDE.md` → "Tmux ≥ 3.3 required for popup menu"). Swap one at a time, when you're already in the file for another reason.

@@ -310,6 +310,25 @@ Regenerate it with `ssh-keygen -y`? [Y/n]
 
 ## 疑難排解 (Troubleshooting)
 
+### 精靈顯示「Could not identify the remote OS」然後失敗
+
+這幾乎都是**連線層**的錯誤被誤報成遠端作業系統問題。在 macOS 上最常見的原因是
+`ControlPath` 超過 `sockaddr_un` 的 104 位元組上限，`ssh` 會在開 socket 之前就以
+255 結束：
+
+```console
+ControlPath too long ('/var/folders/…/ssh-setup.XXXXXX/03d4906e…' >= 104 bytes)
+```
+
+現在的 `ssh-setup-remote` 會限制 socket 路徑長度，並且直接印出 ssh 真正的 stderr
+而不是吞掉，所以上面這行會直接顯示出來。要完全排除多工的影響：
+
+```bash
+SSH_SETUP_NO_MUX=1 ssh-setup-remote <host>
+```
+
+完整來龍去脈見 `pitfalls/ssh-controlpath-too-long-macos-tmpdir.md`。
+
 ### Remote Host Identification Has Changed
 
 連線時若看到 `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!`，代表伺服器的 host key 已和 `~/.ssh/known_hosts` 內存的紀錄不符。常見於重新安裝作業系統，或同一個 IP 重新佈建 (reprovision) server 之後。

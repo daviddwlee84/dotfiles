@@ -63,6 +63,14 @@ fi
 echo "ssh $*" >> "$CAPTURE_LOG"
 last="${!#}"
 case "$last" in
+  'uname -s')
+    # A reachable POSIX host answers this; a Windows one has no uname, and a
+    # host we cannot reach at all exits 255 (which the wizard must NOT confuse
+    # with "connected but unidentifiable").
+    [ "${FAKE_WINDOWS:-0}" = "1" ] && exit 255
+    [ "${FAKE_UNREACHABLE:-0}" = "1" ] && { echo "ssh: connect failed" >&2; exit 255; }
+    printf 'Linux\n'
+    exit 0 ;;
   *EncodedCommand*)
     [ "${FAKE_WINDOWS:-0}" = "1" ] || exit 255
     enc="${last##*EncodedCommand }"
@@ -372,4 +380,181 @@ _mkkey() {
   run _ssh_run bash '_ssh_cfg_py add-include'
   [ "$status" -eq 0 ]
   [ "$(grep -c 'Include' "$FAKE_HOME/.ssh/config")" -eq 1 ]
+}
+
+# ── Connection multiplexing ───────────────────────────────────────────────
+#
+# These exist because the ControlPath bug shipped undetected: every test above
+# sets SSH_SETUP_ASSUME_YES=1, which returns from _ssh_setup_mux_start before
+# a path is ever built, so the whole feature had zero coverage. On macOS the
+# obvious "$TMPDIR/ssh-setup.XXXXXX/%C" is 107 bytes against a 104-byte
+# sockaddr_un limit, and ssh then failed EVERY connection with rc 255.
+
+# Expand a ControlPath template the way ssh would, so the length assertion
+# measures the socket path that actually reaches bind(2).
+_expanded_len() {
+  local p="${1/\%C/0000000000000000000000000000000000000000}"
+  printf '%s' "${#p}"
+}
+
+@test "mux: the ControlPath stays inside the 104-byte sockaddr_un limit" {
+  local sh
+  for sh in bash zsh; do
+    run env HOME="$FAKE_HOME" \
+      "$sh" -c "source '$SSH_FILE'; _ssh_setup_mux_start; printf '%s' \"\$_SSH_SETUP_MUX_PATH\"; _ssh_setup_mux_stop"
+    [ "$status" -eq 0 ]
+    [ -n "$output" ]
+    [ "$(_expanded_len "$output")" -lt 104 ]
+  done
+}
+
+@test "mux: a long TMPDIR does not push the ControlPath over the limit" {
+  # The real macOS shape: /var/folders/<2>/<26>/T/ is ~49 bytes on its own.
+  local long="$SSH_TMP/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  mkdir -p "$long"
+  run env HOME="$FAKE_HOME" TMPDIR="$long" \
+    bash -c "source '$SSH_FILE'; _ssh_setup_mux_start; printf '%s' \"\$_SSH_SETUP_MUX_PATH\"; _ssh_setup_mux_stop"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  [ "$(_expanded_len "$output")" -lt 104 ]
+}
+
+@test "mux: no short enough base degrades to no multiplexing, not a broken path" {
+  # Force every candidate to be rejected; the wizard must still run.
+  run env HOME="$FAKE_HOME" \
+    bash -c "source '$SSH_FILE'; _SSH_SETUP_MUX_MAXDIR=1; _ssh_setup_mux_start; printf 'rc=%s path=[%s]' \"\$?\" \"\$_SSH_SETUP_MUX_PATH\""
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"rc=0"* ]]
+  [[ "$output" == *"path=[]"* ]]
+}
+
+@test "mux: SSH_SETUP_NO_MUX=1 opts out entirely" {
+  run env HOME="$FAKE_HOME" SSH_SETUP_NO_MUX=1 \
+    bash -c "source '$SSH_FILE'; _ssh_setup_mux_start; printf 'path=[%s]' \"\$_SSH_SETUP_MUX_PATH\""
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"path=[]"* ]]
+}
+
+# ── Transport errors must not masquerade as "unknown OS" ──────────────────
+
+@test "probe: an unreachable host is reported as unreachable, not unknown" {
+  run env HOME="$FAKE_HOME" FAKE_WINDOWS=0 FAKE_UNREACHABLE=1 \
+    bash -c "source '$SSH_FILE'; _ssh_setup_probe_kind deadhost"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "unreachable" ]]
+}
+
+@test "probe: the real stderr survives instead of being sent to /dev/null" {
+  run env HOME="$FAKE_HOME" FAKE_UNREACHABLE=1 \
+    bash -c "source '$SSH_FILE'; _ssh_setup_probe_kind deadhost >/dev/null; _ssh_setup_err_summary; _ssh_setup_err_cleanup"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"connect failed"* ]]
+}
+
+@test "driver: an unreachable hop does not ask whether it is a Windows box" {
+  _mkkey k
+  run env HOME="$FAKE_HOME" SSH_CFG_ROOT="$FAKE_HOME/.ssh/config" \
+    SSH_SETUP_ASSUME_YES=1 SSH_SETUP_KEY="$FAKE_HOME/.ssh/k" FAKE_UNREACHABLE=1 \
+    bash -c "source '$SSH_FILE'; ssh-setup-remote nojump"
+  [ "$status" -eq 1 ]
+  [[ "$output" != *"Windows (OpenSSH sshd) machine?"* ]]
+  [[ "$output" == *"Cannot connect to nojump"* ]]
+}
+
+# ── A failed install must not swallow the local config step ───────────────
+
+@test "driver: a failed key install still offers the local ~/.ssh/config edit" {
+  _mkkey k
+  run env HOME="$FAKE_HOME" SSH_CFG_ROOT="$FAKE_HOME/.ssh/config" \
+    SSH_SETUP_ASSUME_YES=1 SSH_SETUP_KEY="$FAKE_HOME/.ssh/k" FAKE_UNREACHABLE=1 \
+    bash -c "source '$SSH_FILE'; ssh-setup-remote nojump"
+  # Overall failure is still reported ...
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Done, with errors"* ]]
+  # ... but step 3 ran, which is the part the user actually noticed missing.
+  [[ "$output" == *"--- Local SSH config ---"* ]]
+  grep -q 'Host nojump' "$FAKE_HOME/.ssh/config"
+  grep -q "IdentityFile $FAKE_HOME/.ssh/k" "$FAKE_HOME/.ssh/config"
+}
+
+@test "driver: an unreachable hop never tries to copy the key pair to it" {
+  _mkkey k
+  run env HOME="$FAKE_HOME" SSH_CFG_ROOT="$FAKE_HOME/.ssh/config" \
+    SSH_SETUP_ASSUME_YES=1 SSH_SETUP_KEY="$FAKE_HOME/.ssh/k" FAKE_UNREACHABLE=1 \
+    bash -c "source '$SSH_FILE'; ssh-setup-remote nojump"
+  [[ "$output" != *"--- Copy key pair to remote ---"* ]]
+}
+
+# ── Prompt layer ──────────────────────────────────────────────────────────
+
+@test "prompt: defaults are honoured under SSH_SETUP_ASSUME_YES" {
+  local sh
+  for sh in bash zsh; do
+    run env SSH_SETUP_ASSUME_YES=1 "$sh" -c "source '$SSH_FILE'
+      _ssh_setup_confirm 'a?' yes && printf 'A=y ' || printf 'A=n '
+      _ssh_setup_confirm 'b?' no  && printf 'B=y ' || printf 'B=n '
+      _ssh_setup_input 'L' 'dflt';         printf 'I=%s ' \"\$_SSH_SETUP_REPLY\"
+      _ssh_setup_choose 'H' 'replace' replace add skip; printf 'C=%s' \"\$_SSH_SETUP_REPLY\""
+    [[ "$output" == *"A=y "* ]]
+    [[ "$output" == *"B=n "* ]]
+    [[ "$output" == *"I=dflt "* ]]
+    [[ "$output" == *"C=replace"* ]]
+  done
+}
+
+@test "prompt: piped answers are read, and an empty answer takes the default" {
+  local sh
+  for sh in bash zsh; do
+    run env SSH_SETUP_NO_GUM=1 "$sh" -c "printf 'n\ny\nmine\n2\n' | { source '$SSH_FILE'
+      _ssh_setup_confirm 'a?' yes && printf 'A=y ' || printf 'A=n '
+      _ssh_setup_confirm 'b?' no  && printf 'B=y ' || printf 'B=n '
+      _ssh_setup_input 'L' 'dflt';         printf 'I=%s ' \"\$_SSH_SETUP_REPLY\"
+      _ssh_setup_choose 'H' 'replace' replace add skip; printf 'C=%s' \"\$_SSH_SETUP_REPLY\"; }"
+    [[ "$output" == *"A=n "* ]]
+    [[ "$output" == *"B=y "* ]]
+    [[ "$output" == *"I=mine "* ]]
+    [[ "$output" == *"C=add"* ]]
+
+    run env SSH_SETUP_NO_GUM=1 "$sh" -c "printf '\n\n\n\n' | { source '$SSH_FILE'
+      _ssh_setup_confirm 'a?' yes && printf 'A=y ' || printf 'A=n '
+      _ssh_setup_input 'L' 'dflt';         printf 'I=%s ' \"\$_SSH_SETUP_REPLY\"
+      _ssh_setup_choose 'H' 'replace' replace add skip; printf 'C=%s' \"\$_SSH_SETUP_REPLY\"; }"
+    [[ "$output" == *"A=y "* ]]
+    [[ "$output" == *"I=dflt "* ]]
+    [[ "$output" == *"C=replace"* ]]
+  done
+}
+
+@test "prompt: gum is never invoked when stdin is not a terminal" {
+  # gum needs a tty; the wizard must fall back rather than hang or crash when
+  # it is piped, which is how the bats suite and `tsnet` drive it.
+  cat > "$BATS_STUB_DIR/gum" <<'EOF'
+#!/usr/bin/env bash
+echo "GUM-WAS-CALLED $*" >> "$CAPTURE_LOG"
+exit 1
+EOF
+  chmod +x "$BATS_STUB_DIR/gum"
+  run env SSH_SETUP_NO_GUM=0 bash -c "printf 'y\n' | { source '$SSH_FILE'; _ssh_setup_confirm 'q?' yes; }"
+  ! grep -q 'GUM-WAS-CALLED' "$CAPTURE_LOG"
+}
+
+@test "driver: a working Windows hop counts as already set up (rc 1, not 255)" {
+  # `true` is not a cmd.exe builtin, so a perfectly authenticated Windows hop
+  # answers 1. Only 255 means ssh itself could not get in.
+  _mkkey k
+  cat > "$BATS_STUB_DIR/ssh" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "-G" ]; then printf 'hostname %s\n' "$2"; exit 0; fi
+echo "ssh $*" >> "$CAPTURE_LOG"
+last="${!#}"
+[ "$last" = "true" ] && exit 1     # authenticated; cmd.exe just has no `true`
+exit 255
+EOF
+  chmod +x "$BATS_STUB_DIR/ssh"
+  run env HOME="$FAKE_HOME" SSH_CFG_ROOT="$FAKE_HOME/.ssh/config" \
+    SSH_SETUP_ASSUME_YES=1 SSH_SETUP_KEY="$FAKE_HOME/.ssh/k" \
+    bash -c "source '$SSH_FILE'; ssh-setup-remote winbox"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already accepts key-based login"* ]]
+  [[ "$output" == *"Skipped."* ]]
 }
