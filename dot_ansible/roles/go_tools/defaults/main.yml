@@ -19,6 +19,16 @@
 # dot_config/homebrew/Brewfile.tmpl); this go-install path is Linux-only (tasks +
 # cat_go gate off Darwin). The entry stays here as the source of truth for the
 # Linux install and for `just upgrade-go`.
+#
+# The pin was raised v0.1.0 → v0.5.2 on 2026-08-27. That is a FLOOR bump, not an
+# upgrade (the split above still holds): v0.1.0 predates almost the whole tool —
+# no dictionary, no TUI engine cycle, no `serve`/`mcp` — so a fresh Linux box got
+# something barely recognisable until someone ran `just upgrade-go`.
+#
+# Linux is now the only platform that builds this from source. macOS gets a
+# prebuilt bottle-style binary from the tap and Windows a prebuilt scoop package;
+# both also install shell completions, which `go install` cannot — which is why
+# the `regen translate` row in scripts/generate_completions.sh has to stay.
 go_tools:
-  - name: github.com/daviddwlee84/translate@v0.1.0
+  - name: github.com/daviddwlee84/translate@v0.5.2
     binary: translate

@@ -185,7 +185,7 @@ nothing, and kills `community.general.homebrew` on empty JSON with
 
 | File | Owns |
 |---|---|
-| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas`. Plus (macOS, **always** — not `installBrewApps`-gated): tap `daviddwlee84/tap` + formula `daviddwlee84/tap/translate` (terminal translator CLI/TUI; Linux uses `go install` via `go_tools`) |
+| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas`. Plus (macOS, **always** — not `installBrewApps`-gated): tap `daviddwlee84/tap` + formula `daviddwlee84/tap/translate` (terminal translator CLI/TUI. Since 2026-08 the formula installs a **prebuilt** binary from the upstream GitHub release — no `go` build dep — and generates its own shell completions. Linux uses `go install` via `go_tools`) |
 | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
 | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
 
@@ -628,7 +628,7 @@ idempotent.
 
 | Package | Binary |
 |---|---|
-| `github.com/daviddwlee84/translate@v0.1.0` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`) |
+| `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
@@ -1202,7 +1202,7 @@ list.
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
-| **translate** | brew (`daviddwlee84/tap`) | go install (`go_tools`) | Brewfile + go_tools |
+| **translate** | brew (`daviddwlee84/tap`, prebuilt + completions) | go install (`go_tools`) | Brewfile + go_tools |
 | **tree** | brew | apt/yum | base |
 | **tree-sitter** / **tree-sitter-cli** | brew | mise-npm → cargo fallback | lazyvim_deps |
 | **trippy** (`trip`) | brew | apt/release | networking_tools |

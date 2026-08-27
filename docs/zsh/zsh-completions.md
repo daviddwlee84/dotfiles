@@ -83,6 +83,7 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `docker` | `docker completion zsh` |
 | `gh` | `gh completion -s zsh` |
 | `opencode` | `opencode completion zsh` |
+| `translate` | `translate completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 **Usage pattern:**
@@ -193,6 +194,16 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 3. **Regeneration is trivial.** One command per tool.
 4. **Brew-installed tools auto-manage their completions** via site-functions. Duplicating them in `~/.zfunc/` creates conflicts.
 
+!!! note "`translate` is in both places on macOS — deliberately"
+    Since 2026-08 the Homebrew formula runs
+    `generate_completions_from_executable(…, shell_parameter_format: :cobra)`, so
+    `$(brew --prefix)/share/zsh/site-functions/_translate` exists on macOS. The
+    `regen translate` row here still writes `~/.zfunc/_translate`, which wins
+    (`~/.zfunc` comes first in `fpath`). That is harmless — both are generated
+    from the same binary — and the row must stay, because **Linux installs
+    `translate` with `go install`, which ships no completions at all**. Point 4
+    above applies to tools that are brew-only.
+
 ### What we DO track
 
 - `fpath+=~/.zfunc` in `dot_zshrc.tmpl` (ensures the directory is in the search path)
@@ -202,7 +213,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 
 ## Generating Completions After Fresh Install
 
-**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 14 self-generating tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`).
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 15 self-generating tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `translate`).
 
 The hook is **idempotent** — it stat-checks each tool's binary mtime against the existing completion file and skips if the cache is fresh. Cost when nothing changed: **~21ms** total (presence checks + 28 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime: ~140ms one-shot to regenerate the affected completions.
 

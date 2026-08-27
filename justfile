@@ -410,7 +410,8 @@ info:
 # See `## Upgrades` section in AGENTS.md for rationale + category matrix.
 
 # Force-regenerate shell completion files for upstream CLIs (chezmoi/mise/uv/
-# just/starship/gh/docker/rg/fd/bat/delta/zellij/pueue/opencode). Normally
+# just/starship/gh/docker/rg/fd/bat/delta/zellij/pueue/opencode/translate).
+# Normally
 # `chezmoi apply` does this automatically (binary-mtime check, idempotent);
 # use this recipe to refresh after a tool upgrade outside chezmoi (e.g. cargo
 # install) or to reset a corrupted completion file.
