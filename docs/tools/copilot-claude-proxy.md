@@ -65,7 +65,7 @@ Codex ──OpenAI /v1/responses──────────▶ the same :4142
 
 - Claude Code speaks only the **Anthropic Messages API** (`/v1/messages`).
 - The fork uses Copilot's native Anthropic path for Claude ids and translates
-  Claude Code requests to the **Responses API** for GPT ids. The pinned `2.3.0`
+  Claude Code requests to the **Responses API** for GPT ids. The pinned `2.3.4`
   forwards Claude Code's `output_config.effort` to `reasoning.effort`, preserves
   reasoning state, and handles the GPT-5.6 request shape.
 - The original (`copilot-api@0.7.0`) always translates through
@@ -118,7 +118,7 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
 | `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
-| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.3.0` pin. While set, `update VERSION` refuses to change persisted state. |
+| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.3.4` pin. While set, `update VERSION` refuses to change persisted state. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = install the package with the proxy env stripped, skipping the 45s stall on a host where bun cannot resolve through the proxy |
@@ -206,6 +206,16 @@ staging prefix, atomically swaps it, and keeps `pkg.previous`. If a previously
 running proxy fails to start after the swap, the old package selection and
 prefix are restored and restarted. The selected `{spec, integrity, registry,
 selected_at}` lives in `$XDG_STATE_HOME/copilot-proxy/package.json`.
+
+The audited built-in release is `@jeffreycao/copilot-api@2.3.4`: tag commit
+[`a515535`](https://github.com/caozhiyuan/copilot-api/commit/a51553569ba071e0c9a8329f8f5ccac2482a3945),
+npm tarball SHA-1 `643f59e0c257db613954738f02300c0a7ceebfeb`, SRI
+`sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ==`,
+35 files, and npm Trusted Publisher provenance from
+[release run 32856658249](https://github.com/caozhiyuan/copilot-api/actions/runs/32856658249).
+A host with a persisted older selection moves deliberately with
+`copilot-proxy update 2.3.4`; verified exact rollback targets remain
+`copilot-proxy update 2.3.0` and `copilot-proxy update 2.1.0`.
 
 On a **normal install** (not `update`), the pinned selection is cross-checked
 against what actually landed in the prefix. `package-lock.json` is consulted
@@ -535,7 +545,7 @@ The important split is **local orchestration vs Anthropic cloud services**:
 |---|---|---|
 | CLI, tools, hooks, skills, memory, plugins, MCP, checkpoints, sandboxing | Yes | These are local Claude Code features; model behavior can still differ because GPT receives translated Claude prompts/tool schemas. |
 | Subagents and dynamic workflows | Yes | Do not set `CLAUDE_CODE_SUBAGENT_MODEL` globally here, so workflow scripts/frontmatter retain normal routing. [Workflow docs](https://code.claude.com/docs/en/workflows) |
-| `ultracode` | Yes on `2.3.0` | Ultracode is xhigh effort plus dynamic workflows, not a separate model. The upgraded fork forwards the requested effort to GPT-5.6. |
+| `ultracode` | Yes on `2.3.4` | Ultracode is xhigh effort plus dynamic workflows, not a separate model. The upgraded fork forwards the requested effort to GPT-5.6. |
 | Thinking/reasoning | Translated | GPT uses Responses reasoning rather than Anthropic-native thinking semantics. Persisted reasoning support is proxy-dependent. |
 | Web search, fast/auto mode, MCP tool search | Provider-dependent | The base-URL gateway and Copilot endpoint decide availability; non-first-party tool search may require an extra bridge/plugin. |
 | Ultrareview, Remote Control, Chrome, cloud Code Review, routines, web/mobile/Slack sessions | No | These require Claude.ai authentication/cloud services; a local API gateway cannot supply the subscription identity. `ultrareview` is unrelated to `ultracode`. |
@@ -695,7 +705,7 @@ original: `COPILOT_API_PKG=copilot-api@0.7.0`.
 Older fork releases could forward Claude Code's `context_management` field to
 an endpoint that rejected it with 400
 ([caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)). The
-The pinned `2.3.0` GPT-5.6 path suppresses that incompatible field and relies on Responses
+The pinned `2.3.4` GPT-5.6 path suppresses that incompatible field and relies on Responses
 reasoning/context handling instead. This avoids the 400, but Anthropic's exact
 context-editing and prompt-cache semantics are not reproduced; long-session
 behavior remains a compatibility surface to watch.

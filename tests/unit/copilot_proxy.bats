@@ -248,7 +248,10 @@ JSON
   mkdir -p "$TMP/state/copilot-proxy"
   run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
   [ "$status" -eq 0 ]
-  [ "$output" = "@jeffreycao/copilot-api@2.3.0" ]
+  [ "$output" = "@jeffreycao/copilot-api@2.3.4" ]
+  run bash -c "source '$SHELL_LIB'; _copilot_builtin_integrity"
+  [ "$status" -eq 0 ]
+  [ "$output" = "sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ==" ]
   printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.2.0","integrity":"sha512-test"}' > "$TMP/state/copilot-proxy/package.json"
   run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
   [ "$status" -eq 0 ]
@@ -259,7 +262,7 @@ JSON
 }
 
 @test "exact update refuses to mutate state while env override is active" {
-  run bash -c "export COPILOT_API_PKG='@jeffreycao/copilot-api@2.1.0'; source '$SHELL_LIB'; _copilot_update_exact 2.3.0"
+  run bash -c "export COPILOT_API_PKG='@jeffreycao/copilot-api@2.1.0'; source '$SHELL_LIB'; _copilot_update_exact 2.3.4"
   [ "$status" -ne 0 ]
   [[ "$output" == *"refusing to mutate persisted selection"* ]]
 }
@@ -272,7 +275,7 @@ JSON
     export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state';
     source '$SHELL_LIB';
     _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"sha512-wrong\",\"tarball\":\"https://fake/package.tgz\"}}'; }
-    _copilot_update_exact 2.3.0"
+    _copilot_update_exact 2.3.4"
   [ "$status" -ne 0 ]
   [[ "$output" == *"integrity mismatch"* ]]
   [ ! -e "$TMP/data/copilot-api/pkg" ]
@@ -301,7 +304,7 @@ JSON
         start) n=0; [ -f '$TMP/start-count' ] && n=\"\$(cat '$TMP/start-count')\"; n=\$((n+1)); printf '%s' \"\$n\" >'$TMP/start-count'; [ \"\$n\" -gt 1 ] ;;
       esac
     }
-    _copilot_update_exact 2.3.0"
+    _copilot_update_exact 2.3.4"
   [ "$status" -ne 0 ]
   [ -f "$TMP/data/copilot-api/pkg/old-marker" ]
   [ "$(jq -r '.spec' "$TMP/state/copilot-proxy/package.json")" = "@jeffreycao/copilot-api@2.1.0" ]
@@ -327,14 +330,14 @@ SH
     source '$SHELL_LIB'; _copilot_ensure_pkg >/dev/null"
   [ "$status" -eq 0 ]
   [ -f "$TMP/data/copilot-api/pkg/npm-fallback-used" ]
-  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.0" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.4" ]
 }
 
 # --- integrity guard: the lock is evidence only about ITS OWN version ----------
 #
 # `bun add` writes bun.lock and never touches package-lock.json, so one npm
 # CA-stack fallback leaves a package-lock.json pinned to that version forever.
-# Reading it unconditionally compared 2.1.0's real hash to the 2.3.0 pin and
+# Reading it unconditionally compared 2.1.0's real hash to the 2.3.4 pin and
 # wedged every start. pitfalls/copilot-proxy-stale-package-lock-integrity.md
 
 # Installs the pinned version into the prefix and writes a package-lock.json
@@ -346,7 +349,7 @@ write_stale_lock_fixture() {
 mkdir -p node_modules/.bin node_modules/@jeffreycao/copilot-api
 printf '#!/bin/sh\n' > node_modules/.bin/copilot-api
 chmod +x node_modules/.bin/copilot-api
-printf '{"version":"2.3.0"}\n' > node_modules/@jeffreycao/copilot-api/package.json
+printf '{"version":"2.3.4"}\n' > node_modules/@jeffreycao/copilot-api/package.json
 SH
   chmod +x "$TMP/bin/bun"
   mkdir -p "$TMP/data/copilot-api/pkg"
@@ -356,7 +359,7 @@ SH
 
 @test "integrity guard: a stale npm lock for ANOTHER version does not block install" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  # 2.1.0's genuine hash, left by a months-old npm fallback; pin is 2.3.0.
+  # 2.1.0's genuine hash, left by a months-old npm fallback; pin is 2.3.4.
   write_stale_lock_fixture 2.1.0 \
     'sha512-9/Ro1UzrYT/erB7eR/rf61XHFyc5TOwQ94B6ij/Wu91TD1hnmbuqYu/PavKGUQ7YDBVCXFENRRvQSpTkS0X3eA=='
   run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
@@ -365,18 +368,18 @@ SH
     _copilot_ensure_pkg >/dev/null"
   [ "$status" -eq 0 ]
   [[ "$output" != *"does not match the trusted pin"* ]]
-  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.0" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.4" ]
 }
 
 @test "integrity guard: a lock for the INSTALLED version with a bad hash still refuses" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  write_stale_lock_fixture 2.3.0 'sha512-tampered'
+  write_stale_lock_fixture 2.3.4 'sha512-tampered'
   run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
     source '$SHELL_LIB'; _copilot_ensure_pkg"
   [ "$status" -ne 0 ]
   [[ "$output" == *"does not match the trusted pin"* ]]
   # The message must name both sides, or the next occurrence needs a bisect.
-  [[ "$output" == *"@2.3.0"* ]]
+  [[ "$output" == *"@2.3.4"* ]]
   [ ! -e "$TMP/data/copilot-api/pkg/.installed-spec" ]
 }
 

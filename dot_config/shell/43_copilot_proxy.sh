@@ -73,7 +73,7 @@
 #   COPILOT_API_PKG      default: unset       - temporary highest-priority
 #                                               package override. Otherwise use
 #                                               persisted selection, then built-in
-#                                               @jeffreycao/copilot-api@2.3.0.
+#                                               @jeffreycao/copilot-api@2.3.4.
 #   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
 #                                               by the original package (the fork
 #                                               has no rate limiter)
@@ -84,8 +84,8 @@
 # --- shared constants / helpers -------------------------------------------------
 
 _copilot_port() { printf '%s' "${COPILOT_PROXY_PORT:-4141}"; }
-_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.3.0'; }
-_copilot_builtin_integrity() { printf '%s' 'sha512-4h7ysNAO8N9zJkIcOnNPio9asGTMsRkvQ70deSRBSwkBJFOZXYeoKmiHU06VSP712gVNaTrRA7abLAPkTuINqA=='; }
+_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.3.4'; }
+_copilot_builtin_integrity() { printf '%s' 'sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ=='; }
 _copilot_pkg_selection_state() { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/package.json"; }
 _copilot_pkg() {
   if [ -n "${COPILOT_API_PKG:-}" ]; then printf '%s' "$COPILOT_API_PKG"; return; fi
@@ -364,7 +364,7 @@ _copilot_update_exact() {
     return 1
   fi
   printf '%s' "$version" | command grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || {
-    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.3.0)." >&2; return 1; }
+    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.3.4)." >&2; return 1; }
   for _tool in jq curl openssl bun; do command -v "$_tool" >/dev/null 2>&1 || {
     printf '%s\n' "copilot-proxy: update requires $_tool." >&2; return 1; }; done
 

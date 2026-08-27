@@ -61,7 +61,7 @@ Codex ──OpenAI /v1/responses──────────▶ 同一個 :414
 
 - Claude Code 只講 **Anthropic Messages API**（`/v1/messages`）。
 - fork 對 Claude id 使用 Copilot native Anthropic path；對 GPT id 把 Claude Code
-  request 轉成 **Responses API**。目前釘選的 `2.3.0` 會把 `output_config.effort` 正確轉成
+  request 轉成 **Responses API**。目前釘選的 `2.3.4` 會把 `output_config.effort` 正確轉成
   `reasoning.effort`，並支援 GPT-5.6 request shape 與 reasoning state。
 - Claude Code 透過 `ANTHROPIC_BASE_URL` 被指向代理 —— 注入方式有兩種：
   per-process 環境變數（`claude-copilot`），或 gitignore 掉的
@@ -104,7 +104,7 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | 代理監聽的 port |
 | `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto`（本機 Clash/Verge/mihomo 有在聽就帶 `--proxy-env`）、`never`（直連）、`always`（一定要偵測到 proxy）、或明確 URL |
-| `COPILOT_API_PKG` | 未設定 | 最高優先的暫時套件覆寫；否則使用已保存的 exact selection，再 fallback 到內建 `@jeffreycao/copilot-api@2.3.0`。設著時 `update VERSION` 不會改 persisted state。 |
+| `COPILOT_API_PKG` | 未設定 | 最高優先的暫時套件覆寫；否則使用已保存的 exact selection，再 fallback 到內建 `@jeffreycao/copilot-api@2.3.4`。設著時 `update VERSION` 不會改 persisted state。 |
 | `COPILOT_PROXY_RATE` | `15` | 僅舊版 `copilot-api@0.7.0` 使用；fork 沒有 rate limiter |
 | `COPILOT_PROXY_QUIET` | `0` | `1` 減少背景模型呼叫，但會犧牲部分 UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = 安裝時把 proxy 環境變數拿掉，跳過「bun 無法透過 proxy 解析」那 45 秒的卡頓 |
@@ -172,6 +172,15 @@ warm start 只執行已安裝 binary，不接觸 npm，因此 registry 下架只
 安裝並 smoke-test 後 atomic swap，保留 `pkg.previous`。若原本正在跑，而新版 swap 後健康
 啟動失敗，會還原舊 prefix 與 selection 並重啟。selection JSON 位於
 `$XDG_STATE_HOME/copilot-proxy/package.json`。
+
+經審核的內建 release 是 `@jeffreycao/copilot-api@2.3.4`：tag commit
+[`a515535`](https://github.com/caozhiyuan/copilot-api/commit/a51553569ba071e0c9a8329f8f5ccac2482a3945)、
+npm tarball SHA-1 `643f59e0c257db613954738f02300c0a7ceebfeb`、SRI
+`sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ==`、
+35 個檔案，以及 npm Trusted Publisher provenance
+[release run 32856658249](https://github.com/caozhiyuan/copilot-api/actions/runs/32856658249)。
+已有 persisted 舊 selection 的 host 必須明確執行 `copilot-proxy update 2.3.4`；已驗證的
+exact rollback target 仍是 `copilot-proxy update 2.3.0` 與 `copilot-proxy update 2.1.0`。
 
 **一般安裝**（非 `update`）時，會把釘選的 selection 與 prefix 內實際落地的版本互相驗證。
 `package-lock.json` 只在它記錄的 `version` 與已安裝版本相同時才採信：這個 prefix 天生是
@@ -443,7 +452,7 @@ copilot-here on             # 黏著本專案，或改用 claude-copilot-once
 |---|---|---|
 | CLI、tools、hooks、skills、memory、plugins、MCP、checkpoints、sandboxing | 可以 | 這些是本機 Claude Code 功能；GPT 收到的是經過轉譯的 Claude prompt/tool schema，行為可能不完全一樣。 |
 | subagents、dynamic workflows | 可以 | 不強制 `CLAUDE_CODE_SUBAGENT_MODEL`，保留 workflow/frontmatter 的 routing。[Workflow 文件](https://code.claude.com/docs/en/workflows) |
-| `ultracode` | `2.3.0` 可以 | Ultracode 是 xhigh effort + dynamic workflows，不是單獨模型；2.3.0 會把 effort 傳到 GPT-5.6。 |
+| `ultracode` | `2.3.4` 可以 | Ultracode 是 xhigh effort + dynamic workflows，不是單獨模型；2.3.4 會把 effort 傳到 GPT-5.6。 |
 | thinking/reasoning | 轉譯後可用 | GPT 使用 Responses reasoning，不是 Anthropic-native thinking semantics。 |
 | Web Search、fast/auto mode、MCP tool search | 依 provider | 由 base-URL gateway 與 Copilot endpoint 能力決定；non-first-party tool search 可能需要額外 bridge/plugin。 |
 | Ultrareview、Remote Control、Chrome、cloud Code Review、routines、web/mobile/Slack session | 不可以 | 這些需要 Claude.ai auth/cloud identity；local API gateway 無法取代。`ultrareview` 和 `ultracode` 無關。 |
@@ -580,7 +589,7 @@ Claude Code 的背景雜訊 —— 那正是 `COPILOT_PROXY_QUIET=1` 注入的�
 ### Context management 是轉譯，不是 Anthropic-native
 
 舊 fork 可能把 Claude Code 的 `context_management` 原樣送到會回 400 的 endpoint
-（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)）。目前釘選的 `2.3.0` 的
+（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)）。目前釘選的 `2.3.4` 的
 GPT-5.6 path 會壓掉這個不相容欄位，改依 Responses reasoning/context handling。這避開 400，
 但不會完整重現 Anthropic 的 context editing 與 prompt-cache semantics；長 session 仍需觀察。
 
