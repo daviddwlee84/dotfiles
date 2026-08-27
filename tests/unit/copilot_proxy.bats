@@ -787,6 +787,42 @@ JS
   [ "$(printf '%s' "$j" | jq -r '.metrics | length')" = "4" ]
 }
 
+@test "shim retries delayed 500s and bounds cancellation/error paths" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  local fixture="$SOURCE_DIR/tests/fixtures/copilot-shim-hardening.mjs"
+  run bash -c "bun '$fixture' '$shim' '$TMP/hardening-metrics.sqlite' 2>&1 | tail -n 1"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.retryReplay.attempts')" = "2" ]
+  [ "$(printf '%s' "$output" | jq -r '.retryReplay.sameBody')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.retryReplay.sameTrace')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.retry.events | join(",")')" = "message_start,message_stop" ]
+  [ "$(printf '%s' "$output" | jq -r '.cancelBarrier.waited')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.cancelBarrier.settled')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.exhausted.events | last')" = "response.failed" ]
+  [ "$(printf '%s' "$output" | jq -r '.responseCodes.status400')" = "invalid_prompt" ]
+  [ "$(printf '%s' "$output" | jq -r '.responseCodes.status401')" = "invalid_prompt" ]
+  [ "$(printf '%s' "$output" | jq -r '.responseCodes.status402')" = "insufficient_quota" ]
+  [ "$(printf '%s' "$output" | jq -r '.responseCodes.status429')" = "rate_limit_exceeded" ]
+  [ "$(printf '%s' "$output" | jq -r '.responseCodes.status500')" = "server_error" ]
+  [ "$(printf '%s' "$output" | jq -r '.counts["/v1/responses:status429"]')" = "2" ]
+  [ "$(printf '%s' "$output" | jq -r '.nonSse.events | last')" = "error" ]
+  [ "$(printf '%s' "$output" | jq -r '.fastNonSse.status')" = "502" ]
+  [ "$(printf '%s' "$output" | jq -r '.mixedSse.events | join(",")')" = "message_start,message_stop" ]
+  [ "$(printf '%s' "$output" | jq -r '.billing.status')" = "402" ]
+  [ "$(printf '%s' "$output" | jq -r '.stalled.elapsed_ms < 4000')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.cancellation.activeAbortResult')" = "AbortError" ]
+  [ "$(printf '%s' "$output" | jq -r '.cancellation.deadResult')" = "AbortError" ]
+  [ "$(printf '%s' "$output" | jq -r '.cancellation.backoffResult')" = "AbortError" ]
+  [ "$(printf '%s' "$output" | jq -r '.cancellation.backoffReleaseMs < 1000')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.counts["/v1/messages:backoff"]')" = "1" ]
+  [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "retry500" and .attempts == 2 and .retries == 1 and .error_kind == null)] | length')" = "1" ]
+  [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "nonsse" and .error_kind == "upstream_protocol")] | length')" = "2" ]
+  [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "activeabort" and .attempts == 1 and .status == 499 and .error_kind == "client_cancel")] | length')" = "1" ]
+  [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "dead" and .attempts == 0 and .error_kind == "client_cancel")] | length')" = "1" ]
+}
+
 @test "shim metrics join one-to-many token events and compute throughput" {
   command -v bun >/dev/null 2>&1 || skip "bun not installed"
   command -v jq >/dev/null 2>&1 || skip "jq not installed"

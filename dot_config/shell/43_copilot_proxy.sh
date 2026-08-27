@@ -439,8 +439,8 @@ _copilot_update_exact() {
 
 # --- throttle + metrics shim (default, in front of the fork) --------------------
 # A tiny Bun reverse proxy that caps concurrent in-flight upstream requests,
-# transparently retries 403/429 (GitHub enterprise abuse throttling) BEFORE any
-# body streams — so downstream agents never see "Please run /login" — and keeps
+# transparently retries 403/429/500/502/503/504 BEFORE any upstream model body
+# streams — so downstream agents never see transient gateway/throttle failures — and keeps
 # a streamed response alive with SSE comment frames while an OpenAI reasoning
 # model thinks (copilot-api withholds headers until the first token and sends no
 # `ping`, so the socket is otherwise silent for minutes and gets reaped; see

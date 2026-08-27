@@ -141,9 +141,8 @@ valid, and a restart alone recovered it.
   client request.
 - Avoid periodic live inference probes: they consume quota. Periodic blind
   restarts can also interrupt a valid long-running stream.
-- As of the observed version the shim's retry set is only
-  `403/429/502/503/504`; adding bare 401 to that set would just resend the same
-  expired token and is not a fix.
+- The shim retries `403/429/500/502/503/504`; adding bare 401 to that set would
+  just resend the same expired token and is not a fix.
 
 This is not being graduated to an `AGENTS.md` hard invariant yet: it does not
 silently corrupt state, and the workaround is a single manager command.

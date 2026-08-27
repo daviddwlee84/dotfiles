@@ -127,6 +127,19 @@ proxy 的重試；兩種嘗試都有 timeout 並會被殺掉，所以卡死的�
 managed Claude/Codex launcher 預設全部經過 shim。shim 啟用但啟動失敗時會 fail closed，
 不會靜默 fallback 到 `:4141`；`copilot-proxy shim off` 是明確的 break-glass 直連模式。
 
+在 upstream model bytes 尚未暴露前，shim 會對 network failure 或 HTTP
+403/429/500/502/503/504 重試**相同 buffered request 與 model**；HTTP 402 與 bare 401
+只通過一次。Queue waiter 與 retry backoff 都會回應 client cancel，放棄的 request 不會繼續
+佔住 permit。所有成功的 streamed response（包括 grace window 內的快速回應）都必須是
+SSE media type。慢 stream 在 queue/retry 期間持續收到 SSE comment；如果這段 pre-header
+pipeline 最後得到 non-2xx 或不是 SSE 的 HTTP 200，shim 會依 Anthropic Messages 或
+OpenAI Responses 的 terminal error shape 送出，不會把 raw JSON 接在 comment frames 後面。
+Responses 會把 402 分類為 quota、429 分類為 rate limit、其他 post-commit 4xx 分類為
+invalid prompt，5xx/transport failure 則分類為 server error，避免 Codex 重試不可重試的
+錯誤。延遲 bare 401 只能用 `invalid_prompt` 作為 stopgap，因 Codex 沒有不可重試的 Responses
+authentication code；只有尚未 commit 前的原始 HTTP 401 能保留 authentication semantics。
+一旦 model bytes 已開始，後續 body error/stall 只會終止 stream，不再 retry。
+
 ```sh
 copilot-proxy stats week --model gpt-5.6-sol
 copilot-proxy events day --limit 20 --json
@@ -533,10 +546,11 @@ headers 前卡死會 abort 並透明重試（此時 client 只收過 comment fra
 | `COPILOT_SHIM_PING_AFTER_MS` | `10000` | 提早 commit SSE 前容忍的靜默時間 |
 | `COPILOT_SHIM_STALL_MS` | `240000` | 判定上游卡死的靜默時間；`0` 關閉 |
 
-在 grace window 內回應的請求完全不受影響 —— 真正的 status code、真正的 headers ——
-這正是讓快速失敗的 `400 model_not_supported`、`401 IDE token expired` 仍能正確
-回報的原因。反面代價是：SSE response 一旦 commit，之後才出現的 non-2xx 只能以
-SSE `error` event 送出，所以不要把 `COPILOT_SHIM_PING_AFTER_MS` 調成 0。
+快速 non-2xx 回應保留真正的 status code 與 headers，因此
+`400 model_not_supported`、`401 IDE token expired` 仍能正確回報。對 `stream:true`
+的快速 HTTP 2xx，只有 SSE media type 才會接受；headers 尚未 commit 時，shim 仍可直接
+拒絕 protocol mismatch。SSE response 一旦 commit，之後才出現的 non-2xx 只能以
+protocol-native terminal event 送出，所以不要把 `COPILOT_SHIM_PING_AFTER_MS` 調成 0。
 
 FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器只在 agent 結束時才
 回填。先去看 `agent-<id>.jsonl` 的 `assistant` 筆數有沒有在長。完整診斷：

@@ -149,6 +149,22 @@ enabled but cannot start, launchers fail closed instead of silently bypassing
 measurement; `copilot-proxy shim off` is the explicit direct-to-`:4141`
 break-glass mode.
 
+Before upstream model bytes are exposed, the shim retries the **same buffered
+request and model** on network failures or HTTP 403/429/500/502/503/504. HTTP
+402 and bare 401 pass through once. Queue waiters and retry backoff are
+client-cancel aware, so an abandoned request cannot retain a permit ahead of
+live work. Every successful streamed response must have the SSE media type,
+including responses inside the grace window. For slow streams the shim sends
+SSE comments while queueing/retrying; if that pre-header pipeline then yields a
+non-2xx or a non-SSE HTTP 200, it emits the native Anthropic Messages or OpenAI
+Responses terminal error shape instead of splicing JSON after comment frames.
+Responses classify 402 as quota, 429 as rate limit, other post-commit 4xx as
+invalid prompt, and 5xx/transport failures as server error so Codex does not
+retry nonretryable failures. A delayed bare 401 must use `invalid_prompt` as a
+stopgap because Codex has no nonretryable Responses authentication code; only a
+pre-commit HTTP 401 preserves authentication semantics. Once model bytes have
+started, a later body error/stall terminates the stream and is not retried.
+
 ```sh
 copilot-proxy stats week --model gpt-5.6-sol
 copilot-proxy events day --limit 20 --json
@@ -635,11 +651,13 @@ with a real error instead of hanging.
 | `COPILOT_SHIM_PING_AFTER_MS` | `10000` | silence tolerated before the SSE response is committed early |
 | `COPILOT_SHIM_STALL_MS` | `240000` | silence that counts as a wedged upstream; `0` disables |
 
-Requests answered inside the grace window are untouched — real status code, real
-headers — which is what keeps a fast `400 model_not_supported` or `401 IDE token
-expired` reporting itself properly. Beware the flip side: once the SSE response
-is committed, a late non-2xx can only be delivered as an SSE `error` event, so
-don't shrink `COPILOT_SHIM_PING_AFTER_MS` to zero.
+Fast non-2xx responses keep their real status and headers, so a
+`400 model_not_supported` or `401 IDE token expired` still reports itself
+properly. A fast HTTP 2xx for `stream:true` is accepted only when its media type
+is SSE; the shim can still reject a protocol mismatch before committing headers.
+Once the SSE response is committed, a late non-2xx can only be delivered as a
+protocol-native terminal event, so don't shrink `COPILOT_SHIM_PING_AFTER_MS` to
+zero.
 
 `0 tok` in FleetView is **not** evidence of this bug — that counter is only
 filled in when an agent finishes. Check `agent-<id>.jsonl` for growing
