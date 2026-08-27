@@ -82,12 +82,13 @@ Three independent contributors, all of which have to be addressed:
 
 1. **copilot-api withholds headers until the first token and emits no `ping`.**
    The client socket is silent for the model's entire think time.
-2. **Queueing adds to that silence.** The shim's semaphore (`COPILOT_SHIM_MAX`,
-   default 4) makes request 5+ wait with *literally* zero traffic. Six review
-   agents plus a parent session exceed the cap immediately:
+2. **Queueing adds to that silence.** The shim starts at
+   `COPILOT_SHIM_MIN=4` and adapts toward `COPILOT_SHIM_MAX=8`; requests beyond
+   the current live limit wait with *literally* zero upstream traffic. Six
+   review agents plus a parent session can still exceed that limit:
 
    ```text
-   03:37:08.849Z [shim] queued POST /v1/messages (4 in-flight, 4 waiting)
+   03:37:08.849Z [shim] queueing POST /v1/messages (active=4/4, queued=4, ceiling=8)
    ```
 
    Queue time and think time stack, and both are silent.
@@ -98,7 +99,7 @@ Three independent contributors, all of which have to be addressed:
 
 ## Workaround
 
-The shim now does two things (`dot_config/shell/copilot-throttle-shim.js`):
+The shim now does three things (`dot_config/shell/copilot-throttle-shim.js`):
 
 - **Keepalive.** For a client-requested stream that produces nothing for
   `COPILOT_SHIM_PING_AFTER_MS` (default 10000), the shim commits the
@@ -114,26 +115,50 @@ The shim now does two things (`dot_config/shell/copilot-throttle-shim.js`):
   retry path (nothing but comment frames has reached the client, so re-issuing
   is transparent); a mid-stream timeout fails the response with a real error
   instead of hanging forever.
+- **Adaptive admission.** The live limit starts at 4, grows one slot at a time
+  only after sustained success under queue pressure, and returns to 4 for a
+  five-minute cooldown on any upstream 403/429. Lowering the live limit never
+  kills active streams; new waiters resume once active work drains below it.
+  `Retry-After` is respected for up to five minutes.
 
 Verify after `chezmoi apply`:
 
 ```sh
 copilot-proxy shim off && copilot-proxy shim on
 copilot-proxy logs shim | tail -1
-#   [shim] listening on :4142 -> http://localhost:4141 (max=4, retries=3,
+#   [shim] listening on :4142 -> http://localhost:4141 (limit=4, range=4..8,
 #          backoff=500ms, ping=15000ms after 10000ms, stall=240000ms)
 ```
 
-For a multi-agent workflow, also raise the concurrency cap — the keepalive stops
-queued agents from *dying*, it does not make them *run*:
+Inspect or change the limiter without restarting the shim:
 
 ```sh
-export COPILOT_SHIM_MAX=8        # persist in ~/.shellrc.adhoc to keep it
-copilot-proxy shim off && copilot-proxy shim on
+copilot-proxy limiter status
+copilot-proxy limiter set --limit 6
+copilot-proxy limiter set --min 4 --max 8
+copilot-proxy limiter reset
 ```
 
-(the env var has to be exported, not prefixed — a `VAR=… copilot-proxy shim off`
-prefix would apply to the `off` and be gone by the time `on` spawns the process).
+Live changes are process-local. Persist a different range by exporting
+`COPILOT_SHIM_MIN/MAX` in `~/.shellrc.adhoc`; setting them equal restores a
+fixed cap. The variables have to be exported, not command-prefixed, so the
+spawned Bun process inherits them.
+
+The line
+
+```text
+[shim] POST /v1/messages silent for 10000ms; keepalive engaged (phase=upstream, ...)
+```
+
+is a health action, not a stall report. `phase=queue` distinguishes local
+admission delay from `phase=upstream` model think time. Use
+`copilot-proxy logs shim -f` to watch transitions live.
+
+One adjacent latency trap is not fixable in the shim: the current pinned
+`@jeffreycao/copilot-api` removes Responses `service_tier` before forwarding.
+`claude-copilot-once` GPT requests and `codex-copilot` requests therefore use
+Copilot default scheduling even if the ordinary Codex config displays fast
+mode. `copilot-proxy doctor` inspects the installed bundle and reports this.
 
 ## Prevention
 

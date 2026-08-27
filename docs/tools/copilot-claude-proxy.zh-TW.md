@@ -26,9 +26,9 @@ fork（npm `@jeffreycao/copilot-api`）。
     用 Copilot 訂閱去驅動非 GitHub 的 agent 是不被允許的，且 copilot-api 是逆向工程/非官方
     的。copilot-api 自己的 README 就警告它可能觸發 GitHub 的 **濫用偵測 (abuse detection)**，
     導致 **Copilot 存取被暫時停權 (temporary suspension)**。Claude Code 很吃 token（頻繁的背景
-    請求、大 context），而 fork 本身沒有 rate limiter；可選擇性設
-    `COPILOT_PROXY_QUIET=1` 減少背景呼叫。風險自負；建議用個人帳號而非公司席位
-    (corporate seat)。
+    請求、大 context）；fork 本身沒有 rate limiter，所以本機 shim 以保守 queue + 自適應並行
+    控制 burst，另可設 `COPILOT_PROXY_QUIET=1` 減少背景呼叫。兩者都不是上游保證的安全上限。
+    風險自負；建議用個人帳號而非公司席位 (corporate seat)。
 
 ## 快速開始
 
@@ -96,7 +96,7 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|status|stats|events|quota|bench|update|...]`
+### `copilot-proxy [start|stop|status|stats|events|limiter|logs|quota|bench|update|...]`
 
 在 `$COPILOT_PROXY_PORT`（預設 `4141`）管理背景代理。
 
@@ -106,6 +106,8 @@ shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆�
 | `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto`（本機 Clash/Verge/mihomo 有在聽就帶 `--proxy-env`）、`never`（直連）、`always`（一定要偵測到 proxy）、或明確 URL |
 | `COPILOT_API_PKG` | 未設定 | 最高優先的暫時套件覆寫；否則使用已保存的 exact selection，再 fallback 到內建 `@jeffreycao/copilot-api@2.3.4`。設著時 `update VERSION` 不會改 persisted state。 |
 | `COPILOT_PROXY_RATE` | `15` | 僅舊版 `copilot-api@0.7.0` 使用；fork 沒有 rate limiter |
+| `COPILOT_SHIM_MIN` | `4` | 自適應並行 floor，也是啟動 limit |
+| `COPILOT_SHIM_MAX` | `8` | 自適應 ceiling；設成與 `MIN` 相同即可固定上限 |
 | `COPILOT_PROXY_QUIET` | `0` | `1` 減少背景模型呼叫，但會犧牲部分 UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = 安裝時把 proxy 環境變數拿掉，跳過「bun 無法透過 proxy 解析」那 45 秒的卡頓 |
 
@@ -140,6 +142,21 @@ invalid prompt，5xx/transport failure 則分類為 server error，避免 Codex 
 authentication code；只有尚未 commit 前的原始 HTTP 401 能保留 authentication semantics。
 一旦 model bytes 已開始，後續 body error/stall 只會終止 stream，不再 retry。
 
+Admission control 現在是自適應，而不是固定 semaphore。啟動時從
+`COPILOT_SHIM_MIN=4` 開始，只有在確實有人排隊且持續成功時，才逐格增加到
+`COPILOT_SHIM_MAX=8`。上游一旦回 403/429 就立刻降回 floor 並冷卻五分鐘；
+`Retry-After` 最多尊重五分鐘。設定 `MIN=MAX` 可得到固定上限。live 調整不會
+中斷正在跑的 stream，也不必重啟：
+
+```sh
+copilot-proxy limiter status
+copilot-proxy limiter set --min 4 --max 8 --limit 6
+copilot-proxy limiter reset     # 回到啟動環境值；live 改動不持久化
+```
+
+寫入端點只接受 loopback，且要求 manager 專用 admin header。若要持久化範圍，
+在 `~/.shellrc.adhoc` export `COPILOT_SHIM_MIN/MAX`，之後再重啟 shim。
+
 ```sh
 copilot-proxy stats week --model gpt-5.6-sol
 copilot-proxy events day --limit 20 --json
@@ -148,7 +165,8 @@ copilot-proxy bench --model gpt-5.6-sol --runs 3 --max-output 256
 ```
 
 `stats` 預設只算一般使用；benchmark 要用 `--scope benchmark`，兩者合併則用 `all`。
-輸出包含 request/error/retry、queue、upstream headers、first byte、stream、end-to-end 的
+輸出包含 request/error/retry，並把 client cancel 與 upstream failure 分開；另有 queue、
+upstream headers、first byte、stream、end-to-end 的
 p50/p90/max，以及 token、AIU、output token/s。只有完成的 stream 且能對到 token event
 時才計算吞吐量，否則為 `null`。
 
@@ -536,8 +554,8 @@ TLS 驗證仍保持開啟，這是在繞過已觀察到的 Bun/Node CA-store 差
 response *headers* 在 8.11s 才到、第一個 body chunk 在 8.12s，也就是 reasoning
 model 的整段思考時間都耗在同一個 `fetch()` 裡，線上一個 byte 都沒有。真正的
 Anthropic stream 會用週期性的 `ping` event 蓋住這段，這個 gateway 一個都不送。
-再加上 shim 的併發佇列（`COPILOT_SHIM_MAX`，預設 4 —— 第 5 個請求在完全靜默中
-排隊），路徑上任何一個 idle timer 都可以合法回收一條其實健康的連線。agent 這端
+再加上 shim 的併發佇列（自適應範圍 4..8；超過當下 live limit 的請求會排隊），
+路徑上任何一個 idle timer 都可以合法回收一條其實健康的連線。agent 這端
 不會收到錯誤、只會一直等，最後只能 Esc + `continue`。
 
 因此對「client 要求 streaming」的請求，shim 會在靜默達
@@ -551,6 +569,8 @@ headers 前卡死會 abort 並透明重試（此時 client 只收過 comment fra
 
 | Env | 預設 | 意義 |
 |---|---|---|
+| `COPILOT_SHIM_MIN` | `4` | 自適應並行 floor，也是啟動 limit |
+| `COPILOT_SHIM_MAX` | `8` | 自適應 ceiling；設成與 `MIN` 相同即可固定上限 |
 | `COPILOT_SHIM_PING_MS` | `15000` | 心跳間隔；`0` 關閉 |
 | `COPILOT_SHIM_PING_AFTER_MS` | `10000` | 提早 commit SSE 前容忍的靜默時間 |
 | `COPILOT_SHIM_STALL_MS` | `240000` | 判定上游卡死的靜默時間；`0` 關閉 |
@@ -564,6 +584,15 @@ protocol-native terminal event 送出，所以不要把 `COPILOT_SHIM_PING_AFTER
 FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器只在 agent 結束時才
 回填。先去看 `agent-<id>.jsonl` 的 `assistant` 筆數有沒有在長。完整診斷：
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md)。
+
+### Codex fast mode 不會穿過 Copilot gateway
+
+目前釘選的 `@jeffreycao/copilot-api` bundle 會在轉送 GitHub Copilot 前明確移除
+Responses 的 `service_tier`。兩條路徑都受影響：`codex-copilot` 即使要求 Codex
+`service_tier = "fast"`，fork 仍會丟掉；`claude-copilot-once` 送 Anthropic
+`/v1/messages`，GPT model 轉成 Responses 時也不會補 priority tier。因此兩者都使用
+Copilot 預設排程。`copilot-proxy doctor` 會檢查實際安裝 bundle 並揭露這點，避免把
+本機 Codex 的 fast 指示誤認成上游 tier。shim 不會注入未受支援的 priority 值。
 
 ### 舊版 shim 會卡住 port，而不是被換掉
 
@@ -583,7 +612,8 @@ FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器�
 
 fork 的 `start` 拿掉了 `--rate-limit`/`--wait`。它 README 給的緩解方式是改成減少
 Claude Code 的背景雜訊 —— 那正是 `COPILOT_PROXY_QUIET=1` 注入的東西（這裡預設關閉；
-我們優先保 UX 而不是 Copilot quota）。真的需要請求節流的話，退回原始套件：
+我們優先保 UX 而不是 Copilot quota）。前置 shim 現在提供並行 admission 與 transient
+retry，但它不是按時間間隔限制請求的 rate limiter。真的需要後者時，退回原始套件：
 `COPILOT_API_PKG=copilot-api@0.7.0`。
 
 ### Context management 是轉譯，不是 Anthropic-native
@@ -648,8 +678,12 @@ claude-copilot-once                  # 透過 settings.local.json pin 跑一次 
 copilot-here status                  # 這個專案有釘在代理上嗎？
 copilot-model -c                     # 目前模型 + 來自哪一層
 copilot-proxy status                 # 有沒有在跑？提供哪些 Claude 模型？
+copilot-proxy limiter status         # live limit / active / queued
+copilot-proxy limiter set --limit 6  # 暫時調整，不重啟或中斷 stream
 copilot-proxy whoami                 # 驗證 token → 帳號 / plan / quota
 copilot-proxy logs 60                # tail 代理的 log
+copilot-proxy logs -f 60             # 跨 restart / rotation 持續 follow
+copilot-proxy logs shim -f            # follow limiter 與 keepalive 事件
 # 用量儀表板 (dashboard)（fork 已在本地內建）：
 #   http://localhost:4141/usage-viewer?endpoint=http://localhost:4141/usage
 ```

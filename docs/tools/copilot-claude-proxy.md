@@ -29,10 +29,11 @@ Both packages share the same token file
     Using a Copilot subscription to power a non-GitHub agent is not permitted, and
     copilot-api is reverse-engineered/unofficial. It can trigger GitHub's
     **abuse detection** and lead to **temporary suspension of Copilot access**.
-    Claude Code is token-hungry (frequent background calls, large context) —
-    note the fork has **no rate limiter** (see Gotchas); `COPILOT_PROXY_QUIET=1`
-    reduces background chatter. Use at your own risk; prefer a personal account
-    over a corporate seat.
+    Claude Code is token-hungry (frequent background calls, large context).
+    The fork has no native rate limiter, so the local shim conservatively
+    queues/adapts concurrent requests; `COPILOT_PROXY_QUIET=1` additionally
+    reduces background chatter. Neither is an upstream-guaranteed safe limit.
+    Use at your own risk; prefer a personal account over a corporate seat.
 
 ## Quick start
 
@@ -110,7 +111,7 @@ So the proxy uses the two layers nobody else owns:
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|status|stats|events|quota|bench|update|...]`
+### `copilot-proxy [start|stop|status|stats|events|limiter|logs|quota|bench|update|...]`
 
 Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 
@@ -120,6 +121,8 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 | `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
 | `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.3.4` pin. While set, `update VERSION` refuses to change persisted state. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
+| `COPILOT_SHIM_MIN` | `4` | adaptive concurrency floor and startup limit |
+| `COPILOT_SHIM_MAX` | `8` | adaptive ceiling; set equal to `MIN` for a fixed cap |
 | `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = install the package with the proxy env stripped, skipping the 45s stall on a host where bun cannot resolve through the proxy |
 
@@ -165,6 +168,24 @@ stopgap because Codex has no nonretryable Responses authentication code; only a
 pre-commit HTTP 401 preserves authentication semantics. Once model bytes have
 started, a later body error/stall terminates the stream and is not retried.
 
+Admission control is adaptive rather than a fixed semaphore. It starts at
+`COPILOT_SHIM_MIN=4` and may grow one slot at a time to
+`COPILOT_SHIM_MAX=8` only after sustained successful traffic while requests
+are actually queued. An upstream 403/429 immediately returns it to the floor
+and holds a five-minute cooldown; `Retry-After` is respected for up to five
+minutes. Set `MIN=MAX` for a fixed cap. Live changes do not interrupt active
+streams and do not require a restart:
+
+```sh
+copilot-proxy limiter status
+copilot-proxy limiter set --min 4 --max 8 --limit 6
+copilot-proxy limiter reset     # startup env values; all live changes are ephemeral
+```
+
+The write endpoint is loopback-only and requires the manager's dedicated admin
+header. To persist a range, export `COPILOT_SHIM_MIN/MAX` in
+`~/.shellrc.adhoc` and restart the shim later.
+
 ```sh
 copilot-proxy stats week --model gpt-5.6-sol
 copilot-proxy events day --limit 20 --json
@@ -173,7 +194,8 @@ copilot-proxy bench --model gpt-5.6-sol --runs 3 --max-output 256
 ```
 
 `stats` defaults to normal interactive traffic; choose `--scope benchmark` or
-`--scope all` explicitly. It reports request/error/retry counts, p50/p90/max
+`--scope all` explicitly. It reports request/error/retry counts, separates
+client cancellations from upstream failures, and shows p50/p90/max
 queue time, upstream-header time, first-byte time, stream/end-to-end duration,
 tokens, AIU and output tokens/sec. Output throughput is only calculated for a
 completed stream that has a matching token event; otherwise it is `null`.
@@ -641,7 +663,7 @@ with `gpt-5.6-sol`, the response *headers* arrive at 8.11s and the first body
 chunk at 8.12s, so a reasoning model's whole think time is spent inside one
 `fetch()` with zero bytes on the wire. Real Anthropic streams cover that with
 periodic `ping` events; this gateway emits none. Add the shim's concurrency
-queue on top (`COPILOT_SHIM_MAX`, default 4 — request 5 waits in total silence)
+queue on top (adaptive range 4..8 — requests beyond the current live limit wait)
 and any idle timer in the path is free to reap a perfectly healthy connection.
 The agent then hangs with no error, and the only way out is Esc + `continue`.
 
@@ -657,6 +679,8 @@ with a real error instead of hanging.
 
 | Env | Default | Meaning |
 |---|---|---|
+| `COPILOT_SHIM_MIN` | `4` | adaptive concurrency floor and startup limit |
+| `COPILOT_SHIM_MAX` | `8` | adaptive ceiling; set equal to `MIN` for a fixed cap |
 | `COPILOT_SHIM_PING_MS` | `15000` | keepalive interval; `0` disables |
 | `COPILOT_SHIM_PING_AFTER_MS` | `10000` | silence tolerated before the SSE response is committed early |
 | `COPILOT_SHIM_STALL_MS` | `240000` | silence that counts as a wedged upstream; `0` disables |
@@ -673,6 +697,18 @@ zero.
 filled in when an agent finishes. Check `agent-<id>.jsonl` for growing
 `assistant` entries first. Full diagnosis:
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md).
+
+### Codex fast mode does not cross the Copilot gateway
+
+The current pinned `@jeffreycao/copilot-api` bundle explicitly removes
+Responses `service_tier` before forwarding to GitHub Copilot. This affects both
+routes: `codex-copilot` may request Codex `service_tier = "fast"`, but the fork
+drops it; `claude-copilot-once` sends Anthropic `/v1/messages`, which the fork
+translates to Responses for GPT models without adding a priority tier. Both use
+Copilot's default scheduling. `copilot-proxy doctor` inspects the installed
+bundle and reports this instead of implying that a local Codex fast indicator
+controls the upstream tier. The shim deliberately does not inject an
+unsupported priority value.
 
 ### An old shim build wedges the port instead of being replaced
 
@@ -697,8 +733,10 @@ is a flood of `GET /_shim/health 404` in the **proxy's** log
 The fork's `start` dropped `--rate-limit`/`--wait`. Its README's mitigation is
 reducing Claude Code's chatter instead — that's exactly what
 `COPILOT_PROXY_QUIET=1` injects (off by default here; we prioritize UX over
-Copilot quota). If you really want request throttling, fall back to the
-original: `COPILOT_API_PKG=copilot-api@0.7.0`.
+Copilot quota). The front shim now supplies concurrency admission and transient
+retry, but it is not a time-based request-rate limiter. If that exact behavior
+is required, fall back to the original:
+`COPILOT_API_PKG=copilot-api@0.7.0`.
 
 ### Context management is translated, not Anthropic-native
 
@@ -766,8 +804,12 @@ claude-copilot-once                  # one-shot session via the settings.local.j
 copilot-here status                  # is this project pinned to the proxy?
 copilot-model -c                     # current model + which layer it came from
 copilot-proxy status                 # up? which Claude models?
+copilot-proxy limiter status         # live adaptive limit / active / queued
+copilot-proxy limiter set --limit 6  # temporary, no restart or stream abort
 copilot-proxy whoami                 # validate token → account / plan / quota
 copilot-proxy logs 60                # tail the proxy log
+copilot-proxy logs -f 60             # follow it across restart/log rotation
+copilot-proxy logs shim -f            # follow adaptive limiter + keepalive events
 # usage dashboard (bundled locally by the fork):
 #   http://localhost:4141/usage-viewer?endpoint=http://localhost:4141/usage
 ```

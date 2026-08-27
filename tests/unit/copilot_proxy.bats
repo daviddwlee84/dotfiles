@@ -461,6 +461,18 @@ SH
   [[ "$output" == claude-sonnet-5\|state\ file:* ]]
 }
 
+@test "doctor helper detects when the installed fork strips fast service_tier" {
+  mkdir -p "$TMP/pkg/node_modules/@jeffreycao/copilot-api/dist"
+  printf '%s\n' 'payload.service_tier = void 0;' >"$TMP/pkg/node_modules/@jeffreycao/copilot-api/dist/server-test.js"
+  run bash -c "source '$SHELL_LIB';
+    _copilot_pkg_flavor() { printf fork; }
+    _copilot_pkg_prefix() { printf '%s' '$TMP/pkg'; }
+    _copilot_pkg_name() { printf '%s' '@jeffreycao/copilot-api'; }
+    _copilot_fast_tier_state"
+  [ "$status" -eq 0 ]
+  [ "$output" = "stripped" ]
+}
+
 # --- model ranking / Claude Code role profiles ---------------------------------
 
 @test "pick_best_model: Claude Fable outranks Opus and OpenAI" {
@@ -727,6 +739,80 @@ SH
   [ "$(printf '%s' "$output" | jq -r '.garbage')" = "false" ]
 }
 
+@test "adaptive limiter ramps under queue pressure, backs off on throttle, and supports live reset" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bun -e "
+    let now=0; const changes=[];
+    const {createAdaptiveLimiter}=await import('$shim');
+    const l=createAdaptiveLimiter({min:4,max:6,successThreshold:2,increaseIntervalMs:100,
+      throttleCooldownMs:500,clock:()=>now,onChange:(c)=>changes.push(c)});
+    l.noteQueued(); now=100; l.observeStatus(200,true); l.observeStatus(200,true);
+    const raised=l.snapshot();
+    now=150; l.observeStatus(429,true); const throttled=l.snapshot();
+    now=700; l.noteQueued(); l.observeStatus(200,true); l.observeStatus(200,true);
+    const recovered=l.snapshot();
+    const configured=l.configure({min:5,max:7,limit:6});
+    const reset=l.reset();
+    console.log(JSON.stringify({raised,throttled,recovered,configured,reset,changes}));"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.raised.limit')" = "5" ]
+  [ "$(printf '%s' "$output" | jq -r '.throttled.limit')" = "4" ]
+  [ "$(printf '%s' "$output" | jq -r '.throttled.last_throttle_status')" = "429" ]
+  [ "$(printf '%s' "$output" | jq -r '.recovered.limit')" = "5" ]
+  [ "$(printf '%s' "$output" | jq -r '.configured | [.min,.max,.limit] | join(",")')" = "5,7,6" ]
+  [ "$(printf '%s' "$output" | jq -r '.reset | [.min,.max,.limit] | join(",")')" = "4,6,4" ]
+}
+
+@test "shim limiter config endpoint is readable and loopback-admin writable" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  cat >"$TMP/limiter-live.js" <<'JS'
+process.env.COPILOT_SHIM_PORT = "0";
+process.env.COPILOT_SHIM_MIN = "2";
+process.env.COPILOT_SHIM_MAX = "5";
+process.env.COPILOT_SHIM_METRICS_DB = process.argv[3];
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const upstream = Bun.serve({ port: 0, async fetch() {
+  await sleep(250);
+  return Response.json({ ok: true });
+} });
+process.env.COPILOT_SHIM_UPSTREAM = `http://127.0.0.1:${upstream.port}`;
+const { startServer } = await import(process.argv[2]);
+const shim = startServer();
+const base = `http://127.0.0.1:${shim.port}/_shim/config`;
+const read = await (await fetch(base)).json();
+const denied = await fetch(base, { method: "PATCH", headers: { "content-type": "application/json" }, body: '{"limit":3}' });
+const changed = await (await fetch(base, { method: "PATCH", headers: {
+  "content-type": "application/json", "x-copilot-shim-admin": "1",
+}, body: '{"min":3,"max":6,"limit":5}' })).json();
+const calls = Array.from({length:4}, () => fetch(`http://127.0.0.1:${shim.port}/probe`, {
+  method: "POST", headers: {"content-type":"application/json"},
+  body: '{"model":"m","stream":false}',
+}));
+await sleep(50);
+const lowered = await (await fetch(base, { method: "PATCH", headers: {
+  "content-type": "application/json", "x-copilot-shim-admin": "1",
+}, body: '{"min":1,"limit":1}' })).json();
+const statuses = await Promise.all(calls).then((rows) => rows.map((row) => row.status));
+const reset = await (await fetch(base, { method: "PATCH", headers: {
+  "content-type": "application/json", "x-copilot-shim-admin": "1",
+}, body: '{"reset":true}' })).json();
+console.log(JSON.stringify({read,denied:denied.status,changed,lowered,statuses,reset}));
+shim.stop(true);
+upstream.stop(true);
+JS
+  run bash -c "bun '$TMP/limiter-live.js' '$shim' '$TMP/limiter-live.sqlite' 2>&1 | tail -n 1"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.read | [.min,.max,.limit] | join(",")')" = "2,5,2" ]
+  [ "$(printf '%s' "$output" | jq -r '.denied')" = "403" ]
+  [ "$(printf '%s' "$output" | jq -r '.changed | [.min,.max,.limit] | join(",")')" = "3,6,5" ]
+  [ "$(printf '%s' "$output" | jq -r '.lowered | [.active,.limit] | join(",")')" = "4,1" ]
+  [ "$(printf '%s' "$output" | jq -r '.statuses | unique | join(",")')" = "200" ]
+  [ "$(printf '%s' "$output" | jq -r '.reset | [.min,.max,.limit] | join(",")')" = "2,5,2" ]
+}
+
 # End-to-end against a mock upstream that withholds its response headers the way
 # copilot-api does while a reasoning model thinks. Guards the four-way split the
 # keepalive introduced; see pitfalls/copilot-proxy-openai-model-silent-stall.md.
@@ -870,7 +956,41 @@ JS
     copilot-proxy stats day --json; copilot-proxy events day"
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | head -n1 | jq -r '.requests')" = "0" ]
+  [ "$(printf '%s\n' "$output" | head -n1 | jq -r '.client_cancels')" = "0" ]
+  [ "$(printf '%s\n' "$output" | head -n1 | jq -r '.upstream_errors')" = "0" ]
   [[ "$output" == *"no matching requests"* ]]
+}
+
+@test "copilot-proxy logs follows current files and preserves rotated-log syntax" {
+  mkdir -p "$TMP/bin"
+  printf '%s\n' '#!/bin/sh' 'printf "tail"; for arg do printf "|%s" "$arg"; done; printf "\n"' >"$TMP/bin/tail"
+  printf '%s\n' '#!/bin/sh' 'exit 0' >"$TMP/bin/bun"
+  chmod +x "$TMP/bin/tail" "$TMP/bin/bun"
+  : >"$TMP/proxy.log"; : >"$TMP/proxy.log.1"; : >"$TMP/shim.log"
+  run bash -c "PATH='$TMP/bin:/usr/bin:/bin'; source '$SHELL_LIB';
+    _copilot_logfile() { printf '%s' '$TMP/proxy.log'; }
+    _copilot_shim_logfile() { printf '%s' '$TMP/shim.log'; }
+    copilot-proxy logs -f 60
+    copilot-proxy logs shim --follow 20
+    copilot-proxy logs 40 1"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed -n '1p')" = "tail|-n|60|-F|$TMP/proxy.log" ]
+  [ "$(printf '%s\n' "$output" | sed -n '2p')" = "tail|-n|20|-F|$TMP/shim.log" ]
+  [ "$(printf '%s\n' "$output" | sed -n '3p')" = "tail|-n|40|$TMP/proxy.log.1" ]
+
+  run bash -c "source '$SHELL_LIB'; _copilot_logfile() { printf '%s' '$TMP/proxy.log'; }; copilot-proxy logs -f 40 1"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"cannot follow a rotated generation"* ]]
+}
+
+@test "copilot-proxy limiter builds live PATCH payloads without persisting state" {
+  run bash -c "source '$SHELL_LIB';
+    _copilot_shim_alive() { return 0; }
+    _copilot_limiter_request() { printf '{\"limit\":6,\"min\":4,\"max\":8,\"active\":3,\"queued\":1,\"adaptive\":true,\"cooldown_ms_remaining\":0,\"successes_to_increase\":12,\"throttle_events\":0,\"last_throttle_status\":null}'; }
+    copilot-proxy limiter set --min 4 --max 8 --limit 6"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | sed '/^copilot-proxy:/d' | jq -r '.limit')" = "6" ]
+  [[ "$output" == *"process only"* ]]
 }
 
 @test "copilot-here on reports the shim URL it actually writes" {

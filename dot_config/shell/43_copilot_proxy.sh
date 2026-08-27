@@ -77,6 +77,9 @@
 #   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
 #                                               by the original package (the fork
 #                                               has no rate limiter)
+#   COPILOT_SHIM_MIN     default: 4           - adaptive concurrency floor
+#   COPILOT_SHIM_MAX     default: 8           - adaptive concurrency ceiling;
+#                                               set MIN=MAX for a fixed cap
 #   COPILOT_PROXY_QUIET  default: 0           - 1 = inject extra quota-saving env
 #                                               (fewer background calls, but a
 #                                               slightly degraded Claude Code UX)
@@ -445,7 +448,7 @@ _copilot_update_exact() {
 # model thinks (copilot-api withholds headers until the first token and sends no
 # `ping`, so the socket is otherwise silent for minutes and gets reaped; see
 # pitfalls/copilot-proxy-openai-model-silent-stall.md). Toggle with
-# `copilot-proxy shim on|off`; tune via COPILOT_SHIM_{PORT,MAX,RETRIES,
+# `copilot-proxy shim on|off`; tune via COPILOT_SHIM_{PORT,MIN,MAX,RETRIES,
 # BACKOFF_MS,PING_MS,PING_AFTER_MS,STALL_MS} — the whole COPILOT_SHIM_* env is
 # inherited by the spawned process, so `export` them before `shim on`.
 _copilot_shim_port()    { printf '%s' "${COPILOT_SHIM_PORT:-4142}"; }
@@ -470,6 +473,53 @@ _copilot_shim_enabled() {
 # older passthrough build on the same port)?
 _copilot_shim_alive() {
   command curl -fsS -o /dev/null --max-time 2 "$(_copilot_shim_base)/_shim/health" >/dev/null 2>&1
+}
+
+_copilot_shim_health_json() {
+  command curl -fsS --max-time 2 "$(_copilot_shim_base)/_shim/health" 2>/dev/null
+}
+
+# Live limiter control is deliberately process-local. Persistent defaults still
+# come from exported COPILOT_SHIM_MIN/MAX and take effect on the next shim start.
+# The custom header is required by the loopback-only admin endpoint, preventing
+# a browser form or a LAN peer from changing admission control accidentally.
+_copilot_limiter_request() {
+  local method="${1:-GET}" body="${2:-}"
+  local response code response_body error
+  if [ "$method" = GET ]; then
+    response="$(command curl -sS --max-time 3 -w '\n%{http_code}' "$(_copilot_shim_base)/_shim/config")" || return 1
+  else
+    response="$(command curl -sS --max-time 3 -X PATCH \
+      -H 'content-type: application/json' \
+      -H 'x-copilot-shim-admin: 1' \
+      -d "$body" -w '\n%{http_code}' "$(_copilot_shim_base)/_shim/config")" || return 1
+  fi
+  code="$(printf '%s\n' "$response" | command tail -n 1)"
+  response_body="$(printf '%s\n' "$response" | command sed '$d')"
+  case "$code" in
+    2*) printf '%s' "$response_body" ;;
+    *)
+      error="$(printf '%s' "$response_body" | jq -r '.error // empty' 2>/dev/null)"
+      [ -n "$error" ] || error="running shim may predate live limiter support; restart it after active requests drain"
+      printf '%s\n' "copilot-proxy: limiter request failed (HTTP $code): $error" >&2
+      return 1 ;;
+  esac
+}
+
+# The maintained fork currently removes Responses service_tier before sending
+# to GitHub Copilot. Inspect the installed bundle rather than guessing from the
+# user's Codex config; a future fork version that changes this returns unknown.
+_copilot_fast_tier_state() {
+  [ "$(_copilot_pkg_flavor)" = fork ] || { printf '%s' unknown; return 0; }
+  local dist
+  for dist in "$(_copilot_pkg_prefix)"/node_modules/"$(_copilot_pkg_name)"/dist/server-*.js; do
+    [ -f "$dist" ] || continue
+    if command grep -Eq 'payload\.service_tier[[:space:]]*=[[:space:]]*void 0|delete websocketPayload\.service_tier' "$dist" 2>/dev/null; then
+      printf '%s' stripped
+      return 0
+    fi
+  done
+  printf '%s' unknown
 }
 
 # Base URL managed clients should use. An enabled-but-down shim is a hard fault:
@@ -841,7 +891,8 @@ _copilot_stale_installers() {
 
 # --- proxy manager --------------------------------------------------------------
 
-# Manage the copilot-api proxy. Subcommands: start|stop|status|restart|logs|auth.
+# Manage the copilot-api proxy. Subcommands include start/stop/status/restart,
+# logs, limiter, metrics, auth, update and diagnostics.
 # Example:
 #   copilot-proxy start          # background-start on $COPILOT_PROXY_PORT
 #   copilot-proxy status         # is it up? which models?
@@ -1001,7 +1052,7 @@ copilot-proxy() {
       ;;
     status)
       if _copilot_alive; then
-        local status_json status_count status_claude
+        local status_json status_count status_claude _shim_health _shim_detail
         status_json="$(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null || true)"
         status_count="$(printf '%s' "$status_json" | jq -r '.data | length' 2>/dev/null || printf '?')"
         status_claude="$(printf '%s' "$status_json" | jq -r '[.data[]?.id | select(startswith("claude-"))] | join(" ")' 2>/dev/null)"
@@ -1010,7 +1061,11 @@ copilot-proxy() {
         printf '%s\n' "  models: $status_count served; Claude: $status_claude"
         if _copilot_shim_enabled; then
           if _copilot_shim_alive; then
-            printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)  → clients use this"
+            _shim_health="$(_copilot_shim_health_json || true)"
+            _shim_detail="$(printf '%s' "$_shim_health" | jq -r '
+              if (.limit // null) == null then ""
+              else " (active \(.active)/\(.limit), queued \(.queued), range \(.min)..\(.max))" end' 2>/dev/null)"
+            printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)${_shim_detail}  → clients use this"
           else
             printf '%s\n' "  shim:   ON but DOWN (managed clients fail closed; try 'copilot-proxy shim on')"
           fi
@@ -1112,7 +1167,13 @@ copilot-proxy() {
         _skip "installer" "no wedged 'bun add' process"
       fi
       if _copilot_shim_enabled; then
-        if _copilot_shim_alive; then _ok "throttle shim" "up on $(_copilot_shim_base) → clients use this"
+        if _copilot_shim_alive; then
+          local _health _health_detail
+          _health="$(_copilot_shim_health_json || true)"
+          _health_detail="$(printf '%s' "$_health" | jq -r '
+            if (.limit // null) == null then ""
+            else "active \(.active)/\(.limit), queued \(.queued), range \(.min)..\(.max)" end' 2>/dev/null)"
+          _ok "throttle shim" "up on $(_copilot_shim_base)${_health_detail:+ — $_health_detail}"
         else _bad "throttle shim" "enabled but DOWN"; _hint "copilot-proxy shim on"; fi
       else
         _skip "throttle shim" "off"
@@ -1230,6 +1291,13 @@ EOF
         else
           _bad "model roles" "could not compute the effective role profile"
         fi
+        case "$(_copilot_fast_tier_state)" in
+          stripped)
+            _note "fast tier" "current fork strips Responses service_tier; Claude/Codex through this gateway use Copilot default scheduling"
+            _hint "Codex service_tier=\"fast\" does not survive the localhost gateway; no unsupported priority injection is attempted"
+            ;;
+          *) _skip "fast tier" "could not prove whether this installed package forwards service_tier" ;;
+        esac
       else
         _bad "served" "could not fetch $(_copilot_base)/v1/models"
         # Still run the A/B so a stopped proxy doesn't hide the geo diagnosis.
@@ -1380,17 +1448,91 @@ EOF
       unset -f _ok _bad _note _skip _hint 2>/dev/null
       ;;
     logs)
-      # logs [N] [gen]  — tail the fork log; gen 1..3 = a rotated prev session.
-      # logs shim [N]    — tail the throttle shim's log instead.
-      local _lf _n
-      if [ "${2:-}" = "shim" ]; then
-        _lf="$(_copilot_shim_logfile)"; _n="${3:-40}"
-      else
-        _lf="$logf"; _n="${2:-40}"
-        case "${3:-}" in 1|2|3) _lf="$logf.$3" ;; esac
+      # logs [N] [gen]          — tail the fork log; gen 1..3 = rotated session.
+      # logs [-f|--follow] [N]  — follow the current fork log across rotation.
+      # logs shim [-f] [N]      — tail/follow the throttle shim log.
+      local _lf="$logf" _n=40 _n_set=0 _gen='' _follow=0 _target=fork _arg
+      shift
+      if [ "${1:-}" = shim ]; then _target=shim; _lf="$(_copilot_shim_logfile)"; shift; fi
+      for _arg in "$@"; do
+        case "$_arg" in
+          -f|--follow) _follow=1 ;;
+          *[!0-9]*|'')
+            printf '%s\n' "copilot-proxy: logs: unknown argument '$_arg'" >&2
+            return 2 ;;
+          *)
+            if [ "$_n_set" -eq 0 ]; then _n="$_arg"; _n_set=1
+            elif [ "$_target" = fork ] && [ -z "$_gen" ]; then _gen="$_arg"
+            else
+              printf '%s\n' "copilot-proxy: logs: too many numeric arguments" >&2
+              return 2
+            fi ;;
+        esac
+      done
+      case "$_n" in 0|*[!0-9]*) printf '%s\n' "copilot-proxy: logs: line count must be a positive integer" >&2; return 2 ;; esac
+      if [ -n "$_gen" ]; then
+        case "$_gen" in 1|2|3) _lf="$logf.$_gen" ;; *) printf '%s\n' "copilot-proxy: logs: generation must be 1..3" >&2; return 2 ;; esac
+        if [ "$_follow" -eq 1 ]; then
+          printf '%s\n' "copilot-proxy: logs: cannot follow a rotated generation" >&2
+          return 2
+        fi
       fi
-      if [ -f "$_lf" ]; then command tail -n "$_n" "$_lf"; else
+      if [ -f "$_lf" ]; then
+        if [ "$_follow" -eq 1 ]; then command tail -n "$_n" -F "$_lf"
+        else command tail -n "$_n" "$_lf"; fi
+      else
         printf '%s\n' "copilot-proxy: no log file at $_lf" >&2; return 1; fi
+      ;;
+    limiter)
+      if ! _copilot_shim_alive; then
+        printf '%s\n' "copilot-proxy: limiter requires the running shim; try 'copilot-proxy shim on'." >&2
+        return 1
+      fi
+      local _limiter_action="${2:-status}" _limiter_json='' _min='' _max='' _limit='' _value
+      case "$_limiter_action" in
+        status)
+          _limiter_json="$(_copilot_limiter_request GET)" || return 1
+          ;;
+        reset)
+          _limiter_json="$(_copilot_limiter_request PATCH '{"reset":true}')" || return 1
+          ;;
+        set)
+          if ! command -v jq >/dev/null 2>&1; then
+            printf '%s\n' "copilot-proxy: limiter set requires jq" >&2
+            return 1
+          fi
+          shift 2
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
+              --min|--max|--limit)
+                [ "$#" -ge 2 ] || { printf '%s\n' "copilot-proxy: limiter set: $1 needs a value" >&2; return 2; }
+                _value="$2"
+                case "$_value" in 0|*[!0-9]*) printf '%s\n' "copilot-proxy: limiter set: $1 must be a positive integer" >&2; return 2 ;; esac
+                case "$1" in --min) _min="$_value" ;; --max) _max="$_value" ;; --limit) _limit="$_value" ;; esac
+                shift 2 ;;
+              *) printf '%s\n' "copilot-proxy: limiter set: unknown argument '$1'" >&2; return 2 ;;
+            esac
+          done
+          [ -n "${_min}${_max}${_limit}" ] || { printf '%s\n' "copilot-proxy: limiter set needs --min, --max, or --limit" >&2; return 2; }
+          _limiter_json="$(jq -nc \
+            --arg min "$_min" --arg max "$_max" --arg limit "$_limit" '
+              {} + (if $min == "" then {} else {min: ($min|tonumber)} end)
+                 + (if $max == "" then {} else {max: ($max|tonumber)} end)
+                 + (if $limit == "" then {} else {limit: ($limit|tonumber)} end)')"
+          _limiter_json="$(_copilot_limiter_request PATCH "$_limiter_json")" || return 1
+          ;;
+        *)
+          printf '%s\n' "Usage: copilot-proxy limiter [status|set --min N --max N --limit N|reset]" >&2
+          return 2 ;;
+      esac
+      if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$_limiter_json" | jq '{limit,min,max,active,queued,adaptive,cooldown_ms_remaining,successes_to_increase,throttle_events,last_throttle_status,startup}'
+      else
+        printf '%s\n' "$_limiter_json"
+      fi
+      if [ "$_limiter_action" != status ]; then
+        printf '%s\n' "copilot-proxy: live limiter updated for this shim process only; export COPILOT_SHIM_MIN/MAX before restart to persist." >&2
+      fi
       ;;
     auth)
       # One-time device login → stores a ghu_ token copilot-api can exchange.
@@ -1501,10 +1643,12 @@ EOF
       esac
       ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|stats|events|quota|bench|update|doctor|...]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|stats|events|quota|bench|limiter|update|doctor|...]"
       printf '%s\n' "  stats [day|week|month] [--model ID] [--scope normal|benchmark|all] [--json]"
       printf '%s\n' "  events [day|week|month] [--model ID] [--scope ...] [--limit N] [--json]"
       printf '%s\n' "  quota [--json]       live plan/quota payload from the running fork"
+      printf '%s\n' "  logs [-f] [N] | logs shim [-f] [N]   tail/follow current logs (-F across restart)"
+      printf '%s\n' "  limiter status | set --min N --max N --limit N | reset   live, process-local"
       printf '%s\n' "  bench [--model ID] [--runs 1..10] [--max-output 32..2048] [--concurrency 1..4] [--json]"
       printf '%s\n' "  update --check | update VERSION   inspect latest or install an exact verified version"
       printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, Claude catalog (direct vs via"

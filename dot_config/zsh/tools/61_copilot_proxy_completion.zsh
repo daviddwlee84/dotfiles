@@ -5,7 +5,7 @@
 
 _copilot_proxy() {
   local -a actions periods scopes
-  actions=(start stop restart status doctor test logs auth reinstall shim whoami usage quota stats events bench update help)
+  actions=(start stop restart status doctor test logs auth reinstall shim limiter whoami usage quota stats events bench update help)
   periods=(day week month)
   scopes=(normal benchmark all)
   if (( CURRENT == 2 )); then
@@ -29,8 +29,15 @@ _copilot_proxy() {
     quota|whoami|usage) _values 'option' --json ;;
     update) _values 'version or check' --check ;;
     shim) _values 'state' on off status ;;
+    limiter)
+      if (( CURRENT == 3 )); then
+        _values 'action' status set reset
+      elif [[ "$words[3]" == set ]]; then
+        _values 'option' --min --max --limit
+      fi
+      ;;
     doctor|test) _values 'option' --live ;;
-    logs) _values 'log' shim 20 40 60 100 ;;
+    logs) _values 'log' shim -f --follow 20 40 60 100 ;;
   esac
 }
 
