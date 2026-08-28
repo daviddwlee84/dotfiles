@@ -13,7 +13,7 @@ This workflow is managed globally through these files:
 
 - `~/.gitconfig` keeps `delta` as the default Git pager.
 - `~/.config/gh-dash/config.yml` sets `pager.diff: "diffnav"`.
-- `~/.config/lazygit/config.yml` uses LazyGit's current `git.pagers` syntax with `delta`.
+- `~/.config/lazygit/config.yml` uses LazyGit's current `git.pagers` syntax with `delta`, and sets `os.copyToClipboardCmd` so `Ctrl+O` copies through the `x` wrapper (local `wl-copy`/`xclip`, OSC 52 over SSH — see [clipboard.md](clipboard.md)).
 - `~/.config/bat/themes/tokyonight_night.tmTheme` provides the shared Tokyo Night theme used by `bat` previews.
 
 ## Why Both `delta` and `diffnav`

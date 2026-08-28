@@ -18,7 +18,7 @@
 
 - `~/.gitconfig` 將 `delta` 設為預設的 Git 分頁器。
 - `~/.config/gh-dash/config.yml` 設定 `pager.diff: "diffnav"`。
-- `~/.config/lazygit/config.yml` 使用 LazyGit 目前的 `git.pagers` 語法搭配 `delta`。
+- `~/.config/lazygit/config.yml` 使用 LazyGit 目前的 `git.pagers` 語法搭配 `delta`，並設定 `os.copyToClipboardCmd`，讓 `Ctrl+O` 透過 `x` 包裝複製（本機用 `wl-copy`/`xclip`，SSH 走 OSC 52 — 見 [clipboard.md](clipboard.md)）。
 - `~/.config/bat/themes/tokyonight_night.tmTheme` 提供 `bat` 預覽 (preview) 共用的 Tokyo Night 主題。
 
 ## 為什麼同時使用 `delta` 和 `diffnav`

@@ -84,6 +84,7 @@ follows when a vendor ships in multiple formats:
 | **Bitwarden CLI** (`bw`) | npm via mise (gated by `installBitwarden=true`) | ❌ — `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
 | **Bitwarden Desktop** | Snap (`bitwarden`) → `.deb` fallback if `snap` unavailable; gated by `installBitwarden=true` AND `profile=ubuntu_desktop` | ✅ via `snapd` background refresh (or `apt upgrade` for fallback `.deb`) | same role | `/snap/bitwarden/current/` |
 | **CopyQ** | `.deb` via stock apt (`apt install copyq`); gated by `profile=ubuntu_desktop` via tag selection in [`run_onchange_after_20_ansible_roles.sh.tmpl`](../../.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl) | ✅ via `apt upgrade` | [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install CopyQ via apt" | `/usr/bin/copyq` + `/etc/xdg/autostart/com.github.hluk.copyq.desktop` |
+| **Clipboard CLIs** (`wl-clipboard`, `xclip`, `xsel`) | stock apt; `ubuntu_desktop` only (same tag gate as CopyQ). Not a GUI app — these are the backend binaries Neovim yank, lazygit `Ctrl+O`, and `~/.dotfiles/bin/x` shell out to (CopyQ's daemon is *not* one of them). See [clipboard.md](../tools/clipboard.md) | ✅ via `apt upgrade` | [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install clipboard CLIs" | `/usr/bin/wl-copy`, `/usr/bin/xclip`, `/usr/bin/xsel` |
 
 ### Manually managed (you installed these yourself, outside ansible)
 

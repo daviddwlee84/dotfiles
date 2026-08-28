@@ -78,7 +78,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 |---------|------|-------------|-------------|
 | `gcam-amend` | function | `dot_config/shell/10_aliases.sh` | `git commit --amend -m "<msg>"` (replace message) |
 | `gundo` | function | `dot_config/shell/10_aliases.sh` | Undo last commit → back to staged; prints undone commit message |
-| `lg` | alias | `dot_config/shell/37_lazygit.sh` | Open lazygit TUI |
+| `lg` | alias | `dot_config/shell/37_lazygit.sh` | Open lazygit TUI. `Ctrl+O` (copy to clipboard) is routed through `x copy` via `os.copyToClipboardCmd` in `~/.config/lazygit/config.yml` — works locally and over SSH ([clipboard](../tools/clipboard.md)) |
 
 ### oh-my-zsh git plugin
 

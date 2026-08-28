@@ -74,7 +74,7 @@
 |---------|------|-------------|-------------|
 | `gcam-amend` | function | `dot_config/shell/10_aliases.sh` | `git commit --amend -m "<msg>"`（取代訊息） |
 | `gundo` | function | `dot_config/shell/10_aliases.sh` | 還原最後一次 commit → 回到 staged；印出已還原的 commit 訊息 |
-| `lg` | alias | `dot_config/shell/37_lazygit.sh` | 開啟 lazygit TUI |
+| `lg` | alias | `dot_config/shell/37_lazygit.sh` | 開啟 lazygit TUI。`Ctrl+O`（複製到剪貼簿）透過 `~/.config/lazygit/config.yml` 的 `os.copyToClipboardCmd` 改走 `x copy` — 本機與 SSH 都可用（[clipboard](../tools/clipboard.md)） |
 
 ### oh-my-zsh git 外掛
 

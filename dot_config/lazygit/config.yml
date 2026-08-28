@@ -2,3 +2,14 @@ git:
   pagers:
     - colorArg: always
       pager: delta --dark --paging=never --syntax-theme base16-256 -s
+
+os:
+  # Route Ctrl+O ("copy to clipboard") through the repo's `x` wrapper instead
+  # of lazygit's vendored atotto/clipboard. Locally `x` picks wl-copy / xclip;
+  # over SSH it falls back to OSC 52 (/dev/tty, tmux-passthrough-wrapped), so
+  # yanks land on the *local* clipboard from remote hosts too. lazygit
+  # shell-quotes {{text}} via c.Cmd.Quote before substitution
+  # (OSCommand.CopyToClipboard), so spaces / quotes / newlines are safe; the
+  # literal '%s' guards a leading-dash payload. `x` resolves via
+  # ~/.dotfiles/bin on PATH (dot_config/shell/00_exports.sh.tmpl).
+  copyToClipboardCmd: "printf '%s' {{text}} | x copy"

@@ -421,7 +421,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
 | `docker` | OrbStack (macOS), Docker rootless (Linux) | macOS: brew cask `orbstack` (skips if `/Applications/Docker.app` exists) · Debian/Ubuntu: `apt` prereqs (`uidmap`, `dbus-user-session`, `fuse-overlayfs`, `slirp4netns`, `iptables`) → `curl https://get.docker.com \| sh` → `docker-ce-rootless-extras` → `dockerd-rootless-setuptool.sh install` user systemd unit |
-| `gui_apps_linux` (Linux Debian + `ubuntu_desktop` profile) | Alacritty, libfuse2, AppImageLauncher, VSCode, Cursor, Google Chrome, Discord, Zen Browser, CopyQ, playerctl/wmctrl/xdotool | Alacritty: cargo build (apt deps `cmake`, `pkg-config`, font/X libs) · AppImageLauncher: PPA → GitHub `.deb` → Lite AppImage to `~/Applications/` · VSCode: Microsoft apt repo · Cursor: `.deb` from `cursor.com/api/download` · Google Chrome: `.deb` from `dl.google.com` (x86_64 only) · Discord: flatpak (Flathub user-scope, default) or `.deb` via `discordChannel` chooser · Zen Browser: AppImage to `~/Applications/zen.AppImage` |
+| `gui_apps_linux` (Linux Debian + `ubuntu_desktop` profile) | Alacritty, libfuse2, AppImageLauncher, VSCode, Cursor, Google Chrome, Discord, Zen Browser, CopyQ, playerctl/wmctrl/xdotool, wl-clipboard/xclip/xsel | Alacritty: cargo build (apt deps `cmake`, `pkg-config`, font/X libs) · AppImageLauncher: PPA → GitHub `.deb` → Lite AppImage to `~/Applications/` · VSCode: Microsoft apt repo · Cursor: `.deb` from `cursor.com/api/download` · Google Chrome: `.deb` from `dl.google.com` (x86_64 only) · Discord: flatpak (Flathub user-scope, default) or `.deb` via `discordChannel` chooser · Zen Browser: AppImage to `~/Applications/zen.AppImage` |
 | `auditd` (Linux, gated `installAuditd`) | `auditd` + `audispd-plugins` (Debian) / `audit` (RedHat); rule files `00-baseline.rules`, `05-privileged.rules`, optional `10-execve.rules`, `99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`, `gitleaks` | macOS: brew (`gitleaks`) + uv (`pre-commit`) · Linux: gitleaks from GitHub release (system → `/usr/local/bin`; user fallback → `~/.local/bin`) + uv pre-commit. **Go is no longer here** — it moved to mise (`go = "latest"`, gated `installExtraRuntimes`). |
 | `bitwarden` (gated `installBitwarden`) | `@bitwarden/cli` + Bitwarden Desktop (when `bitwarden_install_desktop=true`) | CLI: `mise exec -- npm install -g @bitwarden/cli` (preferred) / system npm fallback · Desktop: macOS brew cask · Linux: snap → `.deb` fallback |
@@ -852,7 +852,7 @@ notable upstream-vs-downstream skew).
 | `coding_agents` | `libnotify-bin` (Debian only) | — |
 | `lazyvim_deps` | (mostly via mise + GitHub releases) | — |
 | `auditd` | `auditd`, `audispd-plugins` | `audit` |
-| `gui_apps_linux` | `cmake`, `pkg-config`, font libs (Alacritty build), `libfuse2`, `copyq`, `playerctl`, `wmctrl`, `xdotool` | — |
+| `gui_apps_linux` | `cmake`, `pkg-config`, font libs (Alacritty build), `libfuse2`, `copyq`, `playerctl`, `wmctrl`, `xdotool`, `wl-clipboard`, `xclip`, `xsel` | — |
 | `docker` | `uidmap`, `dbus-user-session`, `fuse-overlayfs`, `slirp4netns`, `iptables` (rootless prereqs) | — |
 | `iac_tools` | `azure-cli`, `terraform`, `opentofu` (via vendor apt repos) | — |
 | `nerdfonts` | `fontconfig` | `fontconfig` |
@@ -975,7 +975,7 @@ manually removed and re-installed.
 | **Cursor `.deb`** / **Discord `.deb`** / **VSCode (Microsoft apt)** | apt-side, not chezmoi-side | apt-upgrade |
 | **Zen Browser AppImage** / **AppImageLauncher Lite** | One-shot download; Zen's guard globs `zen*.AppImage` (AppImageLauncher renames integrated copies) | Delete **every** `~/Applications/zen*.AppImage`, re-apply |
 | **Hack Nerd Font** | `latest` URL, no version tracking | Delete font dir, re-apply |
-| **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool** | System packages, no upgrade automation | apt-upgrade |
+| **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool / wl-clipboard / xclip / xsel** | System packages, no upgrade automation | apt-upgrade |
 | **auditd rules** | Config files, not a "tool" with versions | Edit rule template, re-apply |
 | **claude-hud / LazyVim plugins / TPM plugins / pre-commit / tldr cache / gh extensions** | **Covered** by `cat_plugins` in upgrade_tools.sh | `just upgrade-plugins` |
 
@@ -1220,7 +1220,10 @@ list.
 | **witr** | brew | (release) | devtools |
 | **workmux** | brew (tap `raine/workmux`) | GitHub release `.tar.gz` | devtools |
 | **worktrunk** | brew | GitHub release | devtools |
+| **wl-clipboard** (`wl-copy`/`wl-paste`) | n/a (`pbcopy` built-in) | apt | gui_apps_linux — Wayland clipboard backend for Neovim yank, lazygit `Ctrl+O`, `x copy`. See [clipboard.md](../tools/clipboard.md) |
+| **xclip** | n/a (`pbcopy` built-in) | apt | gui_apps_linux — X11/XWayland clipboard backend (same consumers as `wl-clipboard`) |
 | **xonsh** | uv tool (with xontribs) | uv tool | python_uv_tools |
+| **xsel** | n/a (`pbcopy` built-in) | apt | gui_apps_linux — X11 clipboard backend; last non-OSC-52 fallback in `x`, named in lazygit's error text |
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
 | **yt-dlp** | uv tool (`[default]` + `yt-dlp-ejs`) | uv tool (`[default]` + `yt-dlp-ejs`) | python_uv_tools |

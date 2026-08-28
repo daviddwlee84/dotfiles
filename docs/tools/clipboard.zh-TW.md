@@ -11,10 +11,10 @@
 
 | 你身處… | Neovim 中 yank 會送到… | 擷取 pane（`prefix+y/Y/C-y`）會送到… |
 |----------|--------------------------|---------------------------------------------|
-| 本機（macOS 或 Linux 桌面） | 系統剪貼簿（預設 provider：`pbcopy` / `wl-copy` / `xclip`） | 同上，透過 `tmux load-buffer -w -` 同時發出 OSC 52 *並*設定 tmux 的 paste buffer |
+| 本機（macOS 或 Linux 桌面） | 系統剪貼簿（provider 二進制檔：macOS 用 `pbcopy` / Linux 用 `wl-copy` / `xclip`） | 同上，透過 `tmux load-buffer -w -` 同時發出 OSC 52 *並*設定 tmux 的 paste buffer |
 | SSH（遠端機器，無論有無 tmux） | **本機**的剪貼簿（透過 OSC 52） | **本機**的剪貼簿（透過 tmux → OSC 52） |
 
-不需要額外工具、不需要 X forwarding、不需要 socat 監聽器。唯一硬性需求是你**本機**的終端機模擬器要支援 OSC 52（Ghostty、Alacritty、iTerm2、Kitty、WezTerm — 都支援）。
+不需要 X forwarding、不需要 socat 監聽器。SSH 時唯一硬性需求是你**本機**的終端機模擬器要支援 OSC 52（Ghostty、Alacritty、iTerm2、Kitty、WezTerm — 都支援）。在**本機 Linux 桌面**上，provider 二進制檔不是內建的：`wl-clipboard` + `xclip` + `xsel` 由 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) ansible role 安裝（`ubuntu_desktop` profile）。伺服器 profile 一律沒有 — 那裡只靠 OSC 52。
 
 ## 什麼是 OSC 52？
 
@@ -102,11 +102,22 @@ if vim.env.SSH_CONNECTION or vim.env.SSH_TTY then
 end
 ```
 
-- 本機時，使用 LazyVim 預設 provider（`pbcopy`/`xclip`/`wl-copy` — 貼上正常運作）。
+- 本機時，使用 LazyVim 預設 provider（`pbcopy`/`wl-copy`/`xclip` — 貼上正常運作）。這個 provider 是**執行期二進制檔偵測** — Neovim 沒有編譯期的 `+clipboard`。macOS 內建 `pbcopy`；Linux 桌面的二進制檔來自 `wl-clipboard` / `xclip`，由 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role 安裝（「Install clipboard CLIs」）。沒有它，`:checkhealth provider.clipboard` 會回報「No clipboard tool found」，yank 靜默失效 — 見 [`pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](../../pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md)。
 - SSH 時，Neovim 內建的 `vim.ui.clipboard.osc52`（自 Neovim 0.10 起隨附）直接發出 OSC 52，繞過遠端主機上任何 `pbcopy` 二進制檔。
 - 判斷條件是 `SSH_CONNECTION or SSH_TTY` — 任一個都會由 `sshd` 為互動 session 設定。
 
 為何用條件式而非永遠開啟 OSC 52？OSC 52 貼上不可靠（見上方終端機表格）。本機 session 保留本機 provider 可保留 Neovim 的貼上行為；只有當遠端的 `pbcopy` 顯然是錯誤答案時才覆寫。
+
+### 下游消費者 — lazygit `Ctrl+O`
+
+[`dot_config/lazygit/config.yml`](../../dot_config/lazygit/config.yml) 設定：
+
+```yaml
+os:
+  copyToClipboardCmd: "printf '%s' {{text}} | x copy"
+```
+
+`Ctrl+O`（「複製到剪貼簿」）改走 `x`，而非 lazygit 內附的 `atotto/clipboard`。本機會解析為 `wl-copy`/`xclip`；SSH 時則落到 `x` 的 OSC 52 路徑，讓 yank 也能送到**本機**剪貼簿（lazygit 原生函式庫會送到遠端的 X/Wayland 剪貼簿）。lazygit 在代入前會對 `{{text}}` 做 shell 引號處理，因此含空格的 commit 標題與路徑都安全。
 
 ### 4. Shell CLI — `x`（跨平台剪貼簿包裝）
 
@@ -119,7 +130,7 @@ x paste                        # 把剪貼簿印到 stdout
 x open https://example.com     # 在預設 app 中開啟 URL/檔案
 ```
 
-它的 copy 後端依序嘗試：`clip.exe`（WSL）→ `pbcopy`（macOS）→ `wl-copy`（Wayland）→ `xclip` → `xsel` → **OSC 52 備援**直接寫入 `/dev/tty`。意思是 `x copy` 在 macOS、Linux 桌面、Linux SSH 伺服器、WSL 以及任何能觸及終端機的環境上都能直接使用 — 你完全不需要思考有哪個後端可用。
+它的 copy 後端依序嘗試：`clip.exe`（WSL）→ `pbcopy`（macOS）→ `wl-copy`（Wayland）→ `xclip` → `xsel` → **OSC 52 備援**直接寫入 `/dev/tty`。意思是 `x copy` 在 macOS、Linux 桌面、Linux SSH 伺服器、WSL 以及任何能觸及終端機的環境上都能直接使用 — 你完全不需要思考有哪個後端可用。Linux 桌面上 `wl-copy` / `xclip` / `xsel` 二進制檔來自 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role；沒有它們時 `x copy` 仍可透過 OSC 52 運作，但 `x copy-file` 就沒有後端了。
 
 `x` 中的 OSC 52 備援也為 tmux 做了包裝：
 

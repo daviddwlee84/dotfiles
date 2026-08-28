@@ -6,10 +6,10 @@ This doc explains how clipboard sync is wired across this dotfiles setup, with a
 
 | You are… | Yank in Neovim goes to… | Capture pane (`prefix+y/Y/C-y`) goes to… |
 |----------|--------------------------|---------------------------------------------|
-| Local (macOS or Linux desktop) | system clipboard (default provider: `pbcopy` / `wl-copy` / `xclip`) | same, via `tmux load-buffer -w -` which emits OSC 52 *and* sets tmux's paste buffer |
+| Local (macOS or Linux desktop) | system clipboard (provider binary: `pbcopy` on macOS / `wl-copy` / `xclip` on Linux) | same, via `tmux load-buffer -w -` which emits OSC 52 *and* sets tmux's paste buffer |
 | SSH (remote box, with or without tmux) | **local** machine's clipboard (via OSC 52) | **local** machine's clipboard (via tmux → OSC 52) |
 
-No extra tools, no X forwarding, no socat listener needed. The only hard requirement is a terminal emulator on your **local** machine that supports OSC 52 (Ghostty, Alacritty, iTerm2, Kitty, WezTerm — all do).
+No X forwarding or socat listener needed. Over SSH the only hard requirement is a terminal emulator on your **local** machine that supports OSC 52 (Ghostty, Alacritty, iTerm2, Kitty, WezTerm — all do). On a **local Linux desktop**, the provider binary is not built in: `wl-clipboard` + `xclip` + `xsel` are installed by the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) ansible role (`ubuntu_desktop` profile). Server profiles get none — OSC 52 is the whole story there.
 
 ## What is OSC 52?
 
@@ -98,11 +98,27 @@ if vim.env.SSH_CONNECTION or vim.env.SSH_TTY then
 end
 ```
 
-- Locally, LazyVim's default provider is used (`pbcopy`/`xclip`/`wl-copy` — with working paste).
+- Locally, LazyVim's default provider is used (`pbcopy`/`wl-copy`/`xclip` — with working paste). That provider is a **runtime binary probe** — Neovim has no compile-time `+clipboard`. On macOS `pbcopy` is built in; on a Linux desktop the binary comes from `wl-clipboard` / `xclip`, installed by the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role ("Install clipboard CLIs"). Without it, `:checkhealth provider.clipboard` reports "No clipboard tool found" and yank silently no-ops — see [`pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](../../pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md).
 - Over SSH, Neovim's built-in `vim.ui.clipboard.osc52` (shipping since Neovim 0.10) emits OSC 52 directly, bypassing any `pbcopy` binary on the remote host.
 - The check is `SSH_CONNECTION or SSH_TTY` — either is set by `sshd` for an interactive session.
 
 Why conditional rather than always-on OSC 52? OSC 52 paste is unreliable (see the terminal table above). Keeping the local provider for local sessions preserves Neovim's paste behaviour; the override only activates when `pbcopy` on the remote is clearly the wrong answer.
+
+### Downstream consumer — lazygit `Ctrl+O`
+
+[`dot_config/lazygit/config.yml`](../../dot_config/lazygit/config.yml) sets:
+
+```yaml
+os:
+  copyToClipboardCmd: "printf '%s' {{text}} | x copy"
+```
+
+`Ctrl+O` ("copy to clipboard") is routed through `x` instead of lazygit's
+vendored `atotto/clipboard`. Locally that resolves to `wl-copy`/`xclip`; over
+SSH it falls through to `x`'s OSC 52 path, so the yank lands on the **local**
+clipboard from remote hosts too (lazygit's native library would target the
+remote's X/Wayland clipboard). lazygit shell-quotes `{{text}}` before
+substitution, so multi-word commit subjects and paths survive.
 
 ### 4. Shell CLI — `x` (cross-platform clipboard wrapper)
 
@@ -116,7 +132,7 @@ x paste                        # print clipboard to stdout
 x open https://example.com     # open URL/file in default app
 ```
 
-Its copy backend tries, in order: `clip.exe` (WSL) → `pbcopy` (macOS) → `wl-copy` (Wayland) → `xclip` → `xsel` → **OSC 52 fallback** writing directly to `/dev/tty`. This means `x copy` Just Works on macOS, Linux desktop, Linux SSH server, WSL, and anything else that can reach a terminal — you never have to think about which backend is available.
+Its copy backend tries, in order: `clip.exe` (WSL) → `pbcopy` (macOS) → `wl-copy` (Wayland) → `xclip` → `xsel` → **OSC 52 fallback** writing directly to `/dev/tty`. This means `x copy` Just Works on macOS, Linux desktop, Linux SSH server, WSL, and anything else that can reach a terminal — you never have to think about which backend is available. On a Linux desktop the `wl-copy` / `xclip` / `xsel` binaries come from the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role; without them `x copy` still works via OSC 52 but `x copy-file` has no backend.
 
 `x copy-file PATH...` is intentionally separate from `x copy PATH`: it places file objects on the desktop clipboard so a file manager can paste/copy the selected files, instead of pasting the files' text contents. It uses macOS `osascript` on Finder-compatible desktops and Linux `x-special/gnome-copied-files` MIME data via `wl-copy` / `xclip` for common GTK file managers. This is local-desktop only; OSC 52 cannot carry file objects over SSH. For remote hosts, copy contents with `x copy FILE` or copy a path with `realpath FILE | x copy`.
 

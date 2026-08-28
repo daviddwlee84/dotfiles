@@ -1213,3 +1213,38 @@
       - xdotool
     state: present
     update_cache: false
+
+# =============================================================================
+# Clipboard CLIs — the low-level binaries lazygit (Ctrl+O), Neovim
+# (clipboard=unnamedplus), and `~/.dotfiles/bin/x` shell out to. CopyQ above
+# is a clipboard-history *manager*; its `copyq` CLI is not what any of these
+# probe for.
+#
+#   - wl-clipboard  wl-copy/wl-paste — native Wayland (niri sessions). Both
+#                   Neovim's provider auto-detect and lazygit's vendored
+#                   atotto/clipboard prefer it when $WAYLAND_DISPLAY is set.
+#   - xclip         X11 / XWayland fallback — also `x paste` and Neovim on an
+#                   X11 session.
+#   - xsel          named in lazygit's own "No clipboard utilities available"
+#                   error, and `x`'s last backend before the OSC 52 fallback.
+#                   Redundant with xclip for lazygit (atotto tries xclip
+#                   first) but tiny; kept so the error's advice always holds.
+#
+# Server profiles deliberately don't get these — headless has no clipboard;
+# OSC 52 (tmux `set-clipboard on` + `x`'s /dev/tty fallback) is the answer
+# there. See docs/tools/clipboard.md.
+# =============================================================================
+
+- name: Install clipboard CLIs (wl-clipboard, xclip, xsel)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - wl-clipboard
+      - xclip
+      - xsel
+    state: present
+    update_cache: false
