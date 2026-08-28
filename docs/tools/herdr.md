@@ -141,6 +141,8 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 
 > **Two families of herdr env vars.** The `HERDR_ACTIVE_PANE_*` vars above are injected **only** into `[[keys.command]]` invocations. Every shell *running inside a herdr pane* also gets an **ambient** set: `HERDR_ENV=1`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, and `HERDR_SOCKET_PATH` (the current session's socket). Scripts use `HERDR_ENV` as the "am I inside herdr?" test and inherit `HERDR_SOCKET_PATH` to target the current session — that's what `hvibe`/`hcode` rely on.
 
+> **Pane env is frozen at herdr-server start.** Unlike tmux (`update-environment`), herdr does **not** refresh `SSH_CONNECTION` / `DISPLAY` / `WAYLAND_DISPLAY` / `SSH_AUTH_SOCK` on a new client attach — every pane inherits whatever the daemon had when it first started. Practical fallout: over SSH a pane's `$SSH_*` is empty while `$WAYLAND_DISPLAY` still points at a stale local display, so clipboard tools that pick a backend by those vars copy to the wrong machine. `x` and Neovim work around it by keying on `HERDR_ENV` (→ OSC 52 via the pane TTY, which *does* proxy to the real client); see [`pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md) and [clipboard.md](clipboard.md). For an agent forwarded via `SSH_AUTH_SOCK`, re-export it per pane or start the server from a session that has it.
+
 | Key | Action | Type |
 |---|---|---|
 | `prefix + c` / `prefix + 1..9` | new tab / switch tab | built-in default |

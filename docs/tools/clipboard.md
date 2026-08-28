@@ -88,21 +88,22 @@ bind C-y run-shell "tmux capture-pane -pS - | fzf-tmux … | tmux load-buffer -w
 ```lua
 vim.opt.clipboard = "unnamedplus"
 
-if vim.env.SSH_CONNECTION or vim.env.SSH_TTY then
+local x_clipboard = vim.env.X_CLIPBOARD
+local use_osc52 = x_clipboard == "osc52"
+  or (not x_clipboard and (vim.env.SSH_CONNECTION or vim.env.SSH_TTY or vim.env.SSH_CLIENT
+      or vim.env.HERDR_ENV or vim.env.ZELLIJ))
+
+if use_osc52 then
   local osc52 = require("vim.ui.clipboard.osc52")
-  vim.g.clipboard = {
-    name = "OSC 52",
-    copy  = { ["+"] = osc52.copy("+"),  ["*"] = osc52.copy("*")  },
-    paste = { ["+"] = osc52.paste("+"), ["*"] = osc52.paste("*") },
-  }
+  vim.g.clipboard = { name = "OSC 52", copy = { … }, paste = { … } }
 end
 ```
 
 - Locally, LazyVim's default provider is used (`pbcopy`/`wl-copy`/`xclip` — with working paste). That provider is a **runtime binary probe** — Neovim has no compile-time `+clipboard`. On macOS `pbcopy` is built in; on a Linux desktop the binary comes from `wl-clipboard` / `xclip`, installed by the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role ("Install clipboard CLIs"). Without it, `:checkhealth provider.clipboard` reports "No clipboard tool found" and yank silently no-ops — see [`pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](../../pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md).
-- Over SSH, Neovim's built-in `vim.ui.clipboard.osc52` (shipping since Neovim 0.10) emits OSC 52 directly, bypassing any `pbcopy` binary on the remote host.
-- The check is `SSH_CONNECTION or SSH_TTY` — either is set by `sshd` for an interactive session.
+- Remote / multiplexed — `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT` (an interactive `sshd` session), **or `HERDR_ENV`/`ZELLIJ`** — Neovim's built-in `vim.ui.clipboard.osc52` (since 0.10) emits OSC 52 directly, so yank reaches whatever terminal is attached. herdr and zellij need their own check because their pane environment is frozen at multiplexer-server start (a `wl-copy` there hits a stale display), while the pane TTY still proxies to the real client. `tmux` refreshes those vars via `update-environment`, so a bare tmux session stays on the local provider.
+- `X_CLIPBOARD=osc52` forces OSC 52 on; `X_CLIPBOARD=<any local tool>` forces it off. Same knob and predicate as [`x`](#4-shell-cli--x-cross-platform-clipboard-wrapper) (`prefer_osc52`).
 
-Why conditional rather than always-on OSC 52? OSC 52 paste is unreliable (see the terminal table above). Keeping the local provider for local sessions preserves Neovim's paste behaviour; the override only activates when `pbcopy` on the remote is clearly the wrong answer.
+Why conditional rather than always-on OSC 52? OSC 52 paste is unreliable (see the terminal table above). Keeping the local provider for local sessions preserves Neovim's paste behaviour; the override only activates when a local tool is clearly the wrong answer.
 
 ### Downstream consumer — lazygit `Ctrl+O`
 
@@ -134,7 +135,9 @@ x open https://example.com     # open URL/file in default app
 
 Its copy backend tries, in order: `clip.exe` (WSL) → `pbcopy` (macOS) → `wl-copy` (Wayland) → `xclip` → `xsel` → **OSC 52 fallback** writing directly to `/dev/tty`. This means `x copy` Just Works on macOS, Linux desktop, Linux SSH server, WSL, and anything else that can reach a terminal — you never have to think about which backend is available. On a Linux desktop the `wl-copy` / `xclip` / `xsel` binaries come from the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role; without them `x copy` still works via OSC 52 but `x copy-file` has no backend.
 
-**Under SSH** (`SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT` set) that order flips: OSC 52 is tried *first*, because a `wl-copy` / `xclip` on the remote box would put the text on the **remote's** clipboard — useless. If `/dev/tty` can't be opened (`ssh` with no PTY), `x` falls back through the display-server tools for the `ssh -X` "I actually want the remote X clipboard" case. `x copy-file` refuses outright over SSH — OSC 52 is text-only and a file object can't cross. Same gate as Neovim's `options.lua`.
+**Under SSH, herdr, or zellij** — `prefer_osc52()`: `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT`, `HERDR_ENV`, or `ZELLIJ` — that order flips: OSC 52 is tried *first*, because a local `wl-copy` / `xclip` there targets the **wrong machine** (SSH) or a **frozen display** (a herdr/zellij pane inherits the env from when its server started, not the client attached now; the pane TTY, though, always proxies to the real client). If `/dev/tty` can't be opened (`ssh` with no PTY), `x` falls back through the display-server tools for the `ssh -X` case. `x copy-file` refuses here — OSC 52 is text-only and a file object can't cross. Same predicate as Neovim's `options.lua`.
+
+**`X_CLIPBOARD`** overrides autodetect entirely: `osc52 | wl-copy | xclip | xsel | pbcopy | clip.exe`. Put `export X_CLIPBOARD=osc52` in `~/.shellrc.adhoc` on a box you always reach through something that hides `SSH_*` and isn't herdr/zellij (bare `mosh`, some Remote-SSH setups).
 
 `x copy-file PATH...` is intentionally separate from `x copy PATH`: it places file objects on the desktop clipboard so a file manager can paste/copy the selected files, instead of pasting the files' text contents. It uses macOS `osascript` on Finder-compatible desktops and Linux `x-special/gnome-copied-files` MIME data via `wl-copy` / `xclip` for common GTK file managers. This is local-desktop only; OSC 52 cannot carry file objects over SSH. For remote hosts, copy contents with `x copy FILE` or copy a path with `realpath FILE | x copy`.
 
@@ -181,13 +184,13 @@ If `tmux info` shows `clipboard: false` after editing `common.conf`, remember a 
 | `prefix+y` still copies to remote clipboard | shim binary `tmux` resolves to an old pre-`load-buffer -w` version | `tmux -V` must be ≥ 3.3 for `load-buffer -w`; this repo enforces ≥ 3.3 via ansible `devtools` role |
 | Nested tmux (`tmux inside ssh inside tmux`) | inner tmux eats OSC 52 | inner tmux needs `set -g allow-passthrough on`; already on in this config. Double-nested cases may require `Ptmux;…` wrapping |
 | `x copy` errors with "OSC 52 payload too large" (e.g. copying full pane scrollback over SSH) | payload exceeds the terminal's OSC 52 cap; `x copy` now refuses loudly instead of writing an escape sequence the terminal would silently drop | copy a smaller selection, or raise the cap: `X_OSC52_MAX_BYTES=<n> x copy ...` if your terminal supports more (iTerm2 ~1 MB) |
-| `x copy` over SSH puts nothing on the local clipboard (or lands on the *remote* box's) | pre-fix `x` used a local `wl-copy`/`xclip` on the remote whenever `$WAYLAND_DISPLAY`/`$DISPLAY` was set (leaks in via the systemd user session on a box you're also logged into graphically) | fixed — `x` now sends OSC 52 first under `SSH_*`. If it still fails, the *outer* (local) terminal isn't forwarding OSC 52, or the local tmux server predates `set-clipboard on` (`tmux kill-server`) |
+| `x copy` / nvim yank inside herdr (or zellij/mosh) puts nothing on the local clipboard, or lands on the *remote* box's | the pane env is frozen at multiplexer-server start: `$WAYLAND_DISPLAY` set, `$SSH_*` empty, so `x`/nvim think "local Wayland" and use `wl-copy`. See [`pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md`](../../pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md) | fixed — `prefer_osc52` now also fires on `HERDR_ENV`/`ZELLIJ`. For anything else that hides `SSH_*`, `export X_CLIPBOARD=osc52`. If it still fails, the *local* terminal isn't forwarding OSC 52, or a stale *local* tmux server (`tmux kill-server`) |
 
 ## Design notes / non-defaults
 
 - **tmux `set-clipboard`** is `on`, not `external`. `external` disables tmux's own OSC 52 emission from copy-mode; `on` is a superset and keeps `prefix+[` → `y` working.
-- **Neovim OSC 52 provider** is gated on `SSH_CONNECTION`/`SSH_TTY` rather than always-on, specifically so local paste (`"+p`) continues to work. If you primarily work over SSH and don't mind the paste tradeoff, the `if …` block can be removed.
-- **`x` CLI ordering** prefers local backends (`pbcopy`, `wl-copy`, etc.) over OSC 52 — *except under SSH*, where OSC 52 goes first (a local backend on the remote box is the wrong machine). This is intentional: when `pbcopy` is available locally, it's faster, doesn't touch the TTY, and works for very large payloads (OSC 52 payloads are size-limited by the terminal — iTerm2 caps at 1 MB, many others at 64-256 KB). Because OSC 52 has no delivery acknowledgment, `osc52_copy()` refuses payloads above `X_OSC52_MAX_BYTES` (default 75000 base64 chars) with an explicit error rather than writing an escape sequence the terminal would silently drop — a plain `write(2)` to `/dev/tty` succeeds either way, so without this guard `x copy` would report success even when nothing reached the clipboard. The SSH branch opens `/dev/tty` for real (not just `[[ -w ]]`) before consuming stdin, so a no-PTY `ssh` still falls through cleanly.
+- **Neovim OSC 52 provider** is gated (on `SSH_*` / `HERDR_ENV` / `ZELLIJ` / `X_CLIPBOARD=osc52`) rather than always-on, specifically so local paste (`"+p`) continues to work. If you primarily work remote and don't mind the paste tradeoff, force it with `X_CLIPBOARD=osc52`.
+- **`x` CLI ordering** prefers local backends (`pbcopy`, `wl-copy`, etc.) over OSC 52 — *except* when `prefer_osc52()` is true (`SSH_*` / `HERDR_ENV` / `ZELLIJ`) or `X_CLIPBOARD=osc52`, where OSC 52 goes first (a local backend would be the wrong machine or a frozen display). Local-first is intentional: `pbcopy`/`wl-copy` is faster, doesn't touch the TTY, and works for very large payloads (OSC 52 is size-limited by the terminal — iTerm2 ~1 MB, many others 64-256 KB). Because OSC 52 has no delivery acknowledgment, `osc52_copy()` refuses payloads above `X_OSC52_MAX_BYTES` (default 75000 base64 chars) rather than writing an escape sequence the terminal would silently drop — a plain `write(2)` to `/dev/tty` succeeds either way, so without this guard `x copy` would report success when nothing reached the clipboard. The OSC 52-first branch opens `/dev/tty` for real (not just `[[ -w ]]`) before consuming stdin, so a no-PTY `ssh` still falls through cleanly.
 
 ## Clipboard history (`cb` / `cbl` / `cbe`)
 

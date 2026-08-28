@@ -8,6 +8,13 @@ setup() {
   setup_path_stub
   X_TMP="$(mktemp -d "${TMPDIR:-/tmp}/x-cli.XXXXXX")"
   export X_TMP
+
+  # Hermetic backend selection: `x` keys off these to decide OSC 52 vs a local
+  # tool (prefer_osc52 / clipboard_forced) and Wayland-vs-X11. Running bats
+  # inside herdr, over SSH, or in a graphical session must not change what
+  # these tests exercise — each test sets the vars it needs via `env`.
+  unset HERDR_ENV ZELLIJ SSH_CONNECTION SSH_TTY SSH_CLIENT X_CLIPBOARD \
+    DISPLAY WAYLAND_DISPLAY
 }
 
 teardown() {
@@ -38,14 +45,11 @@ EOF
   [ "$(cat "$X_TMP/pbcopy.input")" = "file contents" ]
 }
 
-@test "copy-file on macOS passes file paths to osascript" {
+@test "copy-file on macOS writes file URLs via JXA + NSPasteboard" {
   _stub_uname "Darwin"
   cat > "$BATS_STUB_DIR/osascript" <<'EOF'
 #!/usr/bin/env bash
-script="$1"
-shift
-printf '%s\n' "$script" > "$X_TMP/osascript.script_arg"
-printf '%s\n' "$@" > "$X_TMP/osascript.args"
+printf '%s\n' "$@" > "$X_TMP/osascript.argv"
 cat > "$X_TMP/osascript.stdin"
 EOF
   chmod +x "$BATS_STUB_DIR/osascript"
@@ -55,10 +59,52 @@ EOF
 
   run "$X_BIN" copy-file "$X_TMP/file.txt" "$X_TMP/folder"
   [ "$status" -eq 0 ]
-  [ "$(cat "$X_TMP/osascript.script_arg")" = "-" ]
-  grep -F 'set the clipboard to fileList' "$X_TMP/osascript.stdin" >/dev/null
-  grep -Fx "$X_TMP/file.txt" "$X_TMP/osascript.args" >/dev/null
-  grep -Fx "$X_TMP/folder" "$X_TMP/osascript.args" >/dev/null
+  # invoked as: osascript -l JavaScript - <path>...
+  grep -Fx -- '-l' "$X_TMP/osascript.argv" >/dev/null
+  grep -Fx -- 'JavaScript' "$X_TMP/osascript.argv" >/dev/null
+  grep -Fx -- "$X_TMP/file.txt" "$X_TMP/osascript.argv" >/dev/null
+  grep -Fx -- "$X_TMP/folder" "$X_TMP/osascript.argv" >/dev/null
+  grep -F 'writeObjects' "$X_TMP/osascript.stdin" >/dev/null
+  grep -F 'fileURLWithPath' "$X_TMP/osascript.stdin" >/dev/null
+}
+
+@test "X_CLIPBOARD forces a specific backend, bypassing autodetect" {
+  _stub_uname "Linux"
+  cat > "$BATS_STUB_DIR/pbcopy" <<'EOF'
+#!/usr/bin/env bash
+echo pbcopy > "$X_TMP/backend"; cat >/dev/null
+EOF
+  cat > "$BATS_STUB_DIR/xsel" <<'EOF'
+#!/usr/bin/env bash
+echo "xsel $*" > "$X_TMP/backend"; cat > "$X_TMP/xsel.input"
+EOF
+  chmod +x "$BATS_STUB_DIR/pbcopy" "$BATS_STUB_DIR/xsel"
+
+  run env X_CLIPBOARD=xsel bash -c 'printf hi | "$1" copy' _ "$X_BIN"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$X_TMP/backend")" = "xsel --clipboard --input" ]
+  [ "$(cat "$X_TMP/xsel.input")" = "hi" ]
+}
+
+@test "X_CLIPBOARD rejects an unknown value" {
+  run env X_CLIPBOARD=bogus bash -c 'printf hi | "$1" copy' _ "$X_BIN"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"unknown X_CLIPBOARD='bogus'"* ]]
+}
+
+@test "copy-file refuses inside herdr (frozen env — OSC 52 can't carry a file)" {
+  _stub_uname "Linux"
+  cat > "$BATS_STUB_DIR/wl-copy" <<'EOF'
+#!/usr/bin/env bash
+echo wl-copy-ran > "$X_TMP/leak"
+EOF
+  chmod +x "$BATS_STUB_DIR/wl-copy"
+  printf 'payload' > "$X_TMP/report.txt"
+
+  run env HERDR_ENV=1 WAYLAND_DISPLAY=wayland-1 "$X_BIN" copy-file "$X_TMP/report.txt"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"can't cross SSH / OSC 52"* ]]
+  [ ! -e "$X_TMP/leak" ]
 }
 
 @test "copy-file on Wayland writes GNOME file-copy MIME payload" {

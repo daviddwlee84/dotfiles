@@ -10,11 +10,17 @@ usage() {
         "  x open TARGET" \
         "  x help" \
         "" \
+        "Backend autodetect: clip.exe (WSL) / pbcopy (macOS) / wl-copy / xclip /" \
+        "xsel, else OSC 52. Under SSH, herdr, or zellij, OSC 52 goes first." \
+        "Override with X_CLIPBOARD=osc52|wl-copy|xclip|xsel|pbcopy|clip.exe" \
+        "(put it in ~/.shellrc.adhoc on a box you always reach remotely)." \
+        "" \
         "Examples:" \
         "  printf \"hello\" | x copy" \
         "  x copy ~/.ssh/id_ed25519.pub" \
         "  x copy-file ~/Downloads/report.pdf" \
         "  x paste" \
+        "  X_CLIPBOARD=osc52 x copy < notes.txt" \
         "  x open https://example.com"
 }
 
@@ -33,14 +39,41 @@ is_macos() {
     [[ "$(uname -s)" == "Darwin" ]]
 }
 
-# In an SSH session a local wl-copy/xclip/xsel would write to *this* (remote)
-# machine's clipboard, which is never what you want — the bytes need to travel
-# back up the TTY to the terminal on your local machine. So under SSH we send
-# OSC 52 first and only fall back to the display-server tools if there's no
-# usable /dev/tty (e.g. `ssh` with no PTY, or `ssh -X` for the remote X clip).
-# Mirrors the Neovim provider gate in dot_config/nvim/lua/config/options.lua.
 is_ssh() {
     [[ -n "${SSH_CONNECTION:-}" || -n "${SSH_TTY:-}" || -n "${SSH_CLIENT:-}" ]]
+}
+
+# Reach for OSC 52 before any local wl-copy/xclip/xsel? True when a local
+# display-server tool would write to the wrong machine or a stale display:
+#
+#   - SSH: the clipboard we want is on the far end of the TTY, not this host.
+#   - herdr: the pane environment is frozen at herdr-server start, so
+#     $WAYLAND_DISPLAY / $SSH_CONNECTION there describe whoever launched the
+#     daemon, not the client attached now. The pane's TTY, however, always
+#     proxies to the real client (local or remote), so OSC 52 is correct
+#     either way. tmux refreshes these vars via update-environment; herdr
+#     doesn't. Same reasoning for $ZELLIJ.
+#
+# Overridden by X_CLIPBOARD (see clipboard_forced). Mirrors the Neovim gate in
+# dot_config/nvim/lua/config/options.lua.
+prefer_osc52() {
+    is_ssh || [[ -n "${HERDR_ENV:-}" || -n "${ZELLIJ:-}" ]]
+}
+
+# X_CLIPBOARD forces one backend, bypassing autodetect:
+#   osc52 | wl-copy | xclip | xsel | pbcopy | clip.exe   (or unset/auto)
+# Prints the normalised value on stdout, or nothing for auto. Exits on garbage.
+clipboard_forced() {
+    case "${X_CLIPBOARD:-auto}" in
+        auto | '') return 0 ;;
+        osc52 | wl-copy | xclip | xsel | pbcopy | clip.exe)
+            printf '%s\n' "${X_CLIPBOARD}"
+            ;;
+        *)
+            err "unknown X_CLIPBOARD='${X_CLIPBOARD}' (auto|osc52|wl-copy|xclip|xsel|pbcopy|clip.exe)"
+            exit 2
+            ;;
+    esac
 }
 
 clipboard_backend_help() {
@@ -51,7 +84,8 @@ clipboard_backend_help() {
         "x:   - Linux Wayland: wl-clipboard (wl-copy/wl-paste)" \
         "x:   - Linux X11: xclip or xsel" \
         "x:   - WSL: clip.exe / powershell.exe" \
-        "x:   - SSH/headless: OSC 52 (needs a TTY and a terminal that supports it)" >&2
+        "x:   - SSH/headless: OSC 52 (needs a TTY and a terminal that supports it)" \
+        "x: or force one with X_CLIPBOARD=osc52|wl-copy|xclip|xsel|pbcopy|clip.exe" >&2
 }
 
 file_clipboard_backend_help() {
@@ -159,6 +193,21 @@ PY
 }
 
 copy_backend() {
+    local forced
+    forced="$(clipboard_forced)" || exit $?
+    if [[ -n "$forced" ]]; then
+        case "$forced" in
+            osc52) osc52_copy && return 0 ;;
+            wl-copy) command -v wl-copy >/dev/null 2>&1 && wl-copy && return 0 ;;
+            xclip) command -v xclip >/dev/null 2>&1 && xclip -selection clipboard && return 0 ;;
+            xsel) command -v xsel >/dev/null 2>&1 && xsel --clipboard --input && return 0 ;;
+            pbcopy) command -v pbcopy >/dev/null 2>&1 && pbcopy && return 0 ;;
+            clip.exe) command -v clip.exe >/dev/null 2>&1 && clip.exe && return 0 ;;
+        esac
+        err "copy backend failed: X_CLIPBOARD=$forced"
+        exit 1
+    fi
+
     if is_wsl && command -v clip.exe >/dev/null 2>&1; then
         if clip.exe; then
             return 0
@@ -167,11 +216,11 @@ copy_backend() {
         exit 1
     fi
 
-    # SSH: OSC 52 before any display-server tool (see is_ssh). osc52_copy
-    # returns non-zero without consuming stdin when /dev/tty is unusable, so
-    # the wl-copy/xclip/xsel fallbacks below still fire for `ssh` with no PTY
-    # or `ssh -X` targeting the remote X clipboard.
-    if is_ssh && osc52_copy; then
+    # SSH / herdr / zellij: OSC 52 before any display-server tool (see
+    # prefer_osc52). osc52_copy returns non-zero without consuming stdin when
+    # /dev/tty is unusable, so the wl-copy/xclip/xsel fallbacks below still fire
+    # for `ssh` with no PTY or `ssh -X` targeting the remote X clipboard.
+    if prefer_osc52 && osc52_copy; then
         return 0
     fi
 
@@ -272,10 +321,12 @@ copy_file_linux() {
 }
 
 copy_file_backend() {
-    # Over SSH a file object can only land on the *remote* desktop's clipboard,
-    # and OSC 52 cannot carry one. Don't silently do the wrong thing.
-    if is_ssh && ! is_macos; then
-        err "copy-file: file objects can't cross SSH (OSC 52 is text-only)."
+    # A file object can only land on *this host's* desktop clipboard, and OSC 52
+    # cannot carry one — so it's meaningless when the clipboard we care about is
+    # elsewhere (SSH / herdr / zellij) or explicitly OSC 52. Don't do the wrong
+    # thing silently.
+    if [[ "${X_CLIPBOARD:-}" == osc52 ]] || { prefer_osc52 && ! is_macos; }; then
+        err "copy-file: file objects can't cross SSH / OSC 52 (text-only)."
         file_clipboard_backend_help
         exit 1
     fi
@@ -295,6 +346,24 @@ copy_file_backend() {
 }
 
 paste_backend() {
+    local forced
+    forced="$(clipboard_forced)" || exit $?
+    if [[ -n "$forced" ]]; then
+        case "$forced" in
+            osc52)
+                err "paste: X_CLIPBOARD=osc52 — OSC 52 read is unsupported by most terminals; \`x paste\` can't honor it"
+                exit 1
+                ;;
+            wl-copy) command -v wl-paste >/dev/null 2>&1 && wl-paste --no-newline && return 0 ;;
+            xclip) command -v xclip >/dev/null 2>&1 && xclip -selection clipboard -o && return 0 ;;
+            xsel) command -v xsel >/dev/null 2>&1 && xsel --clipboard --output && return 0 ;;
+            pbcopy) command -v pbpaste >/dev/null 2>&1 && pbpaste && return 0 ;;
+            clip.exe) command -v powershell.exe >/dev/null 2>&1 && powershell.exe -NoProfile -Command "Get-Clipboard" | tr -d '\r' && return 0 ;;
+        esac
+        err "paste backend failed: X_CLIPBOARD=$forced"
+        exit 1
+    fi
+
     if is_wsl && command -v powershell.exe >/dev/null 2>&1; then
         if powershell.exe -NoProfile -Command "Get-Clipboard" | tr -d '\r'; then
             return 0

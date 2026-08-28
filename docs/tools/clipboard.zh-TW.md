@@ -92,21 +92,22 @@ bind C-y run-shell "tmux capture-pane -pS - | fzf-tmux … | tmux load-buffer -w
 ```lua
 vim.opt.clipboard = "unnamedplus"
 
-if vim.env.SSH_CONNECTION or vim.env.SSH_TTY then
+local x_clipboard = vim.env.X_CLIPBOARD
+local use_osc52 = x_clipboard == "osc52"
+  or (not x_clipboard and (vim.env.SSH_CONNECTION or vim.env.SSH_TTY or vim.env.SSH_CLIENT
+      or vim.env.HERDR_ENV or vim.env.ZELLIJ))
+
+if use_osc52 then
   local osc52 = require("vim.ui.clipboard.osc52")
-  vim.g.clipboard = {
-    name = "OSC 52",
-    copy  = { ["+"] = osc52.copy("+"),  ["*"] = osc52.copy("*")  },
-    paste = { ["+"] = osc52.paste("+"), ["*"] = osc52.paste("*") },
-  }
+  vim.g.clipboard = { name = "OSC 52", copy = { … }, paste = { … } }
 end
 ```
 
 - 本機時，使用 LazyVim 預設 provider（`pbcopy`/`wl-copy`/`xclip` — 貼上正常運作）。這個 provider 是**執行期二進制檔偵測** — Neovim 沒有編譯期的 `+clipboard`。macOS 內建 `pbcopy`；Linux 桌面的二進制檔來自 `wl-clipboard` / `xclip`，由 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role 安裝（「Install clipboard CLIs」）。沒有它，`:checkhealth provider.clipboard` 會回報「No clipboard tool found」，yank 靜默失效 — 見 [`pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](../../pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md)。
-- SSH 時，Neovim 內建的 `vim.ui.clipboard.osc52`（自 Neovim 0.10 起隨附）直接發出 OSC 52，繞過遠端主機上任何 `pbcopy` 二進制檔。
-- 判斷條件是 `SSH_CONNECTION or SSH_TTY` — 任一個都會由 `sshd` 為互動 session 設定。
+- 遠端 / 多工環境 —— `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT`（互動 `sshd` session），**或 `HERDR_ENV`/`ZELLIJ`** —— Neovim 內建的 `vim.ui.clipboard.osc52`（自 0.10 起隨附）直接發出 OSC 52，讓 yank 送到當前接上的終端機。herdr 與 zellij 要各自判斷,因為它們的 pane 環境在 multiplexer server 啟動時就凍結了（該處的 `wl-copy` 打到過期的 display），而 pane TTY 仍代理到真正的 client。`tmux` 透過 `update-environment` 更新這些變數，所以純 tmux session 維持用本機 provider。
+- `X_CLIPBOARD=osc52` 強制開啟 OSC 52；`X_CLIPBOARD=<任何本機工具>` 強制關閉。與 [`x`](#4-shell-cli--x跨平台剪貼簿包裝) 同一個旋鈕與判斷式（`prefer_osc52`）。
 
-為何用條件式而非永遠開啟 OSC 52？OSC 52 貼上不可靠（見上方終端機表格）。本機 session 保留本機 provider 可保留 Neovim 的貼上行為；只有當遠端的 `pbcopy` 顯然是錯誤答案時才覆寫。
+為何用條件式而非永遠開啟 OSC 52？OSC 52 貼上不可靠（見上方終端機表格）。本機 session 保留本機 provider 可保留 Neovim 的貼上行為；只有當本機工具顯然是錯誤答案時才覆寫。
 
 ### 下游消費者 — lazygit `Ctrl+O`
 
@@ -132,7 +133,9 @@ x open https://example.com     # 在預設 app 中開啟 URL/檔案
 
 它的 copy 後端依序嘗試：`clip.exe`（WSL）→ `pbcopy`（macOS）→ `wl-copy`（Wayland）→ `xclip` → `xsel` → **OSC 52 備援**直接寫入 `/dev/tty`。意思是 `x copy` 在 macOS、Linux 桌面、Linux SSH 伺服器、WSL 以及任何能觸及終端機的環境上都能直接使用 — 你完全不需要思考有哪個後端可用。Linux 桌面上 `wl-copy` / `xclip` / `xsel` 二進制檔來自 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role；沒有它們時 `x copy` 仍可透過 OSC 52 運作，但 `x copy-file` 就沒有後端了。
 
-**在 SSH 下**（`SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT` 有設）順序會顛倒：先試 OSC 52，因為遠端機器上的 `wl-copy` / `xclip` 會把文字放進**遠端**的剪貼簿，毫無用處。若 `/dev/tty` 無法開啟（無 PTY 的 `ssh`），`x` 才退回顯示伺服器工具，涵蓋 `ssh -X`「我真的要遠端 X 剪貼簿」的情況。`x copy-file` 在 SSH 下直接拒絕 — OSC 52 只能帶文字，檔案物件無法跨越。與 Neovim `options.lua` 用同一個判斷閘門。
+**在 SSH、herdr、zellij 下** —— `prefer_osc52()`：`SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT`、`HERDR_ENV`、或 `ZELLIJ` —— 順序會顛倒：先試 OSC 52，因為該處的本機 `wl-copy` / `xclip` 打到**錯的機器**（SSH）或**凍結的 display**（herdr/zellij pane 繼承的是其 server 啟動時的環境，不是現在接上的 client；但 pane TTY 永遠代理到真正的 client）。若 `/dev/tty` 無法開啟（無 PTY 的 `ssh`），`x` 才退回顯示伺服器工具，涵蓋 `ssh -X`。`x copy-file` 在此直接拒絕 — OSC 52 只能帶文字。與 Neovim `options.lua` 同一個判斷式。
+
+**`X_CLIPBOARD`** 完全覆蓋自動偵測：`osc52 | wl-copy | xclip | xsel | pbcopy | clip.exe`。在一台你總是透過某種會隱藏 `SSH_*` 又不是 herdr/zellij 的東西（純 `mosh`、某些 Remote-SSH）連進去的機器上，把 `export X_CLIPBOARD=osc52` 放進 `~/.shellrc.adhoc`。
 
 `x` 中的 OSC 52 備援也為 tmux 做了包裝：
 
@@ -176,13 +179,13 @@ nvim -c ':checkhealth provider.clipboard' -c ':only'
 | Neovim yank 正常，但 SSH 下 `"*p` 無作用 | 外層終端機不支援 OSC 52 貼上 | 預期行為 — 用滑鼠中鍵或重打；別硬抗 |
 | `prefix+y` 仍複製到遠端剪貼簿 | shim 的 `tmux` 二進制檔解析到比 `load-buffer -w` 還舊的版本 | `tmux -V` 必須 ≥ 3.3 才支援 `load-buffer -w`；本 repo 透過 ansible `devtools` role 強制 ≥ 3.3 |
 | 嵌套 tmux（`tmux 在 ssh 在 tmux 中`） | 內層 tmux 吃掉 OSC 52 | 內層 tmux 需要 `set -g allow-passthrough on`；本設定已開啟。雙重嵌套案例可能需要 `Ptmux;…` 包裝 |
-| SSH 下 `x copy` 沒把東西放進本機剪貼簿（或跑到**遠端**機器的剪貼簿） | 修正前的 `x` 只要 `$WAYLAND_DISPLAY`/`$DISPLAY` 有設就用遠端的 `wl-copy`/`xclip`（當你同時以圖形登入該機器時，會透過 systemd user session 洩漏進來） | 已修正 —— `x` 在 `SSH_*` 下現在先送 OSC 52。若仍失敗，是**外層**（本機）終端機沒有轉送 OSC 52，或本機 tmux server 早於 `set-clipboard on`（`tmux kill-server`） |
+| 在 herdr（或 zellij/mosh）裡 `x copy` / nvim yank 沒把東西放進本機剪貼簿，或跑到**遠端**機器的 | pane 環境在 multiplexer server 啟動時凍結：`$WAYLAND_DISPLAY` 有設、`$SSH_*` 空，所以 `x`/nvim 以為是「本機 Wayland」而用 `wl-copy`。見 [`pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md`](../../pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md) | 已修正 —— `prefer_osc52` 現在也對 `HERDR_ENV`/`ZELLIJ` 生效。其他會隱藏 `SSH_*` 的情況用 `export X_CLIPBOARD=osc52`。若仍失敗，是**本機**終端機沒轉送 OSC 52，或本機 tmux server 過期（`tmux kill-server`） |
 
 ## 設計筆記 / 非預設值
 
 - **tmux `set-clipboard`** 為 `on`，非 `external`。`external` 會停用 tmux 自家 copy-mode 的 OSC 52 發出；`on` 是超集，能讓 `prefix+[` → `y` 持續運作。
-- **Neovim OSC 52 provider** 以 `SSH_CONNECTION`/`SSH_TTY` 為閘門而非永遠開啟，特別是為了讓本機貼上（`"+p`）持續運作。如果你主要透過 SSH 工作且不在意貼上的取捨，可移除 `if …` 區塊。
-- **`x` CLI 順序**偏好本機後端（`pbcopy`、`wl-copy` 等）而非 OSC 52 —— **SSH 下例外**，此時 OSC 52 優先（遠端機器上的本機後端是錯的機器）。這是刻意的：當本機 `pbcopy` 可用時，它較快、不碰 TTY，且能處理非常大的酬載（OSC 52 酬載受終端機大小限制 — iTerm2 上限為 1 MB，許多其他為 64–256 KB）。SSH 分支會在消耗 stdin 之前真正開啟 `/dev/tty`（而非只做 `[[ -w ]]`），所以無 PTY 的 `ssh` 仍能乾淨地往下退。
+- **Neovim OSC 52 provider** 有閘門（`SSH_*` / `HERDR_ENV` / `ZELLIJ` / `X_CLIPBOARD=osc52`）而非永遠開啟，特別是為了讓本機貼上（`"+p`）持續運作。如果你主要遠端工作且不在意貼上的取捨，用 `X_CLIPBOARD=osc52` 強制開啟。
+- **`x` CLI 順序**偏好本機後端（`pbcopy`、`wl-copy` 等）而非 OSC 52 —— *除非* `prefer_osc52()` 為真（`SSH_*` / `HERDR_ENV` / `ZELLIJ`）或 `X_CLIPBOARD=osc52`，此時 OSC 52 優先（本機後端會是錯的機器或凍結的 display）。本機優先是刻意的：`pbcopy`/`wl-copy` 較快、不碰 TTY，且能處理非常大的酬載（OSC 52 受終端機大小限制 — iTerm2 ~1 MB，許多其他 64–256 KB）。OSC 52 優先的分支會在消耗 stdin 之前真正開啟 `/dev/tty`（而非只做 `[[ -w ]]`），所以無 PTY 的 `ssh` 仍能乾淨地往下退。
 
 ## 相關文件
 

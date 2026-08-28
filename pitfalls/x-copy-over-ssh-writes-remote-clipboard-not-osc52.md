@@ -1,70 +1,89 @@
-# `x copy` over SSH puts nothing on the local clipboard (writes the remote box's clipboard instead of OSC 52)
+# `x copy` / Neovim yank land on the wrong clipboard inside herdr (or any multiplexer that strips `SSH_*`)
 
 **Symptoms** (grep this section):
 
-- SSH'd into a Linux desktop; `abspath | x copy`, `cref`, `printf x | x copy`
-  all report success but **nothing** appears on the clipboard of the machine
-  you're typing on.
-- No error. `x paste` on the remote *does* show the text — it went to the
-  remote's clipboard.
-- Neovim yank over the same SSH session works fine (it lands locally via
-  OSC 52), so it looks like an `x`-only bug.
-- `echo "$WAYLAND_DISPLAY $DISPLAY"` in the SSH shell is **non-empty**
-  (e.g. `wayland-1 :0`) even though you did not `ssh -X`.
+- Working on a remote box **inside herdr** (or zellij, mosh, VS Code / Cursor
+  Remote-SSH). `abspath | x copy`, `cref`, `printf x | x copy` all report
+  success but **nothing** reaches the clipboard of the machine you're typing
+  on. `x paste` on the remote *does* show the text — it went to the remote's
+  clipboard.
+- Neovim `yy` / `"+y` over the same session also doesn't reach your local
+  clipboard (same root cause).
+- `echo "$SSH_CONNECTION | $SSH_TTY | $SSH_CLIENT"` in the pane is **all
+  empty**, yet `echo "$WAYLAND_DISPLAY $DISPLAY"` is set
+  (e.g. `wayland-0 :0`).
+- A raw OSC 52 write **does** work:
+  `printf '\033]52;c;%s\033\\' "$(printf hi | base64)" > /dev/tty` lands on
+  the local clipboard. So the terminal chain is fine — only `x` / nvim pick
+  the wrong backend.
 
 **First seen**: 2026-08
-**Affects**: `dot_dotfiles/bin/executable_x` before the SSH gate; any host
-where you are logged in graphically (niri / GNOME) *and* SSH into the same
-user account.
-**Status**: fixed — `x` sends OSC 52 first when `SSH_CONNECTION` /
-`SSH_TTY` / `SSH_CLIENT` is set.
+**Affects**: `dot_dotfiles/bin/executable_x` and
+`dot_config/nvim/lua/config/options.lua` before the `prefer_osc52` /
+`HERDR_ENV` gate.
+**Status**: fixed — both send OSC 52 first inside herdr/zellij and honour an
+`X_CLIPBOARD` override.
 
 ## Root cause
 
-`x`'s `copy_backend()` chose a backend purely by "is `$WAYLAND_DISPLAY` /
-`$DISPLAY` set and is `wl-copy` / `xclip` installed?" — with **no SSH
-check**. Neovim's `options.lua` gates on `SSH_CONNECTION || SSH_TTY`; `x`
-did not.
+Two independent bugs compounding:
 
-`WAYLAND_DISPLAY` / `DISPLAY` leak into an SSH shell whenever the same user
-has a graphical session: the compositor runs
-`systemctl --user import-environment` /
-`dbus-update-activation-environment`, `loginctl enable-linger` keeps the
-user manager alive, and `pam_systemd` hands the SSH session a slice of that
-environment. So `x copy` found `wl-copy` + a live `$WAYLAND_DISPLAY` and
-wrote to the **remote** compositor's clipboard.
+1. **Backend chosen by `$WAYLAND_DISPLAY`/`$DISPLAY` presence, with no
+   "am I remote?" check.** `x`'s `copy_backend()` and nvim's `options.lua`
+   both did this. nvim gated its OSC 52 override on `SSH_CONNECTION` /
+   `SSH_TTY`; `x` had no SSH awareness at all.
 
-Installing `wl-clipboard` (see
-[`lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md))
-made this *more* likely to bite, because before that there was no `wl-copy`
-to pick and `x` fell through to OSC 52 by accident.
+2. **The herdr server is a persistent daemon and freezes its pane
+   environment.** Every shell in a herdr pane inherits the env that existed
+   when the *server* first started — a graphical login → `WAYLAND_DISPLAY`,
+   `DISPLAY`, `XDG_SESSION_TYPE=wayland`. It never refreshes `SSH_CONNECTION`
+   on a new client attach the way `tmux` does via `update-environment`. So a
+   herdr pane over SSH looks *exactly* like a local Wayland terminal:
+   `$WAYLAND_DISPLAY` set, `$SSH_*` empty. `x` / nvim pick `wl-copy` and
+   write the **remote** compositor's clipboard. mosh (which deliberately
+   unsets `SSH_*`) and older VS Code Remote-SSH hit the same shape.
+
+   The herdr pane's **TTY**, however, always proxies to the real client
+   (local or remote) — so OSC 52 is the correct channel regardless.
 
 ## Workaround / fix
 
-Fixed in `executable_x`:
+`dot_dotfiles/bin/executable_x`:
 
-- `is_ssh()` helper (`SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT`).
-- `copy_backend()`: under SSH, try `osc52_copy` **first**; fall through to
-  `wl-copy` / `xclip` / `xsel` only if `/dev/tty` can't be opened (no-PTY
-  `ssh`, or a deliberate `ssh -X` wanting the remote X clipboard).
-- `osc52_copy()` now does `{ : >/dev/tty; } 2>/dev/null || return 1` instead
-  of `[[ -w /dev/tty ]]` — a detached context can have a `/dev/tty` node
-  whose `open(2)` returns `ENXIO`; the old test passed and then `base64`
-  consumed stdin before the write failed, starving the fallback.
-- `copy_file_backend()`: refuses over SSH (a file object can't cross OSC 52).
+- `prefer_osc52()` — true under `SSH_*`, `HERDR_ENV`, or `ZELLIJ`. Used
+  instead of the old `is_ssh` gate: try `osc52_copy` first, fall through to
+  `wl-copy`/`xclip`/`xsel` only if `/dev/tty` won't open.
+- `osc52_copy()` opens `/dev/tty` for real (`{ : >/dev/tty; }`) before
+  `base64` consumes stdin, so the fallback still has input.
+- `X_CLIPBOARD` env var forces one backend, bypassing autodetect:
+  `osc52 | wl-copy | xclip | xsel | pbcopy | clip.exe`. Honoured by `x copy`
+  and `x paste`; `x copy-file` refuses under `osc52` / `prefer_osc52`.
+- `copy_file_backend()` refuses over SSH/herdr (OSC 52 is text-only).
 
-Manual, pre-fix: `unset WAYLAND_DISPLAY DISPLAY; abspath | x copy`.
+`dot_config/nvim/lua/config/options.lua`: the OSC 52 provider now activates
+on `SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT` / `HERDR_ENV` / `ZELLIJ`, or
+`X_CLIPBOARD=osc52`; `X_CLIPBOARD=<local tool>` opts back out. Keep this
+predicate in sync with `prefer_osc52`.
 
-If `x copy` over SSH *still* doesn't reach the local clipboard after the fix,
-the problem is downstream: the **local** terminal doesn't forward OSC 52, or
-a **local** tmux server started before `set-clipboard on` was applied
-(`tmux kill-server` and reattach). See [`clipboard.md`](../docs/tools/clipboard.md).
+**For a box you always reach through a multiplexer that hides `SSH_*`**
+(and it isn't herdr/zellij — e.g. plain mosh), put this in
+`~/.shellrc.adhoc` on that box:
+
+```sh
+export X_CLIPBOARD=osc52
+```
+
+If `x copy` / yank *still* doesn't reach the local clipboard after this, the
+blocker is downstream: the **local** terminal doesn't forward OSC 52, or a
+stale **local** tmux server (`tmux kill-server`). Confirm with the raw
+`printf '\033]52;c;…'` test above.
 
 ## Related
 
 - [`docs/tools/clipboard.md`](../docs/tools/clipboard.md) § Shell CLI — `x`
-  (the SSH ordering note + failure-modes table).
-- `dot_config/nvim/lua/config/options.lua` — the `SSH_CONNECTION` gate `x`
-  now mirrors.
+  and § Editor — Neovim (the `prefer_osc52` predicate + `X_CLIPBOARD` knob).
+- [`docs/tools/herdr.md`](../docs/tools/herdr.md) § env vars — `HERDR_ENV=1`
+  is the "am I in herdr?" signal; the frozen-env behaviour.
 - [`lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md)
-  — the clipboard-CLI install that surfaced this.
+  — the clipboard-CLI install that surfaced this (before it, `x` fell
+  through to OSC 52 by accident because there was no `wl-copy` to pick).
