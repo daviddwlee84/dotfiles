@@ -32,6 +32,12 @@ brew "daviddwlee84/tap/translate"
 brew "daviddwlee84/tap/dev-cli"
 {{ end -}}
 
+# gopls — Go language server used by Claude Code's official gopls-lsp plugin.
+# Linux installs the same binary via the go_tools role.
+{{ if eq .chezmoi.os "darwin" -}}
+brew "gopls"
+{{ end -}}
+
 # The following formulas support the general macOS GUI app bundle.
 {{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
 # Mac App Store CLI (needed for mas entries in Brewfile.darwin)

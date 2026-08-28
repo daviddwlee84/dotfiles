@@ -47,11 +47,13 @@ LazyVim 的核心 spec 也會自動透過 `lazydev.nvim` 接上 **`lua_ls`**（L
 ```json
 "enabledPlugins": {
   "pyright-lsp@claude-plugins-official": true,
+  "gopls-lsp@claude-plugins-official": true,
   "claude-hud@claude-hud": false
 }
 ```
 
 - **`pyright-lsp@claude-plugins-official`**——Claude Code 用的 Python LSP，來自官方市集。
+- **`gopls-lsp@claude-plugins-official`**——Claude Code 用的 Go LSP adapter；它會從 `PATH` 啟動另外安裝的 `gopls` 執行檔。
 - **`claude-hud@claude-hud`**——statusline 外掛，刻意設為 `false`。停用後，它那兩個只在安裝／設定時才用得到的指令（`claude-hud:setup` / `claude-hud:configure`）就不會再出現在每個 session 的 skill 清單裡——那正是它們唯一佔用的 context。HUD 本身不受影響：`statusLine.command` 是直接 glob `~/.claude/plugins/cache/claude-hud/*/` 並執行 `dist/index.js`，完全不經過外掛載入器。更新同樣不受影響——更新是走 [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py)（`just upgrade-plugins`），它只會動 `installed_plugins.json` 與帶版本的快取目錄。詳見 [upgrades.md](../this_repo/upgrades.md)。
 
 > 「LSP Plugin Recommendation」彈窗——就是你開啟 `.go` 檔時會推薦 `gopls-lsp@claude-plugins-official` 的那個——是 **Claude Code 自己的**功能，不是 claude-hud 的（它的 `src/` 裡沒有任何 LSP 相關程式碼）。claude-hud 停用後它照常運作。
@@ -61,6 +63,7 @@ LazyVim 的核心 spec 也會自動透過 `lazydev.nvim` 接上 **`lua_ls`**（L
 ### 透過 ansible / 系統套件
 
 - **`taplo`**——由 [`dot_ansible/roles/devtools/tasks/main.yml`](../../dot_ansible/roles/devtools/tasks/main.yml) 安裝（系統層級 CLI：`taplo fmt`、`taplo lint`）。注意：`lazyvim.plugins.extras.lang.toml` 也會自動把它裝進 Mason。兩個執行檔，都沒問題。
+- **`gopls`**——macOS 透過 Homebrew、Linux 透過 [`go_tools`](../../dot_ansible/roles/go_tools/defaults/main.yml) 安裝。Claude Code 的 `gopls-lsp` 外掛需要這個位於 `PATH` 的執行檔。
 
 Runtime 先決條件（本身不是 LSP，但多數 LSP 需要它們）：
 
@@ -73,7 +76,7 @@ Runtime 先決條件（本身不是 LSP，但多數 LSP 需要它們）：
 
 | 語言 | NeoVim 路徑 | Claude Code 路徑 | 備註 |
 |---|---|---|---|
-| **Go** | `lazyvim.plugins.extras.lang.go`（透過 Mason 安裝 gopls + goimports） | `gopls-lsp@claude-plugins-official` | 這是截圖中的彈窗。Toolchain (Go) **沒有**由 mise 預先安裝——extra 會裝 gopls，但你需要另外把 `go` 放進 `$PATH`。 |
+| **Go** | `lazyvim.plugins.extras.lang.go`（透過 Mason 安裝 gopls + goimports） | 已啟用：`gopls-lsp@claude-plugins-official` | 剩下的可選項目是 NeoVim 支援。Claude 使用系統的 `gopls`；Mason 則會管理另一份僅供 editor 使用的版本。 |
 | **YAML** | `lazyvim.plugins.extras.lang.yaml`（yamlls + SchemaStore） | n/a | 對本倉庫價值高：`dot_ansible/`、GitHub Actions、MkDocs。SchemaStore 因 JSON 已載入。 |
 | **Bash** | `lazyvim.plugins.extras.lang.bash`（bashls + shellcheck + shfmt） | n/a | 對 `dot_*scripts/` 與 `.chezmoiscripts/` 價值高。pre-commit 已使用 shellcheck。 |
 | **Rust** | `lazyvim.plugins.extras.lang.rust`（透過 Mason 安裝 rust-analyzer） | n/a | Rust toolchain 已透過 mise 提供。 |
@@ -138,6 +141,7 @@ ls ~/.claude/plugins/                 # 已安裝的外掛樹
 jq .enabledPlugins ~/.claude/settings.json
 
 # 系統 CLI
+gopls version
 taplo --version
 shellcheck --version
 

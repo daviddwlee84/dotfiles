@@ -35,7 +35,7 @@ If you want to know:
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
 | **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | Personal Go CLIs: `translate`, `dev` (**Linux only** — macOS installs both via Homebrew `daviddwlee84/tap`) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
+| **go** (`go install`) | Go CLIs: `translate`, `dev`, `gopls` (**Linux only** — macOS installs them via Homebrew) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
@@ -630,6 +630,7 @@ idempotent.
 |---|---|
 | `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
+| `golang.org/x/tools/gopls@v0.23.0` | `gopls` (Linux only; macOS → Homebrew `gopls`) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
@@ -1094,6 +1095,7 @@ list.
 | **git-graph** | brew | GitHub release (x86_64 only) | devtools |
 | **git-lfs** | brew | apt/yum → GitHub release | base |
 | **gitleaks** | brew | GitHub release | security_tools |
+| **gopls** | brew | `go install` (`go_tools`) | Go language server for Claude Code's official `gopls-lsp` plugin |
 | **glab** | brew | vendor apt (.deb) → GitHub tarball | devtools |
 | **glow** | brew | GitHub release tarball | devtools |
 | **go** | mise (`go = "latest"`) | same (mise) | mise (`installExtraRuntimes`) |

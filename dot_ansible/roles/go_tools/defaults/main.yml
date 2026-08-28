@@ -15,10 +15,10 @@
 #   - name: github.com/owner/tool@v1.2.3
 #     binary: tool
 
-# NOTE: on macOS these personal CLIs install via Homebrew (daviddwlee84/tap —
-# see dot_config/homebrew/Brewfile.tmpl); this go-install path is Linux-only
-# (tasks + cat_go gate off Darwin). Entries stay here as the source of truth for
-# Linux installs and for `just upgrade-go`.
+# NOTE: on macOS these tools install via Homebrew (the personal tap for
+# translate/dev-cli, homebrew-core for gopls — see Brewfile.tmpl); this
+# go-install path is Linux-only (tasks + cat_go gate off Darwin). Entries stay
+# here as the source of truth for Linux installs and for `just upgrade-go`.
 #
 # The translate pin was raised v0.1.0 → v0.5.2 on 2026-08-27. That is a FLOOR
 # bump, not an upgrade (the split above still holds): v0.1.0 predates almost the
@@ -34,3 +34,5 @@ go_tools:
     binary: translate
   - name: github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0
     binary: dev
+  - name: golang.org/x/tools/gopls@v0.23.0
+    binary: gopls

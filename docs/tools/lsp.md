@@ -42,11 +42,13 @@ LSP infra plugins from [`create_lazy-lock.json`](../../dot_config/nvim/create_la
 ```json
 "enabledPlugins": {
   "pyright-lsp@claude-plugins-official": true,
+  "gopls-lsp@claude-plugins-official": true,
   "claude-hud@claude-hud": false
 }
 ```
 
 - **`pyright-lsp@claude-plugins-official`** — Python LSP for Claude Code, sourced from the official marketplace.
+- **`gopls-lsp@claude-plugins-official`** — Go LSP adapter for Claude Code. It launches the separately installed `gopls` binary from `PATH`.
 - **`claude-hud@claude-hud`** — the statusline plugin, deliberately `false`. Disabling it drops its two install/config-time commands (`claude-hud:setup` / `claude-hud:configure`) out of every session's skill listing, which is the only context they were costing. The HUD itself is unaffected: `statusLine.command` globs `~/.claude/plugins/cache/claude-hud/*/` and execs `dist/index.js` directly, never resolving through the plugin loader. Updates are likewise unaffected — they run through [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) (`just upgrade-plugins`), which only touches `installed_plugins.json` and the versioned cache dir. See [upgrades.md](../this_repo/upgrades.md).
 
 > The "LSP Plugin Recommendation" popup — the one that offers e.g. `gopls-lsp@claude-plugins-official` when you open a `.go` file — is **Claude Code's own** feature, not claude-hud's (its `src/` contains no LSP code). It keeps working with claude-hud disabled.
@@ -56,6 +58,7 @@ The overlay deep-merges via a hook-aware `jq` script ([details](agent-overlays.m
 ### Via ansible / system packages
 
 - **`taplo`** — installed by [`dot_ansible/roles/devtools/tasks/main.yml`](../../dot_ansible/roles/devtools/tasks/main.yml) (system-wide CLI: `taplo fmt`, `taplo lint`). Note: also auto-installed by `lazyvim.plugins.extras.lang.toml` into Mason. Two binaries, both fine.
+- **`gopls`** — macOS via Homebrew; Linux via [`go_tools`](../../dot_ansible/roles/go_tools/defaults/main.yml). Claude Code's `gopls-lsp` plugin requires this PATH-visible binary.
 
 Runtime prerequisites (not LSPs themselves, but most LSPs need them):
 
@@ -68,7 +71,7 @@ These are unenabled LSPs that would have noticeable value given the languages th
 
 | Language | NeoVim path | Claude Code path | Notes |
 |---|---|---|---|
-| **Go** | `lazyvim.plugins.extras.lang.go` (gopls + goimports via Mason) | `gopls-lsp@claude-plugins-official` | This is the popup in the screenshot. Toolchain (Go) is **not** preinstalled by mise — the extra installs gopls but you need `go` in `$PATH` separately. |
+| **Go** | `lazyvim.plugins.extras.lang.go` (gopls + goimports via Mason) | already enabled: `gopls-lsp@claude-plugins-official` | The remaining optional addition is NeoVim support. Claude uses the system `gopls`; Mason would manage a separate editor-only copy. |
 | **YAML** | `lazyvim.plugins.extras.lang.yaml` (yamlls + SchemaStore) | n/a | High value for this repo: `dot_ansible/`, GitHub Actions, MkDocs. SchemaStore already loaded for JSON. |
 | **Bash** | `lazyvim.plugins.extras.lang.bash` (bashls + shellcheck + shfmt) | n/a | High value for `dot_*scripts/` and `.chezmoiscripts/`. shellcheck is already used by pre-commit. |
 | **Rust** | `lazyvim.plugins.extras.lang.rust` (rust-analyzer via Mason) | n/a | Rust toolchain already provisioned via mise. |
@@ -133,6 +136,7 @@ ls ~/.claude/plugins/                 # installed plugin trees
 jq .enabledPlugins ~/.claude/settings.json
 
 # System CLIs
+gopls version
 taplo --version
 shellcheck --version
 
