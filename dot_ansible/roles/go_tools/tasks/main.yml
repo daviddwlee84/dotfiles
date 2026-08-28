@@ -35,10 +35,10 @@
 # `creates:` guard makes this install-only + idempotent — version bumps go
 # through `just upgrade-go` (scripts/upgrade_tools.sh cat_go), never a re-apply.
 #
-# macOS is EXCLUDED: those tools (currently just `translate`) install via Homebrew
+# macOS is EXCLUDED: these tools (`translate`, `dev`) install via Homebrew
 # (dot_config/homebrew/Brewfile.tmpl → daviddwlee84/tap), so this go path is
-# Linux-only — otherwise both mechanisms fight over the binary and ~/.local/bin
-# shadows brew. cat_go() has the mirror gate. Revisit if a future go tool needs macOS.
+# Linux-only — otherwise both mechanisms fight over the binaries and ~/.local/bin
+# shadows brew. cat_go() has the mirror gate. Revisit if a future tool needs macOS.
 - name: Install Go CLI tools via go install (Linux; macOS uses Homebrew)
   when:
     - (go_bindir.stdout | default('') | trim) != ""

@@ -37,6 +37,7 @@
 | **uv** | Python CLI 工具（`python_uv_tools` ~13 個 + `llm_tools` 1 個 + `litellm`） | `dot_ansible/roles/python_uv_tools/defaults/main.yml`、`dot_ansible/roles/llm_tools/defaults/main.yml`、`coding_agents` 中的 ad-hoc `uv tool install`（specify-cli）+ `security_tools`（pre-commit） | `uv` (`uv tool upgrade --all`) |
 | **npm** (全域) | JS CLI（~5 個：copilot-cli、codex、gemini-cli、openchamber、bitwarden、readability-cli）+ `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`、散布的 `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates：`recon`、`pueue`（Linux）、`tree-sitter-cli`（fallback）、`alacritty`（Linux 編譯）、`modelsdev`（Linux fallback） | `rust_cargo_tools/defaults/main.yml`（目前為 `[]`）+ 在 task 中硬寫 | `cargo` (`cargo install-update -a`) |
+| **go** (`go install`) | 個人 Go CLI：`translate`、`dev`（僅 Linux；macOS 由 `daviddwlee84/tap` 的 Homebrew formula 安裝） | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest`) |
 | **dotnet** (全域工具) | `azure-cost-cli`（binary `azure-cost`） | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli`（binary `try`）、`tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
@@ -178,7 +179,7 @@ ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew
 
 | 檔案 | 擁有什麼 |
 |---|---|
-| `Brewfile.tmpl`(共用) | Taps: `nikitabobko/tap`。Formula(僅 macOS,透過內層 `{{ if eq .chezmoi.os "darwin" }}`): `mas` |
+| `Brewfile.tmpl`(共用) | 一般 macOS GUI 支援（`installBrewApps=true`）加上永遠安裝的 `daviddwlee84/tap` 個人 CLI：`translate` 與 `dev-cli`（binary `dev`）；Linux 由 `go_tools` 透過 `go install` 安裝 |
 | `Brewfile.darwin.tmpl` | 全部 GUI casks — 見下表 |
 | `Brewfile.linux.tmpl` | 空白(只有被註解掉的佔位) |
 
@@ -970,6 +971,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **cursor**(IDE) | brew cask | `.deb` 來自 `cursor.com/api/download` | Brewfile.darwin / gui_apps_linux |
 | **cursor-agent**(CLI) | curl `cursor.com/install` | 同 | coding_agents |
 | **dasel** | brew | release | devtools |
+| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | `go install` (`go_tools`) | Brewfile + go_tools — repository/task/worktree command center |
 | **dbeaver-community** | brew cask | n/a | Brewfile.darwin |
 | **diffnav** | brew | GitHub release | devtools |
 | **direnv** | brew | apt 或 curl-installer | devtools |

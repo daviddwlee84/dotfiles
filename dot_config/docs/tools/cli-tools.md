@@ -74,6 +74,7 @@ All tools installed by this dotfiles project. The **Invocation** column is what 
 
 | Command | Invocation | Description | Notes |
 |---------|------------|-------------|-------|
+| `dev` | `dev` | Repository, task and worktree command center | bare `dev` opens the dashboard; `dev start`, `dev park`, `dev resume` |
 | `jq` | `jq ` | JSON processor | `.` pretty-print, `.key` extract, `keys` list |
 | `yq` | `yq ` | YAML/JSON/XML processor (Mike Farah Go build) | `yq .key file.yaml`, `-i` in-place edit, `-o=json` convert |
 | `dasel` | `dasel ` | Unified YAML/TOML/XML/JSON/CSV query & modify | `dasel -f file.yaml '.key'`, `-r toml -w json` for cross-format conversion |

@@ -84,6 +84,7 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `gh` | `gh completion -s zsh` |
 | `opencode` | `opencode completion zsh` |
 | `translate` | `translate completion zsh` |
+| `dev` | `dev completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 **Usage pattern:**
@@ -213,9 +214,9 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 
 ## Generating Completions After Fresh Install
 
-**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 15 self-generating tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `translate`).
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 16 bulk-generated tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `translate`, `dev`).
 
-The hook is **idempotent** — it stat-checks each tool's binary mtime against the existing completion file and skips if the cache is fresh. Cost when nothing changed: **~21ms** total (presence checks + 28 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime: ~140ms one-shot to regenerate the affected completions.
+The hook is **idempotent** — it stat-checks each tool's binary mtime against the existing completion file and skips if the cache is fresh. Cost when nothing changed: **~50ms** total (presence checks + 32 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime: ~140ms one-shot to regenerate the affected completions.
 
 Output paths:
 - **zsh**: `~/.zfunc/_<tool>` — lazy-loaded by compinit on first TAB (in `$fpath` via `dot_zshrc.tmpl:68`).

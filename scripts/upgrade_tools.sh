@@ -515,9 +515,9 @@ cat_cargo() {
 # dot_ansible/roles/go_tools/defaults/main.yml
 # ============================================================================
 cat_go() {
-  # macOS installs go_tools binaries via Homebrew (translate → daviddwlee84/tap),
-  # so `go install` is Linux-only — skip on macOS to avoid re-creating
-  # ~/.local/bin/translate and shadowing the brew copy. Mirrors the go_tools role
+  # macOS installs go_tools binaries via Homebrew (translate + dev →
+  # daviddwlee84/tap), so `go install` is Linux-only — skip on macOS to avoid
+  # re-creating ~/.local/bin copies that shadow brew. Mirrors the go_tools role
   # gate; on macOS upgrade via `brew upgrade` (just upgrade-brew).
   if [[ "$(uname -s)" == "Darwin" ]]; then
     warn "go tools are Homebrew-managed on macOS — skipping (use \`brew upgrade\`)"

@@ -11,7 +11,7 @@
 tap "nikitabobko/tap"  # aerospace (macOS window manager)
 {{ end -}}
 {{ if eq .chezmoi.os "darwin" -}}
-tap "daviddwlee84/tap"  # translate CLI — auto-trusted by the brew-bundle run-script (trust_bundle_taps)
+tap "daviddwlee84/tap"  # personal CLIs — auto-trusted by the brew-bundle run-script (trust_bundle_taps)
 {{ end -}}
 
 # =============================================================================
@@ -24,6 +24,12 @@ tap "daviddwlee84/tap"  # translate CLI — auto-trusted by the brew-bundle run-
 # `go install` (go_tools role). NOT installBrewApps-gated: it's a CLI wanted on every mac.
 {{ if eq .chezmoi.os "darwin" -}}
 brew "daviddwlee84/tap/translate"
+{{ end -}}
+
+# dev-cli — repository, task and worktree command center. macOS via the public
+# tap; Linux uses `go install` (go_tools role). Installs as the `dev` command.
+{{ if eq .chezmoi.os "darwin" -}}
+brew "daviddwlee84/tap/dev-cli"
 {{ end -}}
 
 # The following formulas support the general macOS GUI app bundle.
