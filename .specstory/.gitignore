@@ -1,3 +1,4 @@
 # SpecStory project identity file
 /.project.json
+/statistics.json
 bin/

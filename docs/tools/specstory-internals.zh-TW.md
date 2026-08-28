@@ -83,13 +83,14 @@
 | *(此處未見)* Droid | `droidcli` |
 | *(此處未見)* Cursor CLI | `cursorcli` |
 
-`<!-- ... Session <uuid> ... -->` 行中的 UUID 與代理 resume flag 使用的 session id **完全相同**（`claude --resume <uuid>`、`codex resume <uuid>`、`cursor-agent --resume <uuid>`、`opencode --session <uuid>`）。這使得 session id → 轉譯檔的對應變成跨 provider 一致的單行 grep：
+`<!-- ... Session <uuid> ... -->` 行中的 UUID 與代理 resume flag 使用的 session id **完全相同**（`claude --resume <uuid>`、`codex resume <uuid>`、`cursor-agent --resume <uuid>`、`opencode --session <uuid>`）。只比對固定前置序言：正文可能引用其他 UUID，最新 mtime也可能屬於另一個agent。
 
 ```sh
-grep -l "Session ${sid}" .specstory/history/*.md
+~/.agents/skills/agent-history-hygiene/scripts/find-session.sh \
+  --format=specstory --session-id "$sid"
 ```
 
-**SpecStory CLI 沒有內建的 `resolve <sid> → path` 子命令。** 已記載的命令是 `specstory run` / `specstory sync` / `specstory watch`。上面的 grep 配方就是受支援的路徑。
+**SpecStory CLI 沒有內建的 `resolve <sid> → path` 子命令。** Managed helper只掃前12行且要求唯一exact match；零筆或重複時自動finalization會fail closed。
 
 關於 `tv agent-sessions` 通道的整合，見 `dot_config/television/executable_agent-sessions.py`——它在啟動時會從 `~/.local/share/chezmoi/.specstory/history/` 快取對應表，並將比對到的路徑作為 TSV 第 5 欄（綁定 `Alt+S` 以複製）暴露出來。
 
@@ -145,6 +146,24 @@ _**User**_ …
 - **`--no-cloud-sync` 則相反**——本機寫入照常，雲端同步停用。
 - **`--debug-raw` 將原始 session 記錄傾印**至 `.specstory/debug/`，與 markdown 並列——當轉譯看起來不對勁、想看 SpecStory 究竟看到什麼時很有用。
 - **Provider ID 與顯示名稱不是同一字串。** `specstory run claudecode` 是 CLI ID；產生的 markdown 中 HTML 註解寫的是 `Claude Code`（含空格）。若您要對其中一個字串寫腳本，請挑對的——HTML 註解才是反向查找 grep 比對的對象。
+
+## Post-writer artifact finalization
+
+`dot_config/shell/22_sesh.sh` 會為wrapper-managed `specstory run` process提供
+`DEV_AGENT_RUN_ID`。Active agent先明確執行 `dev prepare`；外層shell只在
+SpecStory寫完最後Markdown並返回後才執行：
+
+```sh
+dev artifact finalize --run-id "$DEV_AGENT_RUN_ID" --if-pending --writer-stopped
+```
+
+沒有matching intent時安靜no-op。若scanner或quiescence檢查失敗，pane會留在
+shell且restart不會啟動另一個writer。Claude `SessionEnd`只記錄armed run已結束，
+不在teardown內stage/commit；direct/IDE session由外部finalize或 `dev sweep`
+reconcile。
+
+`.specstory/statistics.json` 是derived aggregate，不是review history；finalizer只
+處理exact transcript與明確指定的plan，其他session保持unstaged。
 
 ## 參考資料
 

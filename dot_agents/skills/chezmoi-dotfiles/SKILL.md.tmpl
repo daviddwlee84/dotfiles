@@ -118,7 +118,7 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 
 ## Package-managed personal CLIs
 
-- **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation and generated completion. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the `go_tools` role. Source: `github.com/daviddwlee84/dev-cli`.
+- **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation, generated completion, agent-safe prepare/finalize/done/retire lifecycle, and receipt-backed `dev git` transactions. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the `go_tools` role. Source: `github.com/daviddwlee84/dev-cli`.
 - **`translate`** — terminal translator (CLI + TUI). macOS installs `daviddwlee84/tap/translate`; Linux uses the `go_tools` role.
 
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
@@ -146,7 +146,7 @@ Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, bu
 - **`dotcfg`** — reconfigure dotfiles prompts (above).
 - **`sesh-preview`** — preview helper for the sesh picker.
 
-**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, binary-matched global skill from `herdr --skill`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with three metadata pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`) plus `herdr-grep` for pane-content search. See `docs/tools/herdr.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
+**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, binary-matched global skill from `herdr --skill`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with `prefix+d` for the interactive `dev` dashboard, low-frequency copy helpers under `prefix+y` Quick Actions, three metadata pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`), and `herdr-grep` for pane-content search. See `docs/tools/herdr.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
 
 ## Television (`tv`) — fuzzy pickers with custom channels
 

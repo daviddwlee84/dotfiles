@@ -126,7 +126,7 @@ description = "new tab at the workspace (space) root dir"
 | Agent status 🤖/💬/✅ (workmux, 6 files) | **Native** agent-state rollups in sidebar | Skipped — native (workmux untouched for tmux). Panel ordered as an **attention queue**, not grouped by space: `ui.agent_panel_sort = "priority"` (herdr's default is `"spaces"`) |
 | `sesh` fuzzy switch + `tmuxp` layouts | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects templates |
 | `tv` channel popups (`prefix+T/U/a`) | **Custom command panes** (`[[keys.command]] type="pane"`) | Key bindings + 2 herdr-aware channels |
-| lazygit / scratch popups | **Custom command panes** | Key bindings |
+| dev / lazygit / scratch popups | **Custom command panes** | Key bindings |
 | URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` scans scrollback |
 | File-path picker (`prefix+p`; extrakto `prefix+Tab` on tmux) | **Custom command pane + helper** | `prefix+p` → `path-pick.sh` — two-tier (exists-under-cwd first) → `x copy` |
 | Search all pane content + jump | **CLI pipeline + fzf + exact-focus helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`; Alt+S searches unwrapped scrollback |
@@ -159,6 +159,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + ,` | rename tab | rebound (tmux muscle memory) |
 | `prefix + shift + r` | reload config (`prefix + r` stays resize mode) | rebound |
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
+| `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` | lazygit | command pane |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
@@ -171,12 +172,6 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + Alt + F` | prompt for pane-content pattern → `herdr-grep --pick --visible` → fzf exact jump; Alt+S = scrollback, Alt+V = visible | command pane |
 | `prefix + m` | toggle **review-pending** flag (⭐) on the current pane | command pane |
 | `prefix + i` | `tv herdr-review` — review-pending **inbox** (flagged panes) | command pane |
-| `prefix + P` | copy focused pane's **process info** to the clipboard | command pane |
-| `prefix + D` | copy focused pane's **coordinate** (session>space>tab>pane) | command pane |
-| `prefix + V` | copy focused pane's **content** (visible screen) | command pane |
-| `prefix + S` | copy focused pane's **content** (full scrollback) | command pane |
-| `prefix + d` | copy the **workspace ("space") root dir** — the right-click "Copy dir" herdr doesn't have ([details](#copy-to-clipboard)) | command pane |
-| `prefix + ctrl + d` | copy the focused pane's **live cwd** (the `pwd`/`abspath` answer) | command pane |
 | `` prefix + p `` | **copy a file path** from the pane — two-tier fzf (paths that exist under the pane cwd on top), copies the resolved absolute path (`x copy`) | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + E` | **run any command** in the pane's cwd — fzf-pick from history or type it; the popup closes itself when the command exits ([details](#run-any-command)) | command **popup** |
@@ -244,9 +239,9 @@ herdr plugin install cloudmanic/herdr-plus   # manual fallback / what the role r
 
 Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → the same path under `~/.config/`. The shipped `chezmoi.toml` mirrors this repo's tmuxinator `chezmoi` session (editor/git/shell tabs). Bind `prefix+O` → Projects and `prefix+y` → Quick Actions (already in the config).
 
-**Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the six **copy** actions (see [Copy pane + space facts](#copy-to-clipboard)) plus the plugin's five **starter** examples (GitHub / Google / Search Google / Open Repo / Reveal Working Dir), adapted for Linux — macOS `open` → the repo's cross-platform [`x open`](../shells/aliases.md), and the repo-select points at `daviddwlee84/*`. Because this managed dir is non-empty, herdr-plus does **not** auto-seed those examples itself (it only seeds into an *empty* dir), which is why they're vendored here; delete any TOML you don't want. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
+**Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the six **copy** actions (see [Copy pane + space facts](#copy-to-clipboard)) plus the plugin's five **starter** examples (GitHub / Google / Search Google / Open Repo / Reveal Working Dir), adapted for Linux — macOS `open` → the repo's cross-platform [`x open`](../shells/aliases.md), and the repo-select points at `daviddwlee84/*`. The copy operations deliberately live here instead of consuming six direct prefix keys. Because this managed dir is non-empty, herdr-plus does **not** auto-seed those examples itself (it only seeds into an *empty* dir), which is why they're vendored here; delete any TOML you don't want. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
 
-> **Quick Actions are for one-off, non-interactive commands** (the shipped examples all `open <url>`). herdr-plus runs a chosen action via `sh -c` with no PTY and no interactive stdin, so an interactive TUI misbehaves — btop exits immediately, nvtop can't receive F10. For a TUI you want the lazygit-style *floating command pane* (`[[keys.command]] type="pane"`) instead — that's why **btop** (`prefix+M`) and **nvtop** (`prefix+N`) are keybinds, not Quick Actions.
+> **Quick Actions are for one-off, non-interactive commands** (the shipped examples all `open <url>`). herdr-plus runs a chosen action via `sh -c` with no PTY and no interactive stdin, so an interactive TUI misbehaves — btop exits immediately, nvtop can't receive F10. For a TUI you want the dev/lazygit-style *floating command pane* (`[[keys.command]] type="pane"`) instead — that's why **dev** (`prefix+d`), **btop** (`prefix+M`), and **nvtop** (`prefix+N`) are keybinds, not Quick Actions.
 
 ## Television integration {#television-integration}
 
@@ -383,13 +378,13 @@ Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review
 
 | Approach | Problem |
 |---|---|
-| `type = "pane"` (`prefix+G/M/N`) | splits the **tiled layout** for the duration; everything reflows |
+| `type = "pane"` (`prefix+d/G/M/N`) | splits the **tiled layout** for the duration; everything reflows |
 | `prefix + c` → type → `exit` | four steps, and churns the tab bar |
 | **`type = "popup"`** | session-modal float **above** the layout — nothing reflows, and you land exactly where you were |
 
 `type = "popup"` requires **herdr ≥ 0.7.4** (added in #1125, with `width`/`height` in cells or percentages). It is the true `tmux display-popup -E` analog.
 
-`prefix + `` ` `` (scratch shell) is a popup too, for the same reason — as a command pane it took over the layout and read as a *zoom* of the current window rather than a scratch space. `prefix+G` / `prefix+M` / `prefix+N` (lazygit / btop / nvtop) deliberately stay `type = "pane"`: you quit those immediately with `q`, so the temporary split costs nothing, and popups are **session-modal** — you cannot touch another pane while one is open. That modality is why this is decided per binding rather than globally.
+`prefix + `` ` `` (scratch shell) is a popup too, for the same reason — as a command pane it took over the layout and read as a *zoom* of the current window rather than a scratch space. `prefix+d` / `prefix+G` / `prefix+M` / `prefix+N` (dev / lazygit / btop / nvtop) deliberately stay `type = "pane"`: you quit those immediately with `q`, so the temporary split costs nothing, and popups are **session-modal** — you cannot touch another pane while one is open. That modality is why this is decided per binding rather than globally.
 
 **It cannot be a herdr-plus Quick Action** (`prefix + y`), which is the intuitive place to look. Two blockers: Quick Actions run through `sh -c` with **no PTY/stdin** — the same reason `btop`/`nvtop` are command panes rather than Quick Actions — and every action is a fixed `command = "…"` string with no free-text field.
 
@@ -408,28 +403,27 @@ Behaviour:
 
 ## Copy pane + space facts to the clipboard {#copy-to-clipboard}
 
-Six one-keypress "grab this onto the clipboard" ops, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH). The pane defaults to the **current focused pane** (`herdr pane current`); the keybinds pass `$HERDR_ACTIVE_PANE_ID`, the Quick Actions pass `$HERDR_PLUS_PANE_ID`, and either falls through to the current-pane lookup when empty.
+Six low-frequency "grab this onto the clipboard" operations live in the `prefix+y` Quick Actions list, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a Quick Action may run without the interactive PATH). The action passes the focused pane as `$HERDR_PLUS_PANE_ID`; the helper falls back to `herdr pane current` when empty.
 
-| Op | Key | Quick Action | What lands on the clipboard |
-|---|---|---|---|
-| `process` | `prefix+P` | *Copy pane: process info* | foreground processes — `cmdline` + `pid` + `cwd` (from `herdr pane process-info`) |
-| `coord` | `prefix+D` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
-| `content` (visible) | `prefix+V` | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
-| `content` (scrollback) | `prefix+S` | *Copy pane: content (scrollback)* | the pane's scrollback (`--source recent --lines 1000`), capped at herdr's own per-`pane read` hard ceiling of 1000 lines — a pane retaining more than that (check `.scroll.max_offset_from_bottom` from `herdr pane get`) only yields its most recent 1000 lines; there's no pagination flag to reach further back |
-| `dir` | `prefix+d` | *Copy space: dir* | the **workspace ("space") root directory** — see below |
-| `cwd` | `prefix+ctrl+d` | *Copy pane: cwd* | the focused pane's **live** working directory (what `pwd` / [`abspath`](../shells/aliases.md) returns) |
+| Op | Quick Action | What lands on the clipboard |
+|---|---|---|
+| `process` | *Copy pane: process info* | foreground processes — `cmdline` + `pid` + `cwd` (from `herdr pane process-info`) |
+| `coord` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
+| `content` (visible) | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
+| `content` (scrollback) | *Copy pane: content (scrollback)* | the pane's scrollback (`--source recent --lines 1000`), capped at herdr's own per-`pane read` hard ceiling of 1000 lines — a pane retaining more than that (check `.scroll.max_offset_from_bottom` from `herdr pane get`) only yields its most recent 1000 lines; there's no pagination flag to reach further back |
+| `dir` | *Copy space: dir* | the **workspace ("space") root directory** — see below |
+| `cwd` | *Copy pane: cwd* | the focused pane's **live** working directory (what `pwd` / [`abspath`](../shells/aliases.md) returns) |
 
 The **coordinate** answers "which `session > space > tab > pane` is this?" in a form you can feed back to the CLI. herdr has **no `--session` flag** on the `pane`/`tab`/`workspace` subcommands — a session is targeted only via `HERDR_SOCKET_PATH` — so the block includes the `socket=` line as the session selector (the session *name* is resolved by matching that socket against `herdr session list --json`).
 
-Both surfaces share the same helper: the `[[keys.command]]` binds in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) and the `copy-*.toml` **Quick Actions** under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` (fuzzy-launched via `prefix+y`). `P/D/V/S` are uppercase (`prefix+shift+<letter>`) chosen to dodge herdr's reserved `shift+H/J/K/L` (swap-pane) and this repo's `shift+B` (new_worktree) / `shift+R` (reload); lowercase `d` was the only free mnemonic letter left for the dir ops, with `ctrl+d` keeping the pair adjacent. Confirm no collision with `herdr server reload-config` (empty `diagnostics`).
+The `copy-*.toml` Quick Actions all share the same helper and are fuzzy-launched via `prefix+y`. Their former direct bindings (`prefix+P/D/V/S/d/ctrl+d`) were removed to keep the prefix namespace focused on interactive tools; `prefix+d` now launches the dev dashboard. The interactive file-path picker remains on `prefix+p` because fzf requires a PTY/stdin and cannot run inside a Quick Action.
 
 ### `dir` vs `cwd`, and why the right-click menu can't do this {#space-dir}
 
-`dir` is the answer to *"what directory is this space about?"* — the thing you'd want from a right-click **Copy dir** on a sidebar workspace row. Three ways to reach it:
+`dir` is the answer to *"what directory is this space about?"* — the thing you'd want from a right-click **Copy dir** on a sidebar workspace row. Two ways to reach it:
 
 | Surface | How | Scope |
 |---|---|---|
-| `prefix+d` | keybind | the **focused** workspace |
 | `prefix+y` → *Copy space: dir* | herdr-plus Quick Action | the **focused** workspace |
 | `prefix+T` → **`Alt+Y`** | [`herdr-sesh`](#television-integration) tv channel | **any** workspace in the list — strictly more than right-click could give |
 
@@ -461,7 +455,7 @@ Bound via a `[[keys.command]] type="pane"` in [`.chezmoitemplates/herdr/config.t
 
 ## Copy a file path from the pane (`prefix+p`)
 
-The copy-path sibling of the URL picker. `prefix+p` opens an fzf popup of the file paths in the focused pane; pick one (or several) and the path is copied to the clipboard. Lowercase `p` ("copy **p**ath") sits under the uppercase copy family (`prefix+P/D/V/S`), the same `u`/`U` convention. On tmux the analog is the **extrakto** plugin (`prefix + Tab`) — see [tmux keybindings](tmux/keybindings.md).
+The copy-path sibling of the URL picker. `prefix+p` opens an fzf popup of the file paths in the focused pane; pick one (or several) and the path is copied to the clipboard. It keeps a direct key because the interactive fzf cannot run inside `prefix+y` Quick Actions. On tmux the analog is the **extrakto** plugin (`prefix + Tab`) — see [tmux keybindings](tmux/keybindings.md).
 
 Helper: `~/.config/herdr/path-pick.sh` = [`dot_config/herdr/executable_path-pick.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_path-pick.sh), a direct sibling of `url-pick.sh`/`pane-copy.sh` (same pane + `x`-resolution + `herdr pane read` plumbing), copying via [`x copy`](../shells/aliases.md).
 

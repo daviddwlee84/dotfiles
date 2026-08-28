@@ -142,28 +142,36 @@ function _sesh_wrap_agent() {
 # new-window … "<cmd>"`). Quoting is structured so user $SHELL is the one
 # evaluating the inner command — we don't double-eval.
 function _sesh_on_exit_wrap() {
-    local inner="$1" mode="$2" label="${3:-agent}"
+    local inner="$1" mode="$2" label="${3:-agent}" display_inner="$1"
     # Ctrl+C sends SIGINT to the entire foreground process group, so the
     # wrapper shell itself dies before it can print the hint or exec the
     # login shell — the pane just vanishes. `trap '' INT` makes the wrapper
     # ignore SIGINT; the inner command still receives it and exits normally,
     # then control returns to the wrapper which prints the hint as intended.
-    # (Tools that install their own SIGINT handler — btop, htop, less — were
-    # the visible failure case; agent CLIs happened to handle Ctrl+C as
-    # clean exit so this was masked for them.)
     local guard="trap '' INT;"
+    local finalize="_dev_agent_rc=\$?;"
+    case "$inner" in
+        "specstory run "*)
+            # This shell remains outside SpecStory and regains control only
+            # after its final Markdown render. An older dev binary simply skips
+            # finalization; an armed intent failure always lands in a shell so
+            # no worktree/runtime is destroyed and restart cannot start a new
+            # writer over unresolved state.
+            inner="_dev_agent_run_id=\"\${DEV_AGENT_RUN_ID:-run-\$(date +%s)-\$\$}\"; DEV_AGENT_RUN_ID=\"\$_dev_agent_run_id\" $inner"
+            finalize="_dev_agent_rc=\$?; _dev_finalize_rc=0; if command -v dev >/dev/null 2>&1 && command dev artifact finalize --help >/dev/null 2>&1; then command dev artifact finalize --run-id \"\$_dev_agent_run_id\" --if-pending --writer-stopped || _dev_finalize_rc=\$?; fi; if [ \"\$_dev_finalize_rc\" -ne 0 ]; then printf '\\n\\033[31m[artifact finalization blocked — staying in shell]\\033[0m\\n' >&2; exec \$SHELL -l; fi;"
+            ;;
+    esac
     case "$mode" in
         kill)
-            printf '%s\n' "$inner"
+            printf '%s\n' "$guard $inner; $finalize exit \$_dev_agent_rc"
             ;;
         restart)
-            # `|| true` so a crash exit doesn't abort the loop on `set -e` shells
-            printf '%s\n' "$guard while true; do $inner || true; echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
+            printf '%s\n' "$guard while true; do $inner; $finalize echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
             ;;
         shell|*)
             # Default. Hint message uses tmux color codes — works in all
             # terminals tmux supports.
-            printf '%s\n' "$guard $inner; printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$inner\"; exec \$SHELL -l"
+            printf '%s\n' "$guard $inner; $finalize printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$display_inner\"; exec \$SHELL -l"
             ;;
     esac
 }

@@ -1,8 +1,8 @@
 # herdr-plus Quick Action — copy the focused pane's process info to the clipboard.
 # Managed by chezmoi (dot_config/herdr/plugins/config/cloudmanic.herdr-plus/
 # quick-actions/). Runs ~/.config/herdr/pane-copy.sh against $HERDR_PLUS_PANE_ID
-# (the focused pane herdr-plus captures when Quick Actions fires). The same op is
-# also bound to prefix+P. See docs/tools/herdr.md.
+# (the focused pane herdr-plus captures when Quick Actions fires). Available from
+# the prefix+y Quick Actions list. See docs/tools/herdr.md.
 name = "Copy pane: process info"
 description = "Foreground processes (cmdline + pid + cwd) of the focused pane"
 command = "~/.config/herdr/pane-copy.sh process \"$HERDR_PLUS_PANE_ID\""

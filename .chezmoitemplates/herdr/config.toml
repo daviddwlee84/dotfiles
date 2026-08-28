@@ -21,7 +21,7 @@
 # already close to tmux (prefix+c new tab, prefix+1..9 switch, prefix+h/j/k/l
 # focus pane, prefix+v / prefix+minus split, prefix+z zoom, prefix+x close,
 # prefix+g session navigator, prefix+w workspace nav, prefix+q detach), so we
-# only rebind a couple of keys and add command panes for the tv/lazygit popups.
+# only rebind a couple of keys and add command panes for the tv/dev/lazygit TUIs.
 
 [theme]
 name = "catppuccin"          # mocha (dark)
@@ -106,11 +106,17 @@ focus_agent = "prefix+alt+1..9"          # prefix+alt+N  → jump to agent N's p
 navigate_workspace_down = ["j", "down"]
 navigate_workspace_up = ["k", "up"]
 
-# --- Custom command panes (the tmux-popup recreations) ---
+# --- Custom command panes (interactive TUI launchers) ---
 # type = "pane": opens a temporary pane that closes when the command exits —
 # herdr's analog of `tmux display-popup -E`. The command runs from the focused
 # pane's cwd and gets $HERDR_SOCKET_PATH / $HERDR_ACTIVE_PANE_ID /
 # $HERDR_ACTIVE_PANE_CWD in its environment.
+
+[[keys.command]]
+key = "prefix+d"
+type = "pane"
+command = "dev"
+description = "dev repository/task dashboard (popup pane)"
 
 [[keys.command]]
 key = "prefix+G"
@@ -140,7 +146,7 @@ description = "nvtop GPU monitor (popup pane)"
 # floats ABOVE the tiled layout instead, so nothing reflows and quitting the
 # shell puts you back exactly where you were.
 #
-# The lazygit/btop/nvtop bindings above deliberately STAY type = "pane": you
+# The dev/lazygit/btop/nvtop bindings above deliberately STAY type = "pane": you
 # quit those immediately (`q`) and return, so the temporary split costs nothing
 # and a modal popup would buy nothing. Popups are session-modal — you cannot
 # interact with another pane while one is open — which is the trade-off that
@@ -261,77 +267,20 @@ type = "pane"
 command = "tv herdr-review"
 description = "Review-pending inbox — flagged panes (herdr-aware tv channel)"
 
-# --- Copy focused-pane facts to the clipboard (prefix+P/D/V/S) ---
+# --- Copy focused-pane facts through Quick Actions (prefix+y) ---
 # One helper (~/.config/herdr/pane-copy.sh) distills a pane's data and pipes it to
-# `x copy`. Bound to the KEYBIND-context $HERDR_ACTIVE_PANE_ID (the pane focused
-# when the key was pressed; the helper falls back to `herdr pane current` if empty).
-# The SAME four ops are also herdr-plus Quick Actions (dot_config/herdr/plugins/
-# config/cloudmanic.herdr-plus/quick-actions/). Uppercase letters resolve to
-# prefix+shift+<letter>; P/D/V/S avoid herdr's reserved shift builtins (shift+H/J/K/L
-# swap-pane) and this repo's own shift+B (new_worktree) / shift+R (reload). Confirm
-# clean with `herdr server reload-config` (empty diagnostics). See docs/tools/herdr.md.
-[[keys.command]]
-key = "prefix+P"
-type = "pane"
-command = "~/.config/herdr/pane-copy.sh process \"$HERDR_ACTIVE_PANE_ID\""
-description = "copy pane process info"
-
-[[keys.command]]
-key = "prefix+D"
-type = "pane"
-command = "~/.config/herdr/pane-copy.sh coord \"$HERDR_ACTIVE_PANE_ID\""
-description = "copy pane coordinate (session>space>tab>pane)"
-
-[[keys.command]]
-key = "prefix+V"
-type = "pane"
-command = "~/.config/herdr/pane-copy.sh content \"$HERDR_ACTIVE_PANE_ID\" --source visible"
-description = "copy pane content (visible screen)"
-
-[[keys.command]]
-key = "prefix+S"
-type = "pane"
-command = "~/.config/herdr/pane-copy.sh content \"$HERDR_ACTIVE_PANE_ID\" --source recent"
-description = "copy pane content (full scrollback)"
-
-# --- Copy a DIRECTORY to the clipboard (prefix+d / prefix+ctrl+d) ---
-# The `abspath` analog for herdr's own units. Two ops, because they answer
-# different questions and drift apart the moment you cd inside a tab:
-#   prefix+d       the WORKSPACE ("space") root dir — the directory the sidebar
-#                  row represents, i.e. what a right-click "Copy dir" would give
-#   prefix+ctrl+d  the focused pane's LIVE cwd — what `pwd`/`abspath` returns
-#
-# NOTE this is a WORKAROUND, not the natural home. The natural home is herdr's
-# workspace right-click menu (Rename / Close / New worktree / Open worktree...),
-# which is a FIXED enum compiled into the binary: no config table, no plugin
-# manifest field, and `herdr api schema --json` contains no "menu" at all. The
-# plugin `contexts = ["workspace"]` field looks like menu placement but is inert
-# — upstream confirms it "only surfaces in the plugin action list API response"
-# (ogulcancelik/herdr#1776). Requested four times (#1511, #1671, #1776, #1830),
-# all closed NOT_PLANNED, redirected to discussions #1609/#1672/#1722 which are
-# still open and unanswered. Re-check on herdr upgrades. See docs/tools/herdr.md.
-#
-# Key choice: lowercase `d` was the only free mnemonic letter — `prefix+D` is
-# copy-pane-coordinate above and `prefix+shift+d` is herdr's close_workspace.
-# `prefix+ctrl+d` keeps the pair adjacent; ctrl+letter is herdr's documented
-# reliable-modifier tier, and the repo already uses prefix+ctrl+1..9.
-[[keys.command]]
-key = "prefix+d"
-type = "pane"
-command = "~/.config/herdr/pane-copy.sh dir \"$HERDR_ACTIVE_PANE_ID\""
-description = "copy the workspace (space) root dir"
-
-[[keys.command]]
-key = "prefix+ctrl+d"
-type = "pane"
-command = "~/.config/herdr/pane-copy.sh cwd \"$HERDR_ACTIVE_PANE_ID\""
-description = "copy the focused pane's live cwd"
+# `x copy`. The six non-interactive ops live only in herdr-plus Quick Actions
+# (dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/), where
+# $HERDR_PLUS_PANE_ID identifies the focused pane. Keeping these low-frequency
+# actions behind prefix+y leaves the direct key namespace for interactive tools.
+# See docs/tools/herdr.md.
 
 # Copy a file PATH from the pane (extrakto-style, herdr side). Extracts path-like
 # tokens; two-tier: paths that EXIST under the pane cwd (copied as resolved
 # absolute) on top, unverified candidates below a separator. fzf-pick → `x copy`.
-# Lowercase p pairs with the uppercase copy family (P/D/V/S), same u/U convention.
-# Passes $HERDR_ACTIVE_PANE_CWD for the existence check. Helper mirrors pane-copy.sh.
+# This stays on a direct key because its interactive fzf needs a PTY/stdin and
+# cannot run as a herdr-plus Quick Action. Passes $HERDR_ACTIVE_PANE_CWD for the
+# existence check. Helper mirrors pane-copy.sh.
 [[keys.command]]
 key = "prefix+p"
 type = "pane"

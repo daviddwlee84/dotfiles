@@ -75,12 +75,14 @@ overlay=$(cat <<'JSON'
 {{- $peon := or (eq .agentSounds "peon") (eq .agentSounds "both") }}
 {{- $notify := or (eq .agentSounds "notify") (eq .agentSounds "both") }}
 {{- $peonCmd := "[ -x \"$HOME/.claude/hooks/peon-ping/peon.sh\" ] && \"$HOME/.claude/hooks/peon-ping/peon.sh\" || true" }}
+{{- $retireObserveCmd := "command -v dev >/dev/null 2>&1 && command dev artifact observe-session-end >/dev/null 2>&1 || true" }}
+    "SessionEnd": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $retireObserveCmd | quote }}, "timeout": 5 } ] }{{ if $peon }},
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }{{ end }}
+    ],
 {{- if $peon }}
     "SessionStart": [
       { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10 } ] }
-    ],
-    "SessionEnd": [
-      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }
     ],
     "SubagentStart": [
       { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }

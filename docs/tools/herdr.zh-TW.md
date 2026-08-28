@@ -130,7 +130,7 @@ description = "new tab at the workspace (space) root dir"
 | Agent 狀態 🤖/💬/✅（workmux，6 檔案） | **原生** 側欄 agent-state 彙整 | 略過——原生（tmux 端 workmux 不動）。面板改用**注意力佇列**排序，而非依 space 分組：`ui.agent_panel_sort = "priority"`（herdr 預設是 `"spaces"`） |
 | `sesh` 模糊切換 + `tmuxp` layout | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects 範本 |
 | `tv` channel 彈窗（`prefix+T/U/a`） | **自訂 command pane**（`[[keys.command]] type="pane"`） | Key bindings + 2 個 herdr-aware channel |
-| lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
+| dev / lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
 | URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
 | 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
 | 搜尋所有 pane 內容並跳轉 | **CLI pipeline + fzf + 精確聚焦 helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`；Alt+S 搜尋 unwrapped scrollback |
@@ -163,6 +163,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + ,` | 重新命名 tab | rebound（tmux 肌肉記憶） |
 | `prefix + shift + r` | reload config（`prefix + r` 保留給 resize mode） | rebound |
 | `prefix + shift + b` | 新 git worktree（從 `prefix + shift + g` 移過來） | rebound |
+| `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` | lazygit | command pane |
 | `prefix + M` | btop 系統監控器 | command pane |
 | `prefix + N` | nvtop GPU 監控器 | command pane |
@@ -175,12 +176,6 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + Alt + F` | 輸入 pane-content pattern → `herdr-grep --pick --visible` → fzf 精確跳轉；Alt+S = scrollback、Alt+V = visible | command pane |
 | `prefix + m` | 切換目前 pane 的**待 review** 旗標（⭐） | command pane |
 | `prefix + i` | `tv herdr-review`——待 review **收件匣**（被標記的 pane） | command pane |
-| `prefix + P` | 複製聚焦 pane 的 **process 資訊** 到剪貼簿 | command pane |
-| `prefix + D` | 複製聚焦 pane 的 **座標**（session>space>tab>pane） | command pane |
-| `prefix + V` | 複製聚焦 pane 的 **內容**（可見畫面） | command pane |
-| `prefix + S` | 複製聚焦 pane 的 **內容**（完整 scrollback） | command pane |
-| `prefix + d` | 複製 **workspace（space）根目錄**——herdr 沒有的那個右鍵「Copy dir」（[詳情](#copy-to-clipboard)） | command pane |
-| `prefix + ctrl + d` | 複製聚焦 pane 的**即時 cwd**（`pwd`/`abspath` 的答案） | command pane |
 | `` prefix + p `` | **複製檔案路徑** ——兩層 fzf（cwd 下存在的路徑在上），複製解析後的絕對路徑（`x copy`） | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
@@ -248,9 +243,9 @@ herdr plugin install cloudmanic/herdr-plus   # 手動 fallback / role 實際跑�
 
 Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → `~/.config/` 下的同一路徑。內建的 `chezmoi.toml` 對應本 repo 的 tmuxinator `chezmoi` session（editor/git/shell tab）。把 `prefix+O` 綁到 Projects、`prefix+y` 綁到 Quick Actions（設定裡已備好）。
 
-**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨六個 **copy** action（見 [複製 pane 與 space 的資訊](#copy-to-clipboard)）,外加 plugin 的五個**起手式**範例（GitHub / Google / Search Google / Open Repo / Reveal Working Dir）,已為 Linux 調整——macOS `open` → 本 repo 的跨平台 [`x open`](../shells/aliases.md),repo 選單指向 `daviddwlee84/*`。因為這個受管目錄非空,herdr-plus **不會** 自己 seed 那些範例（它只在*空*目錄時 seed）,所以在此 vendored;不要的 TOML 刪掉即可。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
+**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨六個 **copy** action（見 [複製 pane 與 space 的資訊](#copy-to-clipboard)）,外加 plugin 的五個**起手式**範例（GitHub / Google / Search Google / Open Repo / Reveal Working Dir）,已為 Linux 調整——macOS `open` → 本 repo 的跨平台 [`x open`](../shells/aliases.md),repo 選單指向 `daviddwlee84/*`。這些 copy 操作刻意集中在此處,不再占用六個 prefix 直達鍵。因為這個受管目錄非空,herdr-plus **不會** 自己 seed 那些範例（它只在*空*目錄時 seed）,所以在此 vendored;不要的 TOML 刪掉即可。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
 
-> **Quick Actions 是給一次性、非互動式指令用的**（內建範例全是 `open <url>`）。herdr-plus 用 `sh -c` 跑選中的 action,沒有 PTY、沒有互動 stdin,所以互動式 TUI 會出問題——btop 立刻退出、nvtop 收不到 F10。要跑 TUI 就用 lazygit 那種*浮動 command pane*（`[[keys.command]] type="pane"`）——這就是為何 **btop**（`prefix+M`）與 **nvtop**（`prefix+N`）是快捷鍵而非 Quick Action。
+> **Quick Actions 是給一次性、非互動式指令用的**（內建範例全是 `open <url>`）。herdr-plus 用 `sh -c` 跑選中的 action,沒有 PTY、沒有互動 stdin,所以互動式 TUI 會出問題——btop 立刻退出、nvtop 收不到 F10。要跑 TUI 就用 dev/lazygit 那種*浮動 command pane*（`[[keys.command]] type="pane"`）——這就是為何 **dev**（`prefix+d`）、**btop**（`prefix+M`）與 **nvtop**（`prefix+N`）是快捷鍵而非 Quick Action。
 
 ## Television 整合 {#television-integration}
 
@@ -382,13 +377,13 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 | 做法 | 問題 |
 |---|---|
-| `type = "pane"`（`prefix+G/M/N`） | 執行期間會切開**平鋪版面**，整個重排 |
+| `type = "pane"`（`prefix+d/G/M/N`） | 執行期間會切開**平鋪版面**，整個重排 |
 | `prefix + c` → 打指令 → `exit` | 四個步驟，而且會弄亂 tab bar |
 | **`type = "popup"`** | session-modal，浮在版面**之上** —— 什麼都不重排，關掉就回到原位 |
 
 `type = "popup"` 需要 **herdr ≥ 0.7.4**（#1125 加入，`width`/`height` 支援 cell 數或百分比）。它才是真正的 `tmux display-popup -E` 對應物。
 
-`prefix + `` ` ``（scratch shell）基於同樣理由也是 popup —— 當它還是 command pane 時會佔滿版面，感覺像是把當前視窗 *zoom* 起來而不是開一塊暫存空間。`prefix+G` / `prefix+M` / `prefix+N`（lazygit / btop / nvtop）則刻意維持 `type = "pane"`：那幾個你按 `q` 就馬上退出，暫時切開版面沒有代價；而 popup 是 **session-modal** —— 開著的時候不能操作其他 pane。正因為這個模態特性，這件事是逐個綁定決定，而不是全域切換。
+`prefix + `` ` ``（scratch shell）基於同樣理由也是 popup —— 當它還是 command pane 時會佔滿版面，感覺像是把當前視窗 *zoom* 起來而不是開一塊暫存空間。`prefix+d` / `prefix+G` / `prefix+M` / `prefix+N`（dev / lazygit / btop / nvtop）則刻意維持 `type = "pane"`：那幾個你按 `q` 就馬上退出，暫時切開版面沒有代價；而 popup 是 **session-modal** —— 開著的時候不能操作其他 pane。正因為這個模態特性，這件事是逐個綁定決定，而不是全域切換。
 
 **它沒辦法做成 herdr-plus Quick Action**（`prefix + y`），雖然那是最直覺會去找的地方。兩個硬阻礙：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**（這正是 `btop`/`nvtop` 是 command pane 而不是 Quick Action 的原因），而且每個 action 都是寫死的 `command = "…"` 字串，沒有自由輸入欄位。
 
@@ -407,28 +402,27 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 ## 複製 pane 與 space 的資訊到剪貼簿 {#copy-to-clipboard}
 
-六個一鍵「把這個抓到剪貼簿」的操作,全由同一支腳本驅動（`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)）。它把一個 herdr CLI 呼叫萃取成人類可讀的文字,再導入本 repo 自己的 [`x copy`](../shells/aliases.md)（自動選 pbcopy / wl-copy / xclip / xsel / OSC 52;`x` 以絕對路徑 fallback 解析,因為 command-pane 可能在沒有互動式 PATH 的情況下執行）。pane 預設為**目前聚焦的 pane**（`herdr pane current`）；keybind 傳入 `$HERDR_ACTIVE_PANE_ID`,Quick Actions 傳入 `$HERDR_PLUS_PANE_ID`,兩者為空時都會 fallback 到目前 pane 的查詢。
+六個低頻「把這個抓到剪貼簿」的操作都收在 `prefix+y` Quick Actions 清單中,並由同一支腳本驅動（`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)）。它把一個 herdr CLI 呼叫萃取成人類可讀的文字,再導入本 repo 自己的 [`x copy`](../shells/aliases.md)（自動選 pbcopy / wl-copy / xclip / xsel / OSC 52;`x` 以絕對路徑 fallback 解析,因為 Quick Action 可能在沒有互動式 PATH 的情況下執行）。action 透過 `$HERDR_PLUS_PANE_ID` 傳入聚焦 pane；為空時 helper 會 fallback 到 `herdr pane current`。
 
-| 操作 | 按鍵 | Quick Action | 進剪貼簿的內容 |
-|---|---|---|---|
-| `process` | `prefix+P` | *Copy pane: process info* | 前景 process——`cmdline` + `pid` + `cwd`（來自 `herdr pane process-info`） |
-| `coord` | `prefix+D` | *Copy pane: coordinate* | 可直接貼回 CLI 的 `session` / `workspace` / `tab` / `pane` id 區塊 + `socket` 路徑 + 一行 `# herdr pane get <pane>` |
-| `content`（可見） | `prefix+V` | *Copy pane: content (visible)* | pane 目前螢幕上的文字（`herdr pane read --source visible`） |
-| `content`（scrollback） | `prefix+S` | *Copy pane: content (scrollback)* | pane 完整保留的 scrollback（`--source recent`） |
-| `dir` | `prefix+d` | *Copy space: dir* | **workspace（space）的根目錄**——見下方 |
-| `cwd` | `prefix+ctrl+d` | *Copy pane: cwd* | 聚焦 pane 的**即時**工作目錄（等同 `pwd` / [`abspath`](../shells/aliases.md) 的答案） |
+| 操作 | Quick Action | 進剪貼簿的內容 |
+|---|---|---|
+| `process` | *Copy pane: process info* | 前景 process——`cmdline` + `pid` + `cwd`（來自 `herdr pane process-info`） |
+| `coord` | *Copy pane: coordinate* | 可直接貼回 CLI 的 `session` / `workspace` / `tab` / `pane` id 區塊 + `socket` 路徑 + 一行 `# herdr pane get <pane>` |
+| `content`（可見） | *Copy pane: content (visible)* | pane 目前螢幕上的文字（`herdr pane read --source visible`） |
+| `content`（scrollback） | *Copy pane: content (scrollback)* | pane 完整保留的 scrollback（`--source recent`） |
+| `dir` | *Copy space: dir* | **workspace（space）的根目錄**——見下方 |
+| `cwd` | *Copy pane: cwd* | 聚焦 pane 的**即時**工作目錄（等同 `pwd` / [`abspath`](../shells/aliases.md) 的答案） |
 
 **座標**回答「這是哪個 `session > space > tab > pane`?」,並以可餵回 CLI 的形式呈現。herdr 在 `pane`/`tab`/`workspace` 子命令上**沒有 `--session` 旗標**——session 只能經由 `HERDR_SOCKET_PATH` 指定——所以區塊裡納入 `socket=` 那行作為 session 選擇器（session *名稱* 則是把該 socket 對 `herdr session list --json` 比對而得）。
 
-兩個介面共用同一支腳本:[`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 的 `[[keys.command]]` 綁定,以及 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` 下的 `copy-*.toml` **Quick Actions**（用 `prefix+y` 模糊啟動）。`P/D/V/S` 是大寫（`prefix+shift+<letter>`）,刻意避開 herdr 保留的 `shift+H/J/K/L`（swap-pane）與本 repo 的 `shift+B`（new_worktree）/ `shift+R`（reload）；小寫 `d` 是唯一還空著、又有記憶點的字母,`ctrl+d` 則讓這一對緊鄰。用 `herdr server reload-config`（`diagnostics` 為空）確認無衝突。
+所有 `copy-*.toml` Quick Actions 都共用這支 helper,並由 `prefix+y` 模糊啟動。原本的直達鍵（`prefix+P/D/V/S/d/ctrl+d`）已移除,讓 prefix namespace 優先留給互動式工具；`prefix+d` 現在啟動 dev dashboard。互動式檔案路徑 picker 仍保留在 `prefix+p`,因為 fzf 需要 PTY/stdin,無法在 Quick Action 裡執行。
 
 ### `dir` 與 `cwd` 的差別,以及為什麼右鍵選單做不到 {#space-dir}
 
-`dir` 回答的是*「這個 space 是關於哪個目錄?」*——也就是你會想從 sidebar workspace 列右鍵 **Copy dir** 拿到的東西。三個入口:
+`dir` 回答的是*「這個 space 是關於哪個目錄?」*——也就是你會想從 sidebar workspace 列右鍵 **Copy dir** 拿到的東西。兩個入口:
 
 | 介面 | 方式 | 範圍 |
 |---|---|---|
-| `prefix+d` | keybind | **聚焦中**的 workspace |
 | `prefix+y` → *Copy space: dir* | herdr-plus Quick Action | **聚焦中**的 workspace |
 | `prefix+T` → **`Alt+Y`** | [`herdr-sesh`](#television-integration) tv channel | 清單裡的**任一** workspace——嚴格來說比右鍵能給的還多 |
 
@@ -460,7 +454,7 @@ tmux `prefix + u`（[`joshmedeski/tmux-fzf-url`](https://github.com/joshmedeski/
 
 ## 從 pane 複製檔案路徑（`prefix+p`）
 
-URL 選單的複製路徑姊妹版。`prefix+p` 開一個 fzf 彈窗,列出聚焦 pane 裡的檔案路徑;挑一個(或多個),路徑就複製到剪貼簿。小寫 `p`(copy **p**ath)坐落在大寫複製家族(`prefix+P/D/V/S`)之下,與 `u`/`U` 同一慣例。tmux 上的對應物是 **extrakto** plugin(`prefix + Tab`)——見 [tmux 快捷鍵](tmux/keybindings.md)。
+URL 選單的複製路徑姊妹版。`prefix+p` 開一個 fzf 彈窗,列出聚焦 pane 裡的檔案路徑;挑一個(或多個),路徑就複製到剪貼簿。它保留直達鍵,因為互動式 fzf 無法在 `prefix+y` Quick Actions 裡執行。tmux 上的對應物是 **extrakto** plugin(`prefix + Tab`)——見 [tmux 快捷鍵](tmux/keybindings.md)。
 
 輔助腳本:`~/.config/herdr/path-pick.sh` = [`dot_config/herdr/executable_path-pick.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_path-pick.sh),與 `url-pick.sh`/`pane-copy.sh` 完全同構(相同的 pane + `x` 解析 + `herdr pane read` 管線),用 [`x copy`](../shells/aliases.md) 複製。
 

@@ -12,7 +12,7 @@
 # each carry their own copy and silently drift:
 #
 #   new-tab-at-space-root.sh   prefix+C  (new tab at the space dir)
-#   pane-copy.sh dir           prefix+d  / the "Copy space dir" Quick Action
+#   pane-copy.sh dir           prefix+y → "Copy space: dir" Quick Action
 #   herdr-sesh tv channel      prefix+T, Alt+Y (copy any workspace's dir)
 #
 # "Space root" = the cwd of the workspace's OLDEST surviving tab. Note `.number`

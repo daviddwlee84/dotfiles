@@ -483,6 +483,9 @@ mixed = [1, { a = 2 }]
   # UserPromptSubmit: workmux working injected.
   echo "$output" | jq -e '.hooks.UserPromptSubmit | length == 1' >/dev/null
   echo "$output" | jq -e '.hooks.UserPromptSubmit[0].hooks[0].command | test("workmux set-window-status working")' >/dev/null
+  # SessionEnd: synchronous artifact observer is always present, independent of sound tier.
+  echo "$output" | jq -e '.hooks.SessionEnd | length == 1' >/dev/null
+  echo "$output" | jq -e '.hooks.SessionEnd[0].hooks[0] | (.command | test("artifact observe-session-end")) and (.timeout == 5) and ((.async // false) == false)' >/dev/null
   # PreToolUse: only CodeIsland entry (not in our overlay), must survive untouched.
   echo "$output" | jq -e '.hooks.PreToolUse | length == 1' >/dev/null
   echo "$output" | jq -e '.hooks.PreToolUse[0].hooks[0].command == "~/.codeisland/codeisland-hook.sh"' >/dev/null
@@ -520,6 +523,7 @@ mixed = [1, { a = 2 }]
   # No duplicate notify.sh entry on first pass.
   printf '%s' "$pass1" | jq -e '[.hooks.Notification[] | select(.hooks[0].command == "~/.claude/hooks/notify.sh")] | length == 1' >/dev/null
   printf '%s' "$pass1" | jq -e '[.hooks.Stop[] | select(.hooks[0].command == "~/.claude/hooks/notify.sh")] | length == 1' >/dev/null
+  printf '%s' "$pass1" | jq -e '[.hooks.SessionEnd[] | select(.hooks[0].command | test("artifact observe-session-end"))] | length == 1' >/dev/null
 
   # Stable across re-application.
   diff <(printf '%s' "$pass1" | jq -S .) <(printf '%s' "$pass2" | jq -S .)

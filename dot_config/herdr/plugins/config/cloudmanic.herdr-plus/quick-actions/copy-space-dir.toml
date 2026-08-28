@@ -1,8 +1,8 @@
 # herdr-plus Quick Action — copy the WORKSPACE ("space") root dir.
 # Managed by chezmoi. This is the closest herdr gets to a right-click "Copy dir"
 # on a sidebar workspace row: the context menu is a fixed enum compiled into the
-# binary, so a fuzzy-launched action (prefix+y) is the substitute.
-# Also bound to prefix+d. See docs/tools/herdr.md.
+# binary, so the fuzzy-launched prefix+y Quick Action is the substitute.
+# See docs/tools/herdr.md.
 name = "Copy space: dir"
 description = "The workspace's root directory (the dir the sidebar row is named after)"
 command = "~/.config/herdr/pane-copy.sh dir \"$HERDR_PLUS_PANE_ID\""

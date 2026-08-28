@@ -26,9 +26,8 @@
 #            which drifts away from `dir` the moment you cd.
 #
 # The pane defaults to the CURRENT focused pane (`herdr pane current`); pass a
-# pane id to target another. herdr's keybind context passes $HERDR_ACTIVE_PANE_ID
-# and herdr-plus Quick Actions pass $HERDR_PLUS_PANE_ID — both are wired to call
-# this, and both fall through to the current-pane lookup when empty.
+# pane id to target another. herdr-plus Quick Actions pass $HERDR_PLUS_PANE_ID;
+# it falls through to the current-pane lookup when empty.
 #
 # Clipboard sink is the repo's own `x copy` (dot_dotfiles/bin/executable_x), which
 # auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52. We resolve it by absolute
@@ -42,8 +41,7 @@
 #   pane-copy.sh dir     [PANE_ID|WORKSPACE_ID]
 #   pane-copy.sh cwd     [PANE_ID]
 #
-# Consumers: the prefix+P/L/V/B keybinds (.chezmoitemplates/herdr/config.toml) and
-# the copy-pane-* quick actions (dot_config/herdr/plugins/config/
+# Consumers: the copy-pane-* quick actions (dot_config/herdr/plugins/config/
 # cloudmanic.herdr-plus/quick-actions/). See docs/tools/herdr.md.
 set -eu
 

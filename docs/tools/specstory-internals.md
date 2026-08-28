@@ -78,13 +78,14 @@ Provider display names observed in this repo's `.specstory/history/`:
 | *(not seen here)* Droid | `droidcli` |
 | *(not seen here)* Cursor CLI | `cursorcli` |
 
-The UUID in the `<!-- ... Session <uuid> ... -->` line is the **same session id** the agent uses for its resume flag (`claude --resume <uuid>`, `codex resume <uuid>`, `cursor-agent --resume <uuid>`, `opencode --session <uuid>`). That makes session id → transcript file a one-liner grep, uniform across providers:
+The UUID in the `<!-- ... Session <uuid> ... -->` line is the **same session id** the agent uses for its resume flag (`claude --resume <uuid>`, `codex resume <uuid>`, `cursor-agent --resume <uuid>`, `opencode --session <uuid>`). Resolve only against the fixed preamble: a transcript body can quote another UUID and newest-mtime can belong to another live agent.
 
 ```sh
-grep -l "Session ${sid}" .specstory/history/*.md
+~/.agents/skills/agent-history-hygiene/scripts/find-session.sh \
+  --format=specstory --session-id "$sid"
 ```
 
-**SpecStory CLI has no built-in `resolve <sid> → path` subcommand.** The documented commands are `specstory run` / `specstory sync` / `specstory watch`. The grep recipe above is the supported path.
+**SpecStory CLI has no built-in `resolve <sid> → path` subcommand.** The managed helper scans only the first 12 lines and requires one exact match; automated finalization fails closed on zero or duplicate matches.
 
 For the `tv agent-sessions` channel's integration, see `dot_config/television/executable_agent-sessions.py` — it caches the map on startup from `~/.local/share/chezmoi/.specstory/history/` and exposes the matched path as TSV column 5 (bound to `Alt+S` to copy).
 
@@ -140,6 +141,27 @@ Key elements:
 - **`--no-cloud-sync` is the opposite** — local writes proceed, cloud sync is disabled.
 - **`--debug-raw` dumps raw session records** to `.specstory/debug/` alongside the markdown — useful if a transcript looks wrong and you want to see exactly what SpecStory saw.
 - **Provider IDs vs display names are not the same strings.** `specstory run claudecode` is the CLI ID; the HTML comment in the resulting markdown reads `Claude Code` (with space). If you script against either string, pick the right one — the HTML comment is what the reverse-lookup grep matches.
+
+## Post-writer artifact finalization
+
+`dot_config/shell/22_sesh.sh` gives wrapper-managed `specstory run` processes a
+`DEV_AGENT_RUN_ID`. An active agent explicitly arms finalization with
+`dev prepare`; the outer shell regains control only after SpecStory writes its
+final Markdown, then calls:
+
+```sh
+dev artifact finalize --run-id "$DEV_AGENT_RUN_ID" --if-pending --writer-stopped
+```
+
+No matching intent is a silent no-op. A failed scanner/quiescence check leaves
+the pane in a shell and prevents restart from launching another writer. Claude
+`SessionEnd` only records that an armed run ended; it never stages or commits
+inside teardown. Direct/IDE sessions use an external finalize or `dev sweep`
+fallback.
+
+`.specstory/statistics.json` is a derived aggregate, not review history. Exact
+transcripts and explicitly named plans are finalized; other sessions remain
+unstaged.
 
 ## References
 

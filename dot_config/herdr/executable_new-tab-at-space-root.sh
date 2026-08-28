@@ -15,8 +15,9 @@
 #
 # "Space dir" = the cwd of the workspace's OLDEST surviving tab. That derivation
 # is NOT inlined here: it lives in the sibling ~/.config/herdr/space-root.sh,
-# shared with `pane-copy.sh dir` (prefix+d) and the herdr-sesh tv channel. Change
-# it there, once — including the caveat about the sidebar label drifting from it.
+# shared with `pane-copy.sh dir` (prefix+y Quick Action) and the herdr-sesh tv
+# channel. Change it there, once — including the caveat about the sidebar label
+# drifting from it.
 #
 # Bound to prefix+C (.chezmoitemplates/herdr/config.toml). prefix+c and the mouse
 # "+" button keep herdr's native follow-the-focused-pane behavior. Uses the

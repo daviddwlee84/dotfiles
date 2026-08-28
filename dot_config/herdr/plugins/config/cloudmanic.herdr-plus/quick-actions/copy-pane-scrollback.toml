@@ -1,5 +1,5 @@
 # herdr-plus Quick Action — copy the focused pane's FULL scrollback content.
-# Managed by chezmoi. Also bound to prefix+S. See docs/tools/herdr.md.
+# Managed by chezmoi. Available from prefix+y Quick Actions. See docs/tools/herdr.md.
 name = "Copy pane: content (scrollback)"
 description = "The focused pane's full retained scrollback buffer"
 command = "~/.config/herdr/pane-copy.sh content \"$HERDR_PLUS_PANE_ID\" --source recent"
