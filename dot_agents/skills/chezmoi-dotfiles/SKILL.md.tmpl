@@ -116,6 +116,11 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 - **Vim mode** — shell modal editing + tmux vim nav (NOT Neovim/editors — those are always vim).
 {{- end }}
 
+## Package-managed personal CLIs
+
+- **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation and generated completion. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the `go_tools` role. Source: `github.com/daviddwlee84/dev-cli`.
+- **`translate`** — terminal translator (CLI + TUI). macOS installs `daviddwlee84/tap/translate`; Linux uses the `go_tools` role.
+
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 
 Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, but not all (`x` → `clipboard.md`, `view-ebook` → `yazi-previews.md`, `fleet` → `this_repo/fleet-apply.md`); grep `docs/` if the obvious path 404s. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.

@@ -6,11 +6,11 @@
 # `run_after_*` (not `run_onchange_after_*`): we want to detect tools that
 # ansible / brew / mise / uv upgraded BETWEEN applies. Onchange would only fire
 # when this script's content changes — that misses every package upgrade.
-# Cost when nothing changed: ~50ms (presence checks + 28 stat calls).
+# Cost when nothing changed: ~50ms (presence checks + 32 stat calls).
 #
 # Tools handled (the "self-generating" set from docs/zsh/zsh-completions.md
 # Section A): chezmoi, mise, uv, just, starship, gh, docker, rg, fd, bat,
-# delta, zellij, pueue, opencode, translate.
+# delta, zellij, pueue, opencode, translate, dev.
 #
 # Tools handled elsewhere (don't double-up):
 #   sesh, tv, worktrunk        → shell-startup mtime check

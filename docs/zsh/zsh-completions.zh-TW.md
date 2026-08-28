@@ -48,6 +48,8 @@ compinit runs once (inside oh-my-zsh.sh)
 | `docker` | `docker completion zsh` |
 | `gh` | `gh completion -s zsh` |
 | `opencode` | `opencode completion zsh` |
+| `translate` | `translate completion zsh` |
+| `dev` | `dev completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 **使用模式：**

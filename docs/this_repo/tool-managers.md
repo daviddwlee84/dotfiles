@@ -35,7 +35,7 @@ If you want to know:
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
 | **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | Go CLI tools: `translate` (**Linux only** — macOS installs it via Homebrew `daviddwlee84/tap`) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
+| **go** (`go install`) | Personal Go CLIs: `translate`, `dev` (**Linux only** — macOS installs both via Homebrew `daviddwlee84/tap`) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
@@ -185,7 +185,7 @@ nothing, and kills `community.general.homebrew` on empty JSON with
 
 | File | Owns |
 |---|---|
-| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas`. Plus (macOS, **always** — not `installBrewApps`-gated): tap `daviddwlee84/tap` + formula `daviddwlee84/tap/translate` (terminal translator CLI/TUI. Since 2026-08 the formula installs a **prebuilt** binary from the upstream GitHub release — no `go` build dep — and generates its own shell completions. Linux uses `go install` via `go_tools`) |
+| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas`. Plus (macOS, **always** — not `installBrewApps`-gated): tap `daviddwlee84/tap` + formulas `translate` (prebuilt terminal translator with generated completions) and `dev-cli` (source-built `dev` repository/task/worktree command center with generated completions). Linux uses `go install` via `go_tools` |
 | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
 | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
 
@@ -629,6 +629,7 @@ idempotent.
 | Package | Binary |
 |---|---|
 | `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
+| `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
@@ -1055,6 +1056,7 @@ list.
 | **cursor** (IDE) | brew cask | `.deb` from `cursor.com/api/download` | Brewfile.darwin / gui_apps_linux |
 | **cursor-agent** (CLI) | curl `cursor.com/install` | same | coding_agents |
 | **dasel** | brew | release | devtools |
+| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | `go install` (`go_tools`) | Brewfile + go_tools — repository/task/worktree command center |
 | **dbeaver-community** | brew cask | n/a | Brewfile.darwin |
 | **diffnav** | brew | GitHub release | devtools |
 | **direnv** | brew | apt or curl-installer | devtools |

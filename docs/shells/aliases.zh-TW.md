@@ -470,12 +470,13 @@
 
 ## Worktree Management
 
-> 需要 `worktrunk` (`wt`)。`wtcd` 還需要 `jq` + `fzf`。
+> 需要 `dev-cli` (`dev`) 與／或 `worktrunk` (`wt`)。`wtcd` 還需要 `jq` + `fzf`。
 >
 > Worktrunk 自身的別名（`wt sw`、`wt ls`、`wt rm`、`wt cc`、`wt oc`）定義在 `dot_config/worktrunk/config.toml` 中，不在 zsh 中 —— 它們在任何 shell 與互動式 picker 中皆可使用。
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
+| `dev` | function | `dot_config/shell/39_dev.sh` | `dev` binary 的包裝器；保留真實 TTY，並透過 child-only file descriptor 將目錄切換交回父 shell。bash/zsh 內容由 `dev shell-init` 產生 |
 | `wt` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | `wt` 二進位檔的包裝器，會擷取 `cd`/`exec` 指令以便 `wt switch` 真正改變父 shell 的 `$PWD`（從 `wt config shell init zsh` eval 而來） |
 | `wtcd` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | 對 `wt list --format=json` 路徑的 fzf-tmux picker；`cd` 進入所選 worktree 但**不切換** tmux/sesh session —— 適合偷看姊妹 worktree |
 
