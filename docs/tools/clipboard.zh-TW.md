@@ -132,6 +132,8 @@ x open https://example.com     # 在預設 app 中開啟 URL/檔案
 
 它的 copy 後端依序嘗試：`clip.exe`（WSL）→ `pbcopy`（macOS）→ `wl-copy`（Wayland）→ `xclip` → `xsel` → **OSC 52 備援**直接寫入 `/dev/tty`。意思是 `x copy` 在 macOS、Linux 桌面、Linux SSH 伺服器、WSL 以及任何能觸及終端機的環境上都能直接使用 — 你完全不需要思考有哪個後端可用。Linux 桌面上 `wl-copy` / `xclip` / `xsel` 二進制檔來自 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role；沒有它們時 `x copy` 仍可透過 OSC 52 運作，但 `x copy-file` 就沒有後端了。
 
+**在 SSH 下**（`SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT` 有設）順序會顛倒：先試 OSC 52，因為遠端機器上的 `wl-copy` / `xclip` 會把文字放進**遠端**的剪貼簿，毫無用處。若 `/dev/tty` 無法開啟（無 PTY 的 `ssh`），`x` 才退回顯示伺服器工具，涵蓋 `ssh -X`「我真的要遠端 X 剪貼簿」的情況。`x copy-file` 在 SSH 下直接拒絕 — OSC 52 只能帶文字，檔案物件無法跨越。與 Neovim `options.lua` 用同一個判斷閘門。
+
 `x` 中的 OSC 52 備援也為 tmux 做了包裝：
 
 ```bash
@@ -174,12 +176,13 @@ nvim -c ':checkhealth provider.clipboard' -c ':only'
 | Neovim yank 正常，但 SSH 下 `"*p` 無作用 | 外層終端機不支援 OSC 52 貼上 | 預期行為 — 用滑鼠中鍵或重打；別硬抗 |
 | `prefix+y` 仍複製到遠端剪貼簿 | shim 的 `tmux` 二進制檔解析到比 `load-buffer -w` 還舊的版本 | `tmux -V` 必須 ≥ 3.3 才支援 `load-buffer -w`；本 repo 透過 ansible `devtools` role 強制 ≥ 3.3 |
 | 嵌套 tmux（`tmux 在 ssh 在 tmux 中`） | 內層 tmux 吃掉 OSC 52 | 內層 tmux 需要 `set -g allow-passthrough on`；本設定已開啟。雙重嵌套案例可能需要 `Ptmux;…` 包裝 |
+| SSH 下 `x copy` 沒把東西放進本機剪貼簿（或跑到**遠端**機器的剪貼簿） | 修正前的 `x` 只要 `$WAYLAND_DISPLAY`/`$DISPLAY` 有設就用遠端的 `wl-copy`/`xclip`（當你同時以圖形登入該機器時，會透過 systemd user session 洩漏進來） | 已修正 —— `x` 在 `SSH_*` 下現在先送 OSC 52。若仍失敗，是**外層**（本機）終端機沒有轉送 OSC 52，或本機 tmux server 早於 `set-clipboard on`（`tmux kill-server`） |
 
 ## 設計筆記 / 非預設值
 
 - **tmux `set-clipboard`** 為 `on`，非 `external`。`external` 會停用 tmux 自家 copy-mode 的 OSC 52 發出；`on` 是超集，能讓 `prefix+[` → `y` 持續運作。
 - **Neovim OSC 52 provider** 以 `SSH_CONNECTION`/`SSH_TTY` 為閘門而非永遠開啟，特別是為了讓本機貼上（`"+p`）持續運作。如果你主要透過 SSH 工作且不在意貼上的取捨，可移除 `if …` 區塊。
-- **`x` CLI 順序**偏好本機後端（`pbcopy`、`wl-copy` 等）而非 OSC 52。這是刻意的：當 `pbcopy` 可用時，它較快、不碰 TTY，且能處理非常大的酬載（OSC 52 酬載受終端機大小限制 — iTerm2 上限為 1 MB，許多其他為 64–256 KB）。
+- **`x` CLI 順序**偏好本機後端（`pbcopy`、`wl-copy` 等）而非 OSC 52 —— **SSH 下例外**，此時 OSC 52 優先（遠端機器上的本機後端是錯的機器）。這是刻意的：當本機 `pbcopy` 可用時，它較快、不碰 TTY，且能處理非常大的酬載（OSC 52 酬載受終端機大小限制 — iTerm2 上限為 1 MB，許多其他為 64–256 KB）。SSH 分支會在消耗 stdin 之前真正開啟 `/dev/tty`（而非只做 `[[ -w ]]`），所以無 PTY 的 `ssh` 仍能乾淨地往下退。
 
 ## 相關文件
 

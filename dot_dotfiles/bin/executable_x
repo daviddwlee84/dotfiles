@@ -33,6 +33,16 @@ is_macos() {
     [[ "$(uname -s)" == "Darwin" ]]
 }
 
+# In an SSH session a local wl-copy/xclip/xsel would write to *this* (remote)
+# machine's clipboard, which is never what you want — the bytes need to travel
+# back up the TTY to the terminal on your local machine. So under SSH we send
+# OSC 52 first and only fall back to the display-server tools if there's no
+# usable /dev/tty (e.g. `ssh` with no PTY, or `ssh -X` for the remote X clip).
+# Mirrors the Neovim provider gate in dot_config/nvim/lua/config/options.lua.
+is_ssh() {
+    [[ -n "${SSH_CONNECTION:-}" || -n "${SSH_TTY:-}" || -n "${SSH_CLIENT:-}" ]]
+}
+
 clipboard_backend_help() {
     printf '%s\n' \
         "x: no clipboard backend found." \
@@ -59,7 +69,10 @@ file_clipboard_backend_help() {
 # set-clipboard on) forwards OSC 52. Writes to /dev/tty so it is not captured
 # by an outer pipeline.
 osc52_copy() {
-    [[ -w /dev/tty ]] || return 1
+    # Actually open /dev/tty, not just `[[ -w ]]` — a detached/container
+    # context can have a /dev/tty node whose open(2) returns ENXIO. Bail here,
+    # before `base64` consumes stdin, so a caller's fallback still has input.
+    { : >/dev/tty; } 2>/dev/null || return 1
     command -v base64 >/dev/null 2>&1 || return 1
 
     local data
@@ -154,6 +167,14 @@ copy_backend() {
         exit 1
     fi
 
+    # SSH: OSC 52 before any display-server tool (see is_ssh). osc52_copy
+    # returns non-zero without consuming stdin when /dev/tty is unusable, so
+    # the wl-copy/xclip/xsel fallbacks below still fire for `ssh` with no PTY
+    # or `ssh -X` targeting the remote X clipboard.
+    if is_ssh && osc52_copy; then
+        return 0
+    fi
+
     if command -v pbcopy >/dev/null 2>&1; then
         if pbcopy; then
             return 0
@@ -186,7 +207,8 @@ copy_backend() {
         exit 1
     fi
 
-    # Final fallback: OSC 52 (works over SSH, no display needed).
+    # Final fallback: OSC 52 (no display server, or a local terminal that
+    # still forwards it).
     if osc52_copy; then
         return 0
     fi
@@ -250,6 +272,14 @@ copy_file_linux() {
 }
 
 copy_file_backend() {
+    # Over SSH a file object can only land on the *remote* desktop's clipboard,
+    # and OSC 52 cannot carry one. Don't silently do the wrong thing.
+    if is_ssh && ! is_macos; then
+        err "copy-file: file objects can't cross SSH (OSC 52 is text-only)."
+        file_clipboard_backend_help
+        exit 1
+    fi
+
     if is_macos; then
         if copy_file_macos "$@"; then
             return 0
