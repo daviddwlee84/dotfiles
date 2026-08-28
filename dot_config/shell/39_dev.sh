@@ -9,8 +9,8 @@
 # Skip silently on profiles where the CLI is not installed.
 command -v dev >/dev/null 2>&1 || return 0
 
-if [ -n "$ZSH_VERSION" ]; then
+if [ -n "${ZSH_VERSION:-}" ]; then
     eval "$(command dev shell-init zsh 2>/dev/null)"
-elif [ -n "$BASH_VERSION" ]; then
+elif [ -n "${BASH_VERSION:-}" ]; then
     eval "$(command dev shell-init bash 2>/dev/null)"
 fi
