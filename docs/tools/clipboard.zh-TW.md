@@ -11,10 +11,15 @@
 
 | 你身處… | Neovim 中 yank 會送到… | 擷取 pane（`prefix+y/Y/C-y`）會送到… |
 |----------|--------------------------|---------------------------------------------|
-| 本機（macOS 或 Linux 桌面） | 系統剪貼簿（provider 二進制檔：macOS 用 `pbcopy` / Linux 用 `wl-copy` / `xclip`） | 同上，透過 `tmux load-buffer -w -` 同時發出 OSC 52 *並*設定 tmux 的 paste buffer |
-| SSH（遠端機器，無論有無 tmux） | **本機**的剪貼簿（透過 OSC 52） | **本機**的剪貼簿（透過 tmux → OSC 52） |
+| 直接本機 terminal / 純 tmux | 系統剪貼簿（provider 二進制檔：macOS 用 `pbcopy` / Linux 用 `wl-copy` / `xclip`） | 同上，透過 `tmux load-buffer -w -` 同時發出 OSC 52 *並*設定 tmux 的 paste buffer |
+| SSH / Herdr / Zellij | **目前 attached client** 的剪貼簿（copy-only OSC 52） | **目前 attached client** 的剪貼簿（OSC 52） |
 
 不需要 X forwarding、不需要 socat 監聽器。SSH 時唯一硬性需求是你**本機**的終端機模擬器要支援 OSC 52（Ghostty、Alacritty、iTerm2、Kitty、WezTerm — 都支援）。在**本機 Linux 桌面**上，provider 二進制檔不是內建的：`wl-clipboard` + `xclip` + `xsel` 由 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) ansible role 安裝（`ubuntu_desktop` profile）。伺服器 profile 一律沒有 — 那裡只靠 OSC 52。
+
+遠端 / multiplexer 路徑刻意保持**單向**：Neovim yank 會寫入 attached
+client 的剪貼簿；普通 `p` 只讀 Neovim 自己的 unnamed register，絕不送出
+OSC 52 query。要把外部剪貼簿文字貼進 Neovim，使用 terminal 原生貼上
+（`Cmd+V` / `Ctrl+Shift+V`）。
 
 ## 什麼是 OSC 52？
 
@@ -90,24 +95,25 @@ bind C-y run-shell "tmux capture-pane -pS - | fzf-tmux … | tmux load-buffer -w
 [`dot_config/nvim/lua/config/options.lua`](../../dot_config/nvim/lua/config/options.lua)：
 
 ```lua
-vim.opt.clipboard = "unnamedplus"
-
-local x_clipboard = vim.env.X_CLIPBOARD
-local use_osc52 = x_clipboard == "osc52"
-  or (not x_clipboard and (vim.env.SSH_CONNECTION or vim.env.SSH_TTY or vim.env.SSH_CLIENT
-      or vim.env.HERDR_ENV or vim.env.ZELLIJ))
-
 if use_osc52 then
-  local osc52 = require("vim.ui.clipboard.osc52")
-  vim.g.clipboard = { name = "OSC 52", copy = { … }, paste = { … } }
+  vim.opt.clipboard = "" -- 普通 p 維持使用 Neovim unnamed register
+  vim.g.clipboard = {
+    name = "OSC 52 copy-only",
+    copy = { ["+"] = osc52_copy("+"), ["*"] = osc52_copy("*") },
+    paste = { ["+"] = cached_paste("+"), ["*"] = cached_paste("*") },
+  }
+  -- TextYankPost 只同步 yank，不同步 delete/change。
+else
+  vim.opt.clipboard = "unnamedplus"
 end
 ```
 
 - 本機時，使用 LazyVim 預設 provider（`pbcopy`/`wl-copy`/`xclip` — 貼上正常運作）。這個 provider 是**執行期二進制檔偵測** — Neovim 沒有編譯期的 `+clipboard`。macOS 內建 `pbcopy`；Linux 桌面的二進制檔來自 `wl-clipboard` / `xclip`，由 [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role 安裝（「Install clipboard CLIs」）。沒有它，`:checkhealth provider.clipboard` 會回報「No clipboard tool found」，yank 靜默失效 — 見 [`pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](../../pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md)。
-- 遠端 / 多工環境 —— `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT`（互動 `sshd` session），**或 `HERDR_ENV`/`ZELLIJ`** —— Neovim 內建的 `vim.ui.clipboard.osc52`（自 0.10 起隨附）直接發出 OSC 52，讓 yank 送到當前接上的終端機。herdr 與 zellij 要各自判斷,因為它們的 pane 環境在 multiplexer server 啟動時就凍結了（該處的 `wl-copy` 打到過期的 display），而 pane TTY 仍代理到真正的 client。`tmux` 透過 `update-environment` 更新這些變數，所以純 tmux session 維持用本機 provider。
-- `X_CLIPBOARD=osc52` 強制開啟 OSC 52；`X_CLIPBOARD=<任何本機工具>` 強制關閉。與 [`x`](#4-shell-cli--x跨平台剪貼簿包裝) 同一個旋鈕與判斷式（`prefer_osc52`）。
+- 遠端 / 多工環境 —— `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT`（互動 `sshd` session），**或 `HERDR_ENV`/`ZELLIJ`** —— Neovim 只在 copy 時發出 OSC 52，讓 yank 送到目前 attached terminal；普通 `p` 留在 editor 內且立即完成。Delete/change 不會覆寫 attached client 的剪貼簿。herdr 與 zellij 要各自判斷，因為其 pane 環境在 multiplexer server 啟動時就凍結了（該處的 `wl-copy` 打到過期 display），而 pane TTY 仍代理到真正 client。`tmux` 透過 `update-environment` 更新這些變數，所以純 tmux session 維持用 native provider。
+- 自訂 `+` / `*` paste 函式只會回傳同一個 Neovim process 先前送出的內容，絕不呼叫 `osc52.paste()`。尚未 copy 過時，顯式 `"+p` 會警告後 no-op；外部剪貼簿請用 terminal paste。
+- `X_CLIPBOARD=osc52` 強制 copy-only OSC 52；`X_CLIPBOARD=<任何本機工具>` 強制 native provider。它與 [`x`](#4-shell-cli--x跨平台剪貼簿包裝) 共用環境變數與選擇判斷，但刻意不共用 `x paste` 語意。
 
-為何用條件式而非永遠開啟 OSC 52？OSC 52 貼上不可靠（見上方終端機表格）。本機 session 保留本機 provider 可保留 Neovim 的貼上行為；只有當本機工具顯然是錯誤答案時才覆寫。
+為何用條件式而非永遠開啟 OSC 52？本機 native provider 快且真正雙向；遠端或可重新 attach 的 multiplexer pane 中，server 端 provider 可能打到錯的機器，而 OSC 52 read 不可攜，因此只啟用可靠的 write 方向。
 
 ### 下游消費者 — lazygit `Ctrl+O`
 
@@ -164,7 +170,7 @@ printf "hello from %s" "$(hostname)" | x copy
 
 # Neovim：目前啟用哪個 provider？
 nvim -c ':checkhealth provider.clipboard' -c ':only'
-# 預期：SSH 下為 OSC 52，本機下為原生
+# 預期：SSH/Herdr/Zellij 下為 OSC 52 copy-only，直接本機下為原生
 ```
 
 如果編輯 `common.conf` 後 `tmux info` 仍顯示 `clipboard: false`，記得執行中的 tmux server **保留舊的能力表** — `tmux kill-server`（會失去 sessions；`tmux-resurrect` 可還原）然後重新接入。
@@ -175,8 +181,8 @@ nvim -c ':checkhealth provider.clipboard' -c ':only'
 |---------|-------------|-----|
 | tmux 外 yank 正常，但 tmux 內（遠端）就消失 | `set-clipboard off` 或 server 跑著編輯前的二進制檔 | `tmux show -g set-clipboard`；`tmux kill-server` |
 | `tmux info` 顯示 `Ms: [missing]` | tmux 的 TERM 條目缺 `Ms` *且*未宣告 `terminal-features …:clipboard` | 已由 [`common.conf`](../../dot_config/tmux/common.conf) 處理；如果外層 `$TERM` 不尋常，再加一行 `set -as terminal-features` |
-| Ghostty 每次 yank 都詢問剪貼簿 | `clipboard-read = ask`；當 app 立即重新抓取時，Ghostty 把某些寫入解讀為讀取 | 若你信任 session 裡的所有東西，改 `clipboard-read = allow` |
-| Neovim yank 正常，但 SSH 下 `"*p` 無作用 | 外層終端機不支援 OSC 52 貼上 | 預期行為 — 用滑鼠中鍵或重打；別硬抗 |
+| Neovim 在 `p` 後顯示 `Waiting for OSC 52 response from the terminal. Press Ctrl-C to interrupt...` | 完整 OSC 52 provider 搭配 `clipboard=unnamedplus`，讓普通 paste 變成 terminal clipboard query；Herdr 不會回傳 | 已用 copy-only provider 修正；普通 `p` 用 Neovim register，外部剪貼簿用 terminal `Cmd+V` / `Ctrl+Shift+V`。見 [`pitfalls/nvim-p-waits-for-osc52-response-in-herdr.md`](../../pitfalls/nvim-p-waits-for-osc52-response-in-herdr.md) |
+| SSH/Herdr/Zellij 下顯式 `"+p` 沒有外部剪貼簿內容 | copy-only mode 刻意不讀 client clipboard，只能重播本 Neovim process 最近送出的 `+` 內容 | 預期行為 — 使用 terminal 原生 paste |
 | `prefix+y` 仍複製到遠端剪貼簿 | shim 的 `tmux` 二進制檔解析到比 `load-buffer -w` 還舊的版本 | `tmux -V` 必須 ≥ 3.3 才支援 `load-buffer -w`；本 repo 透過 ansible `devtools` role 強制 ≥ 3.3 |
 | 嵌套 tmux（`tmux 在 ssh 在 tmux 中`） | 內層 tmux 吃掉 OSC 52 | 內層 tmux 需要 `set -g allow-passthrough on`；本設定已開啟。雙重嵌套案例可能需要 `Ptmux;…` 包裝 |
 | 在 herdr（或 zellij/mosh）裡 `x copy` / nvim yank 沒把東西放進本機剪貼簿，或跑到**遠端**機器的 | pane 環境在 multiplexer server 啟動時凍結：`$WAYLAND_DISPLAY` 有設、`$SSH_*` 空，所以 `x`/nvim 以為是「本機 Wayland」而用 `wl-copy`。見 [`pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md`](../../pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md) | 已修正 —— `prefer_osc52` 現在也對 `HERDR_ENV`/`ZELLIJ` 生效。其他會隱藏 `SSH_*` 的情況用 `export X_CLIPBOARD=osc52`。若仍失敗，是**本機**終端機沒轉送 OSC 52，或本機 tmux server 過期（`tmux kill-server`） |
@@ -184,7 +190,7 @@ nvim -c ':checkhealth provider.clipboard' -c ':only'
 ## 設計筆記 / 非預設值
 
 - **tmux `set-clipboard`** 為 `on`，非 `external`。`external` 會停用 tmux 自家 copy-mode 的 OSC 52 發出；`on` 是超集，能讓 `prefix+[` → `y` 持續運作。
-- **Neovim OSC 52 provider** 有閘門（`SSH_*` / `HERDR_ENV` / `ZELLIJ` / `X_CLIPBOARD=osc52`）而非永遠開啟，特別是為了讓本機貼上（`"+p`）持續運作。如果你主要遠端工作且不在意貼上的取捨，用 `X_CLIPBOARD=osc52` 強制開啟。
+- **Neovim OSC 52 在 `SSH_*` / `HERDR_ENV` / `ZELLIJ` / `X_CLIPBOARD=osc52` 下只負責 copy。** 絕不在這些環境把 `vim.ui.clipboard.osc52.paste()` 接進 `unnamedplus`：否則一次 `p` 就可能等十秒，等待 multiplexer 或 terminal 永遠不會送回的 response。當 server 端 clipboard 確實才是目標時，仍可用 `X_CLIPBOARD=<本機工具>` 明確退出。
 - **`x` CLI 順序**偏好本機後端（`pbcopy`、`wl-copy` 等）而非 OSC 52 —— *除非* `prefer_osc52()` 為真（`SSH_*` / `HERDR_ENV` / `ZELLIJ`）或 `X_CLIPBOARD=osc52`，此時 OSC 52 優先（本機後端會是錯的機器或凍結的 display）。本機優先是刻意的：`pbcopy`/`wl-copy` 較快、不碰 TTY，且能處理非常大的酬載（OSC 52 受終端機大小限制 — iTerm2 ~1 MB，許多其他 64–256 KB）。OSC 52 優先的分支會在消耗 stdin 之前真正開啟 `/dev/tty`（而非只做 `[[ -w ]]`），所以無 PTY 的 `ssh` 仍能乾淨地往下退。
 
 ## 相關文件

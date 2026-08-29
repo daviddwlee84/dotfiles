@@ -201,7 +201,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 - `~/.config/gh-dash/config.yml` - Global gh-dash config, with `diffnav` as the diff pager
 - `~/.config/lazygit/config.yml` - Global LazyGit config, with `delta` as the custom diff pager
 - `~/.config/bat/themes/tokyonight_night.tmTheme` - Managed Tokyo Night theme for bat; apply rebuilds the bat cache and clears it if the cache is incompatible with `delta`
-- `~/.config/nvim/` - Neovim (LazyVim) configuration; system clipboard via `unnamedplus`, with an SSH-conditional OSC 52 override so remote yanks reach the local clipboard (pairs with tmux `set-clipboard on`, see [docs](docs/tools/tmux/README.md#osc-52-clipboard-ssh-friendly-yank))
+- `~/.config/nvim/` - Neovim (LazyVim) configuration; native `unnamedplus` clipboard locally, with copy-only OSC 52 under SSH/Herdr/Zellij so yanks reach the attached client's clipboard without making normal `p` wait on unsupported clipboard reads (pairs with tmux `set-clipboard on`, see [docs](docs/tools/clipboard.md))
 - `~/.config/uv/uv.toml` - uv package manager config (PyPI: official / Aliyun+TUNA+USTC via `useChineseMirror`)
 - `~/.cargo/config.toml` - Cargo registry config (crates.io / TUNA sparse index via `useChineseMirror`)
 - `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)

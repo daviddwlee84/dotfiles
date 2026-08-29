@@ -21,8 +21,8 @@
 **Affects**: `dot_dotfiles/bin/executable_x` and
 `dot_config/nvim/lua/config/options.lua` before the `prefer_osc52` /
 `HERDR_ENV` gate.
-**Status**: fixed — both send OSC 52 first inside herdr/zellij and honour an
-`X_CLIPBOARD` override.
+**Status**: fixed — both send OSC 52 writes inside herdr/zellij and honour an
+`X_CLIPBOARD` override; Neovim keeps the read side local to its own registers.
 
 ## Root cause
 
@@ -60,10 +60,12 @@ Two independent bugs compounding:
   and `x paste`; `x copy-file` refuses under `osc52` / `prefer_osc52`.
 - `copy_file_backend()` refuses over SSH/herdr (OSC 52 is text-only).
 
-`dot_config/nvim/lua/config/options.lua`: the OSC 52 provider now activates
-on `SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT` / `HERDR_ENV` / `ZELLIJ`, or
-`X_CLIPBOARD=osc52`; `X_CLIPBOARD=<local tool>` opts back out. Keep this
-predicate in sync with `prefer_osc52`.
+`dot_config/nvim/lua/config/options.lua`: copy-only OSC 52 now activates on
+`SSH_CONNECTION` / `SSH_TTY` / `SSH_CLIENT` / `HERDR_ENV` / `ZELLIJ`, or
+`X_CLIPBOARD=osc52`; `X_CLIPBOARD=<local tool>` opts back out. Normal `p`
+uses Neovim's unnamed register and never queries the terminal clipboard. Keep
+the selection predicate in sync with `prefer_osc52`, but not the paste path —
+see [`nvim-p-waits-for-osc52-response-in-herdr.md`](nvim-p-waits-for-osc52-response-in-herdr.md).
 
 **For a box you always reach through a multiplexer that hides `SSH_*`**
 (and it isn't herdr/zellij — e.g. plain mosh), put this in
@@ -87,3 +89,5 @@ stale **local** tmux server (`tmux kill-server`). Confirm with the raw
 - [`lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md)
   — the clipboard-CLI install that surfaced this (before it, `x` fell
   through to OSC 52 by accident because there was no `wl-copy` to pick).
+- [`nvim-p-waits-for-osc52-response-in-herdr.md`](nvim-p-waits-for-osc52-response-in-herdr.md)
+  — why the Neovim half must use OSC 52 for writes only.

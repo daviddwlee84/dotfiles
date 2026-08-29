@@ -85,10 +85,11 @@ reuses, with no new dependencies:
 
 - `LazyVim.root.git()` — git-root detection.
 - `vim.fs.relpath(root, abspath)` — built-in relative-path computation.
-- `vim.fn.setreg("+", ref)` — respects the OSC 52 clipboard provider configured
-  in `lua/config/options.lua`, so it copies into your local terminal clipboard
-  even over SSH. Do **not** shell out to `pbcopy` — that bypasses OSC 52. See
-  [Clipboard](../tools/clipboard.md).
+- `vim.fn.setreg("+", ref)` — respects the provider configured in
+  `lua/config/options.lua`: native clipboard locally, copy-only OSC 52 under
+  SSH/Herdr/Zellij. It therefore reaches the attached client's clipboard
+  without enabling terminal clipboard reads. Do **not** shell out to `pbcopy`
+  — that bypasses OSC 52. See [Clipboard](../tools/clipboard.md).
 - Visual range via `vim.fn.line(".")` / `vim.fn.line("v")` — the same pattern the
   gitsigns stage-selection maps use.
 

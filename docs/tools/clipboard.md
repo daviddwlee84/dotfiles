@@ -6,10 +6,15 @@ This doc explains how clipboard sync is wired across this dotfiles setup, with a
 
 | You are… | Yank in Neovim goes to… | Capture pane (`prefix+y/Y/C-y`) goes to… |
 |----------|--------------------------|---------------------------------------------|
-| Local (macOS or Linux desktop) | system clipboard (provider binary: `pbcopy` on macOS / `wl-copy` / `xclip` on Linux) | same, via `tmux load-buffer -w -` which emits OSC 52 *and* sets tmux's paste buffer |
-| SSH (remote box, with or without tmux) | **local** machine's clipboard (via OSC 52) | **local** machine's clipboard (via tmux → OSC 52) |
+| Direct local terminal / plain tmux | system clipboard (provider binary: `pbcopy` on macOS / `wl-copy` / `xclip` on Linux) | same, via `tmux load-buffer -w -` which emits OSC 52 *and* sets tmux's paste buffer |
+| SSH / Herdr / Zellij | **attached client's** clipboard (copy-only OSC 52) | **attached client's** clipboard (OSC 52) |
 
 No X forwarding or socat listener needed. Over SSH the only hard requirement is a terminal emulator on your **local** machine that supports OSC 52 (Ghostty, Alacritty, iTerm2, Kitty, WezTerm — all do). On a **local Linux desktop**, the provider binary is not built in: `wl-clipboard` + `xclip` + `xsel` are installed by the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) ansible role (`ubuntu_desktop` profile). Server profiles get none — OSC 52 is the whole story there.
+
+The remote/multiplexer path is deliberately **one-way**. A Neovim yank writes
+to the attached client's clipboard; ordinary `p` reads Neovim's own unnamed
+register and never sends an OSC 52 query. To paste external clipboard text into
+Neovim, use the terminal's native paste (`Cmd+V` / `Ctrl+Shift+V`).
 
 ## What is OSC 52?
 
@@ -86,24 +91,25 @@ bind C-y run-shell "tmux capture-pane -pS - | fzf-tmux … | tmux load-buffer -w
 [`dot_config/nvim/lua/config/options.lua`](../../dot_config/nvim/lua/config/options.lua):
 
 ```lua
-vim.opt.clipboard = "unnamedplus"
-
-local x_clipboard = vim.env.X_CLIPBOARD
-local use_osc52 = x_clipboard == "osc52"
-  or (not x_clipboard and (vim.env.SSH_CONNECTION or vim.env.SSH_TTY or vim.env.SSH_CLIENT
-      or vim.env.HERDR_ENV or vim.env.ZELLIJ))
-
 if use_osc52 then
-  local osc52 = require("vim.ui.clipboard.osc52")
-  vim.g.clipboard = { name = "OSC 52", copy = { … }, paste = { … } }
+  vim.opt.clipboard = "" -- normal p stays on Neovim's unnamed register
+  vim.g.clipboard = {
+    name = "OSC 52 copy-only",
+    copy = { ["+"] = osc52_copy("+"), ["*"] = osc52_copy("*") },
+    paste = { ["+"] = cached_paste("+"), ["*"] = cached_paste("*") },
+  }
+  -- TextYankPost copies yanks (not deletes/changes) into +.
+else
+  vim.opt.clipboard = "unnamedplus"
 end
 ```
 
 - Locally, LazyVim's default provider is used (`pbcopy`/`wl-copy`/`xclip` — with working paste). That provider is a **runtime binary probe** — Neovim has no compile-time `+clipboard`. On macOS `pbcopy` is built in; on a Linux desktop the binary comes from `wl-clipboard` / `xclip`, installed by the [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role ("Install clipboard CLIs"). Without it, `:checkhealth provider.clipboard` reports "No clipboard tool found" and yank silently no-ops — see [`pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md`](../../pitfalls/lazygit-ctrl-o-no-clipboard-utilities-nvim-yank-silent.md).
-- Remote / multiplexed — `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT` (an interactive `sshd` session), **or `HERDR_ENV`/`ZELLIJ`** — Neovim's built-in `vim.ui.clipboard.osc52` (since 0.10) emits OSC 52 directly, so yank reaches whatever terminal is attached. herdr and zellij need their own check because their pane environment is frozen at multiplexer-server start (a `wl-copy` there hits a stale display), while the pane TTY still proxies to the real client. `tmux` refreshes those vars via `update-environment`, so a bare tmux session stays on the local provider.
-- `X_CLIPBOARD=osc52` forces OSC 52 on; `X_CLIPBOARD=<any local tool>` forces it off. Same knob and predicate as [`x`](#4-shell-cli--x-cross-platform-clipboard-wrapper) (`prefer_osc52`).
+- Remote / multiplexed — `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT` (an interactive `sshd` session), **or `HERDR_ENV`/`ZELLIJ`** — Neovim emits OSC 52 only for copy, so yanks reach whatever terminal is attached while ordinary `p` stays instant and local to the editor. Deletes and changes do not overwrite the attached client's clipboard. herdr and zellij need their own check because their pane environment is frozen at multiplexer-server start (a `wl-copy` there hits a stale display), while the pane TTY still proxies to the real client. `tmux` refreshes those vars via `update-environment`, so a bare tmux session stays on the native provider.
+- The custom `+` / `*` paste functions return only content copied earlier by the same Neovim process. They never call `osc52.paste()`. Before any such copy, explicit `"+p` warns and no-ops; use terminal paste for inbound clipboard text.
+- `X_CLIPBOARD=osc52` forces copy-only OSC 52; `X_CLIPBOARD=<any local tool>` forces the native provider. It shares [`x`](#4-shell-cli--x-cross-platform-clipboard-wrapper)'s environment knob and selection predicate, but deliberately not `x paste` semantics.
 
-Why conditional rather than always-on OSC 52? OSC 52 paste is unreliable (see the terminal table above). Keeping the local provider for local sessions preserves Neovim's paste behaviour; the override only activates when a local tool is clearly the wrong answer.
+Why conditional rather than always-on OSC 52? Local native providers are fast and genuinely bidirectional. In a remote or attachable multiplexer pane, the server-side provider may target the wrong machine and OSC 52 reads are not portable, so only the reliable write direction is enabled.
 
 ### Downstream consumer — lazygit `Ctrl+O`
 
@@ -168,7 +174,7 @@ printf "hello from %s" "$(hostname)" | x copy
 
 # Neovim: which provider is active?
 nvim -c ':checkhealth provider.clipboard' -c ':only'
-# expect: OSC 52 under SSH, native under local
+# expect: OSC 52 copy-only under SSH/Herdr/Zellij, native under direct local
 ```
 
 If `tmux info` shows `clipboard: false` after editing `common.conf`, remember a running tmux server **keeps its old capability table** — `tmux kill-server` (losing sessions; `tmux-resurrect` can restore them) and re-attach.
@@ -179,8 +185,8 @@ If `tmux info` shows `clipboard: false` after editing `common.conf`, remember a 
 |---------|-------------|-----|
 | Yank works outside tmux but vanishes inside tmux (remote) | `set-clipboard off` or server running pre-edit binary | `tmux show -g set-clipboard`; `tmux kill-server` |
 | `tmux info` shows `Ms: [missing]` | tmux's TERM entry lacks `Ms` *and* no `terminal-features …:clipboard` declared | already handled by [`common.conf`](../../dot_config/tmux/common.conf); on an unusual outer `$TERM`, add another `set -as terminal-features` line |
-| Ghostty asks about clipboard every yank | `clipboard-read = ask`; Ghostty interprets some writes as reads when apps immediately re-fetch | switch to `clipboard-read = allow` if you trust everything inside your sessions |
-| Neovim yank works, but `"*p` does nothing over SSH | paste over OSC 52 not supported by outer terminal | expected — use mouse middle-click or re-type; don't fight it |
+| Neovim shows `Waiting for OSC 52 response from the terminal. Press Ctrl-C to interrupt...` after `p` | A full OSC 52 provider was paired with `clipboard=unnamedplus`; ordinary paste became a terminal clipboard query, which Herdr does not return | fixed by the copy-only provider; use ordinary `p` for Neovim registers and terminal `Cmd+V` / `Ctrl+Shift+V` for external clipboard text. See [`pitfalls/nvim-p-waits-for-osc52-response-in-herdr.md`](../../pitfalls/nvim-p-waits-for-osc52-response-in-herdr.md) |
+| Explicit `"+p` has no external clipboard content under SSH/Herdr/Zellij | copy-only mode intentionally never reads the client clipboard; it can only replay this Neovim process's last outbound `+` copy | expected — use the terminal's native paste |
 | `prefix+y` still copies to remote clipboard | shim binary `tmux` resolves to an old pre-`load-buffer -w` version | `tmux -V` must be ≥ 3.3 for `load-buffer -w`; this repo enforces ≥ 3.3 via ansible `devtools` role |
 | Nested tmux (`tmux inside ssh inside tmux`) | inner tmux eats OSC 52 | inner tmux needs `set -g allow-passthrough on`; already on in this config. Double-nested cases may require `Ptmux;…` wrapping |
 | `x copy` errors with "OSC 52 payload too large" (e.g. copying full pane scrollback over SSH) | payload exceeds the terminal's OSC 52 cap; `x copy` now refuses loudly instead of writing an escape sequence the terminal would silently drop | copy a smaller selection, or raise the cap: `X_OSC52_MAX_BYTES=<n> x copy ...` if your terminal supports more (iTerm2 ~1 MB) |
@@ -189,7 +195,7 @@ If `tmux info` shows `clipboard: false` after editing `common.conf`, remember a 
 ## Design notes / non-defaults
 
 - **tmux `set-clipboard`** is `on`, not `external`. `external` disables tmux's own OSC 52 emission from copy-mode; `on` is a superset and keeps `prefix+[` → `y` working.
-- **Neovim OSC 52 provider** is gated (on `SSH_*` / `HERDR_ENV` / `ZELLIJ` / `X_CLIPBOARD=osc52`) rather than always-on, specifically so local paste (`"+p`) continues to work. If you primarily work remote and don't mind the paste tradeoff, force it with `X_CLIPBOARD=osc52`.
+- **Neovim OSC 52 is copy-only** under `SSH_*` / `HERDR_ENV` / `ZELLIJ` / `X_CLIPBOARD=osc52`. Never wire `vim.ui.clipboard.osc52.paste()` into `unnamedplus` there: a single `p` can otherwise wait ten seconds for a response the multiplexer or terminal will never deliver. `X_CLIPBOARD=<local tool>` remains the explicit opt-out when the server-side clipboard is genuinely the desired one.
 - **`x` CLI ordering** prefers local backends (`pbcopy`, `wl-copy`, etc.) over OSC 52 — *except* when `prefer_osc52()` is true (`SSH_*` / `HERDR_ENV` / `ZELLIJ`) or `X_CLIPBOARD=osc52`, where OSC 52 goes first (a local backend would be the wrong machine or a frozen display). Local-first is intentional: `pbcopy`/`wl-copy` is faster, doesn't touch the TTY, and works for very large payloads (OSC 52 is size-limited by the terminal — iTerm2 ~1 MB, many others 64-256 KB). Because OSC 52 has no delivery acknowledgment, `osc52_copy()` refuses payloads above `X_OSC52_MAX_BYTES` (default 75000 base64 chars) rather than writing an escape sequence the terminal would silently drop — a plain `write(2)` to `/dev/tty` succeeds either way, so without this guard `x copy` would report success when nothing reached the clipboard. The OSC 52-first branch opens `/dev/tty` for real (not just `[[ -w ]]`) before consuming stdin, so a no-PTY `ssh` still falls through cleanly.
 
 ## Clipboard history (`cb` / `cbl` / `cbe`)

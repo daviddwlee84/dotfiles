@@ -85,8 +85,9 @@ helper，加上四個 `vim.keymap.set({ "n", "x" }, …)` 呼叫。它重用了�
 
 - `LazyVim.root.git()` — git 根目錄偵測。
 - `vim.fs.relpath(root, abspath)` — 內建的相對路徑計算。
-- `vim.fn.setreg("+", ref)` — 尊重 `lua/config/options.lua` 設定的 OSC 52 剪貼簿
-  provider，所以即使透過 SSH 也會複製到你本機終端機的剪貼簿。**不要**直接呼叫
+- `vim.fn.setreg("+", ref)` — 尊重 `lua/config/options.lua` 設定的 provider：本機用
+  native clipboard，SSH/Herdr/Zellij 下用 copy-only OSC 52。因此能送到 attached
+  client 的剪貼簿，又不會開啟 terminal clipboard read。**不要**直接呼叫
   `pbcopy`——那會繞過 OSC 52。詳見 [Clipboard](../tools/clipboard.md)。
 - visual range 用 `vim.fn.line(".")` / `vim.fn.line("v")` 取得——與 gitsigns 的
   stage-selection 對映相同的做法。

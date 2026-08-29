@@ -133,6 +133,7 @@ description = "new tab at the workspace (space) root dir"
 | dev / lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
 | URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
 | 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
+| 本機/遠端 attach 間的 Neovim clipboard | OSC 52 **只寫入**；不支援 clipboard query | yank 送到 attached client；普通 `p` 用 Neovim register；外部文字用 terminal paste 貼入 |
 | 搜尋所有 pane 內容並跳轉 | **CLI pipeline + fzf + 精確聚焦 helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`；Alt+S 搜尋 unwrapped scrollback |
 | 無縫 `Ctrl-hjkl` nvim↔pane 導覽 | **沒有 herdr-aware smart-splits** | **缺口**——見下方 workaround |
 | OSC133 copy-mode（`cpout`/`cpblock`） | tmux 專屬 | **缺口**——`cpcmd`（zsh history）仍可用 |
@@ -145,7 +146,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 
 > **兩組 herdr 環境變數。** 上面那組 `HERDR_ACTIVE_PANE_*` **只**會被注入到 `[[keys.command]]` 的呼叫裡。而每個*跑在 herdr pane 內的 shell* 還會拿到一組**環境值 (ambient)**：`HERDR_ENV=1`、`HERDR_PANE_ID`、`HERDR_TAB_ID`、`HERDR_WORKSPACE_ID`、以及 `HERDR_SOCKET_PATH`（當前 session 的 socket）。腳本用 `HERDR_ENV` 當作「我在不在 herdr 裡？」的判斷，並繼承 `HERDR_SOCKET_PATH` 來鎖定當前 session——這正是 `hvibe`/`hcode` 依賴的東西。
 
-> **Pane 環境在 herdr-server 啟動時凍結。** 不像 tmux（`update-environment`），herdr **不會**在新 client 接上時更新 `SSH_CONNECTION` / `DISPLAY` / `WAYLAND_DISPLAY` / `SSH_AUTH_SOCK` —— 每個 pane 繼承的是 daemon 首次啟動時的值。實際後果：透過 SSH 時 pane 的 `$SSH_*` 是空的，而 `$WAYLAND_DISPLAY` 還指著過期的本機 display，所以按這些變數挑後端的剪貼簿工具會複製到錯的機器。`x` 與 Neovim 靠判斷 `HERDR_ENV`（→ 走 pane TTY 的 OSC 52，它*確實*代理到真正的 client）繞過；見 [`pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md) 與 [clipboard.md](clipboard.md)。透過 `SSH_AUTH_SOCK` 轉發的 agent，需要每個 pane 重新 export，或從有它的 session 啟動 server。
+> **Pane 環境在 herdr-server 啟動時凍結。** 不像 tmux（`update-environment`），herdr **不會**在新 client 接上時更新 `SSH_CONNECTION` / `DISPLAY` / `WAYLAND_DISPLAY` / `SSH_AUTH_SOCK` —— 每個 pane 繼承的是 daemon 首次啟動時的值。實際後果：透過 SSH 時 pane 的 `$SSH_*` 是空的，而 `$WAYLAND_DISPLAY` 還指著過期的本機 display，所以按這些變數挑後端的剪貼簿工具會複製到錯的機器。`x` 與 Neovim 靠判斷 `HERDR_ENV`（→ 走 pane TTY 的 OSC 52，它*確實*代理到真正的 client）繞過。Neovim 刻意只用這條路做 **copy**：Herdr 不會轉送 OSC 52 clipboard-query response，若把完整 provider 接到 `unnamedplus`，普通 `p` 最多會卡十秒。Editor register 用普通 `p`；外部剪貼簿文字用 terminal paste。見 [`pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/x-copy-over-ssh-writes-remote-clipboard-not-osc52.md)、[`pitfalls/nvim-p-waits-for-osc52-response-in-herdr.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/nvim-p-waits-for-osc52-response-in-herdr.md) 與 [clipboard.md](clipboard.md)。透過 `SSH_AUTH_SOCK` 轉發的 agent，需要每個 pane 重新 export，或從有它的 session 啟動 server。
 
 | Key | Action | 類型 |
 |---|---|---|
