@@ -731,6 +731,41 @@ SH
   [ -z "$output" ]
 }
 
+@test "claude-copilot --fast appends the discovered sibling for this session" {
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
+  printf '%s\n' 'gpt-test[1m]' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_fast_model_for() { printf '%s-fast\\n' \"\$1\"; }
+    copilot-run() { printf '<%s>\\n' \"\$@\"; }
+    claude-copilot --no-specstory --fast --model gpt-explicit 'two words'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"claude-copilot: --fast -> gpt-explicit-fast (session only)"* ]]
+  [[ "$output" == *"<--model>"* ]]
+  [[ "$output" == *"<gpt-explicit-fast>"* ]]
+  [[ "$output" == *"<two words>"* ]]
+  [ ! -e "$TMP/home/.claude/settings.json" ]
+}
+
+@test "claude-copilot --fast falls back to the requested standard model" {
+  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
+  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
+
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_fast_model_for() { return 1; }
+    copilot-run() { printf '<%s>\\n' \"\$@\"; }
+    claude-copilot --fast --no-specstory --model gpt-explicit"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"claude-copilot: --fast unavailable for gpt-explicit; using the standard model."* ]]
+  [ "$(printf '%s\n' "$output" | grep -c '<gpt-explicit>')" -eq 1 ]
+}
+
 @test "copilot-here off cleans stale user model even when no local pin exists" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy" "$TMP/proj"
@@ -821,6 +856,36 @@ SH
   [ "$(printf '%s' "$output" | jq -r '.p.input[0].tools[2].description')" = "kept" ]
   [ "$(printf '%s' "$output" | jq -r '.p.input[1].tools[0].description')" = "Tool prompt-data." ]
   [ "$(printf '%s' "$output" | jq -r '.p.tools[0] | has("description")')" = "false" ]
+}
+
+@test "Responses shim derives fast siblings and translates Codex fast tiers" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  local shim="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js"
+  run bun -e "import { buildFastModelMappings as b, normalizeRequestBody as n } from '$shim';
+    const catalog={data:[
+      {id:'gpt-test',claude_model_id:'gpt-test[1m]',capabilities:{type:'chat',supports:{responses:true}}},
+      {id:'gpt-test-fast',claude_model_id:'gpt-test-fast[1m]',capabilities:{type:'chat',supports:{responses:true}}},
+      {id:'gpt-hidden-fast',model_picker_enabled:false,capabilities:{type:'chat',supports:{responses:true}}},
+      {id:'gpt-hidden',capabilities:{type:'chat',supports:{responses:true}}},
+    ]};
+    const mappings=b(catalog);
+    const enc=(o)=>new TextEncoder().encode(JSON.stringify(o)).buffer;
+    const decode=(r)=>typeof r.body==='string'?JSON.parse(r.body):JSON.parse(new TextDecoder().decode(r.body));
+    const fast=n('/v1/responses',enc({model:'gpt-test',service_tier:'fast'}),'',mappings);
+    const priority=n('/responses',enc({model:'gpt-test[1m]',service_tier:'priority'}),'',mappings);
+    const ultra=n('/responses',enc({model:'gpt-test',service_tier:'ultrafast'}),'',mappings);
+    const normal=n('/responses',enc({model:'gpt-test'}),'',mappings);
+    console.log(JSON.stringify({mappings,fast:{p:decode(fast),r:fast.routing},priority:{p:decode(priority),r:priority.routing},ultra:{p:decode(ultra),r:ultra.routing},normalChanged:normal.changed}));"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.mappings["gpt-test"]')" = "gpt-test-fast" ]
+  [ "$(printf '%s' "$output" | jq -r '.mappings["gpt-test[1m]"]')" = "gpt-test-fast[1m]" ]
+  [ "$(printf '%s' "$output" | jq -r '.mappings | has("gpt-hidden")')" = "false" ]
+  [ "$(printf '%s' "$output" | jq -r '.fast.p.model')" = "gpt-test-fast" ]
+  [ "$(printf '%s' "$output" | jq -r '.fast.p | has("service_tier")')" = "false" ]
+  [ "$(printf '%s' "$output" | jq -r '.priority.p.model')" = "gpt-test-fast[1m]" ]
+  [ "$(printf '%s' "$output" | jq -r '.ultra.p.model')" = "gpt-test" ]
+  [ "$(printf '%s' "$output" | jq -r '.ultra.r.fallback')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.normalChanged')" = "0" ]
 }
 
 @test "Responses shim decodes zstd before normalization" {
@@ -1039,11 +1104,15 @@ JS
   [ "$(printf '%s' "$output" | jq -r '.cancellation.deadResult')" = "AbortError" ]
   [ "$(printf '%s' "$output" | jq -r '.cancellation.backoffResult')" = "AbortError" ]
   [ "$(printf '%s' "$output" | jq -r '.cancellation.backoffReleaseMs < 1000')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.cleanupFailures.metricFailureContained')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.fastRoute.forwarded.model')" = "gpt-fixture-fast" ]
+  [ "$(printf '%s' "$output" | jq -r '.fastRoute.forwarded | has("service_tier")')" = "false" ]
   [ "$(printf '%s' "$output" | jq -r '.counts["/v1/messages:backoff"]')" = "1" ]
   [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "retry500" and .attempts == 2 and .retries == 1 and .error_kind == null)] | length')" = "1" ]
   [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "nonsse" and .error_kind == "upstream_protocol")] | length')" = "2" ]
   [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "activeabort" and .attempts == 1 and .status == 499 and .error_kind == "client_cancel")] | length')" = "1" ]
   [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "dead" and .attempts == 0 and .error_kind == "client_cancel")] | length')" = "1" ]
+  [ "$(printf '%s' "$output" | jq -r '[.metrics[] | select(.model == "gpt-fixture-fast" and .status == 200)] | length')" = "1" ]
 }
 
 @test "shim metrics join one-to-many token events and compute throughput" {

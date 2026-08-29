@@ -38,6 +38,7 @@ copilot-proxy start
 copilot-model --auto    # 有 Claude 就用 Claude，否則按 Sol/Terra/Luna 角色配置
 
 claude-copilot          # 一次性 session 走代理（自動啟動代理；不寫任何檔案）
+claude-copilot --fast   # 同上；catalog 有 fast sibling 時改走該模型
 claude-copilot-once     # 釘住「這個專案」跑一次 session，結束自動解除（代理需已啟動）
 codex-copilot           # 一次性 Codex session；auto 優先選 OpenAI
 codex-copilot-once      # 完全相同的 alias；兩者都不寫 Codex config
@@ -282,7 +283,11 @@ ChatGPT MCP，不是只供 Apple Silicon Codex Desktop 使用的 bridge。
   `/model` + **Enter** 時寫入一個全域 key；EXIT guard 會在正常、非零或 Ctrl-C 結束時
   移除 proxy-only 值或還原先前的 native default，session 中其他設定變更不回滾。
 
-### `claude-copilot-once [--no-specstory] [claude args...]` —— 一次性釘選 session
+`claude-copilot --fast` 會用 shim 的 live fast-routing map 對應明確指定或預設模型，
+只為這次 invocation 在最後加上 sibling model，不寫 Claude settings。若 Copilot 沒有
+advertise eligible sibling，launcher 會警告並繼續使用 standard model。
+
+### `claude-copilot-once [--fast] [--no-specstory] [claude args...]` —— 一次性釘選 session
 
 第一層的用完即丟 + 第二層的可靠度：用 `copilot-here on` 釘住 **這個專案**，跑一個
 `claude-copilot` session，結束時 `copilot-here off` —— 連 Ctrl-C 也會還原。當純環境變數
@@ -485,7 +490,8 @@ copilot-here on             # 黏著本專案，或改用 claude-copilot-once
 | subagents、dynamic workflows | 可以 | 不強制 `CLAUDE_CODE_SUBAGENT_MODEL`，保留 workflow/frontmatter 的 routing。[Workflow 文件](https://code.claude.com/docs/en/workflows) |
 | `ultracode` | `2.3.4` 可以 | Ultracode 是 xhigh effort + dynamic workflows，不是單獨模型；2.3.4 會把 effort 傳到 GPT-5.6。 |
 | thinking/reasoning | 轉譯後可用 | GPT 使用 Responses reasoning，不是 Anthropic-native thinking semantics。 |
-| Web Search、fast/auto mode、MCP tool search | 依 provider | 由 base-URL gateway 與 Copilot endpoint 能力決定；non-first-party tool search 可能需要額外 bridge/plugin。 |
+| Fast inference | catalog 有提供時可用 | Codex `/fast` 由 shim 轉成 Copilot 的獨立 `-fast` sibling；Claude Code 使用 `claude-copilot --fast`。沒有 eligible sibling 時會警告並退回 standard。 |
+| Web Search、auto mode、MCP tool search | 依 provider | 由 base-URL gateway 與 Copilot endpoint 能力決定；non-first-party tool search 可能需要額外 bridge/plugin。 |
 | Ultrareview、Remote Control、Chrome、cloud Code Review、routines、web/mobile/Slack session | 不可以 | 這些需要 Claude.ai auth/cloud identity；local API gateway 無法取代。`ultrareview` 和 `ultracode` 無關。 |
 
 官方參考：[feature availability](https://code.claude.com/docs/en/feature-availability)、
@@ -598,14 +604,22 @@ FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器�
 回填。先去看 `agent-<id>.jsonl` 的 `assistant` 筆數有沒有在長。完整診斷：
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md)。
 
-### Codex fast mode 不會穿過 Copilot gateway
+### Fast mode 是 catalog model route，不是轉送 Copilot tier
 
-目前釘選的 `@jeffreycao/copilot-api` bundle 會在轉送 GitHub Copilot 前明確移除
-Responses 的 `service_tier`。兩條路徑都受影響：`codex-copilot` 即使要求 Codex
-`service_tier = "fast"`，fork 仍會丟掉；`claude-copilot-once` 送 Anthropic
-`/v1/messages`，GPT model 轉成 Responses 時也不會補 priority tier。因此兩者都使用
-Copilot 預設排程。`copilot-proxy doctor` 會檢查實際安裝 bundle 並揭露這點，避免把
-本機 Codex 的 fast 指示誤認成上游 tier。shim 不會注入未受支援的 priority 值。
+OpenAI Responses API 以 `service_tier="fast"`（歷史上也用 `priority`）表示 Fast Mode；
+目前釘選的 Copilot fork 會移除這個欄位，而 GitHub Copilot 則把 fast inference
+advertise 成另一個 model id，例如 eligible 的 `<standard>-fast` sibling。前置 shim
+現在會銜接這兩種表示法：每五分鐘由 live `/v1/models` catalog 推導 standard-to-fast
+pair，把 Codex `/fast` request 改寫到 sibling，再於 fork 收到前移除不支援的 tier。
+參考 OpenAI [Fast Mode guide](https://developers.openai.com/api/docs/guides/fast-mode)。
+
+Claude Code 原生 `/fast` 在這個 custom Anthropic gateway 仍不可用，因此要使用
+`claude-copilot --fast`（也可經 `claude-copilot-once` 傳入）。Wrapper 會用 session-only
+`--model` override 選同一份 live-catalog sibling。Discovery 失敗時保留 last-good cache；
+完全沒有 eligible sibling 時，兩條路徑都退回 standard model 並送出去重警告。
+`copilot-proxy status` 與 `doctor` 會顯示 routing state；明確執行
+`copilot-proxy shim off` 也會關掉這項轉譯。不會為了測試 Fast 可用性自動送出會消耗
+quota 的 inference probe。
 
 ### 舊版 shim 會卡住 port，而不是被換掉
 

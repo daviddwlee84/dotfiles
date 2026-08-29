@@ -154,11 +154,14 @@ is a health action, not a stall report. `phase=queue` distinguishes local
 admission delay from `phase=upstream` model think time. Use
 `copilot-proxy logs shim -f` to watch transitions live.
 
-One adjacent latency trap is not fixable in the shim: the current pinned
-`@jeffreycao/copilot-api` removes Responses `service_tier` before forwarding.
-`claude-copilot-once` GPT requests and `codex-copilot` requests therefore use
-Copilot default scheduling even if the ordinary Codex config displays fast
-mode. `copilot-proxy doctor` inspects the installed bundle and reports this.
+One adjacent latency trap now has an explicit shim bridge. The current pinned
+`@jeffreycao/copilot-api` still removes Responses `service_tier`, but Copilot's
+live catalog can advertise a separate `<standard>-fast` model. The shim derives
+those pairs and rewrites Codex Fast requests before the fork strips the tier;
+`claude-copilot --fast` selects the same sibling for one Claude Code session.
+No eligible sibling means a warned standard fallback, not a claim that Copilot
+supports an OpenAI scheduling tier. `copilot-proxy doctor` reports the live
+routing state without sending a paid inference probe.
 
 ## Prevention
 

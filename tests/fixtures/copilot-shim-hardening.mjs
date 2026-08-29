@@ -9,6 +9,12 @@ const upstream = Bun.serve({
   idleTimeout: 60,
   async fetch(req) {
     const url = new URL(req.url);
+    if (req.method === "GET" && url.pathname === "/v1/models") {
+      return Response.json({ data: [
+        { id: "gpt-fixture", claude_model_id: "gpt-fixture[1m]", supported_endpoints: ["/responses"], model_picker_enabled: true, policy: { state: "enabled" }, capabilities: { type: "chat" } },
+        { id: "gpt-fixture-fast", claude_model_id: "gpt-fixture-fast[1m]", supported_endpoints: ["/responses"], model_picker_enabled: true, policy: { state: "enabled" }, capabilities: { type: "chat" } },
+      ] });
+    }
     const mode = url.searchParams.get("mode") ?? "ok";
     const key = `${url.pathname}:${mode}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -50,13 +56,25 @@ process.env.COPILOT_SHIM_PING_MS = "50";
 process.env.COPILOT_SHIM_STALL_MS = "5000";
 process.env.COPILOT_SHIM_METRICS_DB = process.argv[3];
 process.env.COPILOT_API_SQLITE_DB_PATH = `${process.argv[3]}.tokens`;
-const { closeResponse, startServer } = await import(pathToFileURL(process.argv[2]).href);
+const { closeResponse, createMetricTracker, settleCancellation, startServer } = await import(pathToFileURL(process.argv[2]).href);
 let cancelSettled = false;
 const cancelPromise = closeResponse({ body: { async cancel() { await sleep(150); cancelSettled = true; } } }, new Error("test cleanup"));
 await sleep(30);
 const cancelBarrier = { waited: !cancelSettled };
 await cancelPromise;
 cancelBarrier.settled = cancelSettled;
+await settleCancellation({ cancel() { return Promise.reject(new Error("fixture rejected cancel")); } });
+await settleCancellation({ cancel() { throw new Error("fixture throwing cancel"); } });
+let metricFailureContained = true;
+try {
+  const tracker = createMetricTracker(
+    { traceId: "fixture-metric-failure", endpoint: "/fixture", model: "fixture", scope: "normal", streaming: true },
+    { query() { throw new Error("fixture metric write failure"); } },
+    () => 0,
+  );
+  tracker.finalize(200);
+} catch { metricFailureContained = false; }
+const cleanupFailures = { cancellationContained: true, metricFailureContained };
 const shim = startServer();
 
 const responseErrorCode = (result) => {
@@ -64,11 +82,11 @@ const responseErrorCode = (result) => {
   return data ? JSON.parse(data)?.response?.error?.code ?? null : null;
 };
 
-const call = async (path, mode, { stream = true, delay = 120, signal } = {}) => {
+const call = async (path, mode, { stream = true, delay = 120, signal, payload } = {}) => {
   const response = await fetch(`http://127.0.0.1:${shim.port}${path}?mode=${mode}&delay=${delay}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: mode, stream, marker: mode }),
+    body: JSON.stringify(payload ?? { model: mode, stream, marker: mode }),
     signal,
   });
   const body = await response.text();
@@ -81,6 +99,10 @@ const call = async (path, mode, { stream = true, delay = 120, signal } = {}) => 
 };
 
 try {
+  const fastRoute = await call("/v1/responses", "fast-route", {
+    delay: 0,
+    payload: { model: "gpt-fixture", service_tier: "fast", stream: true, marker: "fast-route" },
+  });
   const retry = await call("/v1/messages", "retry500", { delay: 250 });
   const exhausted = await call("/v1/responses", "always500", { delay: 150 });
   const delayedResponses = {
@@ -127,9 +149,15 @@ try {
 
   const metrics = await (await fetch(`http://127.0.0.1:${shim.port}/_shim/events?scope=all&limit=50`)).json();
   const retrySeen = seen.get("/v1/messages:retry500") ?? [];
+  const fastSeen = seen.get("/v1/responses:fast-route") ?? [];
   const expectedRetryBody = JSON.stringify({ model: "retry500", stream: true, marker: "retry500" });
   const result = {
     cancelBarrier,
+    cleanupFailures,
+    fastRoute: {
+      response: fastRoute,
+      forwarded: fastSeen.length === 1 ? JSON.parse(fastSeen[0].body) : null,
+    },
     retry,
     exhausted,
     delayedResponses,
@@ -153,6 +181,8 @@ try {
 
   if (retry.status !== 200 || retry.pings < 1 || retry.events.join(",") !== "message_start,message_stop") throw new Error("retry path failed");
   if (!cancelBarrier.waited || !cancelBarrier.settled) throw new Error("response cleanup barrier was not awaited");
+  if (!cleanupFailures.cancellationContained || !cleanupFailures.metricFailureContained) throw new Error("cleanup failure escaped");
+  if (result.fastRoute.response.status !== 200 || result.fastRoute.forwarded?.model !== "gpt-fixture-fast" || "service_tier" in result.fastRoute.forwarded) throw new Error("fast routing failed");
   if (!result.retryReplay.sameBody || !result.retryReplay.sameTrace || result.retryReplay.attempts !== 2) throw new Error("retry replay changed");
   if (exhausted.events.at(-1) !== "response.failed" || !exhausted.body.includes('"status":"failed"')) throw new Error("responses terminal failure failed");
   if (JSON.stringify(responseCodes) !== JSON.stringify({ status400: "invalid_prompt", status401: "invalid_prompt", status402: "insufficient_quota", status429: "rate_limit_exceeded", status500: "server_error" })) throw new Error("responses error classification failed");
@@ -167,6 +197,7 @@ try {
   if (backoffResult !== "AbortError" || liveAfterBackoff.status !== 200 || backoffReleaseMs > 1000 || counts.get("/v1/messages:backoff") !== 1) throw new Error("backoff cancellation retained permit or retried");
   const hasMetric = (predicate) => metrics.some(predicate);
   if (!hasMetric((row) => row.model === "retry500" && row.status === 200 && row.attempts === 2 && row.retries === 1 && !row.error_kind)) throw new Error("successful retry metrics missing");
+  if (!hasMetric((row) => row.model === "gpt-fixture-fast" && row.status === 200)) throw new Error("fast routing metrics missing");
   if (!hasMetric((row) => row.model === "always500" && row.status === 500 && row.attempts === 2 && row.retries === 1 && row.error_kind === "upstream_status")) throw new Error("exhausted retry metrics missing");
   if (metrics.filter((row) => row.model === "nonsse" && row.error_kind === "upstream_protocol").length !== 2) throw new Error("fast/delayed protocol mismatch metrics missing");
   if (!hasMetric((row) => row.model === "activeabort" && row.status === 499 && row.attempts === 1 && row.error_kind === "client_cancel")) throw new Error("active cancellation metrics missing");

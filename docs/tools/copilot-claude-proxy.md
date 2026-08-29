@@ -43,6 +43,7 @@ copilot-proxy start
 copilot-model --auto    # Claude if served; otherwise Sol/Terra/Luna by role
 
 claude-copilot          # one-off session on the proxy (auto-starts it; no file writes)
+claude-copilot --fast   # same, using a live-catalog fast sibling when available
 claude-copilot-once     # pin THIS project, run one session, then auto-unpin (proxy must be up)
 codex-copilot           # one-off Codex session; auto-picks OpenAI first
 codex-copilot-once      # exact alias; neither name writes Codex config
@@ -337,7 +338,12 @@ project-level settings files — but **not** an active `copilot-here` pin in
   that proxy-only value or restores the prior native default, including on a
   non-zero/Ctrl-C exit. Other settings changed during the session are retained.
 
-### `claude-copilot-once [--no-specstory] [claude args...]` — one-shot pinned session
+`claude-copilot --fast` resolves the requested/default model against the shim's
+live fast-routing map and appends the matching sibling for this invocation only.
+It does not write Claude settings. If Copilot advertises no eligible sibling,
+the launcher warns and continues with the standard model.
+
+### `claude-copilot-once [--fast] [--no-specstory] [claude args...]` — one-shot pinned session
 
 Layer 1's ephemerality with Layer 2's reliability: pin **this project** via
 `copilot-here on`, run one `claude-copilot` session, then `copilot-here off` on
@@ -589,7 +595,8 @@ The important split is **local orchestration vs Anthropic cloud services**:
 | Subagents and dynamic workflows | Yes | Do not set `CLAUDE_CODE_SUBAGENT_MODEL` globally here, so workflow scripts/frontmatter retain normal routing. [Workflow docs](https://code.claude.com/docs/en/workflows) |
 | `ultracode` | Yes on `2.3.4` | Ultracode is xhigh effort plus dynamic workflows, not a separate model. The upgraded fork forwards the requested effort to GPT-5.6. |
 | Thinking/reasoning | Translated | GPT uses Responses reasoning rather than Anthropic-native thinking semantics. Persisted reasoning support is proxy-dependent. |
-| Web search, fast/auto mode, MCP tool search | Provider-dependent | The base-URL gateway and Copilot endpoint decide availability; non-first-party tool search may require an extra bridge/plugin. |
+| Fast inference | Yes when catalogued | Codex `/fast` is translated by the shim to Copilot's separate `-fast` sibling; Claude Code uses `claude-copilot --fast`. No eligible sibling means a warned standard fallback. |
+| Web search, auto mode, MCP tool search | Provider-dependent | The base-URL gateway and Copilot endpoint decide availability; non-first-party tool search may require an extra bridge/plugin. |
 | Ultrareview, Remote Control, Chrome, cloud Code Review, routines, web/mobile/Slack sessions | No | These require Claude.ai authentication/cloud services; a local API gateway cannot supply the subscription identity. `ultrareview` is unrelated to `ultracode`. |
 
 See Claude Code's [feature availability](https://code.claude.com/docs/en/feature-availability),
@@ -718,17 +725,25 @@ filled in when an agent finishes. Check `agent-<id>.jsonl` for growing
 `assistant` entries first. Full diagnosis:
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md).
 
-### Codex fast mode does not cross the Copilot gateway
+### Fast mode is a catalog model route, not a forwarded Copilot tier
 
-The current pinned `@jeffreycao/copilot-api` bundle explicitly removes
-Responses `service_tier` before forwarding to GitHub Copilot. This affects both
-routes: `codex-copilot` may request Codex `service_tier = "fast"`, but the fork
-drops it; `claude-copilot-once` sends Anthropic `/v1/messages`, which the fork
-translates to Responses for GPT models without adding a priority tier. Both use
-Copilot's default scheduling. `copilot-proxy doctor` inspects the installed
-bundle and reports this instead of implying that a local Codex fast indicator
-controls the upstream tier. The shim deliberately does not inject an
-unsupported priority value.
+OpenAI's Responses API represents Fast Mode with `service_tier="fast"` (and
+historically `priority`). The pinned Copilot fork removes that field, while
+GitHub Copilot advertises fast inference as a **separate model id** such as an
+eligible `<standard>-fast` sibling. The front shim now bridges those two models
+of the world: every five minutes it derives standard-to-fast pairs from the live
+`/v1/models` catalog, rewrites Codex `/fast` requests to the sibling, then removes
+the unsupported tier before the fork sees it. See OpenAI's
+[Fast Mode guide](https://developers.openai.com/api/docs/guides/fast-mode).
+
+Claude Code's native `/fast` remains unavailable on this custom Anthropic
+gateway, so use `claude-copilot --fast` (or pass it through
+`claude-copilot-once`). The wrapper selects the same live-catalog sibling with a
+session-only `--model` override. If discovery fails, the cached last-good map is
+kept; if there is no eligible sibling at all, both paths use the standard model
+and emit a deduplicated warning. `copilot-proxy status` and `doctor` show the
+routing state. Explicit `copilot-proxy shim off` also disables this translation.
+No automatic probe sends paid inference merely to test Fast availability.
 
 ### An old shim build wedges the port instead of being replaced
 

@@ -20,9 +20,9 @@
 #                                account-policy fact.
 #   copilot-run <cmd...>       - run any command with the proxy env injected
 #                                (auto-starts the proxy first)
-#   claude-copilot [args...]   - one-off Claude Code session on the proxy
+#   claude-copilot [--fast] [args...] - one-off Claude Code session on the proxy
 #                                (specstory-wrapped when available; zero file writes)
-#   claude-copilot-once [args...] - one-shot session via the copilot-here pin
+#   claude-copilot-once [--fast] [args...] - one-shot session via the copilot-here pin
 #                                (settings.local.json; auto-reverted, even on Ctrl-C)
 #   codex-copilot [args...]    - one-off Codex session on the Responses gateway
 #   codex-copilot-once [args...] - identical zero-persistence spelling
@@ -520,6 +520,20 @@ _copilot_fast_tier_state() {
     fi
   done
   printf '%s' unknown
+}
+
+_copilot_fast_routing_json() {
+  _copilot_shim_enabled || return 1
+  _copilot_shim_alive || return 1
+  command curl -fsS --max-time 4 "$(_copilot_shim_base)/_shim/fast-routing" 2>/dev/null
+}
+
+_copilot_fast_model_for() {
+  [ -n "${1:-}" ] || return 1
+  local routing
+  routing="$(_copilot_fast_routing_json)" || return 1
+  printf '%s' "$routing" | jq -er --arg model "$1" '
+    .mappings[$model] // (if ([.mappings[]] | index($model)) then $model else empty end)' 2>/dev/null
 }
 
 # Base URL managed clients should use. An enabled-but-down shim is a hard fault:
@@ -1052,7 +1066,7 @@ copilot-proxy() {
       ;;
     status)
       if _copilot_alive; then
-        local status_json status_count status_claude _shim_health _shim_detail
+        local status_json status_count status_claude _shim_health _shim_detail _fast_state _fast_count
         status_json="$(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null || true)"
         status_count="$(printf '%s' "$status_json" | jq -r '.data | length' 2>/dev/null || printf '?')"
         status_claude="$(printf '%s' "$status_json" | jq -r '[.data[]?.id | select(startswith("claude-"))] | join(" ")' 2>/dev/null)"
@@ -1066,6 +1080,9 @@ copilot-proxy() {
               if (.limit // null) == null then ""
               else " (active \(.active)/\(.limit), queued \(.queued), range \(.min)..\(.max))" end' 2>/dev/null)"
             printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)${_shim_detail}  → clients use this"
+            _fast_state="$(printf '%s' "$_shim_health" | jq -r '.fast_routing.state // "old-shim"' 2>/dev/null)"
+            _fast_count="$(printf '%s' "$_shim_health" | jq -r '.fast_routing.mappings // 0' 2>/dev/null)"
+            printf '%s\n' "  fast:   $_fast_state ($_fast_count mapping(s); details: copilot-proxy doctor)"
           else
             printf '%s\n' "  shim:   ON but DOWN (managed clients fail closed; try 'copilot-proxy shim on')"
           fi
@@ -1183,6 +1200,7 @@ copilot-proxy() {
       local _served _n _claude _model _src _pin _profile _profile_catalog
       local _role_rows _role _role_model _role_bad
       local _http_proxy _up_direct _up_via _dir_n _dir_c _via_n _via_c
+      local _fast_json _fast_state _fast_routes
       _http_proxy="$(_copilot_resolve_http_proxy)"
       if [ -n "$_http_proxy" ]; then
         _note "http proxy" "$_http_proxy (COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto}) — Node needs --proxy-env to use this"
@@ -1291,12 +1309,36 @@ EOF
         else
           _bad "model roles" "could not compute the effective role profile"
         fi
+        if _copilot_shim_enabled; then
+          if _copilot_shim_alive && _fast_json="$(_copilot_fast_routing_json)"; then
+            _fast_state="$(printf '%s' "$_fast_json" | jq -r '.state // "unknown"')"
+            _fast_routes="$(printf '%s' "$_fast_json" | jq -r '
+              [.mappings | to_entries[]? | select(.key | endswith("[1m]") | not)
+               | "\(.key)->\(.value)"] | join(", ")')"
+            case "$_fast_state" in
+              ready|stale)
+                _ok "fast routing" "$_fast_state${_fast_routes:+ — $_fast_routes}"
+                _hint "Codex /fast is translated before the fork strips service_tier; Claude uses: claude-copilot --fast"
+                ;;
+              unavailable)
+                _note "fast routing" "live catalog has no eligible -fast sibling; fast requests fall back to the standard model"
+                ;;
+              *)
+                _note "fast routing" "$_fast_state — fast requests fall back to the standard model"
+                _hint "inspect: copilot-proxy logs shim 40"
+                ;;
+            esac
+          else
+            _bad "fast routing" "shim is running an old build or its routing endpoint is unavailable"
+            _hint "restart after applying these dotfiles: copilot-proxy restart"
+          fi
+        else
+          _note "fast routing" "shim is off; the fork strips Codex service_tier and no model translation occurs"
+          _hint "copilot-proxy shim on"
+        fi
         case "$(_copilot_fast_tier_state)" in
-          stripped)
-            _note "fast tier" "current fork strips Responses service_tier; Claude/Codex through this gateway use Copilot default scheduling"
-            _hint "Codex service_tier=\"fast\" does not survive the localhost gateway; no unsupported priority injection is attempted"
-            ;;
-          *) _skip "fast tier" "could not prove whether this installed package forwards service_tier" ;;
+          stripped) _skip "fork tier" "service_tier stripping detected (expected; the shim translates it first)" ;;
+          *) _skip "fork tier" "could not prove whether this installed package forwards service_tier" ;;
         esac
       else
         _bad "served" "could not fetch $(_copilot_base)/v1/models"
@@ -2164,18 +2206,74 @@ _copilot_shquote() {
 # Example:
 #   claude-copilot                 # specstory run claude (proxy env)
 #   claude-copilot -c              # continue last session
+#   claude-copilot --fast          # this session uses a live-catalog fast sibling
 #   claude-copilot --no-specstory  # raw claude, no markdown auto-save
+_copilot_claude_model_arg() {
+  local arg expect=0 found=''
+  for arg in "$@"; do
+    if [ "$expect" -eq 1 ]; then found="$arg"; expect=0; continue; fi
+    case "$arg" in
+      --model) expect=1 ;;
+      --model=*) found="${arg#--model=}" ;;
+    esac
+  done
+  printf '%s' "$found"
+}
+
+_copilot_claude_fast_base_model() {
+  local explicit="$1" effective catalog profile role
+  effective="$(_copilot_effective_model)"
+  effective="${effective%%|*}"
+  case "$explicit" in
+    '') printf '%s' "$effective"; return 0 ;;
+    opus|fable|sonnet|haiku|opusplan)
+      catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+      profile="$(_copilot_model_profile_json "$effective" "$catalog" 2>/dev/null || true)"
+      [ -n "$profile" ] || { printf '%s' "$explicit"; return 0; }
+      role="$explicit"; [ "$role" = opusplan ] && role=opus
+      printf '%s' "$profile" | jq -r --arg role "$role" '.[$role] // empty'
+      ;;
+    default) printf '%s' "$effective" ;;
+    *) printf '%s' "$explicit" ;;
+  esac
+}
+
 claude-copilot() {
-  local ss="auto"
-  case "${1:-}" in
-    --no-specstory) ss="never"; shift ;;
-    --specstory)    shift ;;
-    -h|--help)
-      printf '%s\n' "Usage: claude-copilot [--no-specstory] [claude args...]"
+  local ss="auto" fast=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --fast) fast=1; shift ;;
+      --no-specstory) ss="never"; shift ;;
+      --specstory) ss="auto"; shift ;;
+      -h|--help)
+      printf '%s\n' "Usage: claude-copilot [--fast] [--no-specstory] [claude args...]"
       printf '%s\n' "  One-off Claude Code session on the Copilot proxy (no file writes)."
+      printf '%s\n' "  --fast selects this session's live-catalog fast sibling; unavailable falls back with a warning."
       printf '%s\n' "  Sticky per-project instead: copilot-here on"
       return 0 ;;
-  esac
+      *) break ;;
+    esac
+  done
+
+  if [ "$fast" -eq 1 ]; then
+    local explicit_model base_model fast_model
+    if ! command -v jq >/dev/null 2>&1; then
+      printf '%s\n' "claude-copilot: --fast needs jq; using the standard model." >&2
+    else
+      if ! _copilot_alive; then copilot-proxy start || return 1; fi
+      _copilot_require_shim || return 1
+      explicit_model="$(_copilot_claude_model_arg "$@")"
+      base_model="$(_copilot_claude_fast_base_model "$explicit_model")"
+      if fast_model="$(_copilot_fast_model_for "$base_model")" && [ -n "$fast_model" ]; then
+        # Appended last so it overrides an explicit earlier --model while still
+        # using that value as the base model whose sibling was resolved.
+        set -- "$@" --model "$fast_model"
+        printf '%s\n' "claude-copilot: --fast -> $fast_model (session only)" >&2
+      else
+        printf '%s\n' "claude-copilot: --fast unavailable for ${base_model:-the selected model}; using the standard model." >&2
+      fi
+    fi
+  fi
   (
     _copilot_model_guard_begin || exit 1
     trap '_copilot_model_guard_restore' EXIT
@@ -2375,7 +2473,7 @@ copilot-here() {
 claude-copilot-once() {
   case "${1:-}" in
     -h|--help)
-      printf '%s\n' "Usage: claude-copilot-once [--no-specstory] [claude args...]"
+      printf '%s\n' "Usage: claude-copilot-once [--fast] [--no-specstory] [claude args...]"
       printf '%s\n' "  Pin THIS project to the proxy (copilot-here on), run one Claude Code"
       printf '%s\n' "  session, then auto-unpin (copilot-here off) — even on Ctrl-C."
       printf '%s\n' "  Needs the proxy already running:  copilot-proxy start"

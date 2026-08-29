@@ -88,6 +88,28 @@ const ADAPT_THROTTLE_COOLDOWN_MS = 300000;
 const ERROR_BODY_TIMEOUT_MS = 2000;
 const ERROR_BODY_MAX_BYTES = 2048;
 const RETENTION_MS = 90 * 86400 * 1000;
+const FAST_ROUTING_TTL_MS = 5 * 60 * 1000;
+const FAST_ROUTING_TIMEOUT_MS = 2000;
+
+function errorSummary(error) {
+  return String(error?.message ?? error ?? "unknown error").replace(/\s+/g, " ").slice(0, 500);
+}
+
+function logNonFatal(context, error) {
+  try { console.error(new Date().toISOString(), "[shim]", `${context}: ${errorSummary(error)}`); }
+  catch {}
+}
+
+// Stream cancellation is cleanup. Neither a synchronous throw nor a rejected
+// cancel Promise may become an unhandled rejection in the Bun server process.
+export function settleCancellation(target, reason, context = "stream cancellation failed") {
+  try {
+    return Promise.resolve(target?.cancel(reason)).catch((error) => logNonFatal(context, error));
+  } catch (error) {
+    logNonFatal(context, error);
+    return Promise.resolve();
+  }
+}
 
 function xdgPath(kind, ...parts) {
   const home = process.env.HOME ?? ".";
@@ -161,9 +183,14 @@ function requestMetadata(pathname, body, headers) {
   };
 }
 
-export function createMetricTracker(meta, db = getMetricsDb(), clock = () => performance.now()) {
+export function createMetricTracker(meta, db = undefined, clock = () => performance.now()) {
   const wall = Date.now();
   const started = clock();
+  let metricDb = db;
+  if (metricDb === undefined) {
+    try { metricDb = getMetricsDb(); }
+    catch (error) { metricDb = null; logNonFatal("metrics disabled", error); }
+  }
   let permitAt = null;
   let firstAt = null;
   let attempts = 0;
@@ -177,19 +204,21 @@ export function createMetricTracker(meta, db = getMetricsDb(), clock = () => per
     finalize(status, errorKind = null) {
       if (finished) return;
       finished = true;
-      const ended = clock();
-      db.query(`INSERT OR IGNORE INTO request_metrics
-        (trace_id,created_at_ms,endpoint,model,scope,streaming,status,attempts,retries,
-         queue_ms,upstream_headers_ms,first_byte_ms,stream_ms,e2e_ms,error_kind)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-          state.traceId, wall, state.endpoint, state.model, state.scope,
-          state.streaming ? 1 : 0, status, attempts, Math.max(0, attempts - 1),
-          permitAt === null ? null : permitAt - started,
-          permitAt === null || state.headersAt === undefined ? null : state.headersAt - permitAt,
-          firstAt === null ? null : firstAt - started,
-          firstAt === null ? null : ended - firstAt,
-          ended - started, errorKind,
-        );
+      try {
+        const ended = clock();
+        metricDb?.query(`INSERT OR IGNORE INTO request_metrics
+          (trace_id,created_at_ms,endpoint,model,scope,streaming,status,attempts,retries,
+           queue_ms,upstream_headers_ms,first_byte_ms,stream_ms,e2e_ms,error_kind)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+            state.traceId, wall, state.endpoint, state.model, state.scope,
+            state.streaming ? 1 : 0, status, attempts, Math.max(0, attempts - 1),
+            permitAt === null ? null : permitAt - started,
+            permitAt === null || state.headersAt === undefined ? null : state.headersAt - permitAt,
+            firstAt === null ? null : firstAt - started,
+            firstAt === null ? null : ended - firstAt,
+            ended - started, errorKind,
+          );
+      } catch (error) { logNonFatal("metrics write failed", error); }
     },
     headers() { state.headersAt = clock(); },
   };
@@ -316,6 +345,103 @@ const PING_FRAME = new TextEncoder().encode(": copilot-shim keepalive\n\n");
 
 const log = (...a) => console.log(new Date().toISOString(), "[shim]", ...a);
 const abortError = () => new DOMException("client aborted", "AbortError");
+
+const fastRouting = {
+  state: "cold",
+  mappings: {},
+  refreshedAtMs: null,
+  checkedAtMs: 0,
+  error: null,
+  pending: null,
+};
+const fastFallbackWarnings = new Set();
+
+function responsesCapable(model) {
+  if (!model || typeof model !== "object") return false;
+  if ((model.policy?.state ?? "enabled") === "disabled") return false;
+  if (model.model_picker_enabled === false) return false;
+  if ((model.capabilities?.type ?? "chat") === "embeddings") return false;
+  const endpoints = model.supported_endpoints;
+  return !Array.isArray(endpoints)
+    || endpoints.includes("/responses")
+    || endpoints.includes("ws:/responses");
+}
+
+// GitHub exposes fast inference as a distinct model id while Codex expresses
+// the same request as service_tier=fast. Derive pairs from the live catalog so
+// this bridge follows entitlement/policy changes instead of pinning one model.
+export function buildFastModelMappings(catalog) {
+  const models = Array.isArray(catalog?.data) ? catalog.data.filter(responsesCapable) : [];
+  const byId = new Map(models
+    .filter((model) => typeof model.id === "string" && model.id)
+    .map((model) => [model.id, model]));
+  const mappings = {};
+  for (const fast of models) {
+    if (typeof fast.id !== "string" || !fast.id.endsWith("-fast")) continue;
+    const standardId = fast.id.slice(0, -"-fast".length);
+    const standard = byId.get(standardId);
+    if (!standard) continue;
+    mappings[standardId] = fast.id;
+    if (typeof standard.claude_model_id === "string"
+        && typeof fast.claude_model_id === "string") {
+      mappings[standard.claude_model_id] = fast.claude_model_id;
+    }
+  }
+  return Object.fromEntries(Object.entries(mappings).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function fastRoutingSnapshot() {
+  return {
+    state: fastRouting.state,
+    mappings: { ...fastRouting.mappings },
+    refreshed_at_ms: fastRouting.refreshedAtMs,
+    checked_at_ms: fastRouting.checkedAtMs || null,
+    ttl_ms: FAST_ROUTING_TTL_MS,
+    error: fastRouting.error,
+  };
+}
+
+function fastRoutingNeedsRefresh(now = Date.now()) {
+  return !fastRouting.checkedAtMs || now - fastRouting.checkedAtMs >= FAST_ROUTING_TTL_MS;
+}
+
+async function fetchFastRoutingCatalog() {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), FAST_ROUTING_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${UPSTREAM}/v1/models`, {
+      headers: { "user-agent": "copilot-throttle-shim/fast-routing" },
+      signal: ctl.signal,
+    });
+    if (!response.ok) throw new Error(`catalog returned HTTP ${response.status}`);
+    return await response.json();
+  } finally { clearTimeout(timer); }
+}
+
+async function refreshFastRouting(force = false) {
+  if (fastRouting.pending) return fastRouting.pending;
+  if (!force && !fastRoutingNeedsRefresh()) return fastRoutingSnapshot();
+  fastRouting.state = Object.keys(fastRouting.mappings).length ? "refreshing" : "loading";
+  fastRouting.pending = (async () => {
+    fastRouting.checkedAtMs = Date.now();
+    try {
+      const mappings = buildFastModelMappings(await fetchFastRoutingCatalog());
+      fastRouting.mappings = mappings;
+      fastRouting.refreshedAtMs = Date.now();
+      fastRouting.error = null;
+      fastRouting.state = Object.keys(mappings).length ? "ready" : "unavailable";
+      fastFallbackWarnings.clear();
+      log(`fast routing ${fastRouting.state}: ${Object.entries(mappings)
+        .map(([standard, fast]) => `${standard}->${fast}`).join(", ") || "no eligible sibling"}`);
+    } catch (error) {
+      fastRouting.error = errorSummary(error);
+      fastRouting.state = Object.keys(fastRouting.mappings).length ? "stale" : "error";
+      logNonFatal(`fast routing ${fastRouting.state}`, error);
+    }
+    return fastRoutingSnapshot();
+  })().finally(() => { fastRouting.pending = null; });
+  return fastRouting.pending;
+}
 
 const validLimit = (value, name) => {
   if (!Number.isInteger(value) || value < 1 || value > HARD_MAX_CONCURRENCY) {
@@ -475,11 +601,10 @@ export async function closeResponse(resp, reason) {
   const deadline = timeoutToken(ERROR_BODY_TIMEOUT_MS);
   try {
     await Promise.race([
-      resp.body.cancel(reason).catch(() => {}),
+      settleCancellation(resp.body, reason, "response body cancellation failed"),
       deadline.promise,
     ]);
-  } catch {}
-  finally { deadline.cancel(); }
+  } finally { deadline.cancel(); }
 }
 
 // ---- adaptive semaphore (canceled waiters are removed eagerly) ----------------
@@ -599,22 +724,66 @@ export function normalizeResponsesToolDescriptions(payload) {
   return { changed, patched };
 }
 
-export function normalizeRequestBody(pathname, bodyBuf, contentEncoding = "") {
+export function applyFastModelRouting(payload, mappings = {}) {
+  const tier = typeof payload?.service_tier === "string"
+    ? payload.service_tier.trim().toLowerCase() : null;
+  const requested = tier === "fast" || tier === "priority" || tier === "ultrafast";
+  const model = typeof payload?.model === "string" ? payload.model : null;
+  const targets = new Set(Object.values(mappings));
+  const alreadyFast = model !== null && targets.has(model);
+  const target = model === null ? null : mappings[model] ?? null;
+  let changed = 0;
+  let routed = false;
+  let fallback = false;
+
+  if (requested) {
+    if ((tier === "fast" || tier === "priority") && target) {
+      payload.model = target;
+      changed++;
+      routed = true;
+    } else if (!alreadyFast) {
+      fallback = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "service_tier")) {
+      delete payload.service_tier;
+      changed++;
+    }
+  }
+  return { requested, requestedTier: tier, model, target, routed, alreadyFast, fallback, changed };
+}
+
+export function normalizeRequestBody(pathname, bodyBuf, contentEncoding = "", fastMappings = {}) {
   if (pathname !== "/responses" && pathname !== "/v1/responses") {
-    return { body: bodyBuf, inspectBody: bodyBuf, changed: 0, patched: [], parseError: null, decoded: false };
+    return {
+      body: bodyBuf, inspectBody: bodyBuf, changed: 0, toolDescriptionsChanged: 0,
+      patched: [], routing: { requested: false }, parseError: null, decoded: false,
+    };
   }
   try {
     const encoding = contentEncoding.trim().toLowerCase();
     const decodedBody = encoding === "zstd" ? Bun.zstdDecompressSync(new Uint8Array(bodyBuf)) : bodyBuf;
     const payload = JSON.parse(new TextDecoder().decode(decodedBody));
-    const result = normalizeResponsesToolDescriptions(payload);
-    if (result.changed === 0) return { body: bodyBuf, inspectBody: decodedBody, ...result, parseError: null, decoded: false };
+    const tools = normalizeResponsesToolDescriptions(payload);
+    const routing = applyFastModelRouting(payload, fastMappings);
+    const changed = tools.changed + routing.changed;
+    if (changed === 0) {
+      return {
+        body: bodyBuf, inspectBody: decodedBody, changed, toolDescriptionsChanged: tools.changed,
+        patched: tools.patched, routing, parseError: null, decoded: false,
+      };
+    }
     const body = JSON.stringify(payload);
-    return { body, inspectBody: body, ...result, parseError: null, decoded: encoding === "zstd" };
+    return {
+      body, inspectBody: body, changed, toolDescriptionsChanged: tools.changed,
+      patched: tools.patched, routing, parseError: null, decoded: encoding === "zstd",
+    };
   } catch (error) {
     // Preserve malformed/non-JSON requests verbatim; the upstream remains the
     // authority for their validation and error response.
-    return { body: bodyBuf, inspectBody: bodyBuf, changed: 0, patched: [], parseError: String(error), decoded: false };
+    return {
+      body: bodyBuf, inspectBody: bodyBuf, changed: 0, toolDescriptionsChanged: 0,
+      patched: [], routing: { requested: false }, parseError: String(error), decoded: false,
+    };
   }
 }
 
@@ -742,7 +911,7 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
   if (STALL_MS && state.idleMs >= STALL_MS) {
     const secs = Math.round(state.idleMs / 1000);
     log(`${label} stalled mid-stream: no upstream bytes for ${secs}s; failing the response`);
-    try { state.reader.cancel(new Error("stalled")).catch(() => {}); } catch {}
+    void settleCancellation(state.reader, new Error("stalled"), "stalled reader cancellation failed");
     releaseOnce();
     tracker?.finalize(state.status, "upstream_stall");
     controller.error(new Error(`shim: upstream stalled for ${secs}s`));
@@ -780,7 +949,7 @@ function streamThrough(resp, releaseOnce, label = "stream", tracker = null) {
     cancel(reason) {
       abortResponse(resp);
       releaseOnce(); tracker?.finalize(499, "client_cancel");
-      try { state.reader.cancel(reason); } catch {}
+      void settleCancellation(state.reader, reason, "downstream reader cancellation failed");
     },
   });
   return new Response(stream, { status: resp.status, headers });
@@ -819,7 +988,7 @@ async function boundedErrorDetail(resp, err, signal) {
     deadline.cancel();
     signal?.removeEventListener("abort", onAbort);
     abortResponse(resp);
-    try { reader.cancel().catch(() => {}); } catch {}
+    await settleCancellation(reader, undefined, "error reader cancellation failed");
   }
   if (!size) return prefix;
   const bytes = new Uint8Array(size);
@@ -939,8 +1108,8 @@ function keepaliveThenForward(pipeline, releaseOnce, label, tracker, pathname, s
       abortResponse(state.response);
       releaseOnce();
       tracker?.finalize(499, "client_cancel");
-      try { state.reader?.cancel(reason); } catch {}
-      pipeline.then((resp) => closeResponse(resp, reason)).catch(() => {});
+      void settleCancellation(state.reader, reason, "delayed reader cancellation failed");
+      pipeline.then((resp) => closeResponse(resp, reason)).catch((error) => logNonFatal("pipeline cancellation failed", error));
     },
   });
 }
@@ -957,7 +1126,18 @@ export function startServer() {
     const method = req.method;
 
     if (method === "GET" && url.pathname === "/_shim/health") {
-      return jsonResponse({ ok: true, ...limiterStatus() });
+      const routing = fastRoutingSnapshot();
+      return jsonResponse({
+        ok: true,
+        ...limiterStatus(),
+        fast_routing: { state: routing.state, mappings: Object.keys(routing.mappings).length },
+      });
+    }
+    if (method === "GET" && url.pathname === "/_shim/fast-routing") {
+      if (!isLoopbackRequest(req, bunServer)) {
+        return jsonResponse({ error: "loopback request required" }, 403);
+      }
+      return jsonResponse(await refreshFastRouting(url.searchParams.get("refresh") === "1"));
     }
     if (method === "GET" && url.pathname === "/_shim/config") {
       return jsonResponse(limiterStatus());
@@ -1001,14 +1181,39 @@ export function startServer() {
     }
 
     // Mutating requests (POST /v1/messages …): buffer body so we can resend on
-    // retry, then throttle + retry.
-    const bodyBuf = await req.arrayBuffer();
-    const normalized = normalizeRequestBody(url.pathname, bodyBuf, req.headers.get("content-encoding") ?? "");
+    // retry, then throttle + retry. A peer may disappear while Bun is still
+    // assembling a large Codex tools payload; contain that handler rejection.
+    let bodyBuf;
+    try { bodyBuf = await req.arrayBuffer(); }
+    catch (error) {
+      const aborted = req.signal?.aborted;
+      log(`${method} ${url.pathname} request body ${aborted ? "aborted" : "read failed"}: ${errorSummary(error)}`);
+      return new Response(aborted ? "client aborted" : "shim: request body read failed", { status: aborted ? 499 : 400 });
+    }
+    let routingSnapshot = fastRoutingSnapshot();
+    let normalized = normalizeRequestBody(
+      url.pathname, bodyBuf, req.headers.get("content-encoding") ?? "", routingSnapshot.mappings,
+    );
+    if (normalized.routing.requested && (fastRouting.pending || fastRoutingNeedsRefresh())) {
+      routingSnapshot = await refreshFastRouting();
+      normalized = normalizeRequestBody(
+        url.pathname, bodyBuf, req.headers.get("content-encoding") ?? "", routingSnapshot.mappings,
+      );
+    }
     if (normalized.parseError) {
       log(`${method} ${url.pathname} could not inspect JSON (${bodyBuf.byteLength} bytes, content-type=${req.headers.get("content-type") ?? "unset"}, content-encoding=${req.headers.get("content-encoding") ?? "unset"}): ${normalized.parseError}`);
     }
-    if (normalized.changed > 0) {
-      log(`${method} ${url.pathname} filled ${normalized.changed} empty tool description(s): ${normalized.patched.join(", ")}`);
+    if (normalized.toolDescriptionsChanged > 0) {
+      log(`${method} ${url.pathname} filled ${normalized.toolDescriptionsChanged} empty tool description(s): ${normalized.patched.join(", ")}`);
+    }
+    if (normalized.routing.routed) {
+      log(`${method} ${url.pathname} fast route: ${normalized.routing.model} -> ${normalized.routing.target} (${normalized.routing.requestedTier})`);
+    } else if (normalized.routing.fallback) {
+      const warningKey = `${normalized.routing.model ?? "unknown"}:${normalized.routing.requestedTier}:${routingSnapshot.checked_at_ms ?? 0}`;
+      if (!fastFallbackWarnings.has(warningKey)) {
+        fastFallbackWarnings.add(warningKey);
+        log(`fast requested for ${normalized.routing.model ?? "unknown model"} but no eligible sibling is available; using the standard model`);
+      }
     }
     const traceId = req.headers.get("x-trace-id") || crypto.randomUUID();
     const meta = requestMetadata(url.pathname, normalized.inspectBody, req.headers);
@@ -1139,6 +1344,7 @@ export function startServer() {
     },
   });
 
+  void refreshFastRouting(true);
   log(`listening on :${server.port} -> ${UPSTREAM} (limit=${limiter.limit}, range=${STARTUP_MIN}..${STARTUP_MAX}, retries=${RETRIES}, backoff=${BACKOFF_MS}ms, ping=${PING_MS}ms after ${PING_AFTER_MS}ms, stall=${STALL_MS}ms)`);
   return server;
 }
