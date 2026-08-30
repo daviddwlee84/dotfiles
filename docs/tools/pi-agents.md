@@ -4,6 +4,10 @@
 Git-managed [`pi-agents`](https://github.com/daviddwlee84/pi-agents) combo
 manager. The three commands have separate owners so upgrades stay predictable:
 
+The combo repository is private. On a new machine, ensure GitHub HTTPS
+credentials are available before `chezmoi apply` (for example, `gh auth login`
+then `gh auth setup-git`).
+
 | Command | Installed by | Location | Upgrade path |
 |---|---|---|---|
 | `pi` | npm package `@earendil-works/pi-coding-agent` | `~/.local/bin/pi` | `just upgrade-agents` |

@@ -4,6 +4,9 @@
 [`pi-agents`](https://github.com/daviddwlee84/pi-agents) combo manager。三個
 command 各有明確 owner，升級時不會混在一起：
 
+combo repo 是 private。新機器執行 `chezmoi apply` 前，請先準備 GitHub HTTPS
+credential（例如 `gh auth login` 後再執行 `gh auth setup-git`）。
+
 | Command | 安裝方式 | 位置 | 升級路徑 |
 |---|---|---|---|
 | `pi` | npm 套件 `@earendil-works/pi-coding-agent` | `~/.local/bin/pi` | `just upgrade-agents` |
