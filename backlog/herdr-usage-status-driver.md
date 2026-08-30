@@ -37,7 +37,7 @@ herdr pane report-metadata <pane_id> --source <id> --token usage="Claude 62% •
   1. Reuse **CodexBar's own cached data** — CodexBar reads `~/.codex` (rate_limits) and `~/.claude`; if it caches to `~/.config/codexbar/` or similar, read that instead of re-deriving. (Verify what CodexBar persists; it's a mix of local files + OAuth/cookies/Keychain.)
   2. Codex: read `~/.codex/sessions` rate_limits directly (same as the plugin).
   3. Claude: `~/.claude` usage files if present; else scrape the Claude CLI. Hardest part; may not be cleanly file-derivable.
-  - Wire the loop as a herdr `[[keys.command]]` `type="shell"` (detached) entry in `dot_config/herdr/create_config.toml`, or a pueue/launchd timer. Keep the per-pane `--source` stable so labels update in place.
+  - Wire the loop as a herdr `[[keys.command]]` `type="shell"` (detached) entry in `.chezmoitemplates/herdr/config.toml`, or a pueue/launchd timer. Keep the per-pane `--source` stable so labels update in place.
 
 ## Open questions
 

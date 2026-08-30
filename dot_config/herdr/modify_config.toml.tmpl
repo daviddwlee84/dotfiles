@@ -1,13 +1,13 @@
 #!/bin/sh
 # chezmoi modify_ script: overlay a managed herdr config onto ~/.config/herdr/config.toml.
 #
-# Why: herdr can rewrite this file at runtime (onboarding flag, in-app settings
-# popups, [session]/[remote]/[update] state), so tracking it as a plain managed
-# file would clobber that writeback and re-trigger onboarding. It was previously
-# `create_` (seed-once), but that meant repo edits never reached an
-# already-seeded host without a manual refresh. This modify_ overlay enforces
-# our managed tables ([theme], [ui], [terminal], [keys]) on every `chezmoi
-# apply` while preserving every other top-level key herdr writes back.
+# Why: Herdr is a foreign writer for this file. Current releases persist
+# onboarding, update-channel, theme/UI/sound/toast/pane-label/agent-sort, and
+# key-reset changes. Tracking the file as plain managed content would create two
+# writers. It was previously `create_` (seed-once), but that also prevented later
+# repo edits from reaching an already-seeded host. This preventive `modify_`
+# overlay enforces our managed tables ([theme], [ui], [terminal], [keys]) on
+# every `chezmoi apply` while preserving every other top-level key.
 #
 # How: chezmoi pipes the current target file into stdin; this script prints the
 # new contents on stdout.
@@ -16,10 +16,11 @@
 #   - Base = the managed template (.chezmoitemplates/herdr/config.toml), which
 #     carries the comments + the tmux-parity rationale.
 #   - For every TOP-LEVEL key in the live file NOT in {theme, ui, terminal,
-#     keys}, copy it into the base (preserves onboarding, [session], [remote],
-#     [update], [experimental], and any future herdr writeback).
+#     keys}, copy it into the base. `onboarding` and [update] include current
+#     Herdr writes; [session], [remote], [experimental], and unknown sections are
+#     deliberately preserved as live/user-owned configuration too.
 #   - Managed tables are enforced wholesale (template wins) — this is a managed
-#     dotfile; in-app theme/label overrides are intentionally re-asserted.
+#     dotfile; in-app theme/UI/key changes are intentionally re-asserted.
 #
 # Why tomlkit (not codex's inline emitter): herdr's config has an
 # array-of-tables ([[keys.command]]) and comments we want to keep; stdlib
@@ -101,7 +102,7 @@ live_text = os.environ.get("HERDR_LIVE", "").strip()
 doc = tomlkit.parse(template_text)  # base, with comments intact
 live = tomllib.loads(live_text) if live_text else {}
 
-# Pull through every top-level key herdr owns at runtime that we don't manage.
+# Pull through every unmanaged top-level key, whether Herdr- or user-owned.
 for key, value in live.items():
     if key in MANAGED or key in doc:
         continue

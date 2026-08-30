@@ -7,8 +7,10 @@
 #
 # THIS FILE IS THE MANAGED BODY of a chezmoi modify_ overlay
 # (dot_config/herdr/modify_config.toml.tmpl). The overlay enforces the tables
-# below on every `chezmoi apply` and preserves any keys herdr writes back at
-# runtime (onboarding / [session] / [remote] / [update] / [experimental]).
+# below on every `chezmoi apply`. Herdr currently writes onboarding, update,
+# theme/UI/sound/toast/pane-label/agent-sort, and key-reset changes; the overlay
+# also preserves unrelated live/user-owned tables such as [session], [remote],
+# and [experimental], whether or not Herdr writes them today.
 #
 # Schema: https://herdr.dev/docs/configuration/
 # Validate after editing: herdr server reload-config
@@ -112,19 +114,30 @@ navigate_workspace_up = ["k", "up"]
 # pane's cwd and gets $HERDR_SOCKET_PATH / $HERDR_ACTIVE_PANE_ID /
 # $HERDR_ACTIVE_PANE_CWD in its environment.
 
+# Edit the active runtime config directly, validate that exact file, then reload
+# this session's server. No chezmoi command runs. Lowercase e is distinct from
+# prefix+E below and from built-in prefix+e.
+[[keys.command]]
+key = "prefix+alt+e"
+type = "pane"
+command = "~/.config/herdr/edit-config.sh"
+description = "edit runtime config, validate, and reload"
+
 [[keys.command]]
 key = "prefix+d"
 type = "pane"
 command = "dev"
 description = "dev repository/task dashboard (popup pane)"
 
+# Keep lazygit as a temporary pane rather than a near-full popup: popups are
+# session-modal, so leaving lazygit open would block switching tabs/workspaces.
 [[keys.command]]
 key = "prefix+G"
 type = "pane"
 command = "lazygit"
-description = "lazygit (popup pane)"
+description = "lazygit (temporary pane)"
 
-# btop / nvtop monitors as floating command panes (same mechanism as lazygit —
+# btop / nvtop monitors as temporary command panes (same mechanism as prefix+G —
 # a real PTY that closes when you quit the tool). Quick Actions can't host these:
 # herdr-plus runs an action via `sh -c` with no PTY/stdin, so an interactive TUI
 # either exits immediately (btop) or can't receive function keys like F10 (nvtop).
@@ -146,11 +159,10 @@ description = "nvtop GPU monitor (popup pane)"
 # floats ABOVE the tiled layout instead, so nothing reflows and quitting the
 # shell puts you back exactly where you were.
 #
-# The dev/lazygit/btop/nvtop bindings above deliberately STAY type = "pane": you
-# quit those immediately (`q`) and return, so the temporary split costs nothing
-# and a modal popup would buy nothing. Popups are session-modal — you cannot
-# interact with another pane while one is open — which is the trade-off that
-# decides this per binding rather than globally.
+# The dev/lazygit/btop/nvtop bindings deliberately STAY type = "pane": a
+# near-full lazygit popup was tested and removed because popups are session-modal
+# and block switching to another tab/workspace until closed. Popup remains the
+# right primitive for short-lived modal tasks such as the scratch shell below.
 [[keys.command]]
 key = "prefix+`"
 type = "popup"
@@ -160,14 +172,14 @@ height = "80%"
 description = "scratch shell (popup)"
 
 # --- Run an arbitrary command in a floating popup (prefix+E) ---
-# The generalisation of prefix+G: instead of a hardcoded tool, fzf-pick or type
-# any command, run it in the FOCUSED PANE'S cwd, and the popup closes itself when
-# the command exits. Helper: ~/.config/herdr/run-command.sh.
+# The generalisation of the hardcoded prefix+G lazygit launcher: fzf-pick or type any
+# command, run it in the FOCUSED PANE'S cwd, and the popup closes itself when the
+# command exits. Helper: ~/.config/herdr/run-command.sh.
 #
 # type = "popup" (herdr >= 0.7.4) is the tmux `display-popup -E` analog: it floats
 # ABOVE the tiled layout instead of splitting it, so nothing reflows and you land
-# back exactly where you were. That is why this one is NOT type = "pane" like the
-# lazygit/btop/scratch bindings above.
+# back exactly where you were. The same popup primitive powers scratch and the
+# Alt+g lazygit trial; prefix+G/btop/nvtop retain their temporary-pane forms.
 #
 # Deliberately not a herdr-plus Quick Action (prefix+y): Quick Actions run through
 # `sh -c` with no PTY/stdin (the same reason btop/nvtop are command panes) and

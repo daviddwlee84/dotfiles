@@ -27,7 +27,7 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
 > **Install is version-blind; upgrades are yours to run.** The Linux ansible task gates on `herdr --version` returning non-zero — *"is it installed at all"*, not *"is it current"* — so a fresh box gets whatever is latest that day and `chezmoi apply` never touches it again. This is the repo's [install-vs-upgrade split](../this_repo/upgrades.md) working as designed, but herdr drifts faster than most because its config can outrun the binary (a `[[keys.command]]` using `type = "popup"`, added in 0.7.4, makes an older herdr reject **the entire keys block** — `reload-config` reports `status: "partial"` + `keeping current keys settings`, and only that one diagnostic line tells you).
 
 > **The app version and integration schema version are separate.** The current binary is **Herdr 0.8.0**; `current (v7)` / `outdated (v6 < v7)` from `herdr integration status` refers to the Codex integration schema, not a downgraded Herdr binary. Reinstall stale integrations with `herdr integration install <agent>`. Herdr owns the generated scripts (`~/.codex/herdr-agent-state.sh`, etc.); Codex's `~/.codex/hooks.json` is a hook-aware chezmoi `modify_` target that preserves Herdr's entry beside peon/CodeIsland hooks. `just upgrade-herdr` reports stale integrations but deliberately does not reinstall them automatically.
-- **Config**: `~/.config/herdr/config.toml` — chezmoi **`modify_` overlay** (`dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`). The overlay enforces our managed tables on every `chezmoi apply` while preserving whatever herdr writes back at runtime (see [Config management](#config-management-why-modify_)).
+- **Config**: `~/.config/herdr/config.toml` — chezmoi **`modify_` overlay** (`dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`). The overlay enforces our managed tables on every `chezmoi apply` while preserving all other live/user-owned top-level configuration, including Herdr's current runtime writes (see [Config management](#config-management-why-modify_)).
 
 > **Why a package-managed herdr strands its own server — the reason macOS left Homebrew.** herdr's socket API is protocol-versioned, and a package-manager upgrade cannot restart the server, so after `brew upgrade herdr` every CLI call (and therefore every `tv herdr-*` channel, `hvibe`/`hcode`, and `[[keys.command]]` helper) fails `protocol_mismatch` until the server restarts — which kills all pane processes. `herdr update --handoff`, the live pane-preserving path, is **disabled on Homebrew/mise/Nix installs**, so a brew-installed herdr has no way to avoid that restart. This repo now installs the self-managed release binary on macOS too, which is what closes the gap; the pitfall below is kept because it still describes what happens on any box that has not been migrated (and `just upgrade-herdr` skips with instructions when it detects a package-managed install). Check with `herdr status` (`compatible:` / `restart_needed:`), not `herdr --version`. Full recovery matrix: [`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md).
 
@@ -126,7 +126,7 @@ description = "new tab at the workspace (space) root dir"
 | Agent status 🤖/💬/✅ (workmux, 6 files) | **Native** agent-state rollups in sidebar | Skipped — native (workmux untouched for tmux). Panel ordered as an **attention queue**, not grouped by space: `ui.agent_panel_sort = "priority"` (herdr's default is `"spaces"`) |
 | `sesh` fuzzy switch + `tmuxp` layouts | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects templates |
 | `tv` channel popups (`prefix+T/U/a`) | **Custom command panes** (`[[keys.command]] type="pane"`) | Key bindings + 2 herdr-aware channels |
-| dev / lazygit / scratch popups | **Custom command panes** | Key bindings |
+| dev / lazygit / scratch launchers | **Custom command panes + popups** | Full-screen TUIs such as lazygit stay temporary panes; short-lived modal tasks use popups |
 | URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` scans scrollback |
 | File-path picker (`prefix+p`; extrakto `prefix+Tab` on tmux) | **Custom command pane + helper** | `prefix+p` → `path-pick.sh` — two-tier (exists-under-cwd first) → `x copy` |
 | Neovim clipboard across local/remote attaches | OSC 52 **write only**; clipboard queries unsupported | yanks reach the attached client; normal `p` uses Neovim's register; inbound external text uses terminal paste |
@@ -161,9 +161,10 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + ?` | keybinds help overlay — lists every active binding with labels (herdr's native which-key; manually invoked, not an auto-timeout hint) | built-in default |
 | `prefix + ,` | rename tab | rebound (tmux muscle memory) |
 | `prefix + shift + r` | reload config (`prefix + r` stays resize mode) | rebound |
+| `prefix + Alt + e` | edit only the active runtime config, validate it, and reload (never invokes chezmoi) | command pane |
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
-| `prefix + G` | lazygit | command pane |
+| `prefix + G` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
 | `prefix + U` | `tv tools` (CLI launcher) | command pane |
@@ -176,7 +177,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + m` | toggle **review-pending** flag (⭐) on the current pane | command pane |
 | `prefix + i` | `tv herdr-review` — review-pending **inbox** (flagged panes) | command pane |
 | `` prefix + p `` | **copy a file path** from the pane — two-tier fzf (paths that exist under the pane cwd on top), copies the resolved absolute path (`x copy`) | command pane |
-| `` prefix + ` `` | scratch shell | command pane |
+| `` prefix + ` `` | scratch shell | command popup |
 | `prefix + E` | **run any command** in the pane's cwd — fzf-pick from history or type it; the popup closes itself when the command exits ([details](#run-any-command)) | command **popup** |
 | `prefix + O` | herdr-plus **Projects** (layout launcher) | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
@@ -288,18 +289,31 @@ The integration scripts are **not** vendored into the repo, so they do **not** r
 
 ### Config management (why `modify_`)
 
-herdr can rewrite `~/.config/herdr/config.toml` at runtime — finishing onboarding prepends `onboarding = false`, and the in-app *settings* popups (theme / sound / toasts / pane labels) persist there on *apply*. It edits in place and keeps existing comments, but it owns the file at runtime.
+Herdr is a foreign writer for `~/.config/herdr/config.toml`. Upstream v0.8.2 and current `master` persist onboarding, theme/UI, sound, toast, pane-label and agent-sort settings, the update channel, and key resets. Those edits preserve unrelated lines and unknown sections, but finish with an unlocked whole-file write; external edits still need an explicit reload.
 
-This file was originally seeded once with the `create_` prefix so `chezmoi apply` wouldn't clobber that writeback. The cost: **repo edits never reached an already-seeded machine** — split-key rebinds and comment fixes made in the source silently never arrived without a manual `cp … source-path` refresh. That is the real reason a host could feel "out of sync" while `chezmoi diff` showed clean (the diff was clean *because* `create_` never re-touches the file). Note this is independent of hosts: `chezmoi diff` of the source against each host's live file can be byte-identical yet a repo edit still won't land until you refresh.
+The file was originally seeded once with `create_`. During the 2026-07 transition, the checked source and live target were measured byte-identical: there was **no observed onboarding-clobber incident**. The move to `modify_` was a preventive dual-writer correction made while fixing split-key and cwd behavior. `create_` avoided overwriting Herdr's writes, but also meant later repo edits would never reach an already-seeded host.
 
 It is now a **`modify_` overlay** — `dot_config/herdr/modify_config.toml.tmpl`, a small script that:
 
-- uses the managed body in `.chezmoitemplates/herdr/config.toml` as the base (comments + tmux-parity rationale), enforcing the `[theme]` / `[ui]` / `[terminal]` / `[keys]` tables on every apply, and
-- **pulls through every other top-level key** the live file has (`onboarding`, `[session]`, `[remote]`, `[update]`, `[experimental]`, …) so herdr's runtime writeback survives.
+- uses `.chezmoitemplates/herdr/config.toml` as the managed base and enforces `[theme]`, `[ui]`, `[terminal]`, and `[keys]` wholesale on every apply; and
+- **pulls through every other live top-level key**. `onboarding` and `update.channel` are genuine current Herdr writes; other `[update]` subkeys, `[session]`, `[remote]`, `[experimental]`, unknown sections, and similar values are deliberately preserved as live/user-owned configuration, not mislabeled as current writeback.
 
 TOML has no `jq`, so the merge runs in Python via `uv run --with tomlkit` (tomlkit round-trips comments **and** the `[[keys.command]]` array-of-tables; stdlib `tomllib` is read-only and the codex `modify_` emitter can't emit AoT). It degrades to system `python3`, then to emitting the raw managed template, so a fresh host without Python still gets a full config. Second TOML-overlay precedent alongside `~/.codex/config.toml` (`dot_codex/modify_config.toml.tmpl`).
 
-To change herdr's managed config, edit `.chezmoitemplates/herdr/config.toml` and `chezmoi apply` — it now reaches every host. Validate with `herdr server reload-config` (reports keybind collisions in its `diagnostics`; an empty `diagnostics` array + `"status":"applied"` means the config — including array key bindings — parsed clean).
+A later `chezmoi apply` intentionally reasserts the canonical `[theme]`, `[ui]`, `[terminal]`, and `[keys]` tables. Persisting one runtime experiment is therefore a **separate, manual, selective edit** of `.chezmoitemplates/herdr/config.toml`. Never run `chezmoi add` or `chezmoi re-add` for this `modify_` target: either can replace/bypass the merger or import runtime-owned state into source.
+
+### Edit runtime config, validate, and reload (`prefix + Alt + e`)
+
+`prefix + Alt + e` opens a temporary command pane running `~/.config/herdr/edit-config.sh`. It edits **only the active runtime target**: a non-empty `$HERDR_CONFIG_PATH`, otherwise `~/.config/herdr/config.toml`. It never invokes chezmoi. Lowercase `e` is distinct from the `prefix + E` command popup and Herdr's built-in `prefix + e` scrollback editor.
+
+The guarded operation is ordered:
+
+1. Require an existing regular target (Unix symlinks are rejected), resolve one blocking `$EDITOR` executable/wrapper (`vi` fallback), and create a unique same-directory `cp -p` backup before opening the editor.
+2. Edit the exact target, then validate that same path with `HERDR_CONFIG_PATH="$target" herdr config check`.
+3. On editor or validation failure, save the rejected bytes as a restrictive `config.toml.invalid-*` sibling and atomically restore the previous valid backup with a same-filesystem move. No reload occurs.
+4. After successful validation, call `herdr server reload-config`; inherited `$HERDR_SOCKET_PATH` keeps the reload on the current session. Success removes the backup.
+
+Preflight or backup failure leaves the target untouched and never opens the editor. A reload failure does **not** discard a valid edit: both the edited target and original backup remain. A cleanup-only failure likewise keeps/reports the backup without rollback. Rollback failure reports and retains every recoverable target/candidate/backup path. Failures remain visible in an interactive command pane until Enter; non-interactive runs do not wait.
 
 ## Persistence & restore (accidental close)
 
@@ -375,9 +389,9 @@ Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review
 
 ## Run any command in a popup (`prefix + E`) {#run-any-command}
 
-`prefix + G` proves the shape — a transient pane that runs something and vanishes when it exits — but its command is hardcoded. `prefix + E` is the generalisation: **fzf-pick a command from shell history (or just type a new one), it runs in the focused pane's cwd, and the popup closes itself on exit.** Helper: `~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh).
+`prefix + E` provides the popup form where it fits: **fzf-pick a command from shell history (or type a new one), run it in the focused pane's cwd, and close the popup when it exits.** Helper: `~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh).
 
-**Why `type = "popup"` and not the alternatives** — this is the only binding here that is not a command *pane*:
+**Why `type = "popup"` and not the alternatives** — `prefix+E` deliberately floats instead of opening another command pane:
 
 | Approach | Problem |
 |---|---|
@@ -387,7 +401,7 @@ Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review
 
 `type = "popup"` requires **herdr ≥ 0.7.4** (added in #1125, with `width`/`height` in cells or percentages). It is the true `tmux display-popup -E` analog.
 
-`prefix + `` ` `` (scratch shell) is a popup too, for the same reason — as a command pane it took over the layout and read as a *zoom* of the current window rather than a scratch space. `prefix+d` / `prefix+G` / `prefix+M` / `prefix+N` (dev / lazygit / btop / nvtop) deliberately stay `type = "pane"`: you quit those immediately with `q`, so the temporary split costs nothing, and popups are **session-modal** — you cannot touch another pane while one is open. That modality is why this is decided per binding rather than globally.
+`prefix + `` ` `` (scratch shell) is a popup too, for the same reason — as a command pane it took over the layout and read as a *zoom* of the current window rather than a scratch space. `prefix+d` / `prefix+G` / `prefix+M` / `prefix+N` (dev / lazygit / btop / nvtop) stay `type = "pane"`. A near-full lazygit popup was tested and removed: popups are **session-modal**, so leaving one open blocks switching to another tab/workspace. That trade-off is acceptable for short-lived modal tasks, not a full-screen TUI you may leave running.
 
 **It cannot be a herdr-plus Quick Action** (`prefix + y`), which is the intuitive place to look. Two blockers: Quick Actions run through `sh -c` with **no PTY/stdin** — the same reason `btop`/`nvtop` are command panes rather than Quick Actions — and every action is a fixed `command = "…"` string with no free-text field.
 

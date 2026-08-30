@@ -31,7 +31,7 @@
 > **安裝不看版本，升級要自己跑。** Linux 的 ansible task 是用 `herdr --version` 的 rc 當條件 —— 判斷的是「**有沒有裝**」而不是「**是不是最新**」—— 所以新機器拿到的是當天的 latest，之後 `chezmoi apply` 再也不會碰它。這是本 repo [install-vs-upgrade 分離](../this_repo/upgrades.md)的設計，但 herdr 比多數工具更容易出事，因為它的 config 會跑在 binary 前面（`[[keys.command]]` 用了 0.7.4 才有的 `type = "popup"`，舊版 herdr 會拒絕**整個 keys 區塊** —— `reload-config` 回 `status: "partial"` + `keeping current keys settings`，而且只有那一行 diagnostic 會告訴你）。
 
 > **Herdr app 版本與 integration schema 版本是兩件事。** 目前 binary 是 **0.8.0**；`herdr integration status` 顯示的 `v7` 則是 Codex integration 的 schema 版本，不代表 binary 降版。每次 Herdr 升級後若看到 `outdated (v6 < v7)`，執行 `herdr integration install codex`。腳本 sidecar 仍由 Herdr 擁有；`~/.codex/hooks.json` 則透過 chezmoi 的 hook-aware `modify_` merger 與 peon/其他工具共存。
-- **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用我們受管的表 (tables)，同時保留 herdr 在執行期寫回的東西（見 [設定管理](#config-management-modify_)）。
+- **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用受管 tables，同時保留其餘所有 live/user-owned 頂層設定，包括 Herdr 目前的 runtime 寫入（見 [設定管理](#config-management-modify_)）。
 
 > **為什麼套件管理器裝的 herdr 會擱淺自己的 server —— 這就是 macOS 離開 Homebrew 的原因。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 brew 裝的 herdr 沒辦法迴避這次重啟。本 repo 現在在 macOS 上也改裝自管的 release binary，正是為了補掉這個缺口；下面那篇 pitfall 仍然保留，因為它描述的是任何**尚未遷移**的機器上會發生的事（而且 `just upgrade-herdr` 偵測到套件管理器安裝時會跳過並印出指示）。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
 
@@ -130,7 +130,7 @@ description = "new tab at the workspace (space) root dir"
 | Agent 狀態 🤖/💬/✅（workmux，6 檔案） | **原生** 側欄 agent-state 彙整 | 略過——原生（tmux 端 workmux 不動）。面板改用**注意力佇列**排序，而非依 space 分組：`ui.agent_panel_sort = "priority"`（herdr 預設是 `"spaces"`） |
 | `sesh` 模糊切換 + `tmuxp` layout | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects 範本 |
 | `tv` channel 彈窗（`prefix+T/U/a`） | **自訂 command pane**（`[[keys.command]] type="pane"`） | Key bindings + 2 個 herdr-aware channel |
-| dev / lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
+| dev / lazygit / scratch launcher | **自訂 command pane + popup** | lazygit 等全螢幕 TUI 維持暫時 pane；短命 modal task 才用 popup |
 | URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
 | 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
 | 本機/遠端 attach 間的 Neovim clipboard | OSC 52 **只寫入**；不支援 clipboard query | yank 送到 attached client；普通 `p` 用 Neovim register；外部文字用 terminal paste 貼入 |
@@ -165,9 +165,10 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + ?` | 快捷鍵說明覆蓋層——列出每個當前綁定與標籤（herdr 原生 which-key；手動觸發，非逾時自動提示） | built-in default |
 | `prefix + ,` | 重新命名 tab | rebound（tmux 肌肉記憶） |
 | `prefix + shift + r` | reload config（`prefix + r` 保留給 resize mode） | rebound |
+| `prefix + Alt + e` | 只編輯 active runtime config、驗證並 reload（永不呼叫 chezmoi） | command pane |
 | `prefix + shift + b` | 新 git worktree（從 `prefix + shift + g` 移過來） | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
-| `prefix + G` | lazygit | command pane |
+| `prefix + G` | lazygit 暫時 pane（近全螢幕 popup 會阻止切 tab/workspace，因此試用後移除） | command pane |
 | `prefix + M` | btop 系統監控器 | command pane |
 | `prefix + N` | nvtop GPU 監控器 | command pane |
 | `prefix + U` | `tv tools`（CLI launcher） | command pane |
@@ -180,7 +181,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + m` | 切換目前 pane 的**待 review** 旗標（⭐） | command pane |
 | `prefix + i` | `tv herdr-review`——待 review **收件匣**（被標記的 pane） | command pane |
 | `` prefix + p `` | **複製檔案路徑** ——兩層 fzf（cwd 下存在的路徑在上），複製解析後的絕對路徑（`x copy`） | command pane |
-| `` prefix + ` `` | scratch shell | command pane |
+| `` prefix + ` `` | scratch shell | command popup |
 | `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
 | `prefix + O` | herdr-plus **Projects**（layout launcher） | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
@@ -287,18 +288,31 @@ herdr 首次執行的 onboarding 會提議**安裝可選的 agent 整合**（`he
 
 ### 設定管理（為何用 `modify_`） {#config-management-modify_}
 
-herdr 會在執行期改寫 `~/.config/herdr/config.toml`——完成 onboarding 會在檔首插入 `onboarding = false`，而 app 內的*設定*彈窗（theme / sound / toasts / pane labels）在*套用*時也會持久化到那裡。它就地編輯並保留既有註解，但執行期它擁有這個檔案。
+Herdr 是 `~/.config/herdr/config.toml` 的另一個 writer。上游 v0.8.2 與目前 `master` 會持久化 onboarding、theme/UI、sound、toast、pane-label、agent-sort 設定、update channel 與 key reset。這些編輯會保留無關行與未知 sections，但最後仍是不加鎖的 whole-file write；外部修改之後仍需明確 reload。
 
-這個檔案原本用 `create_` 前綴只植入一次，避免 `chezmoi apply` 蓋掉那些寫回。代價是：**repo 的編輯永遠傳不到已植入的機器**——你在 source 改的分割鍵重綁、註解修正,都得手動 `cp … source-path` 刷新才會抵達,否則悄悄不見。這正是為何一台機器在 `chezmoi diff` 顯示乾淨時仍會感覺「沒同步」（diff 之所以乾淨,*正是因為* `create_` 從不再碰該檔）。這與跨機器無關：source 對每台 live 檔的 `diff` 可以逐字節相同,但 repo 編輯在你刷新前仍不會落地。
+這個檔案原本用 `create_` 只植入一次。2026-07 轉換時，實測 source 與 live target **逐 byte 相同**；並沒有發生過已觀察到的 onboarding clobber 事故。改成 `modify_` 是在修正 split key 與 cwd 行為時做的**預防性雙 writer 修正**。`create_` 雖不覆蓋 Herdr 寫入，卻也讓後續 repo 編輯永遠到不了已植入的主機。
 
-現在改成 **`modify_` 覆蓋層**——`dot_config/herdr/modify_config.toml.tmpl`,一個小腳本:
+現在改成 **`modify_` 覆蓋層**——`dot_config/herdr/modify_config.toml.tmpl`，一個小腳本：
 
-- 以受管本體 `.chezmoitemplates/herdr/config.toml` 為 base（帶註解 + tmux-parity 說明）,每次 apply 強制套用 `[theme]` / `[ui]` / `[terminal]` / `[keys]` 表,並
-- **原樣拉回 (pull through)** live 檔的其他每個頂層 key（`onboarding`、`[session]`、`[remote]`、`[update]`、`[experimental]`…）,讓 herdr 的執行期寫回存活。
+- 以 `.chezmoitemplates/herdr/config.toml` 為受管 base，每次 apply 完整強制套用 `[theme]`、`[ui]`、`[terminal]`、`[keys]`；並
+- **原樣拉回 (pull through)** 其餘每個 live 頂層 key。`onboarding` 與 `update.channel` 是目前真正的 Herdr 寫入；其他 `[update]` subkeys、`[session]`、`[remote]`、`[experimental]`、未知 sections 等則刻意以 live/user-owned 設定保留，不能誤稱為目前的 writeback。
 
-TOML 沒有 `jq`,所以合併用 Python 透過 `uv run --with tomlkit` 跑（tomlkit 能來回保留註解**與** `[[keys.command]]` 的 array-of-tables;stdlib `tomllib` 唯讀,而 codex 的 `modify_` emitter 無法輸出 AoT）。它退化到系統 `python3`,再退化到直接輸出原始受管範本,所以沒有 Python 的全新主機仍拿到完整設定。這是繼 `~/.codex/config.toml`（`dot_codex/modify_config.toml.tmpl`）之後第二個 TOML-overlay 先例。
+TOML 沒有 `jq`，所以合併用 Python 透過 `uv run --with tomlkit` 跑（tomlkit 能 round-trip 註解**與** `[[keys.command]]` array-of-tables；stdlib `tomllib` 唯讀，而 codex 的 `modify_` emitter 無法輸出 AoT）。它退化到系統 `python3`，再退化到直接輸出 raw managed template，所以沒有 Python 的全新主機仍拿到完整設定。這是繼 `~/.codex/config.toml`（`dot_codex/modify_config.toml.tmpl`）之後第二個 TOML-overlay 先例。
 
-要改 herdr 的受管設定,編輯 `.chezmoitemplates/herdr/config.toml` 再 `chezmoi apply`——它現在會抵達每台主機。用 `herdr server reload-config` 驗證（會在 `diagnostics` 回報快捷鍵衝突;空的 `diagnostics` 陣列 + `"status":"applied"` 代表設定——含陣列鍵綁定——解析乾淨）。
+之後的 `chezmoi apply` 會刻意重新強制套用 canonical `[theme]`、`[ui]`、`[terminal]`、`[keys]` tables。因此要持久化某一項 runtime 實驗，必須**另外手動、選擇性編輯** `.chezmoitemplates/herdr/config.toml`。這個 `modify_` target 絕不能執行 `chezmoi add` 或 `chezmoi re-add`：它們可能取代／繞過 merger，或把 runtime-owned state 匯入 source。
+
+### 編輯 runtime config、驗證並 reload（`prefix + Alt + e`）
+
+`prefix + Alt + e` 會開一個暫時 command pane，執行 `~/.config/herdr/edit-config.sh`。它**只編輯 active runtime target**：非空的 `$HERDR_CONFIG_PATH` 優先，否則是 `~/.config/herdr/config.toml`。它永不呼叫 chezmoi。小寫 `e` 與 `prefix + E` 指令 popup、Herdr 內建的 `prefix + e` scrollback editor 都不同。
+
+防護流程依序如下：
+
+1. 要求 target 是既有 regular file（Unix symlink 直接拒絕），解析單一 blocking `$EDITOR` executable/wrapper（fallback `vi`），並在開 editor 前以 `cp -p` 建立唯一的同目錄 backup。
+2. 編輯 exact target，再用 `HERDR_CONFIG_PATH="$target" herdr config check` 驗證同一路徑。
+3. Editor 或 validation 失敗時，把被拒內容保存成權限受限的 sibling `config.toml.invalid-*`，再以同 filesystem move 原子還原先前有效 backup；不 reload。
+4. 驗證成功後才呼叫 `herdr server reload-config`；繼承的 `$HERDR_SOCKET_PATH` 讓 reload 留在目前 session。成功時移除 backup。
+
+Preflight 或 backup 失敗會保持 target 不變且不開 editor。Reload 失敗**不會**丟棄有效編輯：edited target 與原始 backup 都保留。只有 cleanup 失敗時同樣保留／回報 backup，不 rollback。Rollback 失敗則回報並保留所有可恢復的 target/candidate/backup 路徑。互動 command pane 會等 Enter 讓錯誤留在畫面；非互動執行不等待。
 
 ## 持久化與還原（不小心關掉）
 
@@ -374,9 +388,9 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 ## 在 popup 裡執行任意指令（`prefix + E`） {#run-any-command}
 
-`prefix + G` 已經示範了那個形狀 —— 一個暫時性的 pane，跑完就消失 —— 但它的指令是寫死的。`prefix + E` 就是它的一般化版本：**用 fzf 從 shell 歷史挑一條指令（或直接打一條新的），它會在聚焦 pane 的 cwd 執行，結束後 popup 自己關掉。** 輔助腳本：`~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh)。
+`prefix + E` 在適合 popup 的情境提供通用入口：**用 fzf 從 shell 歷史挑一條指令（或直接打一條新的），在聚焦 pane 的 cwd 執行，結束後關閉 popup。** 輔助腳本：`~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh)。
 
-**為什麼用 `type = "popup"` 而不是其他做法** —— 這是這裡唯一不是 command *pane* 的綁定：
+**為什麼用 `type = "popup"` 而不是其他做法** —— `prefix+E` 刻意浮在上方，而不是再開一個 command pane：
 
 | 做法 | 問題 |
 |---|---|
@@ -386,7 +400,7 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 `type = "popup"` 需要 **herdr ≥ 0.7.4**（#1125 加入，`width`/`height` 支援 cell 數或百分比）。它才是真正的 `tmux display-popup -E` 對應物。
 
-`prefix + `` ` ``（scratch shell）基於同樣理由也是 popup —— 當它還是 command pane 時會佔滿版面，感覺像是把當前視窗 *zoom* 起來而不是開一塊暫存空間。`prefix+d` / `prefix+G` / `prefix+M` / `prefix+N`（dev / lazygit / btop / nvtop）則刻意維持 `type = "pane"`：那幾個你按 `q` 就馬上退出，暫時切開版面沒有代價；而 popup 是 **session-modal** —— 開著的時候不能操作其他 pane。正因為這個模態特性，這件事是逐個綁定決定，而不是全域切換。
+`prefix + `` ` ``（scratch shell）基於同樣理由也是 popup —— 當它還是 command pane 時會佔滿版面，感覺像是把當前視窗 *zoom* 起來而不是開暫存空間。`prefix+d` / `prefix+G` / `prefix+M` / `prefix+N`（dev / lazygit / btop / nvtop）維持 `type = "pane"`。近全螢幕 lazygit popup 已在試用後移除：Popup 是 **session-modal**，開著時不能切到其他 tab/workspace。這個限制適合短命 modal task，不適合可能留著的全螢幕 TUI。
 
 **它沒辦法做成 herdr-plus Quick Action**（`prefix + y`），雖然那是最直覺會去找的地方。兩個硬阻礙：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**（這正是 `btop`/`nvtop` 是 command pane 而不是 Quick Action 的原因），而且每個 action 都是寫死的 `command = "…"` 字串，沒有自由輸入欄位。
 
