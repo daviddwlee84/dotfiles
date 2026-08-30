@@ -5,7 +5,7 @@
       "source": "daviddwlee84/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local/agent-history-hygiene/SKILL.md",
-      "computedHash": "dff79bfa640a7b5791975cdd8893e25230334bc3b21067fa06bfca3ff9acf9e4"
+      "computedHash": "c0a12a78f154322edf7254ed10881760fdc5e625abd1c828c0596c2cfb550069"
     },
     "mkdocs-site-bootstrap": {
       "source": "daviddwlee84/agent-skills",
