@@ -44,6 +44,10 @@ pia use pi/base
 pia run
 ```
 
+Shell completion is generated during `chezmoi apply`; for example,
+`pia use <Tab>` lists combo ids from the active source root without launching
+the TypeScript CLI again for every completion attempt.
+
 `pia use` writes only the current selection. Do not export `PIA_COMBO` globally:
 that environment variable has higher precedence and would make `pia use` appear
 not to work.
@@ -75,6 +79,8 @@ incompatible armv7 Node 20 path and EL7 baseline. The external checkout may
 still refresh there, but `pia doctor` reports the incompatible Node runtime
 until the host is upgraded.
 
-OMP's zsh and bash completion files are regenerated automatically during every
-apply when its binary is new or changed. Authentication and a first real agent
-request remain manual smoke tests because they require provider credentials.
+OMP's and `pia`'s zsh/bash completion files are regenerated automatically
+during apply. OMP tracks its binary mtime; `pia` tracks the external checkout's
+Git revision stamp because its launcher can remain byte-identical across source
+updates. Authentication and a first real agent request remain manual smoke
+tests because they require provider credentials.

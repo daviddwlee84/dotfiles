@@ -443,6 +443,51 @@ EOF
   grep -Fq 'complete -F _omp_complete omp' "$data_home/bash-completion/completions/omp"
 }
 
+@test "pia completion generator uses the canonical external and Git revision stamp" {
+  local test_home="$BATS_TEST_TMPDIR/home"
+  local data_home="$BATS_TEST_TMPDIR/data"
+  local checkout="$test_home/.local/share/pi-agents"
+  local shadow_log="$BATS_TEST_TMPDIR/pia-shadow.log"
+  mkdir -p "$checkout/bin" "$checkout/.git" "$test_home/.zfunc" \
+    "$data_home/bash-completion/completions"
+
+  cat >"$checkout/bin/pia" <<'EOF'
+#!/bin/sh
+case "${1:-} ${2:-}" in
+  "completion zsh")
+    printf '%s\n' '#compdef pia' '_pia() { :; }' 'compdef _pia pia'
+    ;;
+  "completion bash")
+    printf '%s\n' '_pia_complete() { :; }' 'complete -F _pia_complete pia'
+    ;;
+  *) exit 2 ;;
+esac
+EOF
+  chmod +x "$checkout/bin/pia"
+  cat >"$BATS_STUB_DIR/pia" <<'EOF'
+#!/bin/sh
+printf '%s\n' shadow >>"$PIA_TEST_SHADOW_LOG"
+exit 99
+EOF
+  chmod +x "$BATS_STUB_DIR/pia"
+
+  printf '%s\n' stale >"$test_home/.zfunc/_pia"
+  printf '%s\n' stale >"$data_home/bash-completion/completions/pia"
+  : >"$checkout/.git/index"
+  touch -t 201901010000 "$checkout/bin/pia"
+  touch -t 202001010000 "$test_home/.zfunc/_pia" \
+    "$data_home/bash-completion/completions/pia"
+  touch -t 202101010000 "$checkout/.git/index"
+
+  run env HOME="$test_home" XDG_DATA_HOME="$data_home" \
+    PIA_TEST_SHADOW_LOG="$shadow_log" PATH="$BATS_STUB_DIR:/usr/bin:/bin" \
+    bash "$COMPLETIONS" --quiet
+  [ "$status" -eq 0 ]
+  grep -Fq '#compdef pia' "$test_home/.zfunc/_pia"
+  grep -Fq 'complete -F _pia_complete pia' "$data_home/bash-completion/completions/pia"
+  [ ! -e "$shadow_log" ]
+}
+
 @test "prompt, README, completion docs, and agent skill surface Pi OMP and pia" {
   local consent='Install coding agents (Claude Code, Pi, Oh My Pi, pia presets, OpenCode, Cursor, Copilot, Gemini, etc.)'
   grep -Fq 'Pi/OMP with pia presets' "$REPO_ROOT/scripts/init/dotfiles_init.py"
@@ -452,8 +497,15 @@ EOF
   grep -Fq 'Oh My Pi (`omp`)' "$REPO_ROOT/README.md"
   grep -Fq 'docs/tools/pi-agents.md' "$REPO_ROOT/README.md"
   grep -Fq 'regen omp "completions zsh" "completions bash"' "$COMPLETIONS"
+  grep -Fq 'regen pia "completion zsh" "completion bash"' "$COMPLETIONS"
+  grep -Fq '$HOME/.local/share/pi-agents/bin/pia' "$COMPLETIONS"
+  grep -Fq '$HOME/.local/share/pi-agents/.git/index' "$COMPLETIONS"
   grep -Fq '| `omp` | `omp completions zsh` |' "$REPO_ROOT/docs/zsh/zsh-completions.md"
   grep -Fq '| `omp` | `omp completions zsh` |' "$REPO_ROOT/docs/zsh/zsh-completions.zh-TW.md"
+  grep -Fq '| `pia` | `pia completion zsh` |' "$REPO_ROOT/docs/zsh/zsh-completions.md"
+  grep -Fq '| `pia` | `pia completion zsh` |' "$REPO_ROOT/docs/zsh/zsh-completions.zh-TW.md"
+  grep -Fq 'pia use <Tab>' "$REPO_ROOT/docs/tools/pi-agents.md"
+  grep -Fq 'pia use <Tab>' "$REPO_ROOT/docs/tools/pi-agents.zh-TW.md"
   grep -Fq 'Pi (`pi`), Oh My Pi (`omp`), the `pia` Git-managed harness-combo manager' \
     "$REPO_ROOT/dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl"
 }

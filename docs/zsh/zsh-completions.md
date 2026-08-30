@@ -36,11 +36,11 @@ Tab completion is the same idea on both shells but the plumbing differs.
 | **B. Eager-load at startup** | `dot_config/zsh/tools/<NN>_<tool>_completion.zsh` + `dot_config/bash/<NN>_<tool>_completion.bash` | Sourced via `load_modular_dir` after compinit / bash-completion v2 init | Hand-written completion (this repo's `fleet`, `mlf`, `pqsum`, `x`) |
 | **C. Cached eval at startup** | `${XDG_CACHE_HOME}/<shell>/<tool>_completion.<ext>` | Sourced via shell `init` script (`dot_config/shell/<NN>_<tool>.sh`) | Slow generators whose output has side effects beyond `compdef` (e.g. `thefuck --alias` outputs an `alias` line — needs to land in the running shell's namespace, not just a deferred `_<tool>` function) |
 
-Cache invalidation in classes A and C uses **binary-mtime check**:
+Cache invalidation in classes A and C normally uses a **binary-mtime check**:
 ```sh
 [ ! -f "$cache" ] || [ "$(command -v <tool>)" -nt "$cache" ]  # → regenerate
 ```
-This catches `brew upgrade`, `uv tool upgrade`, `mise install <NEW>` — anything that bumps the binary's mtime. Manual `<tool>-update-completion` helpers (in `dot_config/{shell,zsh}/10_aliases.zsh`) cover edge cases (gem-only upgrades, in-place replacements, cache corruption).
+This catches `brew upgrade`, `uv tool upgrade`, `mise install <NEW>` — anything that bumps the binary's mtime. Repo-backed `pia` is the exception: its canonical runner is fixed at `~/.local/share/pi-agents/bin/pia`, while `.git/index` is the freshness source so a new checkout revision cannot leave completion stale when the launcher itself is unchanged. Manual `<tool>-update-completion` helpers (in `dot_config/{shell,zsh}/10_aliases.zsh`) cover edge cases (gem-only upgrades, in-place replacements, cache corruption).
 
 ## Architecture
 
@@ -84,6 +84,7 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `gh` | `gh completion -s zsh` |
 | `opencode` | `opencode completion zsh` |
 | `omp` | `omp completions zsh` |
+| `pia` | `pia completion zsh` |
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
 | `bw` | `bw completion --shell zsh` |
@@ -215,12 +216,14 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 
 ## Generating Completions After Fresh Install
 
-**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 17 bulk-generated tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `omp`, `translate`, `dev`).
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 18 bulk-generated tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `omp`, `pia`, `translate`, `dev`).
 
-The hook is **idempotent** — it stat-checks each tool's binary mtime against the existing completion file and skips if the cache is fresh. Cost when nothing changed: **~50ms** total (presence checks + 34 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime: ~140ms one-shot to regenerate the affected completions.
+The hook is **idempotent** — it stat-checks each tool's freshness source against the existing completion file and skips if the cache is fresh. That source is normally the binary; `pia` uses the external checkout's `.git/index`. Cost when nothing changed: **~50ms** total (presence checks + 36 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime, or a `pia` checkout refresh that updates its Git index, only the affected completion is regenerated.
 On a fresh apply, it also probes `~/.local/bin/<tool>` when the parent process
 has not reloaded PATH yet; this is how a newly installed OMP gets completions
-without requiring a second shell or apply.
+without requiring a second shell or apply. `pia` similarly uses its canonical
+external launcher directly, so it never depends on shell startup having added
+the checkout to PATH.
 
 Output paths:
 - **zsh**: `~/.zfunc/_<tool>` — lazy-loaded by compinit on first TAB (in `$fpath` via `dot_zshrc.tmpl:68`).
@@ -246,7 +249,7 @@ Existing completion files stay as-is; you can still run `just completions-refres
 
 ### Add a new tool to the auto-gen inventory
 
-Edit the `regen <tool> "<zsh-args>" "<bash-args>"` block in `scripts/generate_completions.sh`. The arguments are whatever follows the tool name to produce the per-shell completion script — check `<tool> completion --help` or `<tool> --help | grep -i complet`. Examples already in the script cover click (`_TOOL_COMPLETE=`), clap (`--generate complete-<shell>`), tyro (`--tyro-write-completion <shell>`-equivalent), cobra (`completion <shell>`), and ad-hoc styles (`--completions <shell>`).
+Edit the `regen <tool> "<zsh-args>" "<bash-args>"` block in `scripts/generate_completions.sh`. The arguments are whatever follows the tool name to produce the per-shell completion script — check `<tool> completion --help` or `<tool> --help | grep -i complet`. Examples already in the script cover click (`_TOOL_COMPLETE=`), clap (`--generate complete-<shell>`), tyro (`--tyro-write-completion <shell>`-equivalent), cobra (`completion <shell>`), and ad-hoc styles (`--completions <shell>`). The optional fourth and fifth arguments pin a canonical runner and a separate freshness path; use that form for repo-backed launchers such as `pia` whose wrapper mtime may stay unchanged across source revisions.
 
 ### What about tools NOT in the auto-gen inventory?
 

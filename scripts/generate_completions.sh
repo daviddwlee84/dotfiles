@@ -5,8 +5,9 @@
 #   scripts/generate_completions.sh [--force] [--quiet] [--help]
 #
 # Modes:
-#   default   Skip tools whose completion file is already newer than the binary
-#             (binary-mtime check — same idiom as 95_bitwarden.zsh / 47_mi_router.sh).
+#   default   Skip tools whose completion file is already newer than its
+#             freshness source (normally the binary; repo CLIs may use a Git
+#             revision stamp such as .git/index).
 #   --force   Regenerate every tool's completion regardless of mtime.
 #   --quiet   Suppress per-tool progress; still print final summary.
 #
@@ -59,13 +60,23 @@ n_z_skip=0
 n_b_skip=0
 n_missing=0
 
-# regen <tool> <zsh-args> <bash-args>
+# regen <tool> <zsh-args> <bash-args> [runner-path] [freshness-path]
 # Uses word-splitting on $zargs / $bargs deliberately (the upstream completion
-# subcommands are 1-3 words, no quoting needed).
+# subcommands are 1-3 words, no quoting needed). runner-path pins a canonical
+# executable instead of PATH resolution; freshness-path handles repo-backed
+# launchers whose wrapper mtime does not change when their source revision does.
 regen() {
   local tool="$1" zargs="$2" bargs="$3"
-  local bin runner
-  if ! bin="$(command -v "$tool" 2>/dev/null)"; then
+  local runner_path="${4:-}" freshness_path="${5:-}"
+  local bin runner freshness
+  if [ -n "$runner_path" ]; then
+    if [ ! -x "$runner_path" ]; then
+      n_missing=$((n_missing + 1))
+      return 0
+    fi
+    bin="$runner_path"
+    runner="$runner_path"
+  elif ! bin="$(command -v "$tool" 2>/dev/null)"; then
     # Fresh `chezmoi init --apply` may install a user-level binary before the
     # parent process has reloaded ~/.local/bin into PATH. Resolve that canonical
     # install location explicitly so first-apply completion generation works.
@@ -80,11 +91,13 @@ regen() {
     # Preserve the short argv[0] for generators that bake it into output.
     runner="$tool"
   fi
+  freshness="${freshness_path:-$bin}"
+  [ -e "$freshness" ] || freshness="$bin"
   local zfile="${ZFUNC}/_${tool}"
   local bfile="${BASHDIR}/${tool}"
 
   # zsh
-  if [ "$force" = 1 ] || [ ! -f "$zfile" ] || [ "$bin" -nt "$zfile" ]; then
+  if [ "$force" = 1 ] || [ ! -f "$zfile" ] || [ "$freshness" -nt "$zfile" ]; then
     # shellcheck disable=SC2086  # word-split intentional
     if "$runner" $zargs >"$zfile.tmp" 2>/dev/null && [ -s "$zfile.tmp" ]; then
       mv "$zfile.tmp" "$zfile"
@@ -98,7 +111,7 @@ regen() {
   fi
 
   # bash
-  if [ "$force" = 1 ] || [ ! -f "$bfile" ] || [ "$bin" -nt "$bfile" ]; then
+  if [ "$force" = 1 ] || [ ! -f "$bfile" ] || [ "$freshness" -nt "$bfile" ]; then
     # shellcheck disable=SC2086
     if "$runner" $bargs >"$bfile.tmp" 2>/dev/null && [ -s "$bfile.tmp" ]; then
       mv "$bfile.tmp" "$bfile"
@@ -138,6 +151,7 @@ regen zellij "setup --generate-completion zsh" "setup --generate-completion bash
 regen pueue "completions zsh" "completions bash"
 regen opencode "completion zsh" "completion bash"
 regen omp "completions zsh" "completions bash"
+regen pia "completion zsh" "completion bash" "$HOME/.local/share/pi-agents/bin/pia" "$HOME/.local/share/pi-agents/.git/index"
 regen translate "completion zsh" "completion bash"
 regen dev "completion zsh" "completion bash"
 

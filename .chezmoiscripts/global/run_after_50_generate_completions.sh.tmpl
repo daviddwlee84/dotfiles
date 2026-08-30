@@ -1,16 +1,16 @@
 #!/bin/bash
 # Regenerate shell completion files for upstream CLIs after every `chezmoi
-# apply`. Detects tools whose binaries were upgraded since the last completion
-# generation (binary mtime > completion file mtime → regen).
+# apply`. Detects tools whose binaries or repo revision stamps were upgraded
+# since the last completion generation (freshness mtime > completion mtime).
 #
 # `run_after_*` (not `run_onchange_after_*`): we want to detect tools that
 # ansible / brew / mise / uv upgraded BETWEEN applies. Onchange would only fire
 # when this script's content changes — that misses every package upgrade.
-# Cost when nothing changed: ~50ms (presence checks + 34 stat calls).
+# Cost when nothing changed: ~50ms (presence checks + 36 stat calls).
 #
 # Tools handled (the "self-generating" set from docs/zsh/zsh-completions.md
 # Section A): chezmoi, mise, uv, just, starship, gh, docker, rg, fd, bat,
-# delta, zellij, pueue, opencode, omp, translate, dev.
+# delta, zellij, pueue, opencode, omp, pia, translate, dev.
 #
 # Tools handled elsewhere (don't double-up):
 #   sesh, tv, worktrunk        → shell-startup mtime check

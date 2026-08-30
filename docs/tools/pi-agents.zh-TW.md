@@ -40,6 +40,10 @@ pia use pi/base
 pia run
 ```
 
+Shell completion 會在 `chezmoi apply` 時產生；例如 `pia use <Tab>` 會從
+當前 source root 列出 combo id，不會在每次 completion 時重新啟動
+TypeScript CLI。
+
 `pia use` 只寫入目前選擇。不要在全域 export `PIA_COMBO`：該環境變數
 優先級更高，會讓 `pia use` 看起來沒有作用。
 
@@ -67,6 +71,7 @@ Pi 與 `pia` 需要 Node 22.19 以上。OMP prebuilt installer 支援 macOS／Li
 路徑與 EL7 baseline。external checkout 仍可能在這些主機刷新，但在主機升級
 前，`pia doctor` 會回報 Node runtime 不相容。
 
-OMP 的 zsh／bash completion 會在 apply 時依 binary mtime 自動重建。
-Authentication 與第一個真實 agent request 仍需手動 smoke test，因為需要
-provider credentials。
+OMP 與 `pia` 的 zsh／bash completion 都會在 apply 時自動重建。OMP
+依 binary mtime 判斷；`pia` 則依 external checkout 的 Git revision stamp，
+因為 source 更新時 launcher 仍可能完全相同。Authentication 與第一個真實
+agent request 仍需手動 smoke test，因為需要 provider credentials。
