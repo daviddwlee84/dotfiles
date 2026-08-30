@@ -33,14 +33,14 @@ If you want to know:
 | **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / go / gem / dotnet / curl-installer / github-release) |
 | **mise** | Runtime versions: `node`, `bun`, `rust`, `go`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
-| **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
+| **npm** (global) | JS CLIs (Pi, copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`); Pi's stable prefix is handled by `agents` |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
 | **go** (`go install`) | Go CLIs: `translate`, `dev`, `gopls` (**Linux only** — macOS installs them via Homebrew) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
-| **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
+| **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, omp, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
 | **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallback for specstory | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
-| **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
+| **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), pi-agents, toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
 | **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
 
@@ -357,6 +357,9 @@ ships via a different mechanism upstream, and the role mirrors that.
 | `terminal-notifier` / `libnotify-bin` | brew formula / apt (Debian) | apt (Debian only) | notifier helpers, lines 9–29 |
 | **Claude Code** | brew cask `claude-code` | `curl https://claude.ai/install.sh \| bash` → `~/.claude/local/bin/claude` | lines 33–71; arch skip for non-amd64/arm64 |
 | **OpenCode** | `curl https://opencode.ai/install \| bash -s -- --no-modify-path` → `~/.opencode/bin/opencode` | same | lines 73–107. Cross-platform unified install; `--no-modify-path` keeps installer from editing chezmoi-managed shell rc. See [`pitfalls/opencode-docker-opentui-glibc-loader-missing.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/opencode-docker-opentui-glibc-loader-missing.md) for the container-image variant |
+| **Pi** (`pi`) | `mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent` | same | Final role section. Requires Node ≥ 22.19; transactionally installs and verifies the stable canonical copy before removing exact deprecated/duplicate packages from another npm prefix |
+| **Oh My Pi** (`omp`) | `curl https://omp.sh/install \| sh -s -- --binary` → `~/.local/bin/omp` | same | Final role section. Detects package copies read-only, then installs/verifies the binary before removing exact `@oh-my-pi/pi-coding-agent` npm/Bun globals; failed installs restore the old command, and unsupported hosts do not migrate |
+| **pia** | chezmoi external → `~/.local/share/pi-agents/bin/pia` | same | `installCodingAgents`-gated CLI + combo checkout; `08_pi_agents.sh` reasserts canonical Pi/OMP/pia precedence after mise/Bun, with runtime/session state outside the checkout |
 | **Cursor CLI** (`cursor-agent`) | `curl https://cursor.com/install \| bash` | same | lines 112–124; brew cask was abandoned due to code-signing |
 | **GitHub Copilot CLI** | npm `@githubnext/github-copilot-cli` (global) | `mise exec -- npm install -g` | lines 134–168 |
 | **OpenAI Codex CLI** | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | lines 172–236 |
@@ -376,6 +379,9 @@ defines autodetect order + `AICAP_*_MODEL` defaults. Four Python
 consumers regex-parse the same file (see AGENTS.md cross-file rule).
 Adding a new agent here means: install in this role + add to the SSOT
 + four Python `AGENT_CONFIG` dicts.
+Pi, OMP, and `pia` are deliberately not added to AICAP in this change: they are
+harness-combo research/runtime surfaces, not new defaults for the generic
+one-shot AI shell helpers.
 
 #### 3.5 Language toolchains (`python_uv_tools`, `ruby_gem_tools`, `rust_cargo_tools`, `go_tools`, `dotnet_tools`, `js_cli_tools`)
 
@@ -561,6 +567,12 @@ Linux explicitly uses `mise exec -- npm` to avoid the Ubuntu apt npm
 (too old; system Node 12 fails `engine` checks for modern packages and
 `/usr/local/lib/node_modules` is root-owned, breaking `--global` for
 non-root users). See [`pitfalls/ansible-js-cli-tools-old-system-node.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-js-cli-tools-old-system-node.md).
+Pi deliberately prefers mise on both operating systems and adds
+`--prefix ~/.local`: its Node 22.19 requirement is shared with `pia`, and the
+stable prefix survives a mise Node-version replacement. The role installs and
+verifies that canonical copy first, then removes exact deprecated/duplicate Pi
+packages from another active npm prefix so a failed migration cannot destroy a
+working command.
 
 **Inventory**:
 
@@ -568,6 +580,7 @@ non-root users). See [`pitfalls/ansible-js-cli-tools-old-system-node.md`](https:
 |---|---|---|
 | `readability-cli` | `readable` | `js_cli_tools/defaults/main.yml` |
 | `@bitwarden/cli` | `bw` | `bitwarden/tasks/main.yml` |
+| `@earendil-works/pi-coding-agent` | `pi` | `coding_agents/tasks/main.yml` (`--ignore-scripts --prefix ~/.local`; removes deprecated `@mariozechner/pi-coding-agent`) |
 | `@githubnext/github-copilot-cli` | `github-copilot-cli` | `coding_agents/tasks/main.yml:134-168` |
 | `@openai/codex` | `codex` (Linux only — macOS uses brew cask) | `coding_agents/tasks/main.yml:172-236` |
 | `@google/gemini-cli` | `gemini` (Linux always; macOS fallback if brew formula fails) | `coding_agents/tasks/main.yml:240-300` |
@@ -577,11 +590,14 @@ non-root users). See [`pitfalls/ansible-js-cli-tools-old-system-node.md`](https:
 
 **Upgrade**: `just upgrade-npm` → `npm -g update` with `mise exec --`
 fallback.
+Pi uses a fixed `~/.local` prefix, so `just upgrade-agents` tries
+`pi update --self` and falls back to an npm reinstall with that same prefix.
 
 **Adding an npm tool**: append to `js_cli_tools/defaults/main.yml` (for
 general utilities); for an agent CLI, add the install task to
 `coding_agents/tasks/main.yml` matching the existing dispatch pattern
-(macOS via system npm, Linux via `mise exec -- npm install -g`).
+(normally macOS via system npm and Linux via `mise exec -- npm install -g`;
+use a stable user prefix when the command must survive runtime upgrades).
 
 ### 7. cargo (Rust crates)
 
@@ -706,6 +722,7 @@ in-binary self-update works without sudo.
 | direnv | (vendor installer) | `~/.local/bin/direnv` | `devtools` (Linux fallback) |
 | **Claude Code** | `https://claude.ai/install.sh` | `~/.claude/local/bin/claude` | `coding_agents` (Linux) |
 | **OpenCode** | `https://opencode.ai/install` (+ `--no-modify-path`) | `~/.opencode/bin/opencode` | `coding_agents` (macOS + Linux) |
+| **Oh My Pi** | `https://omp.sh/install` (`--binary`) | `~/.local/bin/omp` | `coding_agents` (macOS + Linux x64/arm64) |
 | **Cursor CLI** | `https://cursor.com/install` | `~/.local/bin/cursor-agent` | `coding_agents` |
 | **Antigravity CLI** | `https://antigravity.google/cli/install.sh` (patched `--skip-path --skip-aliases`) | `~/.local/bin/agy` + `agyc` symlink | `coding_agents` |
 | **RTK** | `https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh` | `~/.local/bin/rtk` | `coding_agents` (Linux) |
@@ -737,7 +754,10 @@ in-binary self-update works without sudo.
    self-update subcommand (or just an installer-as-upgrader path)
 5. If the binary lands somewhere other than `~/.local/bin` (e.g.
    `~/.opencode/bin/opencode`), add an existence-gated PATH prepend
-   to `dot_config/shell/00_exports.sh.tmpl`
+   to `dot_config/shell/00_exports.sh.tmpl`. When the managed path must
+   override later mise/Bun/package-manager entries, reassert it in a later
+   numbered shared fragment instead (the Pi/OMP/pia pattern lives in
+   `dot_config/shell/08_pi_agents.sh.tmpl`)
 
 ### 12. GitHub-release downloads (user-level fallback)
 
@@ -814,6 +834,7 @@ pulls.
 | `.local/src/blesh` | git-repo (`--recurse-submodules`) | `akinomyoga/ble.sh.git` | always; compiled by `run_onchange_after_26_install_blesh.sh.tmpl` → `~/.local/share/blesh/ble.sh` |
 | `.tmux/plugins/tpm` | git-repo | `tmux-plugins/tpm.git` | always |
 | `.fzf` | git-repo | `junegunn/fzf.git` | Linux only (ansible runs `~/.fzf/install --bin`) |
+| `.local/share/pi-agents` | git-repo | `daviddwlee84/pi-agents.git` | `installCodingAgents`; exposes `bin/pia`, while runtime state stays outside the checkout |
 | `.local/share/toolkami/toolkami.rb` | file (executable) | `https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb` | always |
 
 **Why externals (not git clone in a role)**:
@@ -992,8 +1013,9 @@ by:
 - The gap is sharpest on **noRoot Linux** where GitHub releases are
   the only install path AND there's no upgrade automation
 
-**Coverage gap on `cat_agents`**: only `claude / opencode / cursor-agent
-/ ollama / llmfit / rtk / specstory` get the self-update-then-curl loop.
+**Coverage gap on `cat_agents`**: only `claude / opencode / pi / omp /
+cursor-agent / ollama / llmfit / rtk / specstory` get an explicit guarded
+agent-specific upgrade path.
 **Missing**: `agy` (Antigravity), `codexbar`, `td`, `sidecar`,
 `specify-cli`, `openchamber`, `codex` — these rely on brew / uv / npm
 categories instead.
@@ -1145,6 +1167,7 @@ list.
 | **nvme-cli** (`nvme`) | n/a | apt/yum (gated on NVMe detected) | homelab_tools |
 | **obsidian** | brew cask | n/a | Brewfile.darwin |
 | **ollama** | brew formula `ollama` (CLI) + cask `ollama-app` (GUI) | curl `ollama.com/install.sh` | llm_tools |
+| **omp** (Oh My Pi) | curl `omp.sh/install --binary` → `~/.local/bin/omp` | same | coding_agents |
 | **openchamber** (`@openchamber/web`) | npm global | `mise exec -- npm install -g` | coding_agents |
 | **opencode** | curl `opencode.ai/install` (`--no-modify-path`) → `~/.opencode/bin/opencode` | same | coding_agents |
 | **opencode-desktop** | brew cask | n/a | Brewfile.darwin |
@@ -1152,6 +1175,8 @@ list.
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
 | **peon-ping** (`peon`) | brew tap `PeonPing/tap` (needs `brew trust`, Homebrew 6 gate) | `install.sh --openpeon --no-rc` | coding_agents — agent completion sounds; **never run `peon-ping-setup`** (hooks are declared in `dot_claude/modify_settings.json.tmpl`). Gated by the `agentSounds` prompt. See [agent-sounds.md](../tools/agent-sounds.md) |
+| **pi** | `mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent` | same | coding_agents |
+| **pia** | chezmoi external `~/.local/share/pi-agents/bin/pia` | same | `.chezmoiexternal.toml.tmpl` (`installCodingAgents`) |
 | **piper.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
 | **poppler** (`pdftoppm`) | brew | apt (`poppler-utils`) | devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md) |
@@ -1236,7 +1261,7 @@ list.
 
 > Tools not listed: `oh-my-zsh`, `oh-my-bash`, `zsh-autosuggestions`,
 > `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`,
-> `ble.sh`, `TPM`, `toolkami.rb` — these live as **chezmoi externals**
+> `ble.sh`, `TPM`, `pi-agents`, `toolkami.rb` — these live as **chezmoi externals**
 > ([§ 13](#13-chezmoi-externals-refresh-periodic-gitfile-fetches)),
 > not as "binaries on PATH".
 
@@ -1322,7 +1347,9 @@ Is it Linux-only, vendor-distributed (ships its own install.sh)?
 ├── Yes → curl-installer in the relevant role
 │         · Use creates: guard
 │         · If the binary lands outside ~/.local/bin, add a PATH prepend
-│           to dot_config/shell/00_exports.sh.tmpl
+│           to dot_config/shell/00_exports.sh.tmpl; when it must beat later
+│           mise/Bun/package-manager paths, use a later numbered shared
+│           fragment (for example 08_pi_agents.sh.tmpl)
 └── No → continue
 
 GitHub release tarball (most reliable for everything else):

@@ -47,18 +47,18 @@ just upgrade-<category>   # 單獨執行一個類別
 
 | 類別 | 實際發生的事 |
 | --- | --- |
-| `externals` | `chezmoi upgrade`（chezmoi 二進位檔本身）+ `chezmoi apply --refresh-externals`（強制刷新 168h externals：oh-my-zsh、TPM、toolkami.rb、fzf）。放在最前面是因為 chezmoi 版本提升可能改變後續步驟的行為。 |
+| `externals` | `chezmoi upgrade`（chezmoi 二進位檔本身）+ `chezmoi apply --refresh-externals`（強制刷新 168h externals：oh-my-zsh、TPM、pi-agents、toolkami.rb、fzf）。放在最前面是因為 chezmoi 版本提升可能改變後續步驟的行為。 |
 | `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile`（**不**加 `--no-upgrade`）→ `Brewfile.{darwin,linux}` → `brew cleanup`。macOS 透過 [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) 預先暖機共享 sudo 會話 (session)，讓會 shell out 到 `sudo /usr/sbin/installer` 的 cask pkg 安裝程式能找到有效的 sudo ticket。 |
 | `mise` | `mise self-update --yes` + `mise upgrade`（遵守 `~/.config/mise/config.toml` 中的版本約束 (constraint)）。當 mise 是透過 brew/apt 安裝時，`self-update` 會發出警示 (warning) 而非失敗。 |
 | `uv` | 依 binary 路徑偵測安裝方式（Homebrew vs curl 安裝器），分派到對應通道：Homebrew/Linuxbrew 安裝走 `brew upgrade uv`，curl standalone 安裝走 `uv self update`。接著執行 `uv tool upgrade --all`。涵蓋 [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) 與 [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml) 中列出的每個工具。當 uv 低於 `min_uv_version` 時，`python_uv_tools` ansible role 會自動做相同分派 — 詳見 [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md)。 |
-| `npm` | `npm -g update`，當 `npm` 不在 PATH 上時退回 `mise exec -- npm -g update`（與 [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml) 相同的偵測邏輯）。 |
+| `npm` | `npm -g update`，當 `npm` 不在 PATH 上時退回 `mise exec -- npm -g update`（與 [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml) 相同的偵測邏輯）。Pi 是例外：它使用固定 `~/.local` prefix，由 `agents` 類別更新，而不是這個 active-prefix 批次命令。 |
 | `cargo` | 若不存在則先 bootstrap `cargo-update` crate，再執行 `cargo install-update -a`。涵蓋 pueue（Linux）以及 [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml) 中未來的條目。 |
 | `go` | 從 [`go_tools/defaults/main.yml`](../../dot_ansible/roles/go_tools/defaults/main.yml) 解析工具並逐一執行 `go install <pkg>@latest`。macOS 完全跳過，因為 `translate` 與 `dev` 由 `daviddwlee84/tap` 的 Homebrew formula 管理；使用 `just upgrade-brew` 升級。 |
 | `dotnet` | 從 [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) 解析工具名，逐一執行 `dotnet tool update --global <name>`（透過 mise 的 dotnet shim）。若解析不到任何結果，退回 `dotnet tool list --global`。 |
 | `gem` | 透過 mise 的 ruby shim 執行 `gem update --system` + `gem update`。 |
 | `flatpak` | 對使用者範疇 (user-scope) 的 Flathub 應用程式執行 `flatpak update --user --noninteractive --assumeyes`（當 `discordChannel=flatpak` 時的 Discord 等等 — 見 [`docs/playbooks/linux-gui-apps.md`](../playbooks/linux-gui-apps.md)）。當 `flatpak` 不存在或沒有任何 user-scope 應用程式安裝時跳過。系統範疇 (system-scope)（`flatpak update --system`）刻意不涵蓋 — 它需要 `sudo` 且在本 repo 流程中很罕見；需要時請手動執行。 |
 | `warp` | **僅 Linux。** 透過共享 sudo 會話執行 `sudo apt-get update` + `sudo apt-get install --only-upgrade -y warp-terminal`。macOS 的 Warp 由 `cat_brew` 處理（cask `warp` + `--greedy`）；本類別在 Darwin 上會以 `SKIPPED` 短路。磁碟上的二進位檔會被替換，但執行中的 Warp 程序 (process) 不會被重啟 — 退出並重新啟動 Warp 才會載入新版本。應用程式內的 `warp_finish_update <token>` 優雅重啟僅能在活躍的 Warp 會話內運作（這是 Warp 注入的 shell 函式 (function)，否則不在 `$PATH` 上）— 完整機制請見 [`docs/tools/warp.md`](../tools/warp.md)。 |
-| `agents` | 僅針對**已存在的工具**重新執行官方 `curl \| bash` 安裝程式 — Claude Code、OpenCode、Cursor CLI、Ollama（Linux）、llmfit（Linux）、RTK。Bootstrap 清單對應 [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml)。 |
+| `agents` | 僅更新**已存在的工具**。Pi 呼叫 exact `~/.local/bin/pi update --self`，失敗時用 npm 重新安裝到固定 prefix；OMP 呼叫 exact `~/.local/bin/omp update`，失敗時用 `omp.sh/install --binary`。PATH shadow 不會被執行。Claude Code、OpenCode、Cursor CLI、Ollama（Linux）、llmfit（Linux）、RTK 保留各自受 guard 的 self-update／installer 路徑。Bootstrap 清單對應 [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml)。 |
 | `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → 透過 [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) 刷新已安裝的 `claude-hud` → `pre-commit autoupdate`（在 dotfiles repo 根目錄上）→ `tldr --update` → `gh extension upgrade --all`。每個步驟都會檢查相關二進位檔是否存在。 |
 
 ### 執行順序
@@ -75,7 +75,7 @@ flowchart LR
     gem["gem<br/>(gem update)"] --> flatpak
     flatpak["flatpak<br/>(--user update)"] --> warp
     warp["warp<br/>(Linux apt-only)"] --> agents
-    agents["agents<br/>(curl \| bash installers)"] --> plugins
+    agents["agents<br/>(self-update + installer fallbacks)"] --> plugins
     plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> summary((Summary))
 ```
 

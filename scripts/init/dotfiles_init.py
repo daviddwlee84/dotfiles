@@ -206,10 +206,10 @@ PROMPTS: tuple[Prompt, ...] = (
     # --- Coding agents & AI ----------------------------------------------
     Prompt("installCodingAgents", "bool", "Coding agents & AI",
            "Coding agents",
-           "Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.",
+           "Claude Code, Pi/OMP with pia presets, OpenCode, Cursor, Copilot, Gemini, etc.",
            default=True,
-           prompt_text="Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)",
-           comment="是否安裝 coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)"),
+           prompt_text="Install coding agents (Claude Code, Pi, Oh My Pi, pia presets, OpenCode, Cursor, Copilot, Gemini, etc.)",
+           comment="是否安裝 coding agents (Claude Code, Pi/OMP + pia presets, OpenCode, Cursor, Copilot, Gemini, etc.)"),
     Prompt("installLlmTools", "bool", "Coding agents & AI",
            "Local LLM tools",
            "Ollama, LiteLLM, llmfit and matching local models.",

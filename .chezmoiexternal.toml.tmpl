@@ -171,3 +171,22 @@
     url = "https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb"
     refreshPeriod = "168h"
     executable = true
+
+{{ if .installCodingAgents -}}
+# -----------------------------------------------------------------------------
+# pi-agents (Pi / Oh My Pi harness combo manager)
+# -----------------------------------------------------------------------------
+# Keep the CLI and its Git-managed combos on the same revision. Runtime state,
+# sessions, handoffs, and credentials live outside this checkout; author combo
+# changes in a normal development clone, not in this deployment mirror. Unlike
+# the general shell externals above, pia has no refreshPeriod: upgrades happen
+# only through `just upgrade-externals` / `chezmoi apply --refresh-externals`.
+
+[".local/share/pi-agents"]
+    type = "git-repo"
+    url = "https://github.com/daviddwlee84/pi-agents.git"
+    [".local/share/pi-agents".clone]
+        args = ["--depth", "1"]
+    [".local/share/pi-agents".pull]
+        args = ["--ff-only"]
+{{ end -}}

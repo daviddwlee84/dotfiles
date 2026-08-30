@@ -132,7 +132,8 @@ Full diagnosis: [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](pitfalls/bo
 
 ### After install
 
-- `~/.local/bin` and the rest of the shared layer (mise/uv/cargo/bun PATH, plus Linux OpenCode's `~/.opencode/bin`) are exported via `~/.config/shell/00_exports.sh`, sourced by both the chezmoi-managed `~/.bashrc` and `~/.zshrc`.
+- `~/.local/bin` and the rest of the shared layer are seeded by `~/.config/shell/00_exports.sh`; after mise/Bun initialise, `08_pi_agents.sh` reasserts the canonical `~/.local/bin/{pi,omp}` and external `pia` paths so stale package-manager copies cannot shadow them. Both fragments are sourced by the chezmoi-managed `~/.bashrc` and `~/.zshrc`.
+- With `installCodingAgents=true`, `pi` and `omp` are installed alongside the Git-managed `pia` combo manager. Start with `pia doctor`, `pia list --tree`, then `pia use pi/base`; authentication remains owned by each agent and is never committed to dotfiles.
 - On sudo-enabled machines, the ansible role for your `primaryShell` choice switches your login shell automatically (`zsh` role for `primaryShell=zsh`, `bash` role for `primaryShell=bash`). Log out / back in to pick it up, or run `exec zsh` / `exec bash` now.
 - `primaryShell=bash` on macOS additionally installs Homebrew bash 5.x and adds it to `/etc/shells` (system bash 3.2 is too old for oh-my-bash plugins + ble.sh). zsh-primary mac users see no extra brew install.
 - On `noRoot=true` installs, login shell isn't changed — run `exec zsh` / `exec bash` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER` (or `bash`).
@@ -148,7 +149,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 <!-- dotfiles-init:prompts (coverage-checked by scripts/init/dotfiles_init.py gen --check) -->
 | Option | Default | Description |
 |--------|---------|-------------|
-| `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, Antigravity CLI (`agy`), RTK, td, sidecar, specify-cli, etc. |
+| `installCodingAgents` | true | Claude Code, Pi, Oh My Pi (`omp`), the Git-managed [`pia` combo manager](docs/tools/pi-agents.md), Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, Antigravity CLI (`agy`), RTK, td, sidecar, specify-cli, etc. |
 | `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
 | `installJsCliTools` | true | Standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.) |
@@ -283,6 +284,7 @@ Vendored upstream sources are declared in [`.chezmoiexternal.toml.tmpl`](.chezmo
 - `~/.oh-my-zsh` + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`*) — *`zsh-vi-mode` is conditional on the `enableVimMode` chezmoi prompt (default `true`); see [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md).
 - `~/.tmux/plugins/tpm` (TPM)
 - `~/.fzf` (Linux only; apt version lacks `--zsh`)
+- `~/.local/share/pi-agents` (`installCodingAgents=true`) — `pia` CLI plus version-matched Pi/OMP combo sources; runtime state and credentials stay outside the checkout
 - `~/.local/share/toolkami/toolkami.rb`
 
 See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat) for details and when to add entries here vs. ansible.
@@ -303,7 +305,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
 - **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
 - **File sync** (optional, `installResilioSync=true`): [Resilio Sync](docs/tools/resilio-sync.md) for AirDrop-style cross-system transfer + phone→NAS photo backup. macOS GUI cask; Linux (desktop + server) headless daemon (no GUI) as a per-user systemd service, configured via WebUI at `127.0.0.1:8888` (SSH-tunnel on a server).
-- **Coding Agents** (optional): Claude Code with official Pyright/`gopls` LSP plugins, `claude-hud` statusline plugin, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli; wrapper-managed SpecStory sessions carry a `DEV_AGENT_RUN_ID`, finalize explicitly armed transcripts only after the writer exits, and use Claude `SessionEnd` only as a lightweight observer; the local Copilot gateway includes content-free timing metrics, adaptive 4→8 admission control with live tuning, SSE keepalives, and followable logs
+- **Coding Agents** (optional): Claude Code with official Pyright/`gopls` LSP plugins, Pi, Oh My Pi (`omp`), the Git-managed `pia` harness-combo manager, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli; wrapper-managed SpecStory sessions carry a `DEV_AGENT_RUN_ID`, finalize explicitly armed transcripts only after the writer exits, and use Claude `SessionEnd` only as a lightweight observer; the local Copilot gateway includes content-free timing metrics, adaptive 4→8 admission control with live tuning, SSE keepalives, and followable logs
 - **Agent pane discovery**: `tv agent-panes` channel + tmux `prefix + a` popup — find which Claude/Codex/OpenCode/Cursor sessions are running in any tmux pane and jump straight to them; companion `recon` (Claude-only fast popup) installed via cargo. See [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
 - **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks
@@ -380,9 +382,9 @@ just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
 just upgrade-go           # go install <pkg>@latest per go_tools entry (Linux only; macOS translate/dev → brew)
 just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
 just upgrade-gem          # Ruby gems (try-cli, tmuxinator, ...)
-just upgrade-agents       # re-runs install.sh for Claude Code / OpenCode / Cursor CLI / Ollama / llmfit / RTK
+just upgrade-agents       # self-update/installers for Claude Code / OpenCode / Pi / OMP / Cursor / Ollama / llmfit / RTK
 just upgrade-plugins      # LazyVim :Lazy sync + TPM + claude-hud + pre-commit autoupdate + tldr + gh extensions
-just upgrade-externals    # chezmoi upgrade + chezmoi apply --refresh-externals
+just upgrade-externals    # chezmoi upgrade + refresh externals, including pi-agents
 ```
 
 Underlying script: [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh) —

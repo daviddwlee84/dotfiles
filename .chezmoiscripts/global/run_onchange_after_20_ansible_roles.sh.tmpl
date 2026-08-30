@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-run ansible when any role changes
-# Triggers on changes to any role's tasks or defaults files
+# Triggers on changes to role tasks/defaults and explicitly hashed helper files
 # Profile: {{ .profile }}
 
 # === Role Hashes (changes trigger re-run) ===
@@ -19,6 +19,7 @@
 # nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
 # coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
 # coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+# coding_agents Pi/OMP cleanup: {{ include "dot_ansible/roles/coding_agents/files/pi_omp_package_cleanup.sh" | sha256sum }}
 # bitwarden tasks: {{ include "dot_ansible/roles/bitwarden/tasks/main.yml" | sha256sum }}
 # bitwarden defaults: {{ include "dot_ansible/roles/bitwarden/defaults/main.yml" | sha256sum }}
 # security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}

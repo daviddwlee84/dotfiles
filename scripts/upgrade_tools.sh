@@ -900,10 +900,10 @@ cat_yazi_plugins() {
 }
 
 # ============================================================================
-# Category: agents — re-run install.sh for curl-installed CLI tools
+# Category: agents — agent-native self-updates with canonical fallbacks
 # ============================================================================
-# Only re-runs when the binary is already present. The installers are (by
-# design) idempotent self-upgrades.
+# Only runs when the binary is already present. Installer and package-manager
+# fallbacks are (by design) idempotent self-upgrades.
 cat_agents() {
   local any_fail=0
   local ran_any=0
@@ -973,6 +973,59 @@ cat_agents() {
     ran_any=1
   fi
 
+  # Pi — prefer the CLI's own updater, then reinstall through the same stable
+  # ~/.local npm prefix used by the ansible role. A plain `npm -g update`
+  # follows npm's active (often mise-versioned) prefix and would miss it.
+  if [[ -x "$HOME/.local/bin/pi" ]]; then
+    info "Upgrading Pi (trying self-update first)"
+    local pi_cmd="$HOME/.local/bin/pi"
+    local pi_update="$pi_cmd update --self"
+    if [[ -n "$_timeout_bin" ]]; then
+      pi_update="$_timeout_bin 180 $pi_cmd update --self"
+    fi
+    if ! _run_sh "$pi_update"; then
+      warn "Pi self-update failed/timed out — falling back to npm in ~/.local"
+      local pi_npm=""
+      if [[ -x "$HOME/.local/bin/mise" ]]; then
+        pi_npm="$HOME/.local/bin/mise exec -- npm"
+      elif command -v mise >/dev/null 2>&1; then
+        pi_npm="mise exec -- npm"
+      elif command -v npm >/dev/null 2>&1; then
+        pi_npm="npm"
+      fi
+      if [[ -z "$pi_npm" ]]; then
+        error "Pi fallback requires npm (preferably through mise)"
+        any_fail=1
+      else
+        _run_sh "$pi_npm install -g --ignore-scripts --prefix \"$HOME/.local\" @earendil-works/pi-coding-agent" \
+          || any_fail=1
+      fi
+    fi
+    ran_any=1
+  fi
+
+  # Oh My Pi — the binary updater verifies the release digest and swaps the
+  # executable atomically. Keep the fallback on `--binary`: the installer's
+  # default chooses Bun whenever it is present and may then reject an older
+  # Bun before it ever considers the standalone release asset.
+  if [[ -x "$HOME/.local/bin/omp" ]]; then
+    info "Upgrading Oh My Pi (trying self-update first)"
+    local omp_cmd="$HOME/.local/bin/omp"
+    local omp_update="$omp_cmd update"
+    if [[ -n "$_timeout_bin" ]]; then
+      omp_update="$_timeout_bin 300 $omp_cmd update"
+    fi
+    if ! _run_sh "$omp_update"; then
+      warn "Oh My Pi self-update failed/timed out — falling back to the official prebuilt installer"
+      local omp_fallback="curl -fsSL --connect-timeout 10 --max-time 300 https://omp.sh/install | PI_INSTALL_DIR=\"$HOME/.local/bin\" sh -s -- --binary"
+      if [[ -n "$_timeout_bin" ]]; then
+        omp_fallback="$_timeout_bin 600 bash -c 'curl -fsSL --connect-timeout 10 --max-time 300 https://omp.sh/install | PI_INSTALL_DIR=\"$HOME/.local/bin\" sh -s -- --binary'"
+      fi
+      _run_sh "$omp_fallback" || any_fail=1
+    fi
+    ran_any=1
+  fi
+
   # Cursor CLI — `cursor-agent update`
   if command -v cursor-agent >/dev/null 2>&1 \
     || command -v cursor-cli >/dev/null 2>&1 \
@@ -1029,7 +1082,7 @@ cat_agents() {
   fi
 
   if [[ "$ran_any" -eq 0 ]]; then
-    warn "no known curl-installed agents detected — skipping"
+    warn "no known self-managed agents detected — skipping"
     return $SKIP_RC
   fi
 

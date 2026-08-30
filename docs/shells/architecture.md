@@ -20,6 +20,8 @@ portable) see [`posix.md`](posix.md).
   │                             $ZSH_VERSION / $BASH_VERSION
   ├── 02_legacy_tools.sh       Go / Bun / pnpm / Foundry / NVM / .NET PATH
   ├── 05_mise.sh               mise activate <shell>
+  ├── 08_pi_agents.sh.tmpl      reassert canonical Pi / OMP / pia paths
+  │                             after mise and Bun PATH activation
   ├── 10_aliases.sh            v=nvim, chezmoi-cd, gcam-amend, gundo,
   │                             glop, load-nvm, brew-mirror, ghostty-ssh-
   │                             terminfo, claude-plans-here, ...

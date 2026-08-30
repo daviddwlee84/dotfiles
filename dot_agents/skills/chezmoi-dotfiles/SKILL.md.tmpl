@@ -53,7 +53,7 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 
 (Rendered from this host's selections. For live truth: `chezmoi data | jq`.)
 {{- if dig "installCodingAgents" false . }}
-- **Coding agents** — Claude Code, OpenCode, Cursor, Codex, Gemini, Copilot (configs + CLIs). See `docs/tools/agent-overlays.md`, `docs/tools/agent-skills.md`.
+- **Coding agents** — Claude Code, Pi (`pi`), Oh My Pi (`omp`), the `pia` Git-managed harness-combo manager, OpenCode, Cursor, Codex, Gemini, Copilot (configs + CLIs). `pia doctor` checks the stack; `pia list --tree` / `pia use pi/base` select presets. The external checkout is `~/.local/share/pi-agents`; `08_pi_agents.sh` makes its canonical commands beat mise/Bun shadows, while runtime state and credentials stay elsewhere. See `docs/tools/pi-agents.md`, `docs/tools/agent-overlays.md`, `docs/tools/agent-skills.md`.
 {{- end }}
 {{- if dig "installPythonUvTools" false . }}
 - **Python uv tools** — mlflow, marimo, jupyter, etc. (powers the `mlf` CLI). See `docs/this_repo/uv-bootstrap.md`.

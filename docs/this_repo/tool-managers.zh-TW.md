@@ -35,14 +35,14 @@
 | **Ansible roles** | 主要部分——26 個 role，涵蓋 shells、devtools、agents、語言工具鏈、網路、安全 | `dot_ansible/roles/*/tasks/main.yml` | 間接（每個 role 呼叫 brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release 之一） |
 | **mise** | Runtime 版本：`node`、`bun`、`rust`、`go`、`dotnet`、`ruby`（oldEL：只有 ruby） | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI 工具（`python_uv_tools` ~13 個 + `llm_tools` 1 個 + `litellm`） | `dot_ansible/roles/python_uv_tools/defaults/main.yml`、`dot_ansible/roles/llm_tools/defaults/main.yml`、`coding_agents` 中的 ad-hoc `uv tool install`（specify-cli）+ `security_tools`（pre-commit） | `uv` (`uv tool upgrade --all`) |
-| **npm** (全域) | JS CLI（~5 個：copilot-cli、codex、gemini-cli、openchamber、bitwarden、readability-cli）+ `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`、散布的 `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
+| **npm** (全域) | JS CLI（Pi、copilot-cli、codex、gemini-cli、openchamber、bitwarden、readability-cli）+ `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`、散布的 `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) / Pi 另由 `agents` 處理穩定 prefix |
 | **cargo** | Rust crates：`recon`、`pueue`（Linux）、`tree-sitter-cli`（fallback）、`alacritty`（Linux 編譯）、`modelsdev`（Linux fallback） | `rust_cargo_tools/defaults/main.yml`（目前為 `[]`）+ 在 task 中硬寫 | `cargo` (`cargo install-update -a`) |
 | **go** (`go install`) | 個人 Go CLI：`translate`、`dev`（僅 Linux；macOS 由 `daviddwlee84/tap` 的 Homebrew formula 安裝） | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest`) |
 | **dotnet** (全域工具) | `azure-cost-cli`（binary `azure-cost`） | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli`（binary `try`）、`tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
-| **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
+| **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、omp、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
 | **GitHub-release 下載** | ~30 個 Linux 使用者層級 fallback：ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS specstory 的 fallback | 每個 role 的 `_release_fallback` 區塊 | **無**（install-only — 見 [覆蓋落差](#coverage-gaps-install-only-no-automated-upgrade)） |
-| **chezmoi externals** | 每週刷新的 git checkout：oh-my-zsh + 插件、oh-my-bash、ble.sh、TPM、fzf（Linux）、toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
+| **chezmoi externals** | 每週刷新的 git checkout：oh-my-zsh + 插件、oh-my-bash、ble.sh、TPM、fzf（Linux）、pi-agents、toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | 發行版套件（編譯依賴、ffmpeg、audit、fontconfig、libnotify-bin、系統 git/zsh/bash 等） | role 中散布的 `ansible.builtin.apt:` / `ansible.builtin.yum:` | **無**（依賴 repo 流程外的 `apt upgrade`） |
 | **flatpak** | Discord（Linux 上的預設頻道） | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
 
@@ -342,6 +342,9 @@ Role:`dot_ansible/roles/coding_agents/tasks/main.yml`。由
 | `terminal-notifier` / `libnotify-bin` | brew formula / apt(Debian) | 僅 apt(Debian) | 通知輔助,9–29 行 |
 | **Claude Code** | brew cask `claude-code` | `curl https://claude.ai/install.sh \| bash` → `~/.claude/local/bin/claude` | 33–71 行;非 amd64/arm64 架構跳過 |
 | **OpenCode** | `curl https://opencode.ai/install \| bash -s -- --no-modify-path` → `~/.opencode/bin/opencode` | 同 | 73–107 行。跨平台統一安裝;`--no-modify-path` 阻止 installer 改寫 chezmoi 管理的 shell rc。容器映像 (container image) 變體見 [`pitfalls/opencode-docker-opentui-glibc-loader-missing.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/opencode-docker-opentui-glibc-loader-missing.md) |
+| **Pi** (`pi`) | `mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent` | 同 | role 最後區段。需要 Node ≥ 22.19；先以 transaction 安裝並驗證 stable canonical copy，再從其他 npm prefix 移除精確的已棄用／重複 package |
+| **Oh My Pi** (`omp`) | `curl https://omp.sh/install \| sh -s -- --binary` → `~/.local/bin/omp` | 同 | role 最後區段。先 read-only 偵測 package copy，安裝／驗證 binary 後才移除精確的 `@oh-my-pi/pi-coding-agent` npm/Bun globals；失敗會還原舊 command，不支援主機不 migration |
+| **pia** | chezmoi external → `~/.local/share/pi-agents/bin/pia` | 同 | 由 `installCodingAgents` gate 的 CLI + combo checkout；`08_pi_agents.sh` 在 mise/Bun 後重申 canonical Pi/OMP/pia precedence，runtime/session state 不在 checkout 內 |
 | **Cursor CLI**(`cursor-agent`) | `curl https://cursor.com/install \| bash` | 同 | 112–124 行;brew cask 因簽章 (code-signing) 問題棄用 |
 | **GitHub Copilot CLI** | npm `@githubnext/github-copilot-cli`(全域) | `mise exec -- npm install -g` | 134–168 行 |
 | **OpenAI Codex CLI** | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | 172–236 行 |
@@ -360,6 +363,8 @@ Role:`dot_ansible/roles/coding_agents/tasks/main.yml`。由
 自動偵測順序 + `AICAP_*_MODEL` 預設值。四個 Python 消費者 regex parse
 同一份檔案(見 AGENTS.md cross-file rule)。在此新增 agent 時要同時:
 在本 role 安裝 + 加到 SSOT + 四個 Python `AGENT_CONFIG` dict。
+Pi、OMP 與 `pia` 在本次變更中刻意不加入 AICAP：它們是 harness combo
+研究／runtime surface，不是通用 one-shot AI shell helper 的新預設。
 
 #### 3.5 語言工具鏈 (`python_uv_tools`, `ruby_gem_tools`, `rust_cargo_tools`, `dotnet_tools`, `js_cli_tools`)
 
@@ -540,6 +545,11 @@ Linux 顯式用 `mise exec -- npm` 避開 Ubuntu apt 的 npm(太舊;系統
 Node 12 連現代套件的 `engine` 檢查都過不了,而且 `/usr/local/lib/node_modules`
 是 root-owned,讓非 root 使用者的 `--global` 安裝壞掉)。見
 [`pitfalls/ansible-js-cli-tools-old-system-node.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/ansible-js-cli-tools-old-system-node.md)。
+Pi 在兩個 OS 都刻意優先使用 mise，並加上 `--prefix ~/.local`：它與
+`pia` 共用 Node 22.19 的最低需求，而固定 prefix 能跨 mise Node 版本替換
+保留 command。role 會先安裝並驗證 canonical copy，再從不同的 active
+npm prefix 移除精確的 deprecated／duplicate Pi package，因此失敗的
+migration 不會破壞原本可用的 command。
 
 **清單**:
 
@@ -547,6 +557,7 @@ Node 12 連現代套件的 `engine` 檢查都過不了,而且 `/usr/local/lib/no
 |---|---|---|
 | `readability-cli` | `readable` | `js_cli_tools/defaults/main.yml` |
 | `@bitwarden/cli` | `bw` | `bitwarden/tasks/main.yml` |
+| `@earendil-works/pi-coding-agent` | `pi` | `coding_agents/tasks/main.yml`（`--ignore-scripts --prefix ~/.local`；移除已棄用的 `@mariozechner/pi-coding-agent`） |
 | `@githubnext/github-copilot-cli` | `github-copilot-cli` | `coding_agents/tasks/main.yml:134-168` |
 | `@openai/codex` | `codex`(僅 Linux — macOS 走 brew cask) | `coding_agents/tasks/main.yml:172-236` |
 | `@google/gemini-cli` | `gemini`(Linux 永遠;macOS 在 brew formula 失敗時 fallback) | `coding_agents/tasks/main.yml:240-300` |
@@ -555,10 +566,13 @@ Node 12 連現代套件的 `engine` 檢查都過不了,而且 `/usr/local/lib/no
 | `tree-sitter-cli` | `tree-sitter` | `lazyvim_deps/tasks/main.yml`(優先於 cargo fallback) |
 
 **升級**:`just upgrade-npm` → `npm -g update`,有 `mise exec --` fallback。
+Pi 使用固定的 `~/.local` prefix，因此由 `just upgrade-agents` 先跑
+`pi update --self`，失敗時以同一個 prefix 的 npm install fallback 更新。
 
 **新增 npm 工具**:在 `js_cli_tools/defaults/main.yml` 附加(給一般工具);
 若是 agent CLI,改在 `coding_agents/tasks/main.yml` 新增安裝 task,
-按現有分派模式(macOS 用系統 npm,Linux 用 `mise exec -- npm install -g`)。
+按現有分派模式(通常 macOS 用系統 npm,Linux 用 `mise exec -- npm install -g`；
+若 command 必須跨 runtime 升級保留，使用固定的 user prefix)。
 
 ### 7. cargo (Rust crates)
 
@@ -651,6 +665,7 @@ agents(每個廠商自己維護 installer + self-update 子命令)。所有 land
 | direnv | (廠商 installer) | `~/.local/bin/direnv` | `devtools`(Linux fallback) |
 | **Claude Code** | `https://claude.ai/install.sh` | `~/.claude/local/bin/claude` | `coding_agents`(Linux) |
 | **OpenCode** | `https://opencode.ai/install`(+ `--no-modify-path`) | `~/.opencode/bin/opencode` | `coding_agents`(macOS + Linux) |
+| **Oh My Pi** | `https://omp.sh/install`(`--binary`) | `~/.local/bin/omp` | `coding_agents`(macOS + Linux x64/arm64) |
 | **Cursor CLI** | `https://cursor.com/install` | `~/.local/bin/cursor-agent` | `coding_agents` |
 | **Antigravity CLI** | `https://antigravity.google/cli/install.sh`(改寫成 `--skip-path --skip-aliases`) | `~/.local/bin/agy` + `agyc` symlink | `coding_agents` |
 | **RTK** | `https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh` | `~/.local/bin/rtk` | `coding_agents`(Linux) |
@@ -678,7 +693,10 @@ agents(每個廠商自己維護 installer + self-update 子命令)。所有 land
 4. 如果工具有 self-update 子命令(或 installer-as-upgrader 路徑),
    更新 `scripts/upgrade_tools.sh::cat_agents`
 5. 如果 binary 落在 `~/.local/bin` 以外(例如 `~/.opencode/bin/opencode`),
-   到 `dot_config/shell/00_exports.sh.tmpl` 加一個存在性守衛的 PATH 前置
+   到 `dot_config/shell/00_exports.sh.tmpl` 加一個存在性守衛的 PATH 前置。
+   如果受管理路徑必須蓋過後面的 mise、Bun 或 package-manager PATH,
+   改在更後面的編號共用 fragment 再次前置(Pi/OMP/pia 的做法在
+   `dot_config/shell/08_pi_agents.sh.tmpl`)
 
 ### 11. GitHub-release 下載 (使用者層級 fallback)
 
@@ -757,6 +775,7 @@ GitHub release tarball 並解壓到 `~/.local/bin`(使用者可寫,已在 PATH)�
 | `.local/src/blesh` | git-repo(`--recurse-submodules`) | `akinomyoga/ble.sh.git` | 永遠;由 `run_onchange_after_26_install_blesh.sh.tmpl` 編譯 → `~/.local/share/blesh/ble.sh` |
 | `.tmux/plugins/tpm` | git-repo | `tmux-plugins/tpm.git` | 永遠 |
 | `.fzf` | git-repo | `junegunn/fzf.git` | 僅 Linux(ansible 跑 `~/.fzf/install --bin`) |
+| `.local/share/pi-agents` | git-repo | `daviddwlee84/pi-agents.git` | `installCodingAgents`；提供 `bin/pia`，runtime state 留在 checkout 外 |
 | `.local/share/toolkami/toolkami.rb` | file(executable) | `https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb` | 永遠 |
 
 **為什麼選 externals(而不是在 role 裡 git clone)**:
@@ -910,8 +929,9 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 - 落差在 **noRoot Linux** 上最尖銳,因為 GitHub releases 是唯一安裝
   路徑,而且沒有升級自動化
 
-**`cat_agents` 上的覆蓋落差**:只有 `claude / opencode / cursor-agent
-/ ollama / llmfit / rtk / specstory` 拿到 self-update-then-curl 迴圈。
+**`cat_agents` 上的覆蓋落差**:只有 `claude / opencode / pi / omp /
+cursor-agent / ollama / llmfit / rtk / specstory` 有明確受 guard 的
+agent-specific 升級路徑。
 **漏掉**:`agy`(Antigravity)、`codexbar`、`td`、`sidecar`、
 `specify-cli`、`openchamber`、`codex` — 這些依賴 brew / uv / npm
 類別。
@@ -1045,6 +1065,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **node** | brew(透過 `lazyvim_deps`) | mise | mise + lazyvim_deps |
 | **obsidian** | brew cask | n/a | Brewfile.darwin |
 | **ollama** | brew formula `ollama`(CLI)+ cask `ollama-app`(GUI) | curl `ollama.com/install.sh` | llm_tools |
+| **omp**(Oh My Pi) | curl `omp.sh/install --binary` → `~/.local/bin/omp` | 同 | coding_agents |
 | **openchamber**(`@openchamber/web`) | npm 全域 | `mise exec -- npm install -g` | coding_agents |
 | **opencode** | curl `opencode.ai/install`(`--no-modify-path`)→ `~/.opencode/bin/opencode` | 同 | coding_agents |
 | **opencode-desktop** | brew cask | n/a | Brewfile.darwin |
@@ -1052,6 +1073,8 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
 | **peon-ping** (`peon`) | brew tap `PeonPing/tap`（需 `brew trust`，Homebrew 6 gate） | `install.sh --openpeon --no-rc` | coding_agents —— agent 完成音效；**絕不要跑 `peon-ping-setup`**（hook 由 `dot_claude/modify_settings.json.tmpl` 宣告）。由 `agentSounds` prompt 控制。見 [agent-sounds.md](../tools/agent-sounds.md) |
+| **pi** | `mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent` | 同 | coding_agents |
+| **pia** | chezmoi external `~/.local/share/pi-agents/bin/pia` | 同 | `.chezmoiexternal.toml.tmpl`(`installCodingAgents`) |
 | **playerctl / wmctrl / xdotool** | n/a | apt | gui_apps_linux |
 | **pre-commit** | `uv tool install --python 3.13` | 同 | security_tools |
 | **procps** | (系統) | apt | bootstrap(Linux) |
@@ -1123,7 +1146,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 
 > 未列出的工具:`oh-my-zsh`、`oh-my-bash`、`zsh-autosuggestions`、
 > `zsh-syntax-highlighting`、`zsh-completions`、`zsh-vi-mode`、
-> `ble.sh`、`TPM`、`toolkami.rb` — 這些以 **chezmoi externals** 形式存在
+> `ble.sh`、`TPM`、`pi-agents`、`toolkami.rb` — 這些以 **chezmoi externals** 形式存在
 > ([§ 12](#12-chezmoi-externals-週期刷新-git檔案抓取)),不是「PATH 上的
 > binary」。
 
@@ -1196,7 +1219,9 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 ├── 是 → curl-installer 寫進相關 role
 │         · 用 creates: 守衛
 │         · 如果 binary 落在 ~/.local/bin 以外,在
-│           dot_config/shell/00_exports.sh.tmpl 加 PATH 前置
+│           dot_config/shell/00_exports.sh.tmpl 加 PATH 前置;若必須蓋過
+│           後面的 mise/Bun/package-manager 路徑,則用更後面的編號共用
+│           fragment(例如 08_pi_agents.sh.tmpl)
 └── 否 → 繼續
 
 GitHub release tarball(其他一切的最可靠路徑):

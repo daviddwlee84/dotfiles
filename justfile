@@ -474,7 +474,7 @@ upgrade-atuin:
 upgrade-herdr:
     ./scripts/upgrade_tools.sh herdr
 
-# curl|bash installers: Claude Code, OpenCode, Cursor CLI, Ollama, llmfit, RTK
+# Self-managed agents: Claude Code, OpenCode, Pi, OMP, Cursor CLI, Ollama, llmfit, RTK
 upgrade-agents:
     ./scripts/upgrade_tools.sh agents
 
@@ -487,7 +487,7 @@ upgrade-plugins:
 upgrade-yazi-plugins:
     ./scripts/upgrade_tools.sh yazi-plugins
 
-# chezmoi upgrade + chezmoi apply --refresh-externals (oh-my-zsh, TPM, etc.)
+# chezmoi upgrade + chezmoi apply --refresh-externals (oh-my-zsh, TPM, pi-agents, etc.)
 upgrade-externals:
     ./scripts/upgrade_tools.sh externals
 

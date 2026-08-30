@@ -64,10 +64,21 @@ n_missing=0
 # subcommands are 1-3 words, no quoting needed).
 regen() {
   local tool="$1" zargs="$2" bargs="$3"
-  local bin
+  local bin runner
   if ! bin="$(command -v "$tool" 2>/dev/null)"; then
-    n_missing=$((n_missing + 1))
-    return 0
+    # Fresh `chezmoi init --apply` may install a user-level binary before the
+    # parent process has reloaded ~/.local/bin into PATH. Resolve that canonical
+    # install location explicitly so first-apply completion generation works.
+    if [ -x "$HOME/.local/bin/$tool" ]; then
+      bin="$HOME/.local/bin/$tool"
+      runner="$bin"
+    else
+      n_missing=$((n_missing + 1))
+      return 0
+    fi
+  else
+    # Preserve the short argv[0] for generators that bake it into output.
+    runner="$tool"
   fi
   local zfile="${ZFUNC}/_${tool}"
   local bfile="${BASHDIR}/${tool}"
@@ -75,7 +86,7 @@ regen() {
   # zsh
   if [ "$force" = 1 ] || [ ! -f "$zfile" ] || [ "$bin" -nt "$zfile" ]; then
     # shellcheck disable=SC2086  # word-split intentional
-    if "$tool" $zargs >"$zfile.tmp" 2>/dev/null && [ -s "$zfile.tmp" ]; then
+    if "$runner" $zargs >"$zfile.tmp" 2>/dev/null && [ -s "$zfile.tmp" ]; then
       mv "$zfile.tmp" "$zfile"
       n_z_regen=$((n_z_regen + 1))
       [ "$quiet" = 0 ] && printf '  zsh   %-10s → %s\n' "$tool" "$zfile"
@@ -89,7 +100,7 @@ regen() {
   # bash
   if [ "$force" = 1 ] || [ ! -f "$bfile" ] || [ "$bin" -nt "$bfile" ]; then
     # shellcheck disable=SC2086
-    if "$tool" $bargs >"$bfile.tmp" 2>/dev/null && [ -s "$bfile.tmp" ]; then
+    if "$runner" $bargs >"$bfile.tmp" 2>/dev/null && [ -s "$bfile.tmp" ]; then
       mv "$bfile.tmp" "$bfile"
       n_b_regen=$((n_b_regen + 1))
       [ "$quiet" = 0 ] && printf '  bash  %-10s → %s\n' "$tool" "$bfile"
@@ -126,6 +137,7 @@ regen delta "--generate-completion zsh" "--generate-completion bash"
 regen zellij "setup --generate-completion zsh" "setup --generate-completion bash"
 regen pueue "completions zsh" "completions bash"
 regen opencode "completion zsh" "completion bash"
+regen omp "completions zsh" "completions bash"
 regen translate "completion zsh" "completion bash"
 regen dev "completion zsh" "completion bash"
 

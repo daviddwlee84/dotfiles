@@ -23,6 +23,8 @@
   │                             $ZSH_VERSION / $BASH_VERSION 分派
   ├── 02_legacy_tools.sh       Go / Bun / pnpm / Foundry / NVM / .NET PATH
   ├── 05_mise.sh               mise activate <shell>
+  ├── 08_pi_agents.sh.tmpl      在 mise/Bun PATH 初始化後重新前置
+  │                             canonical Pi / OMP / pia 路徑
   ├── 10_aliases.sh            v=nvim、chezmoi-cd、gcam-amend、gundo、
   │                             glop、load-nvm、brew-mirror、ghostty-ssh-
   │                             terminfo、claude-plans-here、...

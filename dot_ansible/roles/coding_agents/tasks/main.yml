@@ -1524,3 +1524,190 @@
         state: link
         force: true
   ignore_errors: true
+
+# === Pi ===
+# `pia` and the maintained Pi package both require Node >= 22.19. Prefer the
+# mise-managed Node/npm pair, but pin npm's prefix to ~/.local so a future
+# mise Node upgrade does not strand the globally installed command in the old
+# version directory. This also keeps noRoot Linux hosts away from /usr/local.
+# The old @mariozechner package owns the same `pi` executable. Install and
+# verify the maintained @earendil-works line first, then remove exact legacy
+# shadows; a failed install restores the previous executable.
+
+- name: Check whether Node is new enough for Pi and pia
+  when: target_architecture not in ['armv7l', 'armv6l']
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      exec "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" exec -- node -e \
+        'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=19)?0:1)'
+    elif command -v mise >/dev/null 2>&1; then
+      exec mise exec -- node -e \
+        'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=19)?0:1)'
+    elif command -v node >/dev/null 2>&1; then
+      exec node -e \
+        'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=19)?0:1)'
+    fi
+    exit 127
+  args:
+    executable: /bin/bash
+  register: pi_node_runtime_check
+  changed_when: false
+  failed_when: false
+
+- name: Explain why Pi and pia are unavailable on this host
+  when:
+    - target_architecture in ['armv7l', 'armv6l'] or (pi_node_runtime_check.rc | default(1)) != 0
+  ansible.builtin.debug:
+    msg: >-
+      Pi/pia skipped: @earendil-works/pi-coding-agent and pi-agents require
+      Node >= 22.19; this host does not have a compatible managed Node runtime.
+
+- name: Install and transactionally verify maintained Pi in stable prefix
+  when:
+    - target_architecture not in ['armv7l', 'armv6l']
+    - pi_node_runtime_check.rc | default(1) == 0
+  ansible.builtin.script:
+    cmd: pi_omp_package_cleanup.sh pi-install
+    executable: /bin/bash
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    PI_AGENTS_MANAGED_PREFIX: "{{ ansible_facts['env']['HOME'] }}/.local"
+  register: pi_package_install
+  changed_when: "'PI_INSTALL_CHANGED=1' in pi_package_install.stdout"
+  until: pi_package_install is succeeded
+  retries: 3
+  delay: 5
+
+- name: Verify Pi can start from the managed npm runtime
+  when:
+    - target_architecture not in ['armv7l', 'armv6l']
+    - pi_node_runtime_check.rc | default(1) == 0
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      exec "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" exec -- \
+        "{{ ansible_facts['env']['HOME'] }}/.local/bin/pi" --version
+    elif command -v mise >/dev/null 2>&1; then
+      exec mise exec -- "{{ ansible_facts['env']['HOME'] }}/.local/bin/pi" --version
+    fi
+    exec "{{ ansible_facts['env']['HOME'] }}/.local/bin/pi" --version
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Remove deprecated and duplicate Pi packages after canonical verification
+  when:
+    - target_architecture not in ['armv7l', 'armv6l']
+    - pi_node_runtime_check.rc | default(1) == 0
+  ansible.builtin.script:
+    cmd: pi_omp_package_cleanup.sh pi-cleanup
+    executable: /bin/bash
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    PI_AGENTS_MANAGED_PREFIX: "{{ ansible_facts['env']['HOME'] }}/.local"
+  register: pi_package_cleanup
+  changed_when: "'PI_CLEANUP_CHANGED=1' in pi_package_cleanup.stdout"
+
+- name: Verify Pi remains available after package cleanup
+  when:
+    - target_architecture not in ['armv7l', 'armv6l']
+    - pi_node_runtime_check.rc | default(1) == 0
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      exec "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" exec -- \
+        "{{ ansible_facts['env']['HOME'] }}/.local/bin/pi" --version
+    elif command -v mise >/dev/null 2>&1; then
+      exec mise exec -- "{{ ansible_facts['env']['HOME'] }}/.local/bin/pi" --version
+    fi
+    exec "{{ ansible_facts['env']['HOME'] }}/.local/bin/pi" --version
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+# === Oh My Pi (OMP) ===
+# Force the official installer's prebuilt path. Its default switches to a Bun
+# package install whenever `bun` exists, then hard-fails if that Bun is older
+# than OMP's current minimum. The standalone binary has no Bun dependency and
+# lands in the already-managed ~/.local/bin directory. Detect package-managed
+# copies without changing them, install and verify the binary transactionally,
+# then clean exact shadows. A failed download restores the previous command.
+
+- name: Detect package-managed Oh My Pi copies
+  when:
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - not (oldEL | default(false))
+  ansible.builtin.script:
+    cmd: pi_omp_package_cleanup.sh omp-status
+    executable: /bin/bash
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    PI_AGENTS_MANAGED_PREFIX: "{{ ansible_facts['env']['HOME'] }}/.local"
+    BUN_INSTALL: "{{ ansible_facts['env']['BUN_INSTALL'] | default(ansible_facts['env']['HOME'] + '/.bun') }}"
+    BUN_INSTALL_GLOBAL_DIR: "{{ ansible_facts['env']['BUN_INSTALL_GLOBAL_DIR'] | default((ansible_facts['env']['BUN_INSTALL'] | default(ansible_facts['env']['HOME'] + '/.bun')) + '/install/global') }}"
+    BUN_INSTALL_BIN: "{{ ansible_facts['env']['BUN_INSTALL_BIN'] | default((ansible_facts['env']['BUN_INSTALL'] | default(ansible_facts['env']['HOME'] + '/.bun')) + '/bin') }}"
+  register: omp_package_status
+  changed_when: false
+
+- name: Check if Oh My Pi is installed
+  ansible.builtin.command:
+    cmd: "{{ ansible_facts['env']['HOME'] }}/.local/bin/omp --version"
+  register: omp_check
+  changed_when: false
+  failed_when: false
+
+- name: Skip Oh My Pi on unsupported platform
+  when:
+    - omp_check.rc != 0
+    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64'] or (oldEL | default(false))
+  ansible.builtin.debug:
+    msg: >-
+      Oh My Pi skipped: the official prebuilt installer supports macOS/Linux
+      x64 and arm64; this host is {{ target_architecture }}{{ ' on an EL7 runtime' if (oldEL | default(false)) else '' }}.
+
+- name: Install Oh My Pi from the official prebuilt binary
+  when:
+    - omp_check.rc != 0 or 'OMP_PACKAGE_PRESENT=1' in (omp_package_status.stdout | default(''))
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - not (oldEL | default(false))
+  ansible.builtin.script:
+    cmd: pi_omp_package_cleanup.sh omp-install
+    executable: /bin/bash
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    PI_AGENTS_MANAGED_PREFIX: "{{ ansible_facts['env']['HOME'] }}/.local"
+  register: omp_install
+  changed_when: "'OMP_INSTALL_CHANGED=1' in omp_install.stdout"
+  until: omp_install is succeeded
+  retries: 3
+  delay: 5
+
+- name: Verify Oh My Pi can start from the canonical install path
+  when:
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - not (oldEL | default(false))
+  ansible.builtin.command:
+    cmd: "{{ ansible_facts['env']['HOME'] }}/.local/bin/omp --version"
+  changed_when: false
+
+- name: Remove package-managed Oh My Pi copies after binary verification
+  when:
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - not (oldEL | default(false))
+  ansible.builtin.script:
+    cmd: pi_omp_package_cleanup.sh omp-cleanup
+    executable: /bin/bash
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    PI_AGENTS_MANAGED_PREFIX: "{{ ansible_facts['env']['HOME'] }}/.local"
+    BUN_INSTALL: "{{ ansible_facts['env']['BUN_INSTALL'] | default(ansible_facts['env']['HOME'] + '/.bun') }}"
+    BUN_INSTALL_GLOBAL_DIR: "{{ ansible_facts['env']['BUN_INSTALL_GLOBAL_DIR'] | default((ansible_facts['env']['BUN_INSTALL'] | default(ansible_facts['env']['HOME'] + '/.bun')) + '/install/global') }}"
+    BUN_INSTALL_BIN: "{{ ansible_facts['env']['BUN_INSTALL_BIN'] | default((ansible_facts['env']['BUN_INSTALL'] | default(ansible_facts['env']['HOME'] + '/.bun')) + '/bin') }}"
+  register: omp_package_cleanup
+  changed_when: "'OMP_CLEANUP_CHANGED=1' in omp_package_cleanup.stdout"
+
+- name: Verify Oh My Pi remains available after package cleanup
+  when:
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - not (oldEL | default(false))
+  ansible.builtin.command:
+    cmd: "{{ ansible_facts['env']['HOME'] }}/.local/bin/omp --version"
+  changed_when: false

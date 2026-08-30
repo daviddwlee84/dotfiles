@@ -48,9 +48,14 @@ compinit runs once (inside oh-my-zsh.sh)
 | `docker` | `docker completion zsh` |
 | `gh` | `gh completion -s zsh` |
 | `opencode` | `opencode completion zsh` |
+| `omp` | `omp completions zsh` |
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
 | `bw` | `bw completion --shell zsh` |
+
+Fresh apply 若尚未重載 PATH，bulk generator 也會探測
+`~/.local/bin/<tool>`；因此剛安裝的 OMP 不需要第二次開 shell／apply 就能
+生成 completion。
 
 **使用模式：**
 
@@ -142,6 +147,7 @@ command -v pueue && pueue completions zsh > ~/.zfunc/_pueue
 
 # Coding agents（若已安裝）
 command -v opencode && opencode completion zsh > ~/.zfunc/_opencode
+command -v omp   && omp completions zsh > ~/.zfunc/_omp
 command -v bw    && bw completion --shell zsh > ~/.zfunc/_bw
 
 # 強制重建補全快取
