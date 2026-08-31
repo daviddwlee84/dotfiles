@@ -21,14 +21,9 @@ cask "visual-studio-code"
 # =============================================================================
 {{ if .installAiDesktopApps -}}
 cask "claude"
-{{ if eq .chezmoi.arch "arm64" -}}
 cask "chatgpt"
-{{ end -}}
 cask "opencode-desktop"
 cask "antigravity"
-{{ if eq .chezmoi.arch "arm64" -}}
-cask "codex-app"
-{{ end -}}
 # cask "chatgpt-atlas"  # Uncomment if needed
 # CodeIsland — macOS notch HUD that surfaces coding-agent activity (Claude/Codex/
 # Cursor/Copilot/Gemini/AntiGravity/OpenCode). macOS 14+ only; Swift app uses a

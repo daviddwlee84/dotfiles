@@ -228,7 +228,7 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin  # Check
 chezmoi apply                                         # Or trigger via run_onchange
 ```
 
-**Categories (darwin)**: general GUI apps gated by `installBrewApps` (terminals/editors, system utilities, communication, browsers, productivity, media, network, developer tools), AI & coding gated by `installAiDesktopApps` (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installLlmTools`), and gaming gated by `installGamingApps` (Steam).
+**Categories (darwin)**: general GUI apps gated by `installBrewApps` (terminals/editors, system utilities, communication, browsers, productivity, media, network, developer tools), AI & coding gated by `installAiDesktopApps` (claude, chatgpt with integrated Codex on Intel and Apple Silicon, opencode-desktop, antigravity, ollama-app gated on `installLlmTools`), and gaming gated by `installGamingApps` (Steam).
 
 **Conditional sections** (Brewfiles are chezmoi templates):
 

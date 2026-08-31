@@ -52,7 +52,7 @@
 
 ```go-template
 {{ if and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64") -}}
-cask "chatgpt"  # 僅 arm64 的 release
+cask "superset-sh/superset/superset"  # 僅 arm64 的 release
 {{ end -}}
 ```
 

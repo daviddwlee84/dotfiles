@@ -47,7 +47,7 @@ Anti-pattern: adding a `.profile` value to encode a distinction chezmoi already 
 
 ```go-template
 {{ if and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64") -}}
-cask "chatgpt"  # arm64-only release
+cask "superset-sh/superset/superset"  # arm64-only release
 {{ end -}}
 ```
 

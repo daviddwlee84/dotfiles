@@ -188,8 +188,7 @@ ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew
 | Cask | 控管條件 |
 |---|---|
 | `alacritty`、`warp`、`cmux`、`cursor`、`visual-studio-code` | 永遠 |
-| `claude`、`opencode-desktop`、`antigravity` | `installAiDesktopApps` |
-| `chatgpt`、`codex-app` | `installAiDesktopApps` + arm64 |
+| `claude`、`chatgpt`、`opencode-desktop`、`antigravity` | `installAiDesktopApps` |
 | `codeisland`(tap `wxtsky/tap`) | `installAiDesktopApps` |
 | `ollama-app` | `installAiDesktopApps` + `installLlmTools` |
 | `nikitabobko/tap/aerospace`、`alt-tab`、`raycast`、`maccy`、`scroll-reverser`、`the-unarchiver`、`applite` | 永遠(系統工具) |
@@ -975,13 +974,12 @@ agent-specific 升級路徑。
 | **build-essential** | n/a | apt | bootstrap(Linux) |
 | **bun** | mise | mise | mise |
 | **cargo-update** | cargo install(`cat_cargo` 的 bootstrap) | 同 | rust_cargo_tools |
-| **chatgpt** | brew cask(arm64) | n/a | Brewfile.darwin |
+| **chatgpt** | brew cask（Intel + Apple Silicon；內含 Codex） | n/a | Brewfile.darwin |
 | **Claude Code** | brew cask `claude-code` | curl `claude.ai/install.sh` → `~/.claude/local/bin/claude` | coding_agents |
 | **claude-hud** | role 內跑 python 輔助 | 同 | coding_agents |
 | **cloudflared** | brew | GitHub `.deb`/binary / `.rpm` | networking_tools(tunnel) |
 | **CMux** | brew cask | n/a | Brewfile.darwin |
 | **CodexBar** | brew cask `codexbar`(homebrew-cask core) | Linuxbrew `steipete/tap/codexbar` → GitHub release;glibc < 2.38 時改抓 static-musl asset 並跳過 Linuxbrew | coding_agents |
-| **codex-app** | brew cask(arm64) | n/a | Brewfile.darwin |
 | **codex**(OpenAI Codex CLI) | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | coding_agents |
 | **CodeIsland** | brew cask(`wxtsky/tap`) | n/a | Brewfile.darwin |
 | **CopyQ** | n/a | apt | gui_apps_linux |

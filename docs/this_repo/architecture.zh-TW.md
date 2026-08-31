@@ -209,7 +209,7 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin  # Check
 chezmoi apply                                         # Or trigger via run_onchange
 ```
 
-**分類 (darwin)**：由 `installBrewApps` 控管的一般 GUI app（終端機/編輯器、系統工具、通訊、瀏覽器、生產力、媒體、網路、開發工具）、由 `installAiDesktopApps` 控管的 AI 與 coding (claude、chatgpt、opencode-desktop、antigravity、Apple Silicon 上的 codex-app、再由 `installLlmTools` 控管的 ollama-app)、以及由 `installGamingApps` 控管的遊戲 (Steam)。
+**分類 (darwin)**：由 `installBrewApps` 控管的一般 GUI app（終端機/編輯器、系統工具、通訊、瀏覽器、生產力、媒體、網路、開發工具）、由 `installAiDesktopApps` 控管的 AI 與 coding（claude、在 Intel 與 Apple Silicon 上皆整合 Codex 的 chatgpt、opencode-desktop、antigravity、再由 `installLlmTools` 控管的 ollama-app），以及由 `installGamingApps` 控管的遊戲（Steam）。
 
 **條件式區塊**（Brewfile 是 chezmoi 樣板 (template)）：
 

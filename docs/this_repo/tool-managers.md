@@ -194,8 +194,7 @@ nothing, and kills `community.general.homebrew` on empty JSON with
 | Cask | Gating |
 |---|---|
 | `alacritty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | `installBrewApps` |
-| `claude`, `opencode-desktop`, `antigravity` | `installAiDesktopApps` |
-| `chatgpt`, `codex-app` | `installAiDesktopApps` + arm64 |
+| `claude`, `chatgpt`, `opencode-desktop`, `antigravity` | `installAiDesktopApps` |
 | `codeisland` (tap `wxtsky/tap`) | `installAiDesktopApps` |
 | `ollama-app` | `installAiDesktopApps` + `installLlmTools` |
 | `steam` | `installGamingApps` |
@@ -1063,13 +1062,12 @@ list.
 | **calibre** (`ebook-meta`) | brew cask — opt-in `installCalibre` | apt (`calibre`) — opt-in | devtools — backs Kindle .mobi/.azw/.azw3 metadata previews in yazi via `view-ebook`. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **cargo-update** | cargo install (bootstrap for `cat_cargo`) | same | rust_cargo_tools |
 | **chafa** | brew | apt (`chafa`) | devtools — yazi image-display fallback (unicode-art); backs all image/pdf/video/heic previews. Shadowed by a `--probe off` shim (`dot_dotfiles/bin/executable_chafa`) to stop the OSC-query→rename-popup leak. See [yazi-previews.md](../tools/yazi-previews.md) |
-| **chatgpt** | brew cask (arm64) | n/a | Brewfile.darwin |
+| **chatgpt** | brew cask (Intel + Apple Silicon; includes Codex) | n/a | Brewfile.darwin |
 | **Claude Code** | brew cask `claude-code` | curl `claude.ai/install.sh` → `~/.claude/local/bin/claude` | coding_agents |
 | **claude-hud** | python helper run from role | same | coding_agents |
 | **cloudflared** | brew | GitHub `.deb`/binary / `.rpm` | networking_tools (tunnel) |
 | **CMux** | brew cask | n/a | Brewfile.darwin |
 | **CodexBar** | brew cask `codexbar` (homebrew-cask core) | Linuxbrew `steipete/tap/codexbar` → GitHub release; static-musl asset (and no Linuxbrew) when glibc < 2.38 | coding_agents |
-| **codex-app** | brew cask (arm64) | n/a | Brewfile.darwin |
 | **codex** (OpenAI Codex CLI) | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | coding_agents |
 | **CodeIsland** | brew cask (`wxtsky/tap`) | n/a | Brewfile.darwin |
 | **CopyQ** | n/a | apt | gui_apps_linux |
