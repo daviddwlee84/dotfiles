@@ -1,0 +1,7 @@
+data become Git or runtime authority. CI will guarantee ordering, stale-result
+rejection, and responsiveness while producers are blocked.
+
+Scope and non-goals
+
+- Implement tracing, readiness correctness and first-frame deblocking.
+- Preserve lazy live loading for REMOTE, FLEET and SKILLS.

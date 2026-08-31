@@ -132,6 +132,7 @@ description = "new tab at the workspace (space) root dir"
 | `tv` channel 彈窗（`prefix+T/U/a`） | **自訂 command pane**（`[[keys.command]] type="pane"`） | Key bindings + 2 個 herdr-aware channel |
 | dev / lazygit / scratch launcher | **自訂 command pane + popup** | lazygit 等全螢幕 TUI 維持暫時 pane；短命 modal task 才用 popup |
 | URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
+| 翻譯正在讀的 pane | **tmux 沒有對應物** | `prefix+t` → `pane-translate.sh` → `translate -2` 雙語 popup；範圍變體放在 `prefix+y` |
 | 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
 | 本機/遠端 attach 間的 Neovim clipboard | OSC 52 **只寫入**；不支援 clipboard query | yank 送到 attached client；普通 `p` 用 Neovim register；外部文字用 terminal paste 貼入 |
 | 搜尋所有 pane 內容並跳轉 | **CLI pipeline + fzf + 精確聚焦 helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`；Alt+S 搜尋 unwrapped scrollback |
@@ -184,6 +185,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `` prefix + ` `` | scratch shell | command popup |
 | `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
 | `prefix + O` | herdr-plus **Projects**（layout launcher） | plugin action |
+| `` prefix + t `` | **翻譯這個 pane** ——在 popup 裡以雙語對照顯示當前畫面（[詳細](#translate-pane)） | popup |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > 大寫字母會解析成 `prefix+shift+<letter>`，herdr 保留給內建（`shift+g` worktree、`shift+t` rename-tab、`shift+h/j/k/l` swap-pane）。`prefix+G`/`prefix+T` 由上面的重綁釋放出來；`herdr server reload-config` 會在它的 `diagnostics` 回報任何殘餘衝突。
@@ -484,6 +486,62 @@ URL 選單的複製路徑姊妹版。`prefix+p` 開一個 fzf 彈窗,列出聚�
 | **兩層清單** | **存在**的路徑排在最前(複製為解析後的**絕對**路徑);其餘——遠端 / 過期 / 假設的——放在 `── unverified ──` 分隔線下方(仍可選),所以真實但無法解析的路徑不會遺失 |
 
 `path:line:col` 後綴(grep `-n` / stack trace / 編譯器輸出)在存在檢查前先剝除,所以 `pkg.py:42:5` 會以 `pkg.py` 驗證。範圍預設為可見螢幕(`--source recent` 掃 scrollback);多選以換行接合複製;無結果時印出 `no file paths found` 並暫停約 1.5 秒。
+
+## 翻譯 pane（`prefix+t`） {#translate-pane}
+
+把焦點 pane 的內容送進 [`translate`](https://github.com/daviddwlee84/translate) CLI 的**雙語模式**，結果顯示在 popup 裡：原文逐行保留，每個區塊的譯文以 `  ↳ …` 交錯在下方。tmux 沒有對應物——這是 herdr 專屬的，建立在 `herdr pane read` 之上。
+
+Helper：`~/.config/herdr/pane-translate.sh` = [`dot_config/herdr/executable_pane-translate.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-translate.sh)，是 `pane-copy.sh` / `url-pick.sh` / `path-pick.sh` 的兄弟（相同的 pane 解析與 `herdr pane read` 管線）。
+
+| 入口 | 範圍 | 結果去哪裡 |
+|---|---|---|
+| `prefix + t` | 畫面上這一頁 | popup，用 `less -R` 分頁 |
+| `prefix + y` → *Translate pane* | select 清單：當前頁 / 最近 200 / 500 / 1000 行 | 往右分割出的 pane，並自動 focus |
+| `prefix + y` → *Translate pane into…* | 當前頁 | 同上，目標語言由你輸入 |
+| `prefix + y` → *Translate pane: copy* | 當前頁 | 剪貼簿（`x copy`）＋一則通知 |
+
+### 要取多少 scrollback——以及為什麼「當前頁」才是誠實的預設 {#translate-scope}
+
+最直覺的擔心是：固定視窗會切在句子中間，而 coding agent 的 plan 可能超過一整頁。三個事實決定了答案：
+
+- **跑在 alternate screen 上的 agent pane 根本沒有 scrollback。** Claude Code 的 pane 回報 `scroll.max_offset_from_bottom: 0`，而 `herdr pane read --source recent --lines 1000` 剛好只回傳 `viewport_rows` 行——與 `--source visible` 逐字相同。離開 alternate screen 的行永遠不會進入 herdr 的 host scrollback，所以再大的 `--lines` 也救不回來。（隔壁分頁的 shell 或 `codex` pane 則能回報數千行：這是**逐應用程式**的差異，不是全域限制。）也就是說，對於促成這個功能的情境，一頁就是全部——而且因為 `--source visible` 呈現的是你在 app **內部**捲到的位置，「當前頁」是精確的，不是猜的。在 agent 裡捲動，再按一次即可。
+- **`herdr pane read` 上限是 1000 行**，而且沒有 offset/分頁參數，所以 `recent:1000` 是硬天花板——與 [`pane-copy.sh` 記錄的限制](#copy-to-clipboard)相同。
+- **1000 行大約是 62 KB。** `translate` 的成本大致是 10 KB ≈ 60 秒、20 KB ≈ 95 秒，而 provider 在遠低於 62 KB 時就會拒絕。因此真正的上限是**字元預算**（`HERDR_TRANSLATE_MAX_CHARS`，預設 `12000` ≈ 75 秒），不是行數。`recent:N` 只是挑一個粗略視窗，再由預算裁切——每次裁切都會寫在 pane 標頭上，絕不無聲進行。
+
+### 不切在內容中間
+
+分兩個層次處理，而且第二個更重要：
+
+| 機制 | 作用 |
+|---|---|
+| 上緣邊界對齊（僅 `recent:N`） | 掃描前 `clamp(15%, 5, 40)` 行找區塊邊界——空行、agent turn 標記（`●⏺⎿•✻>❯$#`）、水平分隔線，或看起來像標題的行——從那裡開始，並在前面加上 `[… earlier output omitted …]`。若在 margin 內找不到邊界，就完整保留並加上 `[… continued from earlier output …]`。`visible` 擷取**永遠不會**從上緣裁切：那正是你正在看的畫面，最多只會加標記。 |
+| `--instructions` | 擷取內容會附帶一段 system prompt，告訴模型這是終端機節錄、可能從句中開始或結束、必須逐字翻譯眼前的內容而不要自行補完，並且指令 / 路徑 / 旗標 / 識別字 / 程式碼 / JSON 一律原樣保留。LLM 翻譯器不需要乾淨的邊界，它需要的是「被告知邊界不乾淨」。 |
+
+`recent:N` 使用 `--source recent-unwrapped`，會把 soft wrap 接回去，所以長行不會以斷在字中間的形式送進翻譯。
+
+### 翻譯前的清理
+
+三個階段，全部有邊界限制，不會吃掉正文：
+
+- **只清底部裝飾。** 從最後一行往上走，遇到第一行真正的內容就停：輸入框（`╭…╰`）、footer 提示（`? for shortcuts`、`⏵⏵ bypass permissions`、`-- INSERT --`、單獨的 `❯`）、狀態列（多個 ` · `/` │ ` 分隔欄位）與 spinner 行。自訂狀態列是一整個**區塊**，改用錨點裁切：底部附近的整寬分隔線，且其下方有可辨識的裝飾行。出現在 transcript 中段的分隔線不受影響。
+- **眾數 dedent。** 這一步是關鍵：`translate` 的 bitext 只要區塊縮排 ≥ base + 2 就判定為 *code*，而 agent pane 會把正文整體推到一個固定左邊界。base 取的是**眾數**縮排而非最小值——transcript 會把 turn 標記放在第 0 欄、正文放在第 5 欄，用 `min()` 等於完全沒 dedent，整頁都會原封不動地回來。眾數縮排是這個 pane 的主要文字欄位，所以正文會落到 0，而真正巢狀的程式碼區塊保留相對縮排、仍然被判為 code。
+- 折疊的 transcript 標記（`… +194 lines (ctrl + t to view transcript)`）換成單一 `[…]`；連續空行收斂；tab 展開。
+
+不花任何 LLM 呼叫就能檢查上述行為：
+
+```bash
+~/.config/herdr/pane-translate.sh recent:500 "$HERDR_PANE_ID" --dry-run
+```
+
+它會把清理、修補後的擷取內容印到 stdout，並把 `raw_lines=… out_chars=… trimmed=…` 印到 stderr。
+
+### 為什麼 `prefix+t` 是 popup、而範圍變體是 Quick Action
+
+和 [`prefix + E`](#run-any-command) 是同一個分工：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**，因此無法自己承載 pager——它們改成先擷取，再 `herdr pane split` 開一個真正的 pane 並在裡面重新執行 helper（`pane split` 沒有 `--focus` 參數，所以由共用的 `focus-pane.py` 負責 focus）。直接鍵不需要繞這一圈，而 popup 浮在版面之上，這一點在這裡比其他功能更重要：`type = "pane"` 的分割會壓窄來源 pane、讓它重新換行，正好毀掉剛剛讀到的那一頁。因此擷取**一律在分割之前**完成。
+
+用小寫 `t`，因為 `prefix + T` 已經是 `herdr-sesh` session 選擇器。
+
+環境變數：`HERDR_TRANSLATE_MAX_CHARS`（12000）、`HERDR_TRANSLATE_TO`（預設目標語言；未設定時由 `translate` 自己的 `[general]` 設定決定）、`HERDR_RUN_HOLD`（`fail`|`always`|`never`，與 `prefix+E` 相同）、`PAGER`。
 
 ## AI 用量 / 額度狀態
 

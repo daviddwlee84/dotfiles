@@ -1,0 +1,12 @@
+● Now the Unix helper.
+Ran 3 shell commands
+The TUI currently renders a loading screen before local inventory
+finishes, but it still has unmeasured synchronous work.
+
+[…]
+
+- Edit docs/README.md — index the new note.
+- Edit docs/parity-matrix.md — extend the herdr row.
+
+    $ just bats --filter herdr
+    ok 3 pane read

@@ -1,0 +1,6 @@
+[… earlier output omitted …]
+
+Scope and non-goals
+
+- Implement tracing, readiness correctness and first-frame deblocking.
+- Preserve lazy live loading for REMOTE, FLEET and SKILLS.

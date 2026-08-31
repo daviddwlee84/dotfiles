@@ -1,0 +1,13 @@
+# herdr-plus Quick Action — translate the focused pane into a language you type.
+# Managed by chezmoi. The form field becomes {{.Value}} and is passed as --to,
+# which translate resolves fuzzily ("chinees" -> zh). Without it the target comes
+# from translate's own [general] config (or $HERDR_TRANSLATE_TO).
+# See docs/tools/herdr.md § "Translate a pane".
+name = "Translate pane into…"
+description = "Same as Translate pane, but pick the target language"
+type = "form"
+command = "~/.config/herdr/pane-translate.sh visible \"$HERDR_PLUS_PANE_ID\" --to '{{.Value}}'"
+
+[form]
+prompt = "Translate this pane into"
+placeholder = "e.g. zh-TW, en, japanese"

@@ -1,0 +1,36 @@
+# herdr-plus Quick Action — translate the focused pane, with a scope picker.
+# Managed by chezmoi. Runs ~/.config/herdr/pane-translate.sh against
+# $HERDR_PLUS_PANE_ID; it captures, cleans, splits a pane and renders a bilingual
+# view there (Quick Actions have no PTY, so the viewer has to be a real pane).
+#
+# Scope: "current page" is --source visible, which is exactly what you are looking
+# at — and on an alternate-screen agent pane (Claude Code) it is also ALL there is:
+# rows that leave the alternate screen never enter herdr's host scrollback, so the
+# recent:N options only pay off on shell/log/codex panes. 1000 is herdr's own hard
+# per-read ceiling. Whatever you pick, HERDR_TRANSLATE_MAX_CHARS (12000) trims the
+# capture to a boundary and the pane header reports the trim.
+# See docs/tools/herdr.md § "Translate a pane".
+name = "Translate pane"
+description = "Bilingual view of this pane's content in a split pane"
+type = "select"
+command = "~/.config/herdr/pane-translate.sh {{.Value}} \"$HERDR_PLUS_PANE_ID\""
+
+[[options]]
+label = "Current page"
+value = "visible"
+description = "The on-screen viewport — what you are looking at right now"
+
+[[options]]
+label = "Last 200 lines"
+value = "recent:200"
+description = "Scrollback; top edge snapped to a block boundary"
+
+[[options]]
+label = "Last 500 lines"
+value = "recent:500"
+description = "Scrollback; trimmed to the character budget from the top"
+
+[[options]]
+label = "Last 1000 lines"
+value = "recent:1000"
+description = "herdr's hard per-read ceiling — there is no pagination past it"

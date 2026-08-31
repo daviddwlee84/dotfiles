@@ -1,0 +1,22 @@
+● Now the Unix helper.
+  Ran 3 shell commands
+     The TUI currently renders a loading screen before local inventory
+     finishes, but it still has unmeasured synchronous work.
+
+     … +194 lines (ctrl + t to view transcript)
+
+     - Edit docs/README.md — index the new note.
+     - Edit docs/parity-matrix.md — extend the herdr row.
+
+         $ just bats --filter herdr
+         ok 3 pane read
+
+✽ Percolating… (13m 4s · ↓ 52.7k tokens)
+
+❯
+──────────────────────────────────────────────────────────
+  [Opus 5 ◑ high] │ dotfiles-all git:(main* [+9]) │ Cost $9.63 │ CC v2.1.251
+  Context    ██░░░░░░░░ 16% (161k/1.0M)
+  ~statistics.json(+9)  ~dotfiles  ?2
+  Tokens 4.6M (in: 96, out: 52k, cache: 4.5M)
+  -- INSERT -- ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 2 agents

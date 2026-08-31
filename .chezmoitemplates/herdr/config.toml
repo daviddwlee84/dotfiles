@@ -299,6 +299,33 @@ type = "pane"
 command = "~/.config/herdr/path-pick.sh \"$HERDR_ACTIVE_PANE_ID\" --cwd \"$HERDR_ACTIVE_PANE_CWD\""
 description = "copy a file path from the pane (fzf, two-tier)"
 
+# --- Translate the pane you are reading (prefix+t) ---
+# Pipes the focused pane's content through the `translate` CLI in bilingual mode
+# (-2 --bilingual-mode doc): the original lines stay verbatim and each block's
+# translation is interleaved beneath as `  ↳ …`.
+#
+# Scope is the on-screen page. That is not a shortcut — an agent pane on the
+# ALTERNATE SCREEN has no scrollback at all (a Claude Code pane reports
+# scroll.max_offset_from_bottom = 0, and `pane read --source recent --lines 1000`
+# returns exactly viewport_rows), so one page is all that exists there, and
+# --source visible tracks whatever you scrolled to INSIDE the app. The scrollback
+# variants live on the prefix+y Quick Actions, where a select list can offer them
+# without spending a direct key: they only pay off on shell/log/codex panes.
+#
+# A popup rather than a Quick Action for the usual reason (see prefix+E): Quick
+# Actions run through `sh -c` with no PTY/stdin and so cannot host the pager. The
+# Quick Action variants work around it by splitting a real pane; this key does
+# not have to. Popup also means the source pane never reflows — which matters
+# more here than elsewhere, because a reflow would re-wrap the very page we read.
+# lowercase t: prefix+T is already `tv herdr-sesh`.
+[[keys.command]]
+key = "prefix+t"
+type = "popup"
+command = "~/.config/herdr/pane-translate.sh visible \"$HERDR_ACTIVE_PANE_ID\" --inline"
+width = "80%"
+height = "80%"
+description = "translate this pane (bilingual, popup)"
+
 # --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
 # Requires: herdr plugin install cloudmanic/herdr-plus
 # Projects = declarative multi-pane workspace templates (see
