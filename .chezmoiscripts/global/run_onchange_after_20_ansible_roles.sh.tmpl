@@ -29,6 +29,8 @@
 # js_cli_tools defaults: {{ include "dot_ansible/roles/js_cli_tools/defaults/main.yml" | sha256sum }}
 # llm_tools tasks: {{ include "dot_ansible/roles/llm_tools/tasks/main.yml" | sha256sum }}
 # llm_tools defaults: {{ include "dot_ansible/roles/llm_tools/defaults/main.yml" | sha256sum }}
+# summarize tasks: {{ include "dot_ansible/roles/summarize/tasks/main.yml" | sha256sum }}
+# summarize defaults: {{ include "dot_ansible/roles/summarize/defaults/main.yml" | sha256sum }}
 # rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
 # rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
 # go_tools tasks: {{ include "dot_ansible/roles/go_tools/tasks/main.yml" | sha256sum }}
@@ -207,7 +209,7 @@ fi
 #   Desktop: devtools, docker, nerdfonts
 #   Server:  devtools, docker (no nerdfonts - no GUI)
 #   macOS:   homebrew
-#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, go_tools, ruby_gem_tools
+#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, summarize, rust_cargo_tools, go_tools, ruby_gem_tools
 
 {{ if eq .chezmoi.os "darwin" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
@@ -266,6 +268,10 @@ TAGS="${TAGS},js_cli_tools"
 {{ $installLlmTools := false }}{{ if hasKey . "installLlmTools" }}{{ $installLlmTools = .installLlmTools }}{{ end -}}
 {{ if $installLlmTools -}}
 TAGS="${TAGS},llm_tools"
+{{ end -}}
+{{ $installSummarize := false }}{{ if hasKey . "installSummarize" }}{{ $installSummarize = .installSummarize }}{{ end -}}
+{{ if $installSummarize -}}
+TAGS="${TAGS},summarize"
 {{ end -}}
 {{ $installInputMethod := false }}{{ if hasKey . "installInputMethod" }}{{ $installInputMethod = .installInputMethod }}{{ end -}}
 {{ if $installInputMethod -}}

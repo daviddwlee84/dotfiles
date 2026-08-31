@@ -172,6 +172,19 @@ pyrightconfig.json
 .config/aerospace/**
 {{- end }}
 
+# summarize config + prompt presets — only manage when installSummarize=true.
+# ~/.summarize/config.json is NOT XDG on purpose: summarize hardcodes that path
+# (no XDG lookup, no SUMMARIZE_CONFIG override). The prompt presets summarize
+# never writes to DO live under XDG. hasKey guard so hosts whose chezmoi.toml
+# predates the installSummarize prompt don't error.
+{{- $installSummarize := false }}{{ if hasKey . "installSummarize" }}{{ $installSummarize = .installSummarize }}{{ end }}
+{{- if not $installSummarize }}
+.summarize
+.summarize/**
+.config/summarize
+.config/summarize/**
+{{- end }}
+
 # Rime user config — only manage when installInputMethod=true, and only the tree
 # for this OS (macOS/Squirrel reads ~/Library/Rime, Linux/ibus-rime reads
 # ~/.config/ibus/rime). The portable bodies live in .chezmoitemplates/rime/ and

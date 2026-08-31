@@ -64,6 +64,9 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 {{- if dig "installLlmTools" false . }}
 - **LLM tools** — Ollama / LiteLLM / local models.
 {{- end }}
+{{- if dig "installSummarize" false . }}
+- **summarize** — `summarize <url|file>` turns a YouTube video, podcast, webpage, PDF or local media into a summary. Output defaults to 繁體中文 via the managed `~/.summarize/config.json` overlay. Wrappers in `32_summarize.sh`: `ytsum` (video, with timestamps), `sumq` (30-second triage), `suml` (long), `sumj` (JSON). `--cli claude|codex|gemini` reuses an already-authenticated agent instead of an API key. See `docs/tools/summarize.md`.
+{{- end }}
 {{- if dig "installJsCliTools" false . }}
 - **JS CLI tools** — standalone npm CLIs (e.g. readability-cli).
 {{- end }}

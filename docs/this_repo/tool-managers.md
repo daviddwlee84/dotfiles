@@ -33,7 +33,7 @@ If you want to know:
 | **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / go / gem / dotnet / curl-installer / github-release) |
 | **mise** | Runtime versions: `node`, `bun`, `rust`, `go`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
-| **npm** (global) | JS CLIs (Pi, copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`); Pi's stable prefix is handled by `agents` |
+| **npm** (global) | JS CLIs (Pi, copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli, summarize on Linux) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`); Pi's stable prefix is handled by `agents` |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
 | **go** (`go install`) | Go CLIs: `translate`, `dev`, `gopls` (**Linux only** — macOS installs them via Homebrew) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
@@ -395,6 +395,7 @@ Wrappers around language-specific package managers. All consume a
 | `python_uv_tools` | `uv tool install` | 13 | `installPythonUvTools` |
 | `llm_tools` | `uv tool install` + brew + cargo + curl-installer | 4 (litellm, llmfit, models, ollama) | `installLlmTools` |
 | `js_cli_tools` | `mise exec -- npm install -g` / system npm | 1 (`readability-cli`) | `installJsCliTools` |
+| `summarize` | brew (macOS) / `mise exec -- npm install -g` (Linux) | 1 (`summarize`) | `installSummarize` |
 | `rust_cargo_tools` | `cargo install` (after `mise install rust@latest`) | `[]` in defaults + 2 hardcoded (`recon`, `pueue`) | (no gate; rust runtime always installed via mise) |
 | `ruby_gem_tools` | `gem install` (after `mise install ruby@3`) | 2 (`try-cli`, `tmuxinator`) | (no gate; gated by `mise install ruby` skip on noRoot Linux) |
 | `dotnet_tools` | `dotnet tool install --global` (after `mise use -g dotnet@latest`) | 1 (`azure-cost-cli`) | `installDotnetTools` |
@@ -1209,6 +1210,7 @@ list.
 | **steam** | brew cask (gated by `installGamingApps`) | Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`) | Brewfile.darwin / gui_apps_linux |
 | **storcli** | n/a | vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos) | homelab_tools |
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
+| **summarize** | brew (gated `installSummarize`) | `mise exec -- npm install -g @steipete/summarize` (Node 24+; skipped on `oldEL`) | summarize — see [summarize.md](../tools/summarize.md) |
 | **switchaudio-osx** (`SwitchAudioSource`) | brew (gated `installMediaControl`) | n/a | media_control |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask (arm64) | n/a | Brewfile.darwin |

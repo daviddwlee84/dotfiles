@@ -154,6 +154,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
 | `installJsCliTools` | true | Standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.) |
 | `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |
+| `installSummarize` | false | [`summarize`](docs/tools/summarize.md) CLI: YouTube / podcast / web / PDF → LLM summary, defaulting to 繁體中文 output |
 | `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT with Codex on Intel and Apple Silicon, OpenCode Desktop, Antigravity; `ollama-app` also requires `installLlmTools=true`). macOS only. |
 | `agentSounds` | `notify` | How a coding agent announces it finished. `none` = silent; `notify` = desktop banner (`notify.sh` → apprise); `peon` = game voice lines + peon-ping's own overlay (default pack `sc2_scv` → *"Job's finished!"*); `both` = banner + voice. Controls **hook wiring only** — the `peon` CLI installs whenever `installCodingAgents` is on, so you can experiment any time. peon's own volume / pack / notification style stay unmanaged by chezmoi (no drift when you tweak them). Desktop profiles only. See [docs/tools/agent-sounds.md](docs/tools/agent-sounds.md). |
 | `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps). Desktop profiles only (`macos`/`ubuntu_desktop`). |

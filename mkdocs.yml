@@ -128,6 +128,7 @@ plugins:
             Agent overlays (Claude/OpenCode/Codex/Cursor): Agent overlays (Claude/OpenCode/Codex/Cursor)
             Agent pane discovery (tv agent-panes + recon): Agent pane 探索 (tv agent-panes + recon)
             Agent skills: Agent skills
+            "summarize (YouTube/web/PDF → LLM summary)": summarize（YouTube／網頁／PDF → LLM 摘要）
             Pi / OMP harness combos (pia): Pi / OMP harness combos (pia)
             Claude Code keybindings: Claude Code 鍵位
             Codex status line: Codex 狀態列
@@ -326,6 +327,7 @@ nav:
           - SpecStory internals: tools/specstory-internals.md
           - Codexbar: tools/codexbar.md
           - LLM: tools/llm.md
+          - "summarize (YouTube/web/PDF → LLM summary)": tools/summarize.md
       - Git & DevOps:
           - git diff workflow: tools/git_diff_workflow.md
           - lazygit (history-surgery recipes): tools/lazygit.md

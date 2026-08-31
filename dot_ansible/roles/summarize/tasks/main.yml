@@ -1,0 +1,92 @@
+---
+# Install the summarize CLI.
+# - macOS: homebrew-core formula (deps ffmpeg / node / tesseract / yt-dlp)
+# - Linux: npm global via mise (no formula exists; needs Node 24+)
+#
+# The zh-TW output defaults live in dot_summarize/modify_config.json, not here —
+# this role only puts the binary on PATH.
+
+- name: Check whether summarize is already installed
+  ansible.builtin.command: command -v {{ summarize_binary }}
+  register: summarize_presence
+  changed_when: false
+  failed_when: false
+
+- name: Install summarize via Homebrew (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - summarize_presence.rc != 0
+  community.general.homebrew:
+    name: summarize
+    state: present
+
+# --- Linux: npm global, preferring mise's user-level Node prefix ------------
+# Mirrors the js_cli_tools idiom: system npm on noRoot hosts has its prefix at
+# /usr/local (unwritable without sudo), mise's prefix works for both OSes.
+- name: Locate user-installed mise (summarize)
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+  register: summarize_mise_user_bin
+
+- name: Set mise binary path (user install)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - summarize_mise_user_bin.stat.exists | default(false)
+  ansible.builtin.set_fact:
+    summarize_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+
+- name: Detect system-installed mise (summarize)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - summarize_mise_bin is not defined
+  ansible.builtin.command: mise --version
+  register: summarize_mise_system_check
+  changed_when: false
+  failed_when: false
+
+- name: Set mise binary path (system install)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - summarize_mise_bin is not defined
+    - summarize_mise_system_check.rc | default(1) == 0
+  ansible.builtin.set_fact:
+    summarize_mise_bin: mise
+
+# oldEL (CentOS/RHEL 7, glibc 2.17) cannot run Node 18+, let alone the Node 24
+# summarize requires. Mirrors the mise [tools] exclusion — see linux.yml.
+- name: Install summarize via mise npm (Linux)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - not (oldEL | default(false))
+    - summarize_presence.rc != 0
+    - summarize_mise_bin is defined
+  ansible.builtin.shell: |
+    {{ summarize_mise_bin }} exec -- npm install -g {{ summarize_npm_package }}
+  args:
+    executable: /bin/bash
+  register: summarize_npm_install
+  until: summarize_npm_install is succeeded
+  retries: 3
+  delay: 5
+  changed_when: true
+  failed_when: false
+
+- name: Warn summarize installation failed
+  when:
+    - summarize_npm_install is defined
+    - summarize_npm_install.rc is defined
+    - summarize_npm_install.rc != 0
+  ansible.builtin.debug:
+    msg: "summarize installation failed (likely network timeout or Node < 24) - skipping"
+
+- name: Warn when Linux has no mise/Node to install summarize with
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - not (oldEL | default(false))
+    - summarize_presence.rc != 0
+    - summarize_mise_bin is not defined
+  ansible.builtin.debug:
+    msg: >-
+      summarize: mise not found -- skipping {{ summarize_npm_package }}.
+      Ensure Node 24+ is available (e.g. via mise) and re-run.

@@ -216,6 +216,14 @@ PROMPTS: tuple[Prompt, ...] = (
            default=False,
            prompt_text="Install local LLM tools (Ollama, LiteLLM, llmfit, models)",
            comment="是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)"),
+    Prompt("installSummarize", "bool", "Coding agents & AI",
+           "summarize CLI",
+           "steipete/summarize — YouTube / podcast / web / PDF → LLM summary, "
+           "defaulting to 繁體中文 output. Reuses an already-authenticated coding "
+           "CLI (--cli claude/codex/gemini), so no extra API key is needed.",
+           default=False,
+           prompt_text="Install summarize (YouTube/web/PDF summarizer CLI)",
+           comment="是否安裝 summarize (YouTube/網頁/PDF 摘要 CLI，預設輸出繁體中文)"),
     Prompt("installAiDesktopApps", "bool", "Coding agents & AI",
            "AI desktop apps (macOS)",
            "Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app via Brewfile.",
@@ -519,6 +527,7 @@ BUNDLES: dict[str, dict[str, object]] = {
     "personal-mac": {
         "installCodingAgents": True,
         "installLlmTools": True,
+        "installSummarize": True,
         "installAiDesktopApps": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
@@ -531,6 +540,7 @@ BUNDLES: dict[str, dict[str, object]] = {
     },
     "work-mac": {
         "installCodingAgents": True,
+        "installSummarize": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
         "installExtraRuntimes": True,
@@ -561,6 +571,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         # runtimes (rust/bun/ruby + dotnet) — node stays (nvim/agents).
         "installCodingAgents": True,
         "installLlmTools": False,
+        "installSummarize": False,
         "installPythonUvTools": False,
         "installJsCliTools": False,
         "installExtraRuntimes": False,
@@ -582,6 +593,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         # js-cli turned ON for fresh personal machines, and backupMode=smart).
         "installCodingAgents": False,
         "installLlmTools": False,
+        "installSummarize": False,
         "installAiDesktopApps": False,
         "installPythonUvTools": False,
         "installJsCliTools": False,

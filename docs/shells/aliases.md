@@ -33,6 +33,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Tmux Integration](#tmux-integration)
 - [AI Capture](#ai-capture)
 - [AI Run](#ai-run)
+- [Summarize](#summarize)
 - [Claude Code](#claude-code)
 - [Package Managers & Runtime](#package-managers--runtime)
 
@@ -798,6 +799,19 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `antigravity-cli` / `agy-ide` | alias | `dot_config/shell/05_ai_run.sh` | `antigravity-cli` → the Antigravity CLI (`agyc`); `agy-ide` → the Antigravity IDE editor launcher (defined only where the IDE is installed) |
 | `olr <prompt>` | function | `dot_config/shell/05_ai_run.sh` | `ollama run $AICAP_OLLAMA_MODEL "<prompt>"` — shell-only sugar (not an AICAP agent; flag pass-through disabled because ollama puts model positionally) |
 | `air [-a AGENT] [-m MODEL] [--] <prompt>` | function | `dot_config/shell/05_ai_run.sh` | Auto-detect via `$AICAP_AGENT_PRIORITY` (or honor `$AICAP_AGENT` / `-a`), dispatch to one of the wrappers above. `-m MODEL` overrides `AICAP_<AGENT>_MODEL` for this call only (subshell-scoped). `-a http` reaches the OpenAI-compat path (OpenRouter / local Ollama). `air -h` prints current env snapshot |
+
+---
+
+## Summarize
+
+> [`summarize`](../tools/summarize.md) wrappers (`installSummarize`). Output language and length come from the managed `~/.summarize/config.json` overlay, so every wrapper already answers in 繁體中文; the presets under `~/.config/summarize/prompts/` only change the *structure*. Add `--cli claude|codex|gemini` to reuse an authenticated coding CLI instead of an API key, or `--language en` to override for one call.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `ytsum <url>` | function | `dot_config/shell/32_summarize.sh` | Video-shaped summary: TL;DR → 主要論點 → 值得注意的細節 → 重要時間點 → 值不值得完整觀看. Uses `prompts/youtube-zhtw.md` |
+| `sumq <url\|file>` | function | `dot_config/shell/32_summarize.sh` | 30-second triage of any source (`--length short` + `prompts/quickscan-zhtw.md`): one-line conclusion, three points, read-it-or-skip-it |
+| `suml <url\|file>` | function | `dot_config/shell/32_summarize.sh` | `summarize --length long` — upstream's built-in structure, no prompt override |
+| `sumj <url\|file>` | function | `dot_config/shell/32_summarize.sh` | `summarize --json` — machine-readable envelope for `jq` or an agent |
 
 ---
 

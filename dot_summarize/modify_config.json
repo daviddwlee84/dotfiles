@@ -1,0 +1,47 @@
+#!/bin/sh
+# chezmoi modify_ script: deep-merge a managed overlay into ~/.summarize/config.json.
+#
+# Why NOT dot_config/summarize/config.json (the repo's prefer-XDG rule): summarize
+# hardcodes ~/.summarize/config.json. There is no XDG lookup and no SUMMARIZE_CONFIG
+# override, so the root dotfile is the only path the tool reads.
+#
+# Why modify_ and not a plain managed file: summarize is a second writer. `summarize
+# refresh-free` rewrites the OpenRouter free-model presets into this file, and
+# `--set-default` persists a model choice. A plain managed file would clobber both on
+# every apply. Merging keeps our opinionated keys authoritative and everything the
+# tool wrote intact.
+#
+# Why `prompt` is deliberately NOT in the overlay: the top-level `prompt` key REPLACES
+# summarize's built-in summary instructions (structure + formatting guidance) for
+# EVERY source type, not just YouTube. Per-source prompts go through --prompt-file
+# instead — see dot_config/summarize/prompts/ and dot_config/shell/32_summarize.sh.
+#
+# Source: dot_summarize/modify_config.json
+# Target: ~/.summarize/config.json
+# Requires: jq (installed by the `base` ansible role).
+set -eu
+
+overlay=$(cat <<'JSON'
+{
+  "output": {
+    "language": "zh-TW",
+    "length": "medium"
+  }
+}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{}'
+
+# Cold-start fallback: jq is installed by the `base` ansible role, which runs AFTER
+# this file-apply phase. Pass the live file through unchanged and warn — the next
+# apply (after ansible) does the real merge.
+# See pitfalls/modify-script-jq-bootstrap-cycle.md.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_config.json: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
+
+printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'

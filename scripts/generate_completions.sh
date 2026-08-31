@@ -154,6 +154,7 @@ regen omp "completions zsh" "completions bash"
 regen pia "completion zsh" "completion bash" "$HOME/.local/share/pi-agents/bin/pia" "$HOME/.local/share/pi-agents/.git/index"
 regen translate "completion zsh" "completion bash"
 regen dev "completion zsh" "completion bash"
+regen summarize "completion zsh" "completion bash"
 
 if [ "$n_z_regen" -gt 0 ] || [ "$n_b_regen" -gt 0 ] || [ "$quiet" = 0 ]; then
   printf 'completions: regenerated %d zsh + %d bash | skipped %d zsh + %d bash | %d not installed\n' \

@@ -29,6 +29,7 @@
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
 - [AI Capture](#ai-capture)
+- [Summarize](#summarize)
 - [Claude Code](#claude-code)
 - [Package Managers & Runtime](#package-managers--runtime)
 
@@ -640,6 +641,19 @@
 | `aifix-run -- CMD [ARG...]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | 非 tmux：執行 CMD 並 tee stdout+stderr，餵給 agent |
 | `aifix-rerun [-y]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | 非 tmux：thefuck 風格地重新執行最後一個命令（除非 `-y` 否則會確認；副作用警告） |
 | `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | 啟動 `scripts/aiblock.py` TUI：從歷史挑選命令、編輯 prompt、挑選動作（print / copy / 生成新 agent 視窗）。透過 `uv run --script` 解析依賴 |
+
+---
+
+## Summarize
+
+> [`summarize`](../tools/summarize.md) 包裝函式 (`installSummarize`)。輸出語言與長度來自受管的 `~/.summarize/config.json` overlay，所以每個包裝函式本來就回繁體中文；`~/.config/summarize/prompts/` 底下的 presets 只改變*結構*。加上 `--cli claude|codex|gemini` 可沿用已登入的 coding CLI 而非 API key，或用 `--language en` 單次覆蓋語言。
+
+| 指令 | 類型 | 來源檔案 | 說明 |
+|------|------|----------|------|
+| `ytsum <url>` | function | `dot_config/shell/32_summarize.sh` | 影片型摘要：TL;DR → 主要論點 → 值得注意的細節 → 重要時間點 → 值不值得完整觀看。使用 `prompts/youtube-zhtw.md` |
+| `sumq <url\|file>` | function | `dot_config/shell/32_summarize.sh` | 任何來源的 30 秒分流 (`--length short` + `prompts/quickscan-zhtw.md`)：一句話結論、三個重點、要讀還是跳過 |
+| `suml <url\|file>` | function | `dot_config/shell/32_summarize.sh` | `summarize --length long`——使用上游內建結構，不覆寫 prompt |
+| `sumj <url\|file>` | function | `dot_config/shell/32_summarize.sh` | `summarize --json`——給 `jq` 或 agent 用的機器可讀 envelope |
 
 ---
 

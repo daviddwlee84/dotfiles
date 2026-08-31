@@ -52,6 +52,7 @@ compinit runs once (inside oh-my-zsh.sh)
 | `pia` | `pia completion zsh` |
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
+| `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 Fresh apply 若尚未重載 PATH，bulk generator 也會探測

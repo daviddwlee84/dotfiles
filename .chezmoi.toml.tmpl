@@ -29,6 +29,8 @@ name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | q
 installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding agents (Claude Code, Pi, Oh My Pi, pia presets, OpenCode, Cursor, Copilot, Gemini, etc.)" true }}
 # 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
 installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
+# 是否安裝 summarize (YouTube/網頁/PDF 摘要 CLI，預設輸出繁體中文)
+installSummarize = {{ promptBoolOnce . "installSummarize" "Install summarize (YouTube/web/PDF summarizer CLI)" false }}
 # 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)
 {{ if eq .chezmoi.os "darwin" -}}
 installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)" false }}

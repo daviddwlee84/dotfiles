@@ -87,6 +87,7 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `pia` | `pia completion zsh` |
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
+| `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 **Usage pattern:**
@@ -216,7 +217,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 
 ## Generating Completions After Fresh Install
 
-**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 18 bulk-generated tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `omp`, `pia`, `translate`, `dev`).
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 19 bulk-generated tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `omp`, `pia`, `translate`, `dev`, `summarize`).
 
 The hook is **idempotent** — it stat-checks each tool's freshness source against the existing completion file and skips if the cache is fresh. That source is normally the binary; `pia` uses the external checkout's `.git/index`. Cost when nothing changed: **~50ms** total (presence checks + 36 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime, or a `pia` checkout refresh that updates its Git index, only the affected completion is regenerated.
 On a fresh apply, it also probes `~/.local/bin/<tool>` when the parent process
