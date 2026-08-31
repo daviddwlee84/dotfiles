@@ -166,6 +166,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
+| `prefix + Y` | [Yazi](yazi.md) file manager rooted at the focused pane cwd; `q` returns to the unchanged layout | 90% × 85% popup |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
 | `prefix + U` | `tv tools` (CLI launcher) | command pane |
@@ -184,7 +185,12 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `` prefix + t `` | **translate this pane** — bilingual view of the on-screen page in a popup ([details](#translate-pane)) | popup |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
-> Uppercase letters resolve to `prefix+shift+<letter>`, which herdr reserves for built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
+> Uppercase letters resolve to `prefix+shift+<letter>`; many are built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above, while `prefix+Y` is unused upstream; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
+
+`prefix+Y` is deliberately session-modal because it is for quick filesystem
+operations while reading an agent pane. It starts in the focused pane's cwd,
+but its final directory cannot change the already-running source shell; use the
+shell `y` helper when exit-to-directory behavior is wanted.
 
 ### Session navigator (`prefix + g`) — in-popup keys {#navigator-keys}
 

@@ -298,3 +298,19 @@ prepend_preloaders = [
   { url = "*.parquet", run = "duckdb", multi = false },
   { url = "*.xlsx", run = "duckdb", multi = false },
 ]
+
+# Git state signs for both files and directories. `id` keeps the rule parseable
+# on Yazi 26.1.x; `group` is required by 26.8.15+. The managed guard delegates
+# to the latest git.yazi when compatible and falls back to Yazi's noop fetcher
+# on older hosts, avoiding stuck background tasks during the upgrade gap.
+[[plugin.prepend_fetchers]]
+id = "git"
+url = "*"
+run = "git-guard"
+group = "git"
+
+[[plugin.prepend_fetchers]]
+id = "git"
+url = "*/"
+run = "git-guard"
+group = "git"

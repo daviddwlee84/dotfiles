@@ -43,9 +43,18 @@ claude-copilot-once     # 釘住「這個專案」跑一次 session，結束自�
 codex-copilot           # 一次性 Codex session；auto 優先選 OpenAI
 codex-copilot-once      # 完全相同的 alias；兩者都不寫 Codex config
 
+# 單次 planning preset。Codex TUI 開啟後仍需輸入 `/plan`；
+# Codex 0.151.0 沒有啟動時指定 collaboration mode 的公開 flag。
+codex-copilot -c 'plan_mode_reasoning_effort="ultra"' -c 'service_tier="fast"'
+claude-copilot-once --fast --permission-mode plan --settings '{"ultracode":true}'
+
 copilot-here on         # 或者：釘選「這個專案」—— 之後直接跑 `claude` 就走代理
 copilot-here off        # 取消釘選 —— 回到真正的 Anthropic 後端
 ```
+
+Claude 指令不要再加 `--effort`：啟動時的 effort pin 會阻止 session-only
+`ultracode` 生效。Codex 的兩個 override 只影響本次啟動；開啟後輸入 `/plan`
+才會正式進入 Plan mode。
 
 ## 運作原理
 

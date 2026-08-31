@@ -370,17 +370,23 @@ EOF
   [ ! -e "$CHEZMOI_CALLED" ]
 }
 
-@test "edit-config: bindings keep one Alt-e pane and lazygit only on the G pane" {
+@test "edit-config: bindings keep Alt-e, lazygit, and the Yazi popup distinct" {
   [ "$(grep -c '^key = "prefix+alt+e"$' "$CONFIG")" -eq 1 ]
   [ "$(grep -c '^key = "prefix+G"$' "$CONFIG")" -eq 1 ]
+  [ "$(grep -c '^key = "prefix+Y"$' "$CONFIG")" -eq 1 ]
   [ "$(grep -c '^key = "prefix+alt+g"$' "$CONFIG")" -eq 0 ]
 
-  local alt_e pane_g
+  local alt_e pane_g popup_y
   alt_e=$(grep -A3 -B1 '^key = "prefix+alt+e"$' "$CONFIG")
   pane_g=$(grep -A3 -B1 '^key = "prefix+G"$' "$CONFIG")
+  popup_y=$(grep -A6 -B1 '^key = "prefix+Y"$' "$CONFIG")
   [[ "$alt_e" == *$'type = "pane"'* ]]
   [[ "$alt_e" == *$'command = "~/.config/herdr/edit-config.sh"'* ]]
   [[ "$alt_e" == *$'description = "edit runtime config, validate, and reload"'* ]]
   [[ "$pane_g" == *$'type = "pane"'* ]]
   [[ "$pane_g" == *$'command = "lazygit"'* ]]
+  [[ "$popup_y" == *$'type = "popup"'* ]]
+  [[ "$popup_y" == *$'command = "yazi"'* ]]
+  [[ "$popup_y" == *$'width = "90%"'* ]]
+  [[ "$popup_y" == *$'height = "85%"'* ]]
 }

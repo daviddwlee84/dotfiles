@@ -482,7 +482,7 @@ upgrade-agents:
 upgrade-plugins:
     ./scripts/upgrade_tools.sh plugins
 
-# Yazi plugins: ya pkg upgrade (piper.yazi, …). Copy ~/.config/yazi/package.toml
+# Yazi plugins: ya pkg upgrade (piper.yazi, duckdb.yazi, git.yazi, …). Copy ~/.config/yazi/package.toml
 # back into the chezmoi source afterward to persist the new revs.
 upgrade-yazi-plugins:
     ./scripts/upgrade_tools.sh yazi-plugins

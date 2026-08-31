@@ -8,5 +8,10 @@ use = "wylie102/duckdb"
 rev = "3f8c863"
 hash = "87b9233a74325e95011670ed20bbd0d4"
 
+[[plugin.deps]]
+use = "yazi-rs/plugins:git"
+rev = "c591a36"
+hash = "5bb0bfab901d3601c370eafdd66edd31"
+
 [flavor]
 deps = []

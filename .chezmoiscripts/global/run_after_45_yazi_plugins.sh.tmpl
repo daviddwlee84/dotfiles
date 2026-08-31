@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install yazi plugins declared in the managed lockfile via `ya pkg install`.
-# Materializes ~/.config/yazi/plugins/ (piper.yazi, duckdb.yazi, …) so the yazi
-# previewers in yazi.toml work.
+# Materializes ~/.config/yazi/plugins/ (piper.yazi, duckdb.yazi, git.yazi, …)
+# so the previewers and Git status fetchers in yazi.toml work.
 #
 # `run_after_*`, NOT `run_onchange_after_*` (which is what this used to be).
 # Same generalisable rule as run_after_25_bat_theme.sh.tmpl: an onchange hash is
@@ -85,8 +85,8 @@ fi
 # "Failed to load plugin" from whichever plugin init.lua happens to require.
 if ! command -v ya >/dev/null 2>&1; then
     warn "\`ya\` (yazi's CLI companion) is missing, but yazi is installed — this is a PARTIAL yazi install."
-    warn "  Consequence: ~/.config/yazi/plugins/ cannot be created, so ALL plugin previewers"
-    warn "  (duckdb.yazi data tables, piper.yazi Office/markdown/epub) are dead."
+    warn "  Consequence: ~/.config/yazi/plugins/ cannot be created, so ALL plugin features"
+    warn "  (duckdb/piper previews and git.yazi status signs) are dead."
     warn "  Fix: install \`ya\` from the SAME yazi release as your \`yazi\` binary, then re-run \`chezmoi apply\`:"
     warn "    yazi --version   # note the version, then grab the matching release asset"
     warn "  See pitfalls/yazi-lua-runtime-failed-plugin-main-lua.md"

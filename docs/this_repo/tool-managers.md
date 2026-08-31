@@ -920,6 +920,7 @@ In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`
 |---|---|
 | `yazi-rs/plugins:piper` (`piper.yazi`) | "pipe any shell command as a previewer" — backs the Office-document previewers in `dot_config/yazi/yazi.toml` (`piper -- view-office --preview …`) and the feather/sqlite preview fallbacks. See [office-viewers.md](../tools/office-viewers.md). |
 | `wylie102/duckdb` (`duckdb.yazi`) | DuckDB-powered table previewer for data files (csv/tsv/parquet/xlsx/db/duckdb) — `run = "duckdb"` in `dot_config/yazi/yazi.toml` + required (`pcall`-guarded) `require("duckdb"):setup{}` in `dot_config/yazi/init.lua`. Uses the `duckdb` CLI. See [data-viewers.md](../tools/data-viewers.md). |
+| `yazi-rs/plugins:git` (`git.yazi`) | Git state signs for files and directories. The managed `git-guard` fetcher delegates on Yazi 26.8.15+ and becomes a noop on older hosts until the explicit package upgrade. See [yazi.md](../tools/yazi.md). |
 
 **Add a plugin:** `ya pkg add <owner>/<repo>:<plugin>`, then copy `~/.config/yazi/package.toml` back into the source. **Upgrade:** `ya pkg upgrade` → `just upgrade-yazi-plugins` (install-only by design; apply never bumps revs). Requires a recent yazi (`ya pkg` replaced the older `ya pack`).
 
@@ -1115,6 +1116,7 @@ list.
 | **git-filter-repo** | uv tool | uv tool | python_uv_tools |
 | **git-graph** | brew | GitHub release (x86_64 only) | devtools |
 | **git-lfs** | brew | apt/yum → GitHub release | base |
+| **git.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **gitleaks** | brew | GitHub release | security_tools |
 | **gopls** | brew | `go install` (`go_tools`) | Go language server for Claude Code's official `gopls-lsp` plugin |
 | **glab** | brew | vendor apt (.deb) → GitHub tarball | devtools |

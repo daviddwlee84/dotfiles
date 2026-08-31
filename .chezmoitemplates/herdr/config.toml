@@ -137,6 +137,17 @@ type = "pane"
 command = "lazygit"
 description = "lazygit (temporary pane)"
 
+# Yazi is intentionally a popup: this is a quick, modal filesystem operation
+# from an agent pane. It starts in the focused pane's cwd; quitting returns to
+# the unchanged layout and does not attempt to change the source shell's cwd.
+[[keys.command]]
+key = "prefix+Y"
+type = "popup"
+command = "yazi"
+width = "90%"
+height = "85%"
+description = "yazi file manager (popup)"
+
 # btop / nvtop monitors as temporary command panes (same mechanism as prefix+G —
 # a real PTY that closes when you quit the tool). Quick Actions can't host these:
 # herdr-plus runs an action via `sh -c` with no PTY/stdin, so an interactive TUI

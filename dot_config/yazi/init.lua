@@ -43,3 +43,22 @@ if not ok then
 		timeout = 10,
 	})
 end
+
+-- git.yazi — append Git state signs to the manager linemode. The current
+-- upstream plugin requires Yazi 26.8.15; keep setup fail-soft because older
+-- hosts can receive the managed config before their explicitly separate
+-- package-upgrade pass. git-guard.yazi makes the registered fetchers no-op in
+-- that case, so an old host warns instead of accumulating stuck fetch tasks.
+local git_ok, git_err = pcall(function()
+	require("git"):setup({ order = 1500 })
+end)
+
+if not git_ok then
+	ya.err("git.yazi failed to load: " .. tostring(git_err))
+	pcall(ya.notify, {
+		title = "git.yazi not loaded",
+		content = "Git status signs are disabled. Upgrade yazi/ya to 26.8.15+, then run `ya pkg install`.",
+		level = "warn",
+		timeout = 10,
+	})
+end

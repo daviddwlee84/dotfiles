@@ -48,9 +48,18 @@ claude-copilot-once     # pin THIS project, run one session, then auto-unpin (pr
 codex-copilot           # one-off Codex session; auto-picks OpenAI first
 codex-copilot-once      # exact alias; neither name writes Codex config
 
+# One-shot planning presets. Codex still needs `/plan` after the TUI opens;
+# Codex 0.151.0 exposes no startup collaboration-mode flag.
+codex-copilot -c 'plan_mode_reasoning_effort="ultra"' -c 'service_tier="fast"'
+claude-copilot-once --fast --permission-mode plan --settings '{"ultracode":true}'
+
 copilot-here on         # OR: pin THIS project — plain `claude` uses the proxy
 copilot-here off        # unpin — back to the real Anthropic backend
 ```
+
+Do not add `--effort` to the Claude command: a launch-effort pin prevents the
+session-only `ultracode` switch from taking effect. The Codex overrides are
+invocation-only; after launch, enter `/plan` to activate Plan mode.
 
 ## How it works
 
