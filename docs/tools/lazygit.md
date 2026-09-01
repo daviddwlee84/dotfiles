@@ -1,4 +1,4 @@
-# lazygit — history-surgery recipes (cheatsheet)
+# lazygit — branch insights and history-surgery recipes
 
 [lazygit](https://github.com/jesseduffield/lazygit) is the git TUI used here (installed via the `lazyvim_deps` role; bound to `lg`). The everyday stuff (stage, commit, branch) is obvious — this page is the **rebase/amend "surgery" that's hard to remember**, with the **lazygit keys and the equivalent CLI side by side** so you can do it either way.
 
@@ -16,6 +16,64 @@ This dotfiles repo sets Git's global baseline to:
 ```
 
 So LazyGit's normal **`p`** pull runs as a rebase pull, and dirty working-tree changes are stashed before the rebase and re-applied afterwards. If the re-applied stash conflicts, Git keeps the autostash instead of dropping it; inspect `git status` and `git stash list`, resolve any worktree conflicts, then drop the autostash only after confirming your changes are back.
+
+## Branch view and `I` Branch insights
+
+The managed config makes the Local branches panel denser without spending width
+on commit hashes:
+
+- Nerd Font v3 icons clarify file and pull-request indicators.
+- Branch names are colored by common prefixes (`feat/`, `fix/`, `docs/`,
+  maintenance, worktree, and automation branches).
+- Branches default to **recency** order.
+- A right-aligned `↓N` shows how many commits a branch is behind LazyGit's
+  detected base branch.
+
+That `↓N` is useful, but it is **not** a merged marker. A branch can be behind
+main and still contain commits that main does not have. Likewise, the normal
+upstream `✓` means local and upstream are synchronized; it does not mean the
+branch is contained in main.
+
+In the Local branches panel, press **`I`** and choose:
+
+| Key | Report | Network |
+|---|---|---|
+| `g` | Exact Git containment against local and remote-tracking main | none |
+| `p` | The same report plus recent GitHub PR state from one `gh pr list` call | GitHub |
+
+The report is read-only and does not fetch. Press LazyGit's refresh key or wait
+for auto-fetch before relying on the `REM` column.
+
+```text
+Local base:  main
+Remote base: origin/main
+Local main vs origin/main: ahead 1, behind 0
+
+SEL LOC REM  BASE-  BASE+ UPSTREAM      WORKTREE     DATE       BRANCH  PR
+    Y   Y       12      0 gone          -            2026-08-20 fix/old  MERGED->main#42
+>   Y   N        0      1 up1           repo-wt      2026-09-01 feat/new OPEN->main#43
+```
+
+- `LOC` / `REM`: the branch tip is an ancestor of local / remote main. `Y` is
+  the exact `git merge-base --is-ancestor` definition of history containment.
+- `BASE-`: commits only on the comparison base; the branch is behind by this
+  amount.
+- `BASE+`: commits only on the branch; a non-zero value means it is not fully
+  contained in that comparison base.
+- `UPSTREAM`: `=`, `upN`, `downN`, `downN/upN`, `gone`, or `-`.
+- `WORKTREE`: the leaf directory when another/current worktree has the branch
+  checked out.
+- `PR`: best-effort GitHub state. `MERGED` is kept separate from `REM` because
+  squash and rebase merges create different commit ancestry.
+
+The base is inferred from `origin/HEAD`, then `main`, then `master`. Repositories
+with another trunk can opt in locally without changing global dotfiles:
+
+```bash
+git config lazygit.branchBase develop
+```
+
+This setting may also name a remote-tracking ref such as `upstream/trunk`.
 
 ## The mental model: two different "fixup"s
 

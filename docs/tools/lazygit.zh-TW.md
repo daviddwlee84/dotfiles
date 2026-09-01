@@ -1,4 +1,4 @@
-# lazygit — 歷史手術速查表 (cheatsheet)
+# lazygit — branch 洞察與歷史手術速查表
 
 !!! note "Terminology rule (zh-TW pages)"
     技術名詞首次出現以「中文 (English original)」格式呈現，例：變基
@@ -21,6 +21,59 @@
 ```
 
 所以 LazyGit 一般的 **`p`** pull 會以 rebase 方式執行，且工作區 (working-tree) 的髒變更會在 rebase 前被 stash、rebase 後再套用回來。若重新套用的 stash 發生衝突，Git 會保留該 autostash 而非丟棄；請檢查 `git status` 與 `git stash list`，解決工作區衝突、確認你的變更已回來之後，再丟掉 autostash。
+
+## Branch 面板與 `I` Branch insights
+
+受管理的設定讓 Local branches 面板更有資訊量，但不把低訊號的 commit
+hash 塞進有限寬度：
+
+- Nerd Font v3 圖示讓檔案與 pull request indicator 更直覺。
+- 依常見 prefix 為 branch 名稱上色（`feat/`、`fix/`、`docs/`、維護、
+  worktree 與 automation branch）。
+- 預設依最近使用順序 (recency) 排列。
+- 右側 `↓N` 顯示 branch 比 LazyGit 偵測到的 base branch 落後幾個 commit。
+
+`↓N` 很有用，但它**不是 merged 標記**。Branch 即使落後 main，仍可能含有
+main 沒有的 commit。同樣地，原本的 upstream `✓` 只表示 local 與 upstream
+同步，不代表 branch 已被 main 包含。
+
+在 Local branches 面板按 **`I`**，再選：
+
+| 按鍵 | 報告 | 網路 |
+|---|---|---|
+| `g` | 以 local 與 remote-tracking main 做精確 Git containment 判斷 | 不使用 |
+| `p` | 同一份報告，再透過一次 `gh pr list` 補近期 GitHub PR 狀態 | GitHub |
+
+報告完全唯讀且不會 fetch。要依賴 `REM` 欄位前，先按 LazyGit 的 refresh
+鍵，或等待 auto-fetch 更新 remote-tracking refs。
+
+```text
+Local base:  main
+Remote base: origin/main
+Local main vs origin/main: ahead 1, behind 0
+
+SEL LOC REM  BASE-  BASE+ UPSTREAM      WORKTREE     DATE       BRANCH  PR
+    Y   Y       12      0 gone          -            2026-08-20 fix/old  MERGED->main#42
+>   Y   N        0      1 up1           repo-wt      2026-09-01 feat/new OPEN->main#43
+```
+
+- `LOC` / `REM`：branch tip 是否為 local / remote main 的 ancestor。`Y` 是
+  `git merge-base --is-ancestor` 對 history containment 的精確定義。
+- `BASE-`：只有 comparison base 擁有的 commit 數，也就是 branch 落後量。
+- `BASE+`：只有 branch 擁有的 commit 數；非零代表尚未完整包含於該 base。
+- `UPSTREAM`：`=`、`upN`、`downN`、`downN/upN`、`gone` 或 `-`。
+- `WORKTREE`：此 branch 被目前或另一個 worktree checkout 時的末層目錄名。
+- `PR`：best-effort GitHub 狀態。`MERGED` 與 `REM` 刻意分開，因為 squash
+  merge 與 rebase merge 不會保留相同的 commit ancestry。
+
+Base 依序從 `origin/HEAD`、`main`、`master` 推斷。以其他 trunk 為主的 repo
+可以只在該 repo 設定，不必改全域 dotfiles：
+
+```bash
+git config lazygit.branchBase develop
+```
+
+這個設定也可以指定 `upstream/trunk` 一類的 remote-tracking ref。
 
 ## 心智模型：兩種不同的「fixup」
 

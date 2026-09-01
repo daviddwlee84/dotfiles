@@ -1,7 +1,22 @@
 # Lazygit v0.64 renamed custom pagers to diff renderers. Keep the current
 # schema here so lazygit does not migrate and rewrite this chezmoi-managed file
 # every time it starts.
+gui:
+  nerdFontsVersion: "3"
+  showDivergenceFromBaseBranch: arrowAndNumber
+  branchColorPatterns:
+    '^feat/': '#89b4fa'
+    '^fix(/|_)': '#f38ba8'
+    '^docs/': '#89dceb'
+    '^(chore|refactor|test)/': '#f9e2af'
+    '^worktree[-/]': '#cba6f7'
+    '^(codex|dependabot|renovate)/': '#94e2d5'
+
 git:
+  mainBranches:
+    - main
+    - master
+  localBranchSortOrder: recency
   diffRenderers:
     - colorArg: always
       command: delta --dark --paging=never --syntax-theme base16-256 -s
@@ -16,3 +31,25 @@ os:
   # literal '%s' guards a leading-dash payload. `x` resolves via
   # ~/.dotfiles/bin on PATH (dot_config/shell/00_exports.sh.tmpl).
   copyToClipboardCmd: "printf '%s' {{text}} | x copy"
+
+customCommands:
+  - key: I
+    context: localBranches
+    description: Branch insights (local/remote main containment)
+    prompts:
+      - type: menu
+        title: Branch insights
+        key: Mode
+        options:
+          - name: Git containment (offline)
+            description: Compare every local branch with local and remote main
+            value: git
+            key: g
+          - name: Add GitHub PR status
+            description: Also query recent PR state once via gh
+            value: pr
+            key: p
+    command: '"$HOME/.config/lazygit/branch-insights.sh" --mode {{.Form.Mode | quote}} --selected {{.SelectedLocalBranch.Name | quote}}'
+    loadingText: Analyzing branches...
+    output: popup
+    outputTitle: Branch insights
