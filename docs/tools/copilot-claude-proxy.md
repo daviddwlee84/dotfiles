@@ -745,6 +745,16 @@ Once the SSE response is committed, a late non-2xx can only be delivered as a
 protocol-native terminal event, so don't shrink `COPILOT_SHIM_PING_AFTER_MS` to
 zero.
 
+For `/responses`, the shim also verifies that the upstream SSE reaches one of
+`response.completed`, `response.failed`, or `response.incomplete`. An EOF before
+those terminal events is recorded as `upstream_protocol_eof` instead of a
+successful request. This is diagnostic: the shim never fabricates a completion.
+If the fork log shows a matching `WebSocket error`, set
+`useResponsesApiWebSocket` to `false` in its data-dir `config.json` and restart;
+the fork does not automatically fall back from a failed WebSocket to HTTP. See
+[`pitfalls/copilot-responses-stream-closed-before-completed.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-responses-stream-closed-before-completed.md)
+for the 0ms-stream fingerprint and the verified A/B procedure.
+
 `0 tok` in FleetView is **not** evidence of this bug — that counter is only
 filled in when an agent finishes. Check `agent-<id>.jsonl` for growing
 `assistant` entries first. Full diagnosis:

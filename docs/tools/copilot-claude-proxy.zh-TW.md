@@ -620,6 +620,14 @@ headers 前卡死會 abort 並透明重試（此時 client 只收過 comment fra
 拒絕 protocol mismatch。SSE response 一旦 commit，之後才出現的 non-2xx 只能以
 protocol-native terminal event 送出，所以不要把 `COPILOT_SHIM_PING_AFTER_MS` 調成 0。
 
+對 `/responses`，shim 也會驗證上游 SSE 最後是否到達
+`response.completed`、`response.failed` 或 `response.incomplete`。在這些 terminal event
+之前就 EOF，會記成 `upstream_protocol_eof`，不再算成功。這只改善診斷；shim 絕不偽造
+完成事件。若 fork log 同時出現 `WebSocket error`，請把 data dir `config.json` 裡的
+`useResponsesApiWebSocket` 設成 `false` 後 restart；fork 的 WebSocket 失敗不會自動
+fallback 到 HTTP。0ms stream 的指紋與已驗證 A/B 步驟見
+[`pitfalls/copilot-responses-stream-closed-before-completed.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-responses-stream-closed-before-completed.md)。
+
 FleetView 顯示 `0 tok` **不是**這個 bug 的證據 —— 那個計數器只在 agent 結束時才
 回填。先去看 `agent-<id>.jsonl` 的 `assistant` 筆數有沒有在長。完整診斷：
 [`pitfalls/copilot-proxy-openai-model-silent-stall.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-openai-model-silent-stall.md)。

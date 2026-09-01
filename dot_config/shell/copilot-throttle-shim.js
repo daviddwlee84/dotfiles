@@ -883,6 +883,32 @@ function fetchAttempt(target, makeInit, clientSignal) {
 // promise is NOT abandoned, it is carried into the next pull. Re-reading would
 // drop a chunk. Keeping the pull-driven shape (rather than a `start()` pump)
 // preserves backpressure toward the upstream.
+function observeResponsesTerminal(state, value) {
+  if (!state.responsesTerminal || state.responsesTerminal.seen) return;
+  const text = state.responsesTerminal.decoder.decode(value, { stream: true });
+  const combined = `${state.responsesTerminal.tail}${text}`.replaceAll("\r\n", "\n");
+  if (/(?:^|\n)event:\s*response\.(?:completed|failed|incomplete)\s*(?:\n|$)/.test(combined)) {
+    state.responsesTerminal.seen = true;
+  }
+  // An SSE field name and value are tiny. Retain enough overlap for a field
+  // split across arbitrary transport chunks without buffering model output.
+  state.responsesTerminal.tail = combined.slice(-256);
+}
+
+function finishStream(state, controller, releaseOnce, label, tracker) {
+  if (state.responsesTerminal && !state.responsesTerminal.seen) {
+    const tail = state.responsesTerminal.decoder.decode();
+    if (tail) observeResponsesTerminal(state, new TextEncoder().encode(tail));
+  }
+  const missingTerminal = state.responsesTerminal && !state.responsesTerminal.seen;
+  if (missingTerminal) {
+    log(`${label} ended before a Responses terminal event`);
+  }
+  controller.close();
+  releaseOnce();
+  tracker?.finalize(state.status, missingTerminal ? "upstream_protocol_eof" : null);
+}
+
 async function pumpStep(state, controller, releaseOnce, label, tracker) {
   if (!state.pending) state.pending = state.reader.read();
 
@@ -890,8 +916,9 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
   if (!intervalMs) {
     const { done, value } = await state.pending;
     state.pending = null;
-    if (done) { controller.close(); releaseOnce(); tracker?.finalize(state.status); return; }
+    if (done) { finishStream(state, controller, releaseOnce, label, tracker); return; }
     tracker?.firstByte();
+    observeResponsesTerminal(state, value);
     controller.enqueue(value);
     return;
   }
@@ -903,8 +930,9 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
   if (winner.read) {
     state.pending = null;
     state.idleMs = 0;
-    if (winner.read.done) { controller.close(); releaseOnce(); tracker?.finalize(state.status); return; }
+    if (winner.read.done) { finishStream(state, controller, releaseOnce, label, tracker); return; }
     tracker?.firstByte();
+    observeResponsesTerminal(state, winner.read.value);
     controller.enqueue(winner.read.value);
     return;
   }
@@ -924,7 +952,7 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
 
 // Stream an upstream response to the client, holding the semaphore permit until
 // the stream ends / errors / is cancelled (true in-flight accounting).
-function streamThrough(resp, releaseOnce, label = "stream", tracker = null) {
+function streamThrough(resp, releaseOnce, label = "stream", tracker = null, pathname = "") {
   const headers = new Headers(resp.headers);
   headers.delete("content-encoding");  // Bun already decoded the upstream body
   headers.delete("content-length");
@@ -942,6 +970,10 @@ function streamThrough(resp, releaseOnce, label = "stream", tracker = null) {
     status: resp.status,
     // Only an SSE body may carry comment frames; a JSON body must stay verbatim.
     keepalive: PING_MS > 0 && isEventStream(headers.get("content-type")),
+    responsesTerminal: (pathname === "/responses" || pathname === "/v1/responses")
+      && isEventStream(headers.get("content-type"))
+      ? { decoder: new TextDecoder(), tail: "", seen: false }
+      : null,
   };
   const stream = new ReadableStream({
     async pull(controller) {
@@ -1055,7 +1087,17 @@ async function terminalErrorFrame(pathname, resp, err, signal) {
 // Slow path body: ping through queueing, bounded attempts and bounded backoffs,
 // then splice in only a real SSE stream. Client cancellation aborts that pipeline.
 function keepaliveThenForward(pipeline, releaseOnce, label, tracker, pathname, signal) {
-  const state = { reader: null, response: null, pending: null, idleMs: 0, keepalive: true, status: 200 };
+  const state = {
+    reader: null,
+    response: null,
+    pending: null,
+    idleMs: 0,
+    keepalive: true,
+    status: 200,
+    responsesTerminal: pathname === "/responses" || pathname === "/v1/responses"
+      ? { decoder: new TextDecoder(), tail: "", seen: false }
+      : null,
+  };
   let settled = false;
   return new ReadableStream({
     async pull(controller) {
@@ -1313,7 +1355,7 @@ export function startServer() {
     // Non-streaming callers keep the original shape: one await, real status.
     const eligible = PING_MS > 0 && PING_AFTER_MS > 0 && wantsStream(normalized.inspectBody);
     if (!eligible) {
-      try { return streamThrough(await pipeline, releaseOnce, label, tracker); }
+      try { return streamThrough(await pipeline, releaseOnce, label, tracker, url.pathname); }
       catch (err) { releaseOnce(); tracker.finalize(500, "pipeline_error"); return new Response(`shim: ${err}`, { status: 500 }); }
     }
 
@@ -1338,7 +1380,7 @@ export function startServer() {
           headers: { "content-type": "text/plain; charset=utf-8", "x-trace-id": traceId },
         });
       }
-      return streamThrough(early.resp, releaseOnce, label, tracker);
+      return streamThrough(early.resp, releaseOnce, label, tracker, url.pathname);
     }
 
     // Slow path — still queued, or the model is still thinking. Commit the SSE
