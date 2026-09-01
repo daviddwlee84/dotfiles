@@ -99,7 +99,7 @@ This automatically:
 
 1. Bootstraps Homebrew (macOS/Linux), uv, mise, ansible
 2. Deploys all config files
-3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.)
+3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.); Neovim uses an official release fallback when Homebrew cannot provide a suitable macOS build
 4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` / `installGamingApps` is enabled)
 
 #### Sudo password injection (when chezmoi can't open `/dev/tty`)
@@ -293,7 +293,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 ### Tools (via ansible)
 
 - **Base**: git, git-lfs, curl, ripgrep, fd, just, build tools
-- **Neovim**: >= 0.11.2 with LazyVim dependencies
+- **Neovim**: >= 0.11.2 with LazyVim dependencies; macOS keeps a healthy install untouched, uses Homebrew on Apple Silicon, and falls back to the checksum-verified official release on Intel or when Homebrew cannot satisfy the minimum
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Git review stack**: gh, glab, gh-dash (via `gh` extension), diffnav, git-delta, lazygit
 - **Markdown reader**: `glow` for terminal Markdown rendering, plus `readurl <url>` / `readlocal` / `readnode` / `readraw` to render web pages as markdown in the terminal with auto proxy fallback (see [docs/tools/web-reader.md](docs/tools/web-reader.md))
@@ -345,7 +345,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 
 | Platform | Package Manager | Notes |
 |----------|-----------------|-------|
-| macOS | Homebrew | Full support |
+| macOS | Homebrew + official release fallbacks | Full support, including Intel Neovim when Homebrew has no bottle |
 | Ubuntu Desktop | apt + snap (GUI apps only) | Full support |
 | Ubuntu Server | apt + GitHub binaries | Full support; no snap ([why](docs/linux-package-sources.md#snap-in-this-repo)) |
 | Ubuntu Server (no root) | GitHub binaries + mise + cargo + uv | `noRoot=true`, tools installed to `~/.local/bin` |

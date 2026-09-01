@@ -14,10 +14,11 @@
 
 The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes in [`justfile`](../../justfile). It is the **only** thing that intentionally moves tools forward on this repo's flow.
 
-Two side-effects worth knowing about:
+Three side-effects worth knowing about:
 
 - `.chezmoiexternal.toml.tmpl` entries have `refreshPeriod = "168h"` — chezmoi itself will re-fetch those weekly on apply. That's a bounded "nudge", not an upgrade mechanism for installed binaries.
 - Homebrew casks that carry a `homebrew_cask` entry with `state: present` freeze to that version until a Brewfile hash change forces a re-bundle with `--no-upgrade`. Still install-only; `upgrade-brew` is what actually bumps them.
+- Neovim installed by the macOS official-release fallback is outside Homebrew, so `upgrade-brew` does not refresh it. The role replaces it only when the active `nvim` falls below `neovim_min_version`; otherwise update that fallback manually from the official archive. Removing `~/.local/bin/nvim` and re-applying reinstalls it only when no other `nvim` on `PATH` already satisfies the minimum. Existing Homebrew Neovim installs remain owned by `upgrade-brew`.
 
 ## Entry points
 

@@ -17,10 +17,11 @@
 
 顯式的升級路徑位於 [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh)，透過 [`justfile`](../../justfile) 中的 `just upgrade-*` recipe 對外暴露。它是這個 repo 流程中**唯一**會刻意推進工具版本的東西。
 
-有兩個值得一提的副作用：
+有三個值得一提的副作用：
 
 - `.chezmoiexternal.toml.tmpl` 條目的 `refreshPeriod = "168h"` — chezmoi 自身會在 apply 時每週重新抓取一次。那是有界限的「輕推」，並非已安裝二進位檔的升級機制。
 - 帶有 `state: present` 的 `homebrew_cask` 條目的 Homebrew cask 會凍結在該版本，直到 Brewfile 雜湊 (hash) 變動強制以 `--no-upgrade` 重新 bundle。仍然是 install-only；真正會推進它們的是 `upgrade-brew`。
+- 由 macOS 官方 release fallback 安裝的 Neovim 位於 Homebrew 之外，因此 `upgrade-brew` 不會刷新它。role 只會在目前生效的 `nvim` 低於 `neovim_min_version` 時替換；否則需從官方 archive 手動更新 fallback。只有在 `PATH` 上沒有其他已符合最低版本的 `nvim` 時，移除 `~/.local/bin/nvim` 後重新 apply 才會重裝。既有 Homebrew Neovim 仍由 `upgrade-brew` 管理。
 
 ## 進入點
 

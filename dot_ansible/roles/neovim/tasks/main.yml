@@ -15,12 +15,181 @@
   ansible.builtin.debug:
     msg: "Current Neovim version: {{ nvim_current_version }} (required: >= {{ neovim_min_version }})"
 
-# macOS - use Homebrew
-- name: Install Neovim (macOS)
+# macOS - keep healthy installs untouched. Apple Silicon uses Homebrew as the
+# primary install path; Intel Macs use the official release because Homebrew's
+# Tier 3 Intel configurations may not have a bottle. Either architecture can
+# fall back to the official archive when Homebrew does not satisfy the minimum.
+- name: Set Neovim macOS release architecture
   when: ansible_facts["os_family"] == "Darwin"
-  community.general.homebrew:
-    name: neovim
-    state: latest
+  ansible.builtin.set_fact:
+    nvim_macos_arch: >-
+      {{
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Install Neovim with Homebrew (macOS Apple Silicon)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_current_version is version(neovim_min_version, '<')
+    - nvim_macos_arch == 'arm64'
+  block:
+    - name: Ensure Neovim is installed with Homebrew (macOS Apple Silicon)
+      community.general.homebrew:
+        name: neovim
+        state: present
+
+  rescue:
+    - name: Continue with official Neovim release after Homebrew failure
+      ansible.builtin.debug:
+        msg: "Homebrew could not install Neovim; continuing with the official macOS release"
+
+- name: Check Neovim version after macOS package attempt
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_current_version is version(neovim_min_version, '<')
+  ansible.builtin.shell: nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
+  register: nvim_macos_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Set effective Neovim macOS version
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_current_version is version(neovim_min_version, '<')
+  ansible.builtin.set_fact:
+    nvim_macos_effective_version: >-
+      {{ nvim_macos_version_check.stdout | default(nvim_current_version, true) | trim or nvim_current_version }}
+
+- name: Fail when Neovim has no official macOS release for this architecture
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_macos_effective_version | default(nvim_current_version) is version(neovim_min_version, '<')
+    - nvim_macos_arch == ''
+  ansible.builtin.fail:
+    msg: "Neovim has no official macOS release for architecture {{ target_architecture }}"
+
+- name: Report Neovim macOS release fallback in check mode
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_macos_effective_version | default(nvim_current_version) is version(neovim_min_version, '<')
+    - nvim_macos_arch != ''
+    - ansible_check_mode
+  ansible.builtin.debug:
+    msg: "Would install the official nvim-macos-{{ nvim_macos_arch }}.tar.gz release to ~/.local"
+
+- name: Install Neovim from official macOS release
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_macos_effective_version | default(nvim_current_version) is version(neovim_min_version, '<')
+    - nvim_macos_arch != ''
+    - not ansible_check_mode
+  block:
+    - name: Get latest official Neovim release (macOS)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/neovim/neovim/releases/latest
+        return_content: true
+        timeout: 30
+      register: nvim_macos_release
+      environment:
+        http_proxy: "{{ lookup('env', 'http_proxy') | default('', true) }}"
+        https_proxy: "{{ lookup('env', 'https_proxy') | default('', true) }}"
+
+    - name: Set official Neovim macOS asset name
+      ansible.builtin.set_fact:
+        nvim_macos_asset_name: "nvim-macos-{{ nvim_macos_arch }}.tar.gz"
+
+    - name: Select official Neovim macOS release asset
+      ansible.builtin.set_fact:
+        nvim_macos_asset: >-
+          {{
+            (
+              nvim_macos_release.json.assets
+              | selectattr('name', 'equalto', nvim_macos_asset_name)
+              | list
+              | first
+            ) | default({})
+          }}
+
+    - name: Validate official Neovim macOS release asset
+      ansible.builtin.assert:
+        that:
+          - nvim_macos_asset.browser_download_url is defined
+          - nvim_macos_asset.digest is defined
+          - nvim_macos_asset.digest is match('^sha256:[0-9a-f]{64}$')
+        fail_msg: >-
+          The latest Neovim release does not contain {{ nvim_macos_asset_name }}
+          with a SHA-256 digest
+
+    - name: Ensure ~/.local exists for Neovim macOS release
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local"
+        state: directory
+        mode: '0755'
+
+    - name: Download official Neovim macOS release
+      ansible.builtin.get_url:
+        url: "{{ nvim_macos_asset.browser_download_url }}"
+        dest: "/tmp/{{ nvim_macos_asset_name }}"
+        checksum: "{{ nvim_macos_asset.digest }}"
+        mode: '0644'
+        timeout: 600
+      retries: 3
+      delay: 5
+      environment:
+        http_proxy: "{{ lookup('env', 'http_proxy') | default('', true) }}"
+        https_proxy: "{{ lookup('env', 'https_proxy') | default('', true) }}"
+
+    # ansible.builtin.unarchive rejects macOS's BSD tar and insists on GNU
+    # tar even though the system tar handles this archive correctly. Invoke
+    # the platform tar directly instead of adding a Homebrew gnu-tar dependency.
+    - name: Extract official Neovim macOS release to ~/.local
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tar
+          - -xzf
+          - "/tmp/{{ nvim_macos_asset_name }}"
+          - -C
+          - "{{ ansible_facts['env']['HOME'] }}/.local"
+          - --strip-components=1
+
+    - name: Check installed Neovim macOS release version
+      ansible.builtin.shell: >-
+        {{ ansible_facts['env']['HOME'] }}/.local/bin/nvim --version 2>/dev/null
+        | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
+      register: nvim_macos_release_version
+      changed_when: false
+
+    - name: Validate installed Neovim macOS release version
+      ansible.builtin.assert:
+        that:
+          - nvim_macos_release_version.stdout is version(neovim_min_version, '>=')
+        fail_msg: >-
+          Installed Neovim {{ nvim_macos_release_version.stdout | default('unknown', true) }}
+          is older than required {{ neovim_min_version }}
+
+    - name: Display installed Neovim macOS release version
+      ansible.builtin.debug:
+        msg: "Installed Neovim {{ nvim_macos_release_version.stdout }} from the official macOS release"
+
+  rescue:
+    - name: Record Neovim macOS release installation failure
+      ansible.builtin.set_fact:
+        nvim_macos_release_error: "{{ ansible_failed_result.msg | default('unknown error') }}"
+
+  always:
+    - name: Clean up Neovim macOS release archive
+      ansible.builtin.file:
+        path: "/tmp/nvim-macos-{{ nvim_macos_arch }}.tar.gz"
+        state: absent
+
+- name: Fail after Neovim macOS release installation error
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - nvim_macos_release_error is defined
+  ansible.builtin.fail:
+    msg: "Failed to install Neovim from the official macOS release: {{ nvim_macos_release_error }}"
 
 # Linux - apt baseline, GitHub release tarball when apt is too old.
 # Deliberately NO snap: snaps auto-refresh outside the explicit
