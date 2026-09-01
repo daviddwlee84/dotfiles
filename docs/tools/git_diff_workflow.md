@@ -13,7 +13,7 @@ This workflow is managed globally through these files:
 
 - `~/.gitconfig` keeps `delta` as the default Git pager.
 - `~/.config/gh-dash/config.yml` sets `pager.diff: "diffnav"`.
-- `~/.config/lazygit/config.yml` uses LazyGit's current `git.pagers` syntax with `delta`, and sets `os.copyToClipboardCmd` so `Ctrl+O` copies through the `x` wrapper (local `wl-copy`/`xclip`, OSC 52 over SSH — see [clipboard.md](clipboard.md)).
+- `~/.config/lazygit/config.yml` uses LazyGit's current `git.diffRenderers` syntax with `delta`, and sets `os.copyToClipboardCmd` so `Ctrl+O` copies through the `x` wrapper (local `wl-copy`/`xclip`, OSC 52 over SSH — see [clipboard.md](clipboard.md)).
 - `~/.config/bat/themes/tokyonight_night.tmTheme` provides the shared Tokyo Night theme used by `bat` previews.
 
 ## Why Both `delta` and `diffnav`
@@ -42,16 +42,19 @@ gh dash
 
 ## LazyGit + `delta`
 
-LazyGit's current pager configuration uses `git.pagers`, not the older `git.paging` key:
+Since v0.64, LazyGit's diff renderer configuration uses `git.diffRenderers`
+and `command`. The former `git.pagers` and `pager` fields trigger an automatic
+migration that rewrites the config file on startup:
 
 ```yaml
 git:
-  pagers:
+  diffRenderers:
     - colorArg: always
-      pager: delta --dark --paging=never --syntax-theme base16-256 -s
+      command: delta --dark --paging=never --syntax-theme base16-256 -s
 ```
 
-This keeps LazyGit aligned with the existing `delta`-first CLI setup while avoiding the outdated config shape from the old issue thread.
+This keeps LazyGit aligned with the existing `delta`-first CLI setup while
+preventing migration drift against the chezmoi-managed file.
 
 ## Fonts and Theme
 
@@ -65,5 +68,5 @@ bat never reads `.tmTheme` at runtime — only the bincode cache under `~/.cache
 
 - [diffnav](https://github.com/dlvhdr/diffnav)
 - [gh-dash docs](https://www.gh-dash.dev/getting-started/)
-- [LazyGit custom pagers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md)
+- [LazyGit custom diff renderers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_DiffRenderers.md)
 - [bat](https://github.com/sharkdp/bat)

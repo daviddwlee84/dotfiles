@@ -201,7 +201,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 - `~/.gitconfig` - Git configuration; managed via `modify_` so `gh auth setup-git`'s `[credential "..."]` blocks (with the per-machine absolute path to `gh`) survive `chezmoi apply`; default pull behavior is rebase + autostash (`pull.rebase=true`, `rebase.autoStash=true`) so LazyGit's `p` pull keeps local dirty work across the rebase ([docs](docs/tools/gh-cli.md), [LazyGit notes](docs/tools/lazygit.md))
 - `~/.config/git/hooks/` - Global Git hooks (via a global `core.hooksPath`): managed `pre-commit` (gitleaks) + Git LFS hooks, all hardened to skip gracefully — PATH-robust and non-fatal so a stripped-PATH clone like `brew tap` can't break (see [pitfall](pitfalls/git-lfs-global-hook-breaks-brew-tap.md))
 - `~/.config/gh-dash/config.yml` - Global gh-dash config, with `diffnav` as the diff pager
-- `~/.config/lazygit/config.yml` - Global LazyGit config, with `delta` as the custom diff pager
+- `~/.config/lazygit/config.yml` - Global LazyGit config, with `delta` as the custom diff renderer using the v0.64+ schema
 - `~/.config/bat/themes/tokyonight_night.tmTheme` - Managed Tokyo Night theme for bat; apply rebuilds the bat cache and clears it if the cache is incompatible with `delta`
 - `~/.config/nvim/` - Neovim (LazyVim) configuration; native `unnamedplus` clipboard locally, with copy-only OSC 52 under SSH/Herdr/Zellij so yanks reach the attached client's clipboard without making normal `p` wait on unsupported clipboard reads (pairs with tmux `set-clipboard on`, see [docs](docs/tools/clipboard.md))
 - `~/.config/uv/uv.toml` - uv package manager config (PyPI: official / Aliyun+TUNA+USTC via `useChineseMirror`)

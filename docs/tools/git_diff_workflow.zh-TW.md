@@ -18,7 +18,7 @@
 
 - `~/.gitconfig` 將 `delta` 設為預設的 Git 分頁器。
 - `~/.config/gh-dash/config.yml` 設定 `pager.diff: "diffnav"`。
-- `~/.config/lazygit/config.yml` 使用 LazyGit 目前的 `git.pagers` 語法搭配 `delta`，並設定 `os.copyToClipboardCmd`，讓 `Ctrl+O` 透過 `x` 包裝複製（本機用 `wl-copy`/`xclip`，SSH 走 OSC 52 — 見 [clipboard.md](clipboard.md)）。
+- `~/.config/lazygit/config.yml` 使用 LazyGit 目前的 `git.diffRenderers` 語法搭配 `delta`，並設定 `os.copyToClipboardCmd`，讓 `Ctrl+O` 透過 `x` 包裝複製（本機用 `wl-copy`/`xclip`，SSH 走 OSC 52 — 見 [clipboard.md](clipboard.md)）。
 - `~/.config/bat/themes/tokyonight_night.tmTheme` 提供 `bat` 預覽 (preview) 共用的 Tokyo Night 主題。
 
 ## 為什麼同時使用 `delta` 和 `diffnav`
@@ -47,16 +47,19 @@ gh dash
 
 ## LazyGit + `delta`
 
-LazyGit 目前的分頁器設定使用 `git.pagers`，而非舊版的 `git.paging` 鍵：
+自 v0.64 起，LazyGit 的 diff renderer 設定使用 `git.diffRenderers` 與
+`command`。舊的 `git.pagers` 與 `pager` 欄位會觸發自動遷移，並在啟動時
+重寫設定檔：
 
 ```yaml
 git:
-  pagers:
+  diffRenderers:
     - colorArg: always
-      pager: delta --dark --paging=never --syntax-theme base16-256 -s
+      command: delta --dark --paging=never --syntax-theme base16-256 -s
 ```
 
-這使 LazyGit 與既有的「`delta` 優先」CLI 設定保持一致，同時避免使用舊 issue 討論中過時的設定形狀。
+這使 LazyGit 與既有的「`delta` 優先」CLI 設定保持一致，也避免遷移結果與
+chezmoi 管理的檔案形成 drift。
 
 ## 字型與主題
 
@@ -70,5 +73,5 @@ bat 執行期並不讀取 `.tmTheme`，只讀 `~/.cache/bat` 底下由 `bat cach
 
 - [diffnav](https://github.com/dlvhdr/diffnav)
 - [gh-dash docs](https://www.gh-dash.dev/getting-started/)
-- [LazyGit custom pagers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md)
+- [LazyGit custom diff renderers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_DiffRenderers.md)
 - [bat](https://github.com/sharkdp/bat)

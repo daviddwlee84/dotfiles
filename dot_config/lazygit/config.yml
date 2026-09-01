@@ -1,7 +1,10 @@
+# Lazygit v0.64 renamed custom pagers to diff renderers. Keep the current
+# schema here so lazygit does not migrate and rewrite this chezmoi-managed file
+# every time it starts.
 git:
-  pagers:
+  diffRenderers:
     - colorArg: always
-      pager: delta --dark --paging=never --syntax-theme base16-256 -s
+      command: delta --dark --paging=never --syntax-theme base16-256 -s
 
 os:
   # Route Ctrl+O ("copy to clipboard") through the repo's `x` wrapper instead
