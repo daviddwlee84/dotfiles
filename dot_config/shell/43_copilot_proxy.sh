@@ -1583,7 +1583,16 @@ EOF
       if [ "$(_copilot_pkg_flavor)" = "original" ]; then
         "$(_copilot_pkg_bin)" auth
       else
-        "$(_copilot_pkg_bin)" auth --provider copilot
+        # Fork ≥ 2.3.x nests the device flow under `auth login` (`auth` alone now
+        # only prints usage and exits 1 with "Unknown command copilot", because
+        # citty reads the --provider VALUE as the missing subcommand). Older forks
+        # took `auth --provider`. Probe the help text instead of the version so a
+        # bump either way keeps working.
+        if "$(_copilot_pkg_bin)" auth --help 2>&1 | command grep -qE '^[[:space:]]*login([[:space:]]|$)'; then
+          "$(_copilot_pkg_bin)" auth login --provider copilot
+        else
+          "$(_copilot_pkg_bin)" auth --provider copilot
+        fi
       fi
       ;;
     update)
