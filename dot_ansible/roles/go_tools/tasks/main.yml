@@ -25,6 +25,33 @@
   failed_when: false
 
 # =============================================================================
+# One-time migration: drop the Homebrew Go toolchain (macOS)
+# =============================================================================
+# Commit 34cc271 moved Go from the security_tools brew install to mise
+# (`go = "latest"` in dot_config/mise/config.toml.tmpl) but only removed the
+# INSTALL — hosts provisioned before it keep a brew Go forever. `go` then
+# resolves to whichever of /opt/homebrew/opt/go/bin (prepended unconditionally
+# by dot_config/shell/02_legacy_tools.sh) and mise's installs/go/<ver>/bin wins
+# the PATH race, so an interactive shell and a non-mise context can compile with
+# DIFFERENT toolchain versions. Same two-binaries-on-PATH hazard the devtools
+# role solves for herdr.
+#
+# Guarded on mise ACTUALLY providing go (`go_bindir` above): with
+# installExtraRuntimes=false mise has no Go at all, and brew's copy is then the
+# only toolchain on the box — removing it there would leave the host with none.
+# Nothing depends on the formula (`brew uses --installed go` is empty; `gopls`
+# ships as a bottle and takes Go only as a :build dep), so the uninstall is safe
+# whenever mise has taken over.
+- name: Migrate Go off Homebrew (macOS, one-time — mise owns the toolchain)
+  when:
+    - ansible_facts['os_family'] == 'Darwin'
+    - (go_bindir.stdout | default('') | trim) != ""
+  community.general.homebrew:
+    name: go
+    state: absent
+  failed_when: false
+
+# =============================================================================
 # Install Go CLI tools (Linux; macOS uses Homebrew)
 # =============================================================================
 # GOBIN forces binaries into ~/.local/bin (the blessed dir already on PATH),

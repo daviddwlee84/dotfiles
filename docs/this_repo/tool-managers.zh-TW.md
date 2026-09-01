@@ -378,7 +378,7 @@ Pi、OMP 與 `pia` 在本次變更中刻意不加入 AICAP：它們是 harness c
 | `python_uv_tools` | `uv tool install` | 13 | `installPythonUvTools` |
 | `llm_tools` | `uv tool install` + brew + cargo + curl-installer | 4(litellm、llmfit、models、ollama) | `installLlmTools` |
 | `js_cli_tools` | `mise exec -- npm install -g` / 系統 npm | 1(`readability-cli`) | `installJsCliTools` |
-| `rust_cargo_tools` | `cargo install`(在 `mise install rust@latest` 之後) | defaults 中 `[]` + 2 個 hard-code(`recon`、`pueue`) | (無 gate;rust runtime 永遠透過 mise 安裝) |
+| `rust_cargo_tools` | `cargo install`(在 `mise install rust@stable` 之後) | defaults 中 `[]` + 2 個 hard-code(`recon`、`pueue`) | (無 gate;rust runtime 永遠透過 mise 安裝) |
 | `ruby_gem_tools` | `gem install`(在 `mise install ruby@3` 之後) | 2(`try-cli`、`tmuxinator`) | (無 gate;在 noRoot Linux 上由 `mise install ruby` 跳過來 gate) |
 | `dotnet_tools` | `dotnet tool install --global`(在 `mise use -g dotnet@latest` 之後) | 1(`azure-cost-cli`) | `installDotnetTools` |
 
@@ -391,7 +391,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 | Role | 擁有什麼 | OS 機制 |
 |---|---|---|
 | `neovim` | `neovim` ≥ 0.11.2（健康的既有安裝保持不動） | macOS：Apple Silicon brew formula（`state: present`）→ 仍缺少／太舊時使用經 checksum 驗證的官方 macOS release 安裝到 `~/.local`；Intel 直接使用官方 release · Linux：apt → 太舊則 GitHub release tarball（`/opt/nvim` + `/usr/local/bin/nvim` symlink）→ 使用者層級 tarball 到 `~/.local`；**oldEL** 抓 `neovim/neovim-releases`（glibc 2.17 重建 repo）。不用 snap（2026-06 移除——見 [linux-package-sources.zh-TW.md → 這個 repo 的 snap 使用現況](../linux-package-sources.zh-TW.md#這個-repo-的-snap-使用現況)）。見 [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
-| `lazyvim_deps` | `fzf`、`lazygit`、`tree-sitter`、`node` | macOS:brew · Linux:mise(一般情境 `node@lts`;armv7l 上 `node@20` + `rust@latest`);fzf 由 chezmoi external clone 編譯(Linux);lazygit PPA → GitHub release;tree-sitter-cli 透過 `mise exec -- npm install -g tree-sitter-cli`(timeout 180)→ cargo fallback 並先裝 `libclang-dev`/`clang-devel` |
+| `lazyvim_deps` | `fzf`、`lazygit`、`tree-sitter`、`node` | macOS:brew 裝這四個套件,**另外**跑一次 config-driven 的 `mise install --yes`(Darwin 上唯一會安裝 `dot_config/mise/config.toml.tmpl` 裡 `go`/`rust` 的地方)· Linux:mise(一般情境 `node@lts`;armv7l 上 `node@20` + `rust@stable`);fzf 由 chezmoi external clone 編譯(Linux);lazygit PPA → GitHub release;tree-sitter-cli 透過 `mise exec -- npm install -g tree-sitter-cli`(timeout 180)→ cargo fallback 並先裝 `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (見 [§ 3.1 基礎/共用](#31-基礎--共用-cli)) | — |
 
 #### 3.7 網路 + IaC + LLM + 媒體 (`networking_tools`, `iac_tools`, `llm_tools`, `media_tools`)
@@ -578,7 +578,9 @@ Pi 使用固定的 `~/.local` prefix，因此由 `just upgrade-agents` 先跑
 **設定檔**:`dot_ansible/roles/rust_cargo_tools/defaults/main.yml`
 (目前 `cargo_tools: []` — 沒有泛用條目)。
 
-**Rust 安裝**:`mise install rust@latest`(優先),在 noRoot/oldEL 主機
+**Rust 安裝**:`mise install rust@stable`(優先——這個 spec 必須與
+`dot_config/mise/config.toml.tmpl` 的 `rust = "stable"` 一致,見
+[`pitfalls/mise-warn-missing-rust-stable-every-prompt.md`](../../pitfalls/mise-warn-missing-rust-stable-every-prompt.md)),在 noRoot/oldEL 主機
 上有兩層 fallback:直接 `rustup-init`、設定的 mirror manifest 過期
 時退回 `https://static.rust-lang.org`。
 

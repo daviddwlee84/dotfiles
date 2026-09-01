@@ -51,6 +51,21 @@
       delay: 20
       changed_when: hashicorp_tap_result.rc == 0
 
+    # Homebrew 6.0 formula-trust gate: `brew install hashicorp/tap/terraform`
+    # refuses to load the formula until the tap is trusted. Not gated on the
+    # tap task above — the tap is often already present but untrusted from an
+    # apply that predates the gate. # See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
+    - name: Check trust state of the hashicorp tap
+      ansible.builtin.command: brew tap-info hashicorp/tap
+      register: hashicorp_tap_info
+      changed_when: false
+      failed_when: false
+
+    - name: Trust the hashicorp tap when Homebrew marks it untrusted
+      when: "'Untrusted' in (hashicorp_tap_info.stdout | default(''))"
+      ansible.builtin.command: brew trust hashicorp/tap
+      changed_when: true
+
 - name: Install Terraform (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"

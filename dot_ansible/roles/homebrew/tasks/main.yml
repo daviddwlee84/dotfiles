@@ -3,6 +3,94 @@
 # NOTE: Homebrew installation is handled by bootstrap script (run_once_before_00)
 # This role only updates Homebrew if already installed
 
+# ===========================================================================
+# Xcode Command Line Tools pre-flight (macOS)
+# ===========================================================================
+# Homebrew needs a *current* CLT for any source build. Two distinct broken
+# states, both of which abort `brew install` outright:
+#   - absent   -> "Error: No developer tools installed."
+#   - outdated -> "Error: Your Command Line Tools are too outdated."
+# Homebrew's own installer only installs CLT when it is ABSENT; it never
+# refreshes a stale one, so a machine that has been upgraded across macOS
+# majors silently carries a CLT from the previous major until the first
+# source-built formula (e.g. peonping/tap/peon-ping) blows up mid-play.
+#
+# Freshness heuristic: CLT major >= macOS major. Apple has shipped
+# CLT/Xcode majors at or above the macOS major for every release this repo
+# supports (macOS 14 -> Xcode 15, 15 -> 16, 26 -> 26), so this never
+# false-positives on a supported host and catches exactly the stale case.
+#
+# The major is extracted with `awk` + shell parameter expansion rather than
+# `regex_replace` in a `when:` clause — see
+# pitfalls/ansible-when-regex-replace-backslash-strip.md.
+- name: Check whether the Xcode Command Line Tools are installed (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - homebrew_require_clt | bool
+  ansible.builtin.command: /usr/bin/xcode-select -p
+  register: homebrew_clt_path
+  changed_when: false
+  failed_when: false
+
+- name: Read the installed Command Line Tools major version (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - homebrew_require_clt | bool
+    - homebrew_clt_path.rc == 0
+  ansible.builtin.shell: |
+    ver="$(/usr/sbin/pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null \
+           | awk -F': ' '/^version:/ {print $2}')"
+    major="${ver%%.*}"
+    echo "${major:-0}"
+  args:
+    executable: /bin/bash
+  register: homebrew_clt_major_raw
+  changed_when: false
+  failed_when: false
+
+- name: Fail when the Xcode Command Line Tools are absent (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - homebrew_require_clt | bool
+    - homebrew_clt_path.rc != 0
+  ansible.builtin.fail:
+    msg: |
+      Xcode Command Line Tools are not installed — Homebrew cannot build any
+      formula from source ("Error: No developer tools installed.").
+
+      Install them (GUI prompt, no sudo):
+          xcode-select --install
+      or headless (needs sudo, ~900 MB):
+          sudo softwareupdate --install "$(softwareupdate --list 2>&1 \
+            | sed -n 's/^ *\* Label: \(Command Line Tools.*\)$/\1/p' | tail -1)" --verbose
+
+      Then re-run `chezmoi apply`.
+      Override this check with: -e homebrew_require_clt=false
+
+- name: Fail when the Xcode Command Line Tools are too old for this macOS (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - homebrew_require_clt | bool
+    - homebrew_clt_path.rc == 0
+    - (homebrew_clt_major_raw.stdout | default('0') | trim | int) > 0
+    - (homebrew_clt_major_raw.stdout | trim | int) < (ansible_facts['distribution_major_version'] | int)
+  ansible.builtin.fail:
+    msg: |
+      Xcode Command Line Tools {{ homebrew_clt_major_raw.stdout | trim }}.x are too old for
+      macOS {{ ansible_facts['distribution_major_version'] }} — Homebrew refuses every source build
+      ("Error: Your Command Line Tools are too outdated.").
+
+      Upgrade them (headless, needs sudo, ~900 MB):
+          sudo softwareupdate --install "$(softwareupdate --list 2>&1 \
+            | sed -n 's/^ *\* Label: \(Command Line Tools.*\)$/\1/p' | tail -1)" --verbose
+
+      If Software Update lists nothing, reinstall from scratch:
+          sudo rm -rf /Library/Developer/CommandLineTools
+          xcode-select --install
+
+      Then re-run `chezmoi apply`.
+      Override this check with: -e homebrew_require_clt=false
+
 - name: Check if Homebrew is installed (Apple Silicon)
   ansible.builtin.stat:
     path: /opt/homebrew/bin/brew

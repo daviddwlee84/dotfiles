@@ -396,7 +396,7 @@ Wrappers around language-specific package managers. All consume a
 | `llm_tools` | `uv tool install` + brew + cargo + curl-installer | 4 (litellm, llmfit, models, ollama) | `installLlmTools` |
 | `js_cli_tools` | `mise exec -- npm install -g` / system npm | 1 (`readability-cli`) | `installJsCliTools` |
 | `summarize` | brew (macOS) / `mise exec -- npm install -g` (Linux) | 1 (`summarize`) | `installSummarize` |
-| `rust_cargo_tools` | `cargo install` (after `mise install rust@latest`) | `[]` in defaults + 2 hardcoded (`recon`, `pueue`) | (no gate; rust runtime always installed via mise) |
+| `rust_cargo_tools` | `cargo install` (after `mise install rust@stable`) | `[]` in defaults + 2 hardcoded (`recon`, `pueue`) | (no gate; rust runtime always installed via mise) |
 | `ruby_gem_tools` | `gem install` (after `mise install ruby@3`) | 2 (`try-cli`, `tmuxinator`) | (no gate; gated by `mise install ruby` skip on noRoot Linux) |
 | `dotnet_tools` | `dotnet tool install --global` (after `mise use -g dotnet@latest`) | 1 (`azure-cost-cli`) | `installDotnetTools` |
 
@@ -409,7 +409,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
 | `neovim` | `neovim` ≥ 0.11.2 (healthy installs are left untouched) | macOS: Apple Silicon brew formula (`state: present`) → checksum-verified official macOS release to `~/.local` when still missing/old; Intel goes directly to the official release · Linux: apt → GitHub release tarball if too old (`/opt/nvim` + `/usr/local/bin/nvim` symlink) → user-level tarball to `~/.local`; **oldEL** pulls from `neovim/neovim-releases` (glibc 2.17 rebuild repo). No snap (dropped 2026-06 — see [linux-package-sources.md → snap in this repo](../linux-package-sources.md#snap-in-this-repo)). See [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
-| `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew · Linux: mise (`node@lts` general; `node@20` + `rust@latest` on armv7l); fzf built from chezmoi external clone (Linux); lazygit GitHub release (its PPA was deprecated upstream in 2021 and broke `apt update`; the role now also purges leftover lazygit PPA source files); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
+| `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew for the four packages, **plus** a config-driven `mise install --yes` (the only thing that installs `go`/`rust` from `dot_config/mise/config.toml.tmpl` on Darwin) · Linux: mise (`node@lts` general; `node@20` + `rust@stable` on armv7l); fzf built from chezmoi external clone (Linux); lazygit GitHub release (its PPA was deprecated upstream in 2021 and broke `apt update`; the role now also purges leftover lazygit PPA source files); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
 
 #### 3.7 Networking + IaC + LLM + media (`networking_tools`, `iac_tools`, `llm_tools`, `media_tools`)
@@ -604,7 +604,9 @@ use a stable user prefix when the command must survive runtime upgrades).
 **Config**: `dot_ansible/roles/rust_cargo_tools/defaults/main.yml`
 (currently `cargo_tools: []` — no generic entries).
 
-**Rust install**: `mise install rust@latest` (preferred), with two
+**Rust install**: `mise install rust@stable` (preferred — the spec MUST match
+`rust = "stable"` in `dot_config/mise/config.toml.tmpl`, see
+[`pitfalls/mise-warn-missing-rust-stable-every-prompt.md`](../../pitfalls/mise-warn-missing-rust-stable-every-prompt.md)), with two
 fallback layers on noRoot/oldEL boxes: direct `rustup-init`, then
 `https://static.rust-lang.org` when the configured mirror's manifest
 is stale.

@@ -1,0 +1,9 @@
+---
+# Fail the play early when the Xcode Command Line Tools are missing or too old
+# for the running macOS. Homebrew hard-refuses every source build in either
+# state ("No developer tools installed." / "Your Command Line Tools are too
+# outdated."), so without this pre-flight the failure surfaces ~12 minutes into
+# `chezmoi apply` on whichever source-built formula happens to come first.
+# Set to false to install anyway (bottle-only installs still work).
+# See pitfalls/homebrew-refuses-source-build-outdated-command-line-tools.md
+homebrew_require_clt: true

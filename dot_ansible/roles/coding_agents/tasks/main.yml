@@ -90,16 +90,41 @@
 # already exported by dot_config/shell/00_exports.sh.tmpl, so we pass
 # `--no-modify-path` to keep the installer binary-only (no profile writes).
 
-- name: Check if OpenCode is installed
-  ansible.builtin.command: which opencode
-  register: opencode_check
+# Dropping the Homebrew INSTALL path (see the block comment above) was not
+# enough on hosts that already had the formula: a leftover brew `opencode`
+# keeps satisfying a `which opencode` guard, so the official installer never
+# runs and the host stays pinned to whatever version the Cellar holds —
+# observed 2026-09 with brew opencode 1.14.47, `~/.opencode/bin/` empty, and
+# `opencode upgrade` unable to swap the binary (exactly the failure mode the
+# comment above says we moved away from). Detect and remove the conflicting
+# formula, same shape as the td / codexbar blocks further down, and guard on
+# the path we actually own rather than on PATH resolution.
+- name: Check whether a Homebrew formula owns the opencode binary
+  # Probe brew by OUTPUT, not exit status — a stub `brew` returns 0 for every
+  # subcommand. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md
+  ansible.builtin.shell: |
+    [ -n "$(brew --prefix 2>/dev/null)" ] || exit 1
+    brew list --formula 2>/dev/null | grep -qx opencode
+  args:
+    executable: /bin/bash
+  register: opencode_brew_formula
   changed_when: false
   failed_when: false
-  environment:
-    PATH: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Remove the conflicting Homebrew opencode formula
+  when: opencode_brew_formula.rc == 0
+  community.general.homebrew:
+    name: opencode
+    state: absent
+  ignore_errors: true
+
+- name: Check if OpenCode is installed
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin/opencode"
+  register: opencode_check
 
 - name: Install OpenCode (official installer, no shell-profile mutation)
-  when: opencode_check.rc != 0
+  when: not opencode_check.stat.exists
   ansible.builtin.shell: |
     curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path
   args:
@@ -190,12 +215,45 @@
   register: codex_macos_brew_prefix
   changed_when: false
 
-- name: Verify OpenAI Codex CLI binary is available from Homebrew path (macOS)
+# Two compounding traps here, both of which made a BROKEN codex look healthy on
+# every apply (observed 2026-09: `/opt/homebrew/bin/codex` -> an EMPTY
+# `Caskroom/codex/0.130.0/`, `codex --version` -> "no such file or directory",
+# and `specstory run codex` -> `codex execution failed: signal: killed`):
+#   1. `brew list --cask codex` above only proves the Caskroom RECEIPT exists.
+#      A `brew cleanup` that prunes a stale cask version deletes the payload but
+#      does NOT unlink `$(brew --prefix)/bin/codex` — so the receipt survives,
+#      the install task is skipped, and a dangling symlink is left behind.
+#   2. `ansible.builtin.stat` defaults to `follow: false` (lstat), and a
+#      dangling symlink reports `exists: true`. The verification passed too.
+# `follow: true` resolves the link so a broken one is correctly "missing", and
+# the repair task below reinstalls the cask instead of only reporting the fault.
+- name: Verify OpenAI Codex CLI binary resolves (macOS)
   when: ansible_facts["os_family"] == "Darwin"
   ansible.builtin.stat:
     path: "{{ codex_macos_brew_prefix.stdout }}/bin/codex"
+    follow: true
   register: codex_macos_bin_stat
-  failed_when: not codex_macos_bin_stat.stat.exists
+
+- name: Repair a broken Codex cask install (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not codex_macos_bin_stat.stat.exists
+  # `homebrew_cask: state=present` is a no-op while the receipt is intact, so
+  # reinstall explicitly rather than round-tripping through uninstall.
+  ansible.builtin.command: brew reinstall --cask codex
+  register: codex_macos_reinstall
+  changed_when: codex_macos_reinstall.rc == 0
+  failed_when: false
+
+- name: Re-verify OpenAI Codex CLI binary after repair (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not codex_macos_bin_stat.stat.exists
+  ansible.builtin.stat:
+    path: "{{ codex_macos_brew_prefix.stdout }}/bin/codex"
+    follow: true
+  register: codex_macos_bin_recheck
+  failed_when: not codex_macos_bin_recheck.stat.exists
 
 - name: Check if OpenAI Codex CLI is installed (Linux)
   when:
@@ -428,6 +486,24 @@
   community.general.homebrew_tap:
     name: specstoryai/tap
     state: present
+
+# Homebrew 6.0 formula-trust gate — same treatment as the peon-ping tap below.
+# Deliberately NOT gated on specstory_macos_check: the tap can already be
+# present-but-untrusted from an earlier apply, in which case the tap task above
+# is skipped and only this one can repair the state. # See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
+- name: Check trust state of the specstoryai tap (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: "brew tap-info specstoryai/tap"
+  register: coding_agents_specstory_tap_info
+  changed_when: false
+  failed_when: false
+
+- name: Trust the specstoryai tap (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - "'Untrusted' in (coding_agents_specstory_tap_info.stdout | default(''))"
+  ansible.builtin.command: "brew trust specstoryai/tap"
+  changed_when: true
 
 - name: Install SpecStory via Homebrew (macOS)
   when:
@@ -744,6 +820,18 @@
         name: steipete/tap
         state: present
 
+    # Homebrew 6.0 formula-trust gate. # See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
+    - name: Check trust state of the steipete tap (Linuxbrew)
+      ansible.builtin.command: "brew tap-info steipete/tap"
+      register: coding_agents_steipete_tap_info
+      changed_when: false
+      failed_when: false
+
+    - name: Trust the steipete tap (Linuxbrew)
+      when: "'Untrusted' in (coding_agents_steipete_tap_info.stdout | default(''))"
+      ansible.builtin.command: "brew trust steipete/tap"
+      changed_when: true
+
     - name: Install CodexBar (Linuxbrew)
       community.general.homebrew:
         name: steipete/tap/codexbar
@@ -896,6 +984,24 @@
   community.general.homebrew_tap:
     name: marcus/tap
     state: present
+
+# Homebrew 6.0 formula-trust gate. One trust pass covers BOTH marcus/tap
+# consumers — td here and sidecar further down — because it runs before either
+# install and `brew trust` is tap-wide. Deliberately not gated on the td checks
+# so it still repairs an already-tapped-but-untrusted state. # See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
+- name: Check trust state of the marcus tap (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: "brew tap-info marcus/tap"
+  register: coding_agents_marcus_tap_info
+  changed_when: false
+  failed_when: false
+
+- name: Trust the marcus tap (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - "'Untrusted' in (coding_agents_marcus_tap_info.stdout | default(''))"
+  ansible.builtin.command: "brew trust marcus/tap"
+  changed_when: true
 
 - name: Install td (macOS)
   when:

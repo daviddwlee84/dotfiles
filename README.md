@@ -13,6 +13,13 @@ Cross-platform development environment setup using **chezmoi** + **ansible**.
 
 - [chezmoi](https://www.chezmoi.io/install/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (for ansible)
+- **macOS**: [Homebrew](https://brew.sh) — its installer also installs the Xcode
+  Command Line Tools. It only does so when they are *absent*, so a Mac carried
+  across a macOS major upgrade keeps a stale CLT and Homebrew then refuses every
+  source build. `chezmoi apply` fails fast on that (absent CLT, or CLT major
+  below the macOS major); refresh with
+  `sudo softwareupdate --install "$(softwareupdate --list 2>&1 | sed -n 's/^ *\* Label: \(Command Line Tools.*\)$/\1/p' | tail -1)"`
+  or skip the check with `-e homebrew_require_clt=false`.
 
 ## Architecture
 

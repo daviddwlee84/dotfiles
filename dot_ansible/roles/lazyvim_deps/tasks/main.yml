@@ -12,26 +12,33 @@
       - node
     state: present
 
-# Linux - find mise binary (installed by bootstrap)
+# Find the mise binary (installed by bootstrap on Linux, by Homebrew or the
+# upstream installer on macOS). Darwin is included on purpose: `mise install`
+# below is the ONLY thing that installs the runtimes declared in
+# dot_config/mise/config.toml.tmpl, and leaving macOS out silently stranded
+# go@latest / rust@stable as permanently "(missing)" — mise then warns on every
+# shell prompt. See the "Install mise global tools" comment below.
 - name: Check for user-installed mise
-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
   ansible.builtin.stat:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
   register: mise_user_bin
 
 - name: Set mise binary path (user install)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - mise_user_bin.stat.exists | default(false)
   ansible.builtin.set_fact:
     mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
 
 - name: Set mise binary path (system install)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - mise_bin is not defined
   ansible.builtin.set_fact:
-    mise_bin: /usr/bin/mise
+    mise_bin: >-
+      {{ ('/opt/homebrew/bin/mise' if target_architecture == 'arm64' else '/usr/local/bin/mise')
+         if ansible_facts["os_family"] == "Darwin" else '/usr/bin/mise' }}
 
 # Install mise tools from ~/.config/mise/config.toml (node@lts)
 # Non-fatal: mise downloads are flaky and some tools (e.g. ruby) may fail on
@@ -46,19 +53,34 @@
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - target_architecture in ['armv7l', 'armv6l']
   ansible.builtin.command:
-    cmd: "{{ mise_bin }} install --yes node@20 rust@latest"
+    cmd: "{{ mise_bin }} install --yes node@20 rust@stable"
   register: mise_install
-  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+  # mise prints "mise all tools are installed" when there is nothing to do —
+  # that string contains "install", so a bare substring test reports `changed`
+  # on every single run. Exclude the no-op line explicitly.
+  changed_when:
+    - "'all tools are installed' not in (mise_install.stdout + mise_install.stderr)"
+    - "'install' in mise_install.stderr or 'install' in mise_install.stdout"
   failed_when: false
 
-- name: Install mise global tools (Debian/Ubuntu)
+# Darwin included: nothing else on macOS installs the runtimes declared in
+# dot_config/mise/config.toml.tmpl. `rust_cargo_tools` installs rust and
+# Homebrew covers node, but go@latest had NO installer at all after commit
+# 34cc271 moved Go off the security_tools brew path onto mise — leaving
+# `mise ls` permanently showing `go <ver> (missing)`.
+- name: Install mise global tools (Debian/Ubuntu/macOS)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - target_architecture not in ['armv7l', 'armv6l']
   ansible.builtin.command:
     cmd: "{{ mise_bin }} install --yes"
   register: mise_install
-  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+  # mise prints "mise all tools are installed" when there is nothing to do —
+  # that string contains "install", so a bare substring test reports `changed`
+  # on every single run. Exclude the no-op line explicitly.
+  changed_when:
+    - "'all tools are installed' not in (mise_install.stdout + mise_install.stderr)"
+    - "'install' in mise_install.stderr or 'install' in mise_install.stdout"
   failed_when: false
 
 # TUNA's rustup mirror lags upstream releases: right after a new stable lands,
@@ -71,7 +93,7 @@
 # ~/.cargo/config.toml mirror. See pitfalls/mise-rust-cargo-shim-dead.md.
 - name: Retry mise global tools against official rustup server (mirror lag)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - target_architecture not in ['armv7l', 'armv6l']
     - mise_install.rc is defined
     - mise_install.rc != 0
@@ -81,12 +103,17 @@
     RUSTUP_DIST_SERVER: "https://static.rust-lang.org"
     RUSTUP_UPDATE_ROOT: "https://static.rust-lang.org/rustup"
   register: mise_install_retry
-  changed_when: "'install' in mise_install_retry.stderr or 'install' in mise_install_retry.stdout"
+  # mise prints "mise all tools are installed" when there is nothing to do —
+  # that string contains "install", so a bare substring test reports `changed`
+  # on every single run. Exclude the no-op line explicitly.
+  changed_when:
+    - "'all tools are installed' not in (mise_install_retry.stdout + mise_install_retry.stderr)"
+    - "'install' in mise_install_retry.stderr or 'install' in mise_install_retry.stdout"
   failed_when: false
 
 - name: Warn if mise install had failures
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - mise_install.rc is defined
     - mise_install.rc != 0
     - mise_install_retry.rc | default(1) != 0

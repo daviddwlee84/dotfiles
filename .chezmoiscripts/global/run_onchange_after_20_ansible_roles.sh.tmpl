@@ -5,6 +5,7 @@
 
 # === Role Hashes (changes trigger re-run) ===
 # homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+# homebrew defaults: {{ include "dot_ansible/roles/homebrew/defaults/main.yml" | sha256sum }}
 # base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
 # zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
 # zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}

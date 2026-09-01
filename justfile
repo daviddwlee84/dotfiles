@@ -657,6 +657,33 @@ az-dev-vm-ssh *ARGS:
     ./scripts/azure/dev_vm.py ssh {{ARGS}}
 
 # ============================================================================
+# Documentation (MkDocs)
+# ============================================================================
+
+# Build the docs site with --strict (the check AGENTS.md requires for new docs).
+#
+# Two things `uv run mkdocs` alone does NOT do, both of which make the `social`
+# plugin (OG/Twitter cards) abort the build with ~350 warnings:
+#   1. The docs deps live in `[project.optional-dependencies].docs`, and `uv run`
+#      only syncs the project's BASE dependencies — optional extras need an
+#      explicit `uv sync --extra docs`. CI does this (.github/workflows/docs.yml).
+#   2. On macOS, cairosvg resolves libcairo through `ctypes.util.find_library()`,
+#      which does not look in Homebrew's prefix (SIP strips DYLD_* from
+#      inherited env), so it crashes with `no library called "cairo-2" was
+#      found` even with the Python package installed. DYLD_FALLBACK_LIBRARY_PATH
+#      is set below; needs `brew install cairo pango` (Linux: the apt list in
+#      .github/workflows/docs.yml).
+# See pitfalls/mkdocs-social-plugin-cairosvg-not-found-macos.md
+docs-build:
+    uv sync --extra docs
+    DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix 2>/dev/null)/lib" uv run mkdocs build --strict
+
+# Live-reloading preview on http://127.0.0.1:8000 (same env as docs-build).
+docs-serve:
+    uv sync --extra docs
+    DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix 2>/dev/null)/lib" uv run mkdocs serve
+
+# ============================================================================
 # Ad-hoc Scripts
 # ============================================================================
 

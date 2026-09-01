@@ -22,9 +22,15 @@
 # cargo shim fails with "cargo is not a valid shim". Keying on ~/.cargo/bin/cargo
 # (same as the cargo-tools + EL7 tasks below) self-heals that state.
 # See pitfalls/mise-rust-cargo-shim-dead.md.
+#
+# The version spec MUST match `rust = "stable"` in dot_config/mise/config.toml.tmpl
+# (the SSOT). Installing `rust@latest` here instead writes installs/rust/<semver>
+# and leaves installs/rust/stable absent, so mise prints `WARN missing: rust@stable`
+# on every shell prompt forever — the `creates:` guard below is already satisfied
+# by ~/.cargo/bin/cargo, so the task never re-runs to correct it.
 - name: Install Rust via mise (non-EL7) — configured mirror first
   when: not (oldEL | default(false))
-  ansible.builtin.command: "{{ mise_bin }} install rust@latest"
+  ansible.builtin.command: "{{ mise_bin }} install rust@stable"
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/cargo"
   environment:
@@ -33,7 +39,7 @@
   failed_when: false
 
 # Fallback when the user's RUSTUP_DIST_SERVER (e.g. the TUNA mirror behind the GFW)
-# serves an obsolete/GC'd manifest for `rust@latest` — fails with "the server
+# serves an obsolete/GC'd manifest for the rust channel — fails with "the server
 # unexpectedly provided an obsolete version of the distribution manifest". Retry
 # against the canonical rustup server (same reasoning as the CentOS-7 fallback
 # below, now generalized to all platforms). crates.io stays on the user's mirror
@@ -42,7 +48,7 @@
   when:
     - not (oldEL | default(false))
     - mise_rust_install.rc | default(0) != 0
-  ansible.builtin.command: "{{ mise_bin }} install rust@latest"
+  ansible.builtin.command: "{{ mise_bin }} install rust@stable"
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/cargo"
   environment:
