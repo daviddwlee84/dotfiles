@@ -80,6 +80,8 @@ const PING_MS = Math.max(0, Number(process.env.COPILOT_SHIM_PING_MS ?? 15000));
 const PING_AFTER_MS = Math.max(0, Number(process.env.COPILOT_SHIM_PING_AFTER_MS ?? 10000));
 const STALL_MS = Math.max(0, Number(process.env.COPILOT_SHIM_STALL_MS ?? 240000));
 const RETRY_STATUS = new Set([403, 429, 500, 502, 503, 504]);
+const REQUEST_BODY_TIMEOUT_STATUS = 408;
+const REQUEST_BODY_TIMEOUT_RETRIES = 1;
 const MAX_BACKOFF_MS = 30000;
 const MAX_RETRY_AFTER_MS = 300000;
 const ADAPT_SUCCESS_THRESHOLD = 32;
@@ -1231,6 +1233,7 @@ export function startServer() {
     // committed. Resolves to a Response whose body has NOT been read yet, or to
     // a synthetic error Response (permit already released in that case).
     const runUpstream = async () => {
+      let requestBodyTimeoutRetries = 0;
       const willQueue = active >= limiter.limit;
       const queuedAt = willQueue ? performance.now() : null;
       if (willQueue) {
@@ -1276,9 +1279,15 @@ export function startServer() {
 
         limiter.observeStatus(resp.status, willQueue || waiters.length > 0);
 
-        // Retryable status and attempts left → back off and try again. The 403
-        // arrives fast (<2s, before any body), so retrying here is safe.
-        if (RETRY_STATUS.has(resp.status) && attempt < RETRIES) {
+        // Retryable status and attempts left → back off and try again. A 408
+        // user_request_timeout means the upstream did not finish reading the
+        // already-buffered request body; replay it at most once so a transient
+        // reader stall can recover without turning a persistent large-body
+        // failure into four minute-long attempts.
+        const bodyTimeoutRetry = resp.status === REQUEST_BODY_TIMEOUT_STATUS
+          && requestBodyTimeoutRetries < REQUEST_BODY_TIMEOUT_RETRIES;
+        if ((RETRY_STATUS.has(resp.status) || bodyTimeoutRetry) && attempt < RETRIES) {
+          if (bodyTimeoutRetry) requestBodyTimeoutRetries++;
           const d = backoffMs(attempt, resp.headers.get("retry-after"));
           log(`${label} -> ${resp.status}; retry ${attempt + 1}/${RETRIES} in ${d}ms`);
           await closeResponse(resp, new Error(`retrying upstream status ${resp.status}`));

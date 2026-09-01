@@ -26,10 +26,12 @@ const upstream = Bun.serve({
     const attempt = counts.get(key);
     await sleep(Number(url.searchParams.get("delay") ?? 0));
     if (mode === "retry500" && attempt === 1) return new Response('{"error":"transient"}', { status: 500 });
+    if (mode === "retry408" && attempt === 1) return new Response('{"error":{"code":"user_request_timeout"}}', { status: 408 });
     if (mode === "always500") return new Response('{"error":"persistent"}', { status: 500 });
     if (mode === "nonsse") return Response.json({ ok: true });
     if (mode === "status400") return new Response('{"error":"bad"}', { status: 400, headers: { "content-type": "application/json" } });
     if (mode === "status401") return new Response('{"error":"unauthorized"}', { status: 401 });
+    if (mode === "status422") return new Response('{"error":{"code":"cyber_policy"}}', { status: 422 });
     if (mode === "402") return new Response('{"error":"billing"}', { status: 402 });
     if (mode === "status429") return new Response('{"error":"rate limited"}', { status: 429 });
     if (mode === "backoff") return new Response('{"error":"retry later"}', { status: 500, headers: { "retry-after": "2" } });
@@ -104,11 +106,13 @@ try {
     payload: { model: "gpt-fixture", service_tier: "fast", stream: true, marker: "fast-route" },
   });
   const retry = await call("/v1/messages", "retry500", { delay: 250 });
+  const retry408 = await call("/v1/messages", "retry408", { delay: 0 });
   const exhausted = await call("/v1/responses", "always500", { delay: 150 });
   const delayedResponses = {
     status400: await call("/v1/responses", "status400", { delay: 150 }),
     status401: await call("/v1/responses", "status401", { delay: 150 }),
     status402: await call("/v1/responses", "402", { delay: 150 }),
+    status422: await call("/v1/responses", "status422", { delay: 150 }),
     status429: await call("/v1/responses", "status429", { delay: 150 }),
   };
   const responseCodes = Object.fromEntries(Object.entries(delayedResponses).map(([key, value]) => [key, responseErrorCode(value)]));
@@ -149,6 +153,7 @@ try {
 
   const metrics = await (await fetch(`http://127.0.0.1:${shim.port}/_shim/events?scope=all&limit=50`)).json();
   const retrySeen = seen.get("/v1/messages:retry500") ?? [];
+  const retry408Seen = seen.get("/v1/messages:retry408") ?? [];
   const fastSeen = seen.get("/v1/responses:fast-route") ?? [];
   const expectedRetryBody = JSON.stringify({ model: "retry500", stream: true, marker: "retry500" });
   const result = {
@@ -159,6 +164,7 @@ try {
       forwarded: fastSeen.length === 1 ? JSON.parse(fastSeen[0].body) : null,
     },
     retry,
+    retry408,
     exhausted,
     delayedResponses,
     responseCodes,
@@ -174,19 +180,21 @@ try {
       sameTrace: retrySeen.length === 2 && Boolean(retrySeen[0].trace) && retrySeen[0].trace === retrySeen[1].trace,
       delayMs: retrySeen.length === 2 ? retrySeen[1].at - retrySeen[0].at : null,
     },
+    retry408Replay: { attempts: retry408Seen.length },
     counts: Object.fromEntries(counts),
     metrics,
   };
   console.log(JSON.stringify(result));
 
   if (retry.status !== 200 || retry.pings < 1 || retry.events.join(",") !== "message_start,message_stop") throw new Error("retry path failed");
+  if (retry408.status !== 200 || result.retry408Replay.attempts !== 2) throw new Error("408 body-timeout retry failed");
   if (!cancelBarrier.waited || !cancelBarrier.settled) throw new Error("response cleanup barrier was not awaited");
   if (!cleanupFailures.cancellationContained || !cleanupFailures.metricFailureContained) throw new Error("cleanup failure escaped");
   if (result.fastRoute.response.status !== 200 || result.fastRoute.forwarded?.model !== "gpt-fixture-fast" || "service_tier" in result.fastRoute.forwarded) throw new Error("fast routing failed");
   if (!result.retryReplay.sameBody || !result.retryReplay.sameTrace || result.retryReplay.attempts !== 2) throw new Error("retry replay changed");
   if (exhausted.events.at(-1) !== "response.failed" || !exhausted.body.includes('"status":"failed"')) throw new Error("responses terminal failure failed");
-  if (JSON.stringify(responseCodes) !== JSON.stringify({ status400: "invalid_prompt", status401: "invalid_prompt", status402: "insufficient_quota", status429: "rate_limit_exceeded", status500: "server_error" })) throw new Error("responses error classification failed");
-  if (counts.get("/v1/responses:status400") !== 1 || counts.get("/v1/responses:status401") !== 1 || counts.get("/v1/responses:402") !== 1 || counts.get("/v1/responses:status429") !== 2) throw new Error("responses retry classification changed");
+  if (JSON.stringify(responseCodes) !== JSON.stringify({ status400: "invalid_prompt", status401: "invalid_prompt", status402: "insufficient_quota", status422: "invalid_prompt", status429: "rate_limit_exceeded", status500: "server_error" })) throw new Error("responses error classification failed");
+  if (counts.get("/v1/responses:status400") !== 1 || counts.get("/v1/responses:status401") !== 1 || counts.get("/v1/responses:402") !== 1 || counts.get("/v1/responses:status422") !== 1 || counts.get("/v1/responses:status429") !== 2) throw new Error("responses retry classification changed");
   if (nonSse.events.at(-1) !== "error" || !nonSse.body.includes("non-SSE")) throw new Error("delayed non-SSE guard failed");
   if (fastNonSse.status !== 502 || !fastNonSse.body.includes("non-SSE")) throw new Error("fast non-SSE guard failed");
   if (mixedSse.events.join(",") !== "message_start,message_stop") throw new Error("case-insensitive SSE media type failed");

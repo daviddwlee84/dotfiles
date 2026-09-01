@@ -644,7 +644,7 @@ SH
     source '$SHELL_LIB'
     _copilot_alive() { return 0; }
     _copilot_require_shim() { return 0; }
-    _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\"}]}'; }
+    _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\",\"capabilities\":{\"limits\":{\"max_prompt_tokens\":922000}}}]}'; }
     copilot-run argecho 'two words' 'a|b' ''"
   [ "$status" -eq 0 ]
   [[ "$output" == *"<two words>"* ]]
@@ -658,7 +658,7 @@ SH
     source '$SHELL_LIB'
     _copilot_alive() { return 0; }
     _copilot_require_shim() { return 0; }
-    _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\"}]}'; }
+    _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\",\"capabilities\":{\"limits\":{\"max_prompt_tokens\":922000}}}]}'; }
     copilot-run env | grep -cE '^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=' || true"
   run bash -c "$body"
   [ "$output" = "0" ]
@@ -740,10 +740,11 @@ SH
     _copilot_alive() { return 0; }
     _copilot_require_shim() { return 0; }
     _copilot_fast_model_for() { printf '%s-fast\\n' \"\$1\"; }
-    copilot-run() { printf '<%s>\\n' \"\$@\"; }
+    copilot-run() { printf 'launch=%s\\n' \"\$COPILOT_CLAUDE_MODEL\"; printf '<%s>\\n' \"\$@\"; }
     claude-copilot --no-specstory --fast --model gpt-explicit 'two words'"
   [ "$status" -eq 0 ]
   [[ "$output" == *"claude-copilot: --fast -> gpt-explicit-fast (session only)"* ]]
+  [[ "$output" == *"launch=gpt-explicit-fast"* ]]
   [[ "$output" == *"<--model>"* ]]
   [[ "$output" == *"<gpt-explicit-fast>"* ]]
   [[ "$output" == *"<two words>"* ]]
@@ -764,6 +765,19 @@ SH
   [ "$status" -eq 0 ]
   [[ "$output" == *"claude-copilot: --fast unavailable for gpt-explicit; using the standard model."* ]]
   [ "$(printf '%s\n' "$output" | grep -c '<gpt-explicit>')" -eq 1 ]
+}
+
+@test "claude-copilot-once builds its temporary pin for the explicit launch model" {
+  mkdir -p "$TMP/proj"
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_base() { printf '%s' 'http://localhost:4141'; }
+    copilot-here() { printf 'pin=%s|%s\n' \"\$1\" \"\$2\"; }
+    claude-copilot() { return 0; }
+    claude-copilot-once --no-specstory --model gpt-5-mini"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pin=on|gpt-5-mini"* ]]
+  [[ "$output" == *"pin=off|"* ]]
 }
 
 @test "copilot-here off cleans stale user model even when no local pin exists" {
@@ -1085,6 +1099,7 @@ JS
   [ "$(printf '%s' "$output" | jq -r '.retryReplay.attempts')" = "2" ]
   [ "$(printf '%s' "$output" | jq -r '.retryReplay.sameBody')" = "true" ]
   [ "$(printf '%s' "$output" | jq -r '.retryReplay.sameTrace')" = "true" ]
+  [ "$(printf '%s' "$output" | jq -r '.retry408Replay.attempts')" = "2" ]
   [ "$(printf '%s' "$output" | jq -r '.retry.events | join(",")')" = "message_start,message_stop" ]
   [ "$(printf '%s' "$output" | jq -r '.cancelBarrier.waited')" = "true" ]
   [ "$(printf '%s' "$output" | jq -r '.cancelBarrier.settled')" = "true" ]
@@ -1092,6 +1107,7 @@ JS
   [ "$(printf '%s' "$output" | jq -r '.responseCodes.status400')" = "invalid_prompt" ]
   [ "$(printf '%s' "$output" | jq -r '.responseCodes.status401')" = "invalid_prompt" ]
   [ "$(printf '%s' "$output" | jq -r '.responseCodes.status402')" = "insufficient_quota" ]
+  [ "$(printf '%s' "$output" | jq -r '.responseCodes.status422')" = "invalid_prompt" ]
   [ "$(printf '%s' "$output" | jq -r '.responseCodes.status429')" = "rate_limit_exceeded" ]
   [ "$(printf '%s' "$output" | jq -r '.responseCodes.status500')" = "server_error" ]
   [ "$(printf '%s' "$output" | jq -r '.counts["/v1/responses:status429"]')" = "2" ]
@@ -1231,6 +1247,23 @@ JS
   [ "$output" = "gpt-large[1m]|gpt-small" ]
 }
 
+@test "Claude compact window uses max_prompt_tokens then context minus output" {
+  local catalog='{"data":[{"id":"direct","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":922000,"max_output_tokens":128000}}},{"id":"derived","capabilities":{"limits":{"max_context_window_tokens":500000,"max_output_tokens":128000}}},{"id":"huge","capabilities":{"limits":{"max_prompt_tokens":1500000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    printf '%s|%s|%s' \"\$(_copilot_claude_compact_window direct \"\$CATALOG\")\" \
+      \"\$(_copilot_claude_compact_window derived \"\$CATALOG\")\" \
+      \"\$(_copilot_claude_compact_window huge \"\$CATALOG\")\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "922000|372000|1000000" ]
+}
+
+@test "Claude compact window rejects a known ceiling below Claude's minimum" {
+  local catalog='{"data":[{"id":"tiny","capabilities":{"limits":{"max_prompt_tokens":64000}}}]}'
+  run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'; _copilot_claude_compact_window tiny \"\$CATALOG\""
+  [ "$status" -eq 3 ]
+  [ -z "$output" ]
+}
+
 @test "model profile: OpenAI maps quality balanced and fast roles" {
   local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
   run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
@@ -1256,12 +1289,12 @@ JS
 }
 
 @test "env profile: Fable is managed and legacy small-fast follows Haiku" {
-  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
+  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":922000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":922000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000,"max_prompt_tokens":272000}}}]}'
   run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
     _copilot_env_json_for_model gpt-5.6-sol \"\$CATALOG\" \
-      | jq -r '[.ANTHROPIC_DEFAULT_FABLE_MODEL,.ANTHROPIC_DEFAULT_OPUS_MODEL,.ANTHROPIC_DEFAULT_SONNET_MODEL,.ANTHROPIC_DEFAULT_HAIKU_MODEL,.ANTHROPIC_SMALL_FAST_MODEL] | join(\"|\")'"
+      | jq -r '[.ANTHROPIC_DEFAULT_FABLE_MODEL,.ANTHROPIC_DEFAULT_OPUS_MODEL,.ANTHROPIC_DEFAULT_SONNET_MODEL,.ANTHROPIC_DEFAULT_HAIKU_MODEL,.ANTHROPIC_SMALL_FAST_MODEL,.CLAUDE_CODE_AUTO_COMPACT_WINDOW,(.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE // \"unset\")] | join(\"|\")'"
   [ "$status" -eq 0 ]
-  [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna" ]
+  [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna|922000|unset" ]
 }
 
 @test "copilot-model --auto: refuses an offline static fallback" {
@@ -1277,11 +1310,23 @@ JS
   mkdir -p "$TMP/proj/.claude"
   printf '%s\n' '{"env":{"ANTHROPIC_BASE_URL":"http://localhost:4141","ANTHROPIC_MODEL":"stale","ANTHROPIC_DEFAULT_SONNET_MODEL":"stale"},"permissions":{"defaultMode":"auto"}}' \
     > "$TMP/proj/.claude/settings.local.json"
-  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000}}}]}'
+  local catalog='{"data":[{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":922000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":922000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":400000,"max_prompt_tokens":272000}}}]}'
   run env CATALOG="$catalog" bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
     _copilot_model_catalog() { printf '%s' \"\$CATALOG\"; }
     copilot-model --auto >/dev/null 2>&1
-    jq -r '[.env.ANTHROPIC_MODEL,.env.ANTHROPIC_DEFAULT_FABLE_MODEL,.env.ANTHROPIC_DEFAULT_OPUS_MODEL,.env.ANTHROPIC_DEFAULT_SONNET_MODEL,.env.ANTHROPIC_DEFAULT_HAIKU_MODEL,.env.ANTHROPIC_SMALL_FAST_MODEL,.permissions.defaultMode] | join(\"|\")' .claude/settings.local.json"
+    jq -r '[.env.ANTHROPIC_MODEL,.env.ANTHROPIC_DEFAULT_FABLE_MODEL,.env.ANTHROPIC_DEFAULT_OPUS_MODEL,.env.ANTHROPIC_DEFAULT_SONNET_MODEL,.env.ANTHROPIC_DEFAULT_HAIKU_MODEL,.env.ANTHROPIC_SMALL_FAST_MODEL,.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW,.permissions.defaultMode] | join(\"|\")' .claude/settings.local.json"
   [ "$status" -eq 0 ]
-  [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna|auto" ]
+  [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna|922000|auto" ]
+}
+
+@test "copilot-model offline preserves same-model compact ceiling and drops it on model change" {
+  mkdir -p "$TMP/proj/.claude"
+  printf '%s\n' '{"env":{"ANTHROPIC_BASE_URL":"http://localhost:4142","ANTHROPIC_MODEL":"gpt-5.5[1m]","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"372000"}}' > "$TMP/proj/.claude/settings.local.json"
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'; _copilot_model_catalog() { return 1; }; copilot-model gpt-5.5 >/dev/null; jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW' .claude/settings.local.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "372000" ]
+
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'; _copilot_model_catalog() { return 1; }; copilot-model gpt-5-mini >/dev/null; jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // \"removed\"' .claude/settings.local.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "removed" ]
 }

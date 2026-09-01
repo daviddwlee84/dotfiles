@@ -1920,8 +1920,17 @@ copilot-run() {
   # drift that function's comment warns about: `copilot-here on` and `copilot-run`
   # could inject different env on the same machine, and only one of them was
   # covered by the drift check.
-  local env_json _kv
-  env_json="$(_copilot_env_json_for_model --live "$(_copilot_default_model)")" || return 1
+  local env_json _kv selected_model command_path command_name explicit_model
+  selected_model="$(_copilot_default_model)"
+  command_path="$1"
+  command_name="$(command basename -- "$command_path" 2>/dev/null || printf '%s' "$command_path")"
+  if [ "$command_name" = "claude" ]; then
+    shift
+    explicit_model="$(_copilot_claude_model_arg "$@")"
+    [ -n "$explicit_model" ] && selected_model="$(_copilot_claude_fast_base_model "$explicit_model")"
+    set -- "$command_path" "$@"
+  fi
+  env_json="$(_copilot_env_json_for_model --live "$selected_model")" || return 1
   # Prepend each NAME=VALUE as an `env` argument; order is irrelevant to env(1).
   # A here-doc rather than a pipe: the loop MUST run in this shell or every
   # `set --` is discarded with the subshell.
@@ -2231,20 +2240,47 @@ _copilot_claude_model_arg() {
 
 _copilot_claude_fast_base_model() {
   local explicit="$1" effective catalog profile role
-  effective="$(_copilot_effective_model)"
-  effective="${effective%%|*}"
   case "$explicit" in
-    '') printf '%s' "$effective"; return 0 ;;
+    '') effective="$(_copilot_effective_model)"; printf '%s' "${effective%%|*}"; return 0 ;;
     opus|fable|sonnet|haiku|opusplan)
+      effective="$(_copilot_effective_model)"
+      effective="${effective%%|*}"
       catalog="$(_copilot_model_catalog 2>/dev/null || true)"
       profile="$(_copilot_model_profile_json "$effective" "$catalog" 2>/dev/null || true)"
       [ -n "$profile" ] || { printf '%s' "$explicit"; return 0; }
       role="$explicit"; [ "$role" = opusplan ] && role=opus
       printf '%s' "$profile" | jq -r --arg role "$role" '.[$role] // empty'
       ;;
-    default) printf '%s' "$effective" ;;
+    default) effective="$(_copilot_effective_model)"; printf '%s' "${effective%%|*}" ;;
     *) printf '%s' "$explicit" ;;
   esac
+}
+
+# Resolve the model whose prompt ceiling must govern this Claude process. The
+# final --model wins; role aliases are expanded through the same live profile as
+# ANTHROPIC_DEFAULT_* so the compact window follows the actual provider id.
+_copilot_claude_launch_model() {
+  local explicit
+  explicit="$(_copilot_claude_model_arg "$@")"
+  _copilot_claude_fast_base_model "$explicit"
+}
+
+# A settings.local pin outranks process env for keys it contains. Refuse only
+# the unsafe case: a persisted window larger than the explicitly launched
+# model's live prompt ceiling. A smaller pin merely compacts early.
+_copilot_assert_pinned_compact_safe() {
+  local model="$1" settings=".claude/settings.local.json" catalog limit pinned
+  [ -f "$settings" ] || return 0
+  [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" ] || return 0
+  pinned="$(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // empty' "$settings" 2>/dev/null)"
+  case "$pinned" in ''|*[!0-9]*) return 0 ;; esac
+  catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+  limit="$(_copilot_claude_compact_window "$model" "$catalog" 2>/dev/null)" || return 0
+  if [ "$pinned" -gt "$limit" ]; then
+    printf '%s\n' "claude-copilot: active copilot-here pin has compact window $pinned, but $model allows $limit." >&2
+    printf '%s\n' "  run: copilot-model $(_copilot_strip_context_hint "$model")   (then restart Claude Code)" >&2
+    return 1
+  fi
 }
 
 claude-copilot() {
@@ -2284,6 +2320,12 @@ claude-copilot() {
     fi
   fi
   (
+    local launch_model
+    launch_model="$(_copilot_claude_launch_model "$@")" || exit 1
+    _copilot_assert_pinned_compact_safe "$launch_model" || exit 1
+    COPILOT_CLAUDE_MODEL="$launch_model"
+    export COPILOT_CLAUDE_MODEL
+
     _copilot_model_guard_begin || exit 1
     trap '_copilot_model_guard_restore' EXIT
 
@@ -2311,7 +2353,7 @@ claude-copilot() {
 # Env keys we own in .claude/settings.local.json (kept in one place so `off`
 # removes exactly what `on` added — including the COPILOT_PROXY_QUIET extras,
 # regardless of the knob's value at `off` time).
-_copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_FABLE_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION","CLAUDE_CODE_ENABLE_AWAY_SUMMARY","DISABLE_NON_ESSENTIAL_MODEL_CALLS"]'
+_copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_FABLE_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_AUTO_COMPACT_WINDOW","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION","CLAUDE_CODE_ENABLE_AWAY_SUMMARY","DISABLE_NON_ESSENTIAL_MODEL_CALLS"]'
 
 # The EXACT env object `copilot-here on` would write right now, as JSON.
 #
@@ -2332,15 +2374,21 @@ _copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODE
 _copilot_env_json_for_model() {
   local base_fn=_copilot_pinned_base
   if [ "${1:-}" = "--live" ]; then base_fn=_copilot_client_base; shift; fi
-  local selected="$1" catalog="${2:-}" profile
-  if [ "$#" -ge 2 ]; then
-    profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
-  else
-    profile="$(_copilot_model_profile_json "$selected")" || return 1
+  local selected="$1" catalog="${2:-}" profile compact='' compact_rc=0
+  if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
+  profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
+  compact="$(_copilot_claude_compact_window "$selected" "$catalog")" || compact_rc=$?
+  if [ "$compact_rc" -eq 3 ]; then
+    printf '%s\n' "copilot-proxy: $(_copilot_strip_context_hint "$selected") has a prompt ceiling below Claude Code's 100000-token minimum" >&2
+    return 1
+  elif [ "$compact_rc" -ne 0 ]; then
+    printf '%s\n' "copilot-proxy: compact ceiling unavailable for $(_copilot_strip_context_hint "$selected"); Claude Code will use its built-in assumption" >&2
+    compact=''
   fi
   jq -n \
     --arg base_url "$("$base_fn")" \
     --argjson profile "$profile" \
+    --arg compact "$compact" \
     --arg quiet "${COPILOT_PROXY_QUIET:-0}" '
     {
       ANTHROPIC_BASE_URL: $base_url,
@@ -2352,7 +2400,9 @@ _copilot_env_json_for_model() {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: $profile.haiku,
       ANTHROPIC_SMALL_FAST_MODEL: $profile.haiku,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-    } + (if $quiet == "1" then {
+    } + (if $compact != "" then {
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: $compact
+    } else {} end) + (if $quiet == "1" then {
       CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "false",
       CLAUDE_CODE_ENABLE_AWAY_SUMMARY: "0",
@@ -2385,13 +2435,23 @@ copilot-here() {
       local base='{}'
       [ -f "$settings" ] && base="$(command cat "$settings")"
       [ -n "$base" ] || base='{}'
-      local base_url model want_env
-      want_env="$(_copilot_env_json)" || return 1
+      local base_url model want_env old_model old_compact has_compact requested_model="${2:-}"
+      if [ -n "$requested_model" ]; then
+        want_env="$(_copilot_env_json_for_model "$requested_model")" || return 1
+      else
+        want_env="$(_copilot_env_json)" || return 1
+      fi
       base_url="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_BASE_URL')"
       model="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_MODEL')"
+      old_model="$(printf '%s' "$base" | jq -r '.env.ANTHROPIC_MODEL // empty' 2>/dev/null)"
+      old_compact="$(printf '%s' "$base" | jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // empty' 2>/dev/null)"
+      has_compact="$(printf '%s' "$want_env" | jq -r 'has("CLAUDE_CODE_AUTO_COMPACT_WINDOW")')"
       local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
       if printf '%s' "$base" | jq --argjson want "$want_env" \
-          '.env = ((.env // {}) + $want)' >"$tmp"; then
+          --arg old_model "$old_model" --arg new_model "$model" --arg has_compact "$has_compact" '
+          .env = ((.env // {}) + $want)
+          | if $has_compact == "false" and (($old_model | sub("\\[1m\\]$"; "")) != ($new_model | sub("\\[1m\\]$"; "")))
+            then del(.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW) else . end' >"$tmp"; then
         command mv -- "$tmp" "$settings"
       else
         command rm -f -- "$tmp"
@@ -2414,6 +2474,13 @@ copilot-here() {
         fi
       fi
       printf '%s\n' "copilot-here: ON — $settings pins Claude Code to $base_url (model: $model)"
+      if [ "$has_compact" = "true" ]; then
+        printf '%s\n' "  compact window: $(printf '%s' "$want_env" | jq -r '.CLAUDE_CODE_AUTO_COMPACT_WINDOW') tokens (live model metadata)"
+      elif [ -n "$old_compact" ] && [ "$(_copilot_strip_context_hint "$old_model")" = "$(_copilot_strip_context_hint "$model")" ]; then
+        printf '%s\n' "  ⚠ compact window: $old_compact tokens (last-known; live metadata unavailable)"
+      else
+        printf '%s\n' "  ⚠ compact window not pinned; refresh with 'copilot-here on' when the proxy is available"
+      fi
       printf '%s\n' "  plain \`claude\` in this project now uses the proxy (restart any running session)"
       _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
       ;;
@@ -2448,6 +2515,7 @@ copilot-here() {
       local _status_rc=0
       if [ -f "$settings" ] && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" != "" ]; then
         printf '%s\n' "copilot-here: ON  (base: $(jq -r '.env.ANTHROPIC_BASE_URL' "$settings"), model: $(jq -r '.env.ANTHROPIC_MODEL // "(unset)"' "$settings"))"
+        printf '%s\n' "  compact window: $(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // "unverified"' "$settings")"
         local _drift; _drift="$(_copilot_here_drift)"
         [ -n "$_drift" ] && { printf '%s\n' "  ⚠ stale vs current defaults:"; printf '%s\n' "$_drift"; printf '%s\n' "  refresh in place: copilot-here on"; }
         _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
@@ -2509,7 +2577,19 @@ claude-copilot-once() {
   fi
 
   if [ "$_cco_was_on" = "0" ]; then
-    copilot-here on || return 1
+    local _cco_explicit _cco_model _cco_arg _cco_fast=0 _cco_fast_model=''
+    _cco_explicit="$(_copilot_claude_model_arg "$@")"
+    for _cco_arg in "$@"; do [ "$_cco_arg" = "--fast" ] && _cco_fast=1; done
+    if [ -n "$_cco_explicit" ] || [ "$_cco_fast" -eq 1 ]; then
+      _cco_model="$(_copilot_claude_fast_base_model "$_cco_explicit")"
+      if [ "$_cco_fast" -eq 1 ]; then
+        _cco_fast_model="$(_copilot_fast_model_for "$_cco_model" 2>/dev/null || true)"
+        [ -n "$_cco_fast_model" ] && _cco_model="$_cco_fast_model"
+      fi
+      copilot-here on "$_cco_model" || return 1
+    else
+      copilot-here on || return 1
+    fi
     # Auto-unpin even on Ctrl-C / kill. Mirror tmux_status_run's INT/TERM/HUP
     # trap + explicit normal-path cleanup; a bare function-scope EXIT trap would
     # fire on the wrong event when bash sources this file.
@@ -2625,6 +2705,39 @@ _copilot_catalog_ids() {
 
 _copilot_strip_context_hint() {
   printf '%s' "${1%\[1m\]}"
+}
+
+# Claude Code exposes one process-wide auto-compact capacity, separate from the
+# [1m] model hint used for its HUD/full context classification. Feed it the
+# provider's real prompt ceiling so its own default ~95% trigger fires before
+# Copilot rejects the request. Exit 2 = unavailable; 3 = known but below
+# Claude Code's configurable 100k minimum (unsafe to round upward).
+_copilot_claude_compact_window() {
+  local requested="${1:-}" catalog="${2:-}" raw value
+  [ -n "$requested" ] || return 2
+  raw="$(_copilot_strip_context_hint "$requested")"
+  if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
+  [ -n "$catalog" ] && command -v jq >/dev/null 2>&1 || return 2
+  value="$(printf '%s' "$catalog" | jq -r --arg id "$raw" '
+    def number_or_null:
+      if type == "number" then .
+      elif type == "string" then (tonumber? // null)
+      else null end;
+    first(.data[]? | select(.id == $id) | .capabilities.limits) as $limits
+    | if $limits == null then empty
+      else ($limits.max_prompt_tokens | number_or_null) as $prompt
+      | ($limits.max_context_window_tokens | number_or_null) as $context
+      | ($limits.max_output_tokens | number_or_null) as $output
+      | if $prompt != null then ($prompt | floor)
+        elif $context != null and $output != null and $context > $output
+        then (($context - $output) | floor)
+        else empty end
+      end
+  ' 2>/dev/null)"
+  case "$value" in ''|*[!0-9]*) return 2 ;; esac
+  [ "$value" -ge 100000 ] || return 3
+  if [ "$value" -gt 1000000 ]; then value=1000000; fi
+  printf '%s' "$value"
 }
 
 # Convert a raw proxy id to the spelling Claude Code should receive. A live
@@ -2859,10 +2972,14 @@ copilot-model() {
           haiku: ($env.ANTHROPIC_DEFAULT_HAIKU_MODEL // $env.ANTHROPIC_MODEL // "(unset)")
         }')"
         _copilot_print_model_profile "$current_profile"
+        printf '  compact: %s\n' "$(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // "unverified"' "$settings")"
       else
         catalog="$(_copilot_model_catalog 2>/dev/null || true)"
         printf 'model profile (global main: %s)\n' "$statef"
         _copilot_print_model_profile "$(_copilot_model_profile_json "$(_copilot_model_current)" "$catalog")"
+        local current_compact=''
+        current_compact="$(_copilot_claude_compact_window "$(_copilot_model_current)" "$catalog" 2>/dev/null || true)"
+        printf '  compact: %s\n' "${current_compact:-unverified}"
       fi
       return 0 ;;
     -h|--help)
@@ -2964,15 +3081,27 @@ copilot-model() {
   fi
 
   if [ "$target" = "local" ]; then
-    local tmp profile; tmp="$(mktemp "${TMPDIR:-/tmp}/copilot-model.XXXXXX")" || return 1
+    local tmp profile compact='' compact_rc=0 old_raw new_raw
+    tmp="$(mktemp "${TMPDIR:-/tmp}/copilot-model.XXXXXX")" || return 1
     profile="$(_copilot_model_profile_json "$resolved" "$catalog")" || { command rm -f -- "$tmp"; return 1; }
-    if jq --argjson p "$profile" '
+    compact="$(_copilot_claude_compact_window "$resolved" "$catalog")" || compact_rc=$?
+    if [ "$compact_rc" -eq 3 ]; then
+      command rm -f -- "$tmp"
+      printf '%s\n' "copilot-model: $(_copilot_strip_context_hint "$resolved") has a prompt ceiling below Claude Code's 100000-token minimum" >&2
+      return 1
+    fi
+    old_raw="$(_copilot_strip_context_hint "$old")"
+    new_raw="$(_copilot_strip_context_hint "$resolved")"
+    if jq --argjson p "$profile" --arg compact "$compact" --arg old_raw "$old_raw" --arg new_raw "$new_raw" '
          .env.ANTHROPIC_MODEL = $p.main
          | .env.ANTHROPIC_DEFAULT_FABLE_MODEL = $p.fable
          | .env.ANTHROPIC_DEFAULT_OPUS_MODEL = $p.opus
          | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = $p.sonnet
          | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL = $p.haiku
-         | .env.ANTHROPIC_SMALL_FAST_MODEL = $p.haiku' \
+         | .env.ANTHROPIC_SMALL_FAST_MODEL = $p.haiku
+         | if $compact != "" then .env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = $compact
+           elif $old_raw != $new_raw then del(.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW)
+           else . end' \
          "$settings" >"$tmp"; then
       command mv -- "$tmp" "$settings"
       if [ "$old" = "$resolved" ]; then
@@ -2981,6 +3110,11 @@ copilot-model() {
         printf '%s\n' "copilot-model: $old -> $resolved  (project: $settings)"
       fi
       _copilot_print_model_profile "$profile"
+      if [ -n "$compact" ]; then
+        printf '%s\n' "  compact: $compact tokens (live max prompt)"
+      else
+        printf '%s\n' "  ⚠ compact: metadata unavailable; existing same-model value was preserved when possible"
+      fi
       printf '%s\n' "  ⟳ restart Claude Code to apply (exit, then: claude -c)"
     else
       command rm -f -- "$tmp"

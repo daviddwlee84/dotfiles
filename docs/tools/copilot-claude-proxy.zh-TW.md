@@ -147,8 +147,9 @@ managed Claude/Codex launcher 預設全部經過 shim。shim 啟用但啟動失�
 不會靜默 fallback 到 `:4141`；`copilot-proxy shim off` 是明確的 break-glass 直連模式。
 
 在 upstream model bytes 尚未暴露前，shim 會對 network failure 或 HTTP
-403/429/500/502/503/504 重試**相同 buffered request 與 model**；HTTP 402 與 bare 401
-只通過一次。Queue waiter 與 retry backoff 都會回應 client cancel，放棄的 request 不會繼續
+403/429/500/502/503/504 重試**相同 buffered request 與 model**。上游讀取 buffered body
+時回 `408 user_request_timeout` 最多只重播一次，持續的大 request failure 不會吃滿一般 retry
+budget；HTTP 402、bare 401 與 policy 422 只通過一次。Queue waiter 與 retry backoff 都會回應 client cancel，放棄的 request 不會繼續
 佔住 permit。所有成功的 streamed response（包括 grace window 內的快速回應）都必須是
 SSE media type。慢 stream 在 queue/retry 期間持續收到 SSE comment；如果這段 pre-header
 pipeline 最後得到 non-2xx 或不是 SSE 的 HTTP 200，shim 會依 Anthropic Messages 或
@@ -158,6 +159,7 @@ invalid prompt，5xx/transport failure 則分類為 server error，避免 Codex 
 錯誤。延遲 bare 401 只能用 `invalid_prompt` 作為 stopgap，因 Codex 沒有不可重試的 Responses
 authentication code；只有尚未 commit 前的原始 HTTP 401 能保留 authentication semantics。
 一旦 model bytes 已開始，後續 body error/stall 只會終止 stream，不再 retry。
+`422 cyber_policy` 是 provider 的內容政策判定；shim 不 retry、不改寫，也不嘗試繞過。
 
 Admission control 現在是自適應，而不是固定 semaphore。啟動時從
 `COPILOT_SHIM_MIN=4` 開始，只有在確實有人排隊且持續成功時，才逐格增加到
@@ -440,6 +442,10 @@ host 不具可攜性。因此正式 helper 沿用已認證的 localhost gateway�
   正規化（`opus-4.8` 一樣可用）。
 - `[1m]` 是只給 Claude Code 看的 context 提示。helper 會依 live `/v1/models`
   的 `max_context_window_tokens` 對每個 provider 自動決定，不再靠模型名寫死。
+- Auto-compact 另外使用 `max_prompt_tokens`，透過
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 設定真正的 prompt ceiling，再讓 Claude Code
+  沿用約 95% 的預設觸發比例；不會硬塞固定 percentage。缺少明確 prompt limit 時才以
+  context 減 maximum output 推導，`copilot-model -c` 會顯示結果。
 - 會對照即時的代理 `/v1/models` 驗證（離線時仍提供靜態 discovery 清單供手動選擇）；
   打錯字與不明確的前綴會被拒絕，`--auto` 絕不從離線清單寫入 pin。
 - `--auto` / `-a` 必須讀到 live catalog。先選 Claude
@@ -480,12 +486,17 @@ copilot-here on             # 黏著本專案，或改用 claude-copilot-once
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-terra[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-luna[1m]",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-luna[1m]",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "922000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
 ```
 
 `ANTHROPIC_AUTH_TOKEN` 會被代理忽略，但必須設定。
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` 是所選模型的 provider prompt ceiling，不是完整
+context size。以 1.05M context、128k maximum output 的 GPT 為例，實際 prompt ceiling
+是 922k；`[1m]` 負責 HUD/full-window 分類，這個變數則確保 gateway 拒絕前先 compact。
+若希望更早 compact，可自行設定 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`。
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 可減少背景流量（有助於速率限制）。
 **不要** 把這段貼進會 commit 的 `.claude/settings.json` —— 改用 `copilot-here on`。
 
@@ -690,7 +701,9 @@ API Error: 400 {"error":{"message":"The requested model is not supported.",
   的 context 可能顯示超過 100%，compaction 也會用錯誤的預算觸發。
 
 helper 會使用連字號 id，並依每個 live model 的 context metadata 自動加 `[1m]`；GPT id 也適用，
-例如 `gpt-5.6-sol[1m]`。Claude Code 送出前會剝掉 suffix；raw API client 必須使用 plain id。
+例如 `gpt-5.6-sol[1m]`。此外會從 `max_prompt_tokens` 獨立設定精確的 auto-compact capacity；
+`[1m]` 本身不是精確的 prompt limit。Claude Code 送出前會剝掉 suffix；raw API client 必須使用
+plain id。
 
 ### Token 陷阱：`gho_` vs `ghu_`
 

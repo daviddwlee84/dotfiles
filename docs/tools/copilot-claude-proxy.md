@@ -172,8 +172,10 @@ measurement; `copilot-proxy shim off` is the explicit direct-to-`:4141`
 break-glass mode.
 
 Before upstream model bytes are exposed, the shim retries the **same buffered
-request and model** on network failures or HTTP 403/429/500/502/503/504. HTTP
-402 and bare 401 pass through once. Queue waiters and retry backoff are
+request and model** on network failures or HTTP 403/429/500/502/503/504. An
+upstream `408 user_request_timeout` while reading the buffered request body gets
+at most one replay; persistent large-body failures are not multiplied across the
+general retry budget. HTTP 402, bare 401 and policy 422 pass through once. Queue waiters and retry backoff are
 client-cancel aware, so an abandoned request cannot retain a permit ahead of
 live work. Every successful streamed response must have the SSE media type,
 including responses inside the grace window. For slow streams the shim sends
@@ -186,6 +188,8 @@ retry nonretryable failures. A delayed bare 401 must use `invalid_prompt` as a
 stopgap because Codex has no nonretryable Responses authentication code; only a
 pre-commit HTTP 401 preserves authentication semantics. Once model bytes have
 started, a later body error/stall terminates the stream and is not retried.
+An upstream `422 cyber_policy` is a provider content-policy decision: the shim
+does not retry, rewrite, or attempt to bypass it.
 
 Admission control is adaptive rather than a fixed semaphore. It starts at
 `COPILOT_SHIM_MIN=4` and may grow one slot at a time to
@@ -523,6 +527,11 @@ Behavior:
 - `[1m]` is a Claude Code-only context hint. The helper now derives it from
   live `/v1/models` `max_context_window_tokens` metadata for every provider;
   manual explicit suffixes remain usable while offline.
+- Auto-compact uses the separate live `max_prompt_tokens` ceiling through
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. Claude Code then applies its own default
+  threshold (roughly 95%); no fixed percentage override is injected. When the
+  explicit prompt limit is absent, the helper derives it from context minus
+  maximum output. `copilot-model -c` shows the resulting value.
 - Validated against the live proxy `/v1/models` (a static discovery list remains
   available for manual picking while offline); typos and ambiguous prefixes are
   rejected. `--auto` never writes from that offline list.
@@ -571,12 +580,19 @@ The role variables are read at Claude Code startup, so
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-terra[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-luna[1m]",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-luna[1m]",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "922000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
 ```
 
 `ANTHROPIC_AUTH_TOKEN` is ignored by the proxy but must be set.
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` is the selected model's provider prompt
+ceiling, not its full context size. For example, a 1.05M-context GPT model with
+128k maximum output advertises a 922k prompt ceiling. The `[1m]` suffix keeps the
+HUD/full-window classification correct while this variable makes compaction run
+before the gateway rejects the request. Set `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`
+yourself only when you want to compact earlier.
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` cuts background chatter (helps with
 rate limits). Do **not** paste this into the committed `.claude/settings.json` —
 use `copilot-here on` instead.
@@ -827,8 +843,10 @@ fails to match its built-in model table, so it:
   wrong budget.
 
 The helpers use hyphenated ids and derive `[1m]` from each live model's context
-metadata. That applies to GPT ids too (`gpt-5.6-sol[1m]`, for example). Claude
-Code strips the suffix before sending; a raw API client must use the plain id.
+metadata. That applies to GPT ids too (`gpt-5.6-sol[1m]`, for example). They
+separately derive the auto-compact capacity from `max_prompt_tokens`; `[1m]`
+alone is not an exact prompt-limit declaration. Claude Code strips the suffix
+before sending; a raw API client must use the plain id.
 
 ### The token gotcha: `gho_` vs `ghu_`
 
