@@ -106,7 +106,7 @@ This automatically:
 
 1. Bootstraps Homebrew (macOS/Linux), uv, mise, ansible
 2. Deploys all config files
-3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.); Neovim uses an official release fallback when Homebrew cannot provide a suitable macOS build
+3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.); Neovim and LazyGit enforce config-compatible minimum versions with official release fallbacks
 4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` / `installGamingApps` is enabled)
 
 #### Sudo password injection (when chezmoi can't open `/dev/tty`)
@@ -301,7 +301,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 
 - **Base**: git, git-lfs, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies; macOS keeps a healthy install untouched, uses Homebrew on Apple Silicon, and falls back to the checksum-verified official release on Intel or when Homebrew cannot satisfy the minimum
-- **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
+- **LazyVim deps**: fzf, LazyGit >= 0.64.0, tree-sitter-cli, Node.js; stale Homebrew LazyGit installs receive a targeted formula upgrade, with a checksum-verified official release fallback when the active binary still cannot satisfy the renderer schema
 - **Git review stack**: gh, glab, gh-dash (via `gh` extension), diffnav, git-delta, lazygit
 - **Markdown reader**: `glow` for terminal Markdown rendering, plus `readurl <url>` / `readlocal` / `readnode` / `readraw` to render web pages as markdown in the terminal with auto proxy fallback (see [docs/tools/web-reader.md](docs/tools/web-reader.md))
 - **Office documents**: view Word/Excel/PowerPoint (plus legacy `.doc/.xls/.ppt` and OpenDocument) in the terminal via the `view-office` dispatcher — [doxx](https://github.com/bgreenwell/doxx) (docx), visidata (xlsx), [markitdown](https://github.com/microsoft/markitdown) (pptx), LibreOffice headless fallback; also wired as a [yazi](docs/tools/office-viewers.md) inline previewer (see [docs/tools/office-viewers.md](docs/tools/office-viewers.md))

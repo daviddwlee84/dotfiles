@@ -19,6 +19,7 @@ Three side-effects worth knowing about:
 - `.chezmoiexternal.toml.tmpl` entries have `refreshPeriod = "168h"` — chezmoi itself will re-fetch those weekly on apply. That's a bounded "nudge", not an upgrade mechanism for installed binaries.
 - Homebrew casks that carry a `homebrew_cask` entry with `state: present` freeze to that version until a Brewfile hash change forces a re-bundle with `--no-upgrade`. Still install-only; `upgrade-brew` is what actually bumps them.
 - Neovim installed by the macOS official-release fallback is outside Homebrew, so `upgrade-brew` does not refresh it. The role replaces it only when the active `nvim` falls below `neovim_min_version`; otherwise update that fallback manually from the official archive. Removing `~/.local/bin/nvim` and re-applying reinstalls it only when no other `nvim` on `PATH` already satisfies the minimum. Existing Homebrew Neovim installs remain owned by `upgrade-brew`.
+- LazyGit is similarly version-gated at >= 0.64.0 because the managed config uses `git.diffRenderers`. An older Homebrew formula receives a targeted `brew upgrade lazygit`; other stale or shadowed installs fall back to the checksum-verified official release in `~/.local/bin`. Once the minimum is met, normal updates remain the responsibility of `upgrade-brew` or the install source.
 
 ## Entry points
 

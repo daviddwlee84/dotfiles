@@ -41,7 +41,7 @@
 | **dotnet** (全域工具) | `azure-cost-cli`（binary `azure-cost`） | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli`（binary `try`）、`tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、omp、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
-| **GitHub-release 下載** | ~30 個 Linux 使用者層級 fallback：ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS specstory 與 neovim 的 fallback | 每個 role 的 `_release_fallback` 區塊 | **無**（install-only — 見 [覆蓋落差](#coverage-gaps-install-only-no-automated-upgrade)） |
+| **GitHub-release 下載** | ~30 個 Linux 使用者層級 fallback：ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS specstory、lazygit 與 neovim 的 fallback | 每個 role 的 `_release_fallback` 區塊 | **無**（明確的最低版本修復除外；見 [覆蓋落差](#coverage-gaps-install-only-no-automated-upgrade)） |
 | **chezmoi externals** | 每週刷新的 git checkout：oh-my-zsh + 插件、oh-my-bash、ble.sh、TPM、fzf（Linux）、pi-agents、toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | 發行版套件（編譯依賴、ffmpeg、audit、fontconfig、libnotify-bin、系統 git/zsh/bash 等） | role 中散布的 `ansible.builtin.apt:` / `ansible.builtin.yum:` | **無**（依賴 repo 流程外的 `apt upgrade`） |
 | **flatpak** | Discord（Linux 上的預設頻道） | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
@@ -391,7 +391,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 | Role | 擁有什麼 | OS 機制 |
 |---|---|---|
 | `neovim` | `neovim` ≥ 0.11.2（健康的既有安裝保持不動） | macOS：Apple Silicon brew formula（`state: present`）→ 仍缺少／太舊時使用經 checksum 驗證的官方 macOS release 安裝到 `~/.local`；Intel 直接使用官方 release · Linux：apt → 太舊則 GitHub release tarball（`/opt/nvim` + `/usr/local/bin/nvim` symlink）→ 使用者層級 tarball 到 `~/.local`；**oldEL** 抓 `neovim/neovim-releases`（glibc 2.17 重建 repo）。不用 snap（2026-06 移除——見 [linux-package-sources.zh-TW.md → 這個 repo 的 snap 使用現況](../linux-package-sources.zh-TW.md#這個-repo-的-snap-使用現況)）。見 [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
-| `lazyvim_deps` | `fzf`、`lazygit`、`tree-sitter`、`node` | macOS:brew 裝這四個套件,**另外**跑一次 config-driven 的 `mise install --yes`(Darwin 上唯一會安裝 `dot_config/mise/config.toml.tmpl` 裡 `go`/`rust` 的地方)· Linux:mise(一般情境 `node@lts`;armv7l 上 `node@20` + `rust@stable`);fzf 由 chezmoi external clone 編譯(Linux);lazygit PPA → GitHub release;tree-sitter-cli 透過 `mise exec -- npm install -g tree-sitter-cli`(timeout 180)→ cargo fallback 並先裝 `libclang-dev`/`clang-devel` |
+| `lazyvim_deps` | `fzf`、`lazygit` >= 0.64.0、`tree-sitter`、`node` | macOS：brew 安裝四個套件；舊版 brew LazyGit 會只升級該 formula，若 active binary 仍太舊則以經 checksum 驗證的官方 release fallback 到 `~/.local/bin`。**另外**跑 config-driven `mise install --yes`（Darwin 上唯一會安裝 `dot_config/mise/config.toml.tmpl` 裡 `go`/`rust` 的地方）· Linux：mise（一般 `node@lts`；armv7l 為 `node@20` + `rust@stable`）；fzf 由 chezmoi external clone 編譯；LazyGit 依序走 brew 偵測 → 經 checksum 驗證的 system release → user release fallback（舊 PPA 會移除）；tree-sitter-cli 透過 `mise exec -- npm install -g tree-sitter-cli`（timeout 180）→ cargo fallback 並先裝 `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (見 [§ 3.1 基礎/共用](#31-基礎--共用-cli)) | — |
 
 #### 3.7 網路 + IaC + LLM + 媒體 (`networking_tools`, `iac_tools`, `llm_tools`, `media_tools`)
@@ -867,6 +867,7 @@ GitHub release tarball 並解壓到 `~/.local/bin`(使用者可寫,已在 PATH)�
 | **Discord** | macOS:brew cask;Linux:flatpak(預設)或 `.deb`,由 `discordChannel` 選 | apt 沒有 Discord;flatpak 沙箱化且最新,`.deb` 給討厭 flatpak 的人 |
 | **just**、**starship**、**zoxide**、**direnv** | macOS:brew;Linux:廠商 curl-installer | Linux 發行版套件對這些快速迭代的工具太舊 |
 | **Neovim** | macOS：健康安裝 → Apple Silicon brew（`state: present`）→ 經 checksum 驗證的官方 release；Intel 需要安裝時跳過 brew。Linux：apt → GitHub release tarball → 使用者 fallback → oldEL 上的 `neovim/neovim-releases` | 在不把 `chezmoi apply` 變成升級流程的前提下強制最低版本 0.11.2；政策上不用 snap |
+| **LazyGit** | 既有版本 >= 0.64.0 → Homebrew 管理的舊 formula 定向升級 → 經 checksum 驗證的官方 release（Linux 先 `/usr/local/bin`，所有支援 OS 再以 `~/.local/bin` fallback） | 0.64 前會靜默忽略託管的 `git.diffRenderers` schema，因此這是最低版本修復，不是一般升級 |
 | **tree-sitter-cli** | npm 透過 mise(優先,timeout 180)→ cargo fallback | npm 比較快;cargo 需要 libclang 才能編譯。兩條路徑產生同一份 binary |
 | **bw (Bitwarden CLI)** | npm 全域(優先)或系統 npm fallback | 永遠是 npm,分派是 mise-npm vs 系統-npm |
 
@@ -885,6 +886,7 @@ fallback。多層 fallback 會增加實際沒人會跑的測試組合(5 層 × 5
 | **mise binary** | curl `https://mise.run`(優先)→ 直接從 `mise.jdx.dev/mise-latest-linux-${arch}` 下載 → musl 變體(glibc < 2.28 時強制) |
 | **Neovim (macOS)** | 既有版本 ≥ 最低要求 → Apple Silicon Homebrew 安裝 → 經 checksum 驗證的官方 arm64 release fallback；Intel 需要安裝時直接使用官方 x86_64 release |
 | **Neovim (Linux)** | apt → 太舊則 GitHub release tarball(`/opt/nvim` + symlink)→ 使用者 tarball 到 `~/.local` → `neovim-releases` 分支(oldEL glibc 2.17 重建) |
+| **LazyGit** | 既有版本 >= 0.64.0 → formula 管理時定向升級 Homebrew → Linux 經 checksum 驗證的官方 release 到 `/usr/local/bin` → 使用者 fallback 到 `~/.local/bin`（同時處理 macOS 非 brew／PATH shadow） |
 | **base/devtools/networking_tools 中大多數 Linux CLI** | apt/yum(sudo)→ 使用者層級 GitHub release musl tarball 到 `~/.local/bin`。部分有架構專屬 brew-on-aarch64 分支(`eza`、`git-delta`) |
 | **Rust (mise)** | 設定的 mirror → 官方 `static.rust-lang.org` → 在 oldEL 上:直接 `rustup-init` |
 | **Cursor `.deb` (Linux)** | `get_url` 配 retries=4(大檔,GFW-prone)— 單一機制但重試多次 |
@@ -926,7 +928,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 使用:ripgrep、fd、jq、git-delta、lazygit 等)永遠釘在安裝時間。
 這部分被以下事實**部分緩解**:
 
-- 這些工具在 **macOS** 上通常走 brew，而 `cat_brew` 涵蓋；Neovim 的 Intel／最低版本 release fallback 是例外
+- 這些工具在 **macOS** 上通常走 brew，而 `cat_brew` 涵蓋；Neovim 與 LazyGit 有狹義的最低版本 release fallback
 - **非 noRoot Linux** 上,發行版套件可以在 repo 流程外被 apt 升級
 - 落差在 **noRoot Linux** 上最尖銳,因為 GitHub releases 是唯一安裝
   路徑,而且沒有升級自動化
@@ -1045,7 +1047,7 @@ agent-specific 升級路徑。
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab**(`jupyter-lab`) | uv tool(配 notebook、ipykernel 等) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh`(永遠) | 同 | base |
-| **lazygit** | brew(透過 `lazyvim_deps`) | PPA → GitHub release | lazyvim_deps |
+| **lazygit** | brew → 官方 release fallback（最低 0.64.0） | 移除舊 PPA → brew 偵測 → 官方 system/user release（最低 0.64.0） | lazyvim_deps |
 | **libnotify-bin** | n/a | apt(Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **litellm[proxy]**(`litellm`) | uv tool(python 3.13) | uv tool | llm_tools |

@@ -39,7 +39,7 @@ If you want to know:
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, omp, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
-| **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallbacks for specstory and neovim | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
+| **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallbacks for specstory, lazygit, and neovim | Each role's `_release_fallback` block | **none** (install-only except explicit minimum-version repairs — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
 | **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), pi-agents, toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
 | **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
@@ -409,7 +409,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
 | `neovim` | `neovim` ≥ 0.11.2 (healthy installs are left untouched) | macOS: Apple Silicon brew formula (`state: present`) → checksum-verified official macOS release to `~/.local` when still missing/old; Intel goes directly to the official release · Linux: apt → GitHub release tarball if too old (`/opt/nvim` + `/usr/local/bin/nvim` symlink) → user-level tarball to `~/.local`; **oldEL** pulls from `neovim/neovim-releases` (glibc 2.17 rebuild repo). No snap (dropped 2026-06 — see [linux-package-sources.md → snap in this repo](../linux-package-sources.md#snap-in-this-repo)). See [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
-| `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew for the four packages, **plus** a config-driven `mise install --yes` (the only thing that installs `go`/`rust` from `dot_config/mise/config.toml.tmpl` on Darwin) · Linux: mise (`node@lts` general; `node@20` + `rust@stable` on armv7l); fzf built from chezmoi external clone (Linux); lazygit GitHub release (its PPA was deprecated upstream in 2021 and broke `apt update`; the role now also purges leftover lazygit PPA source files); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
+| `lazyvim_deps` | `fzf`, `lazygit` >= 0.64.0, `tree-sitter`, `node` | macOS: brew for the four packages; stale brew LazyGit gets a targeted formula upgrade, then a checksum-verified official release fallback to `~/.local/bin` if the active binary remains old. **Also** runs config-driven `mise install --yes` (the only thing that installs `go`/`rust` from `dot_config/mise/config.toml.tmpl` on Darwin) · Linux: mise (`node@lts` general; `node@20` + `rust@stable` on armv7l); fzf built from chezmoi external clone; LazyGit brew detection → checksum-verified system release → user release fallback (its PPA was deprecated upstream in 2021 and is purged); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
 
 #### 3.7 Networking + IaC + LLM + media (`networking_tools`, `iac_tools`, `llm_tools`, `media_tools`)
@@ -949,6 +949,7 @@ with rationale.
 | **Steam** | macOS: brew cask gated by `installGamingApps`; Linux: Valve apt repo + `steam-launcher` gated by `installGamingApps` | Valve's apt repo is the supported Linux path; Flathub exists but is community-packaged |
 | **just**, **starship**, **zoxide**, **direnv** | macOS: brew; Linux: vendor curl-installer | Linux distro packages are too stale for these fast-moving tools |
 | **Neovim** | macOS: healthy install → Apple Silicon brew (`state: present`) → checksum-verified official release; Intel skips brew when installation is needed. Linux: apt → GitHub release tarball → user fallback → `neovim/neovim-releases` on oldEL | Min version 0.11.2 is enforced without turning `chezmoi apply` into an upgrade; no snap by policy |
+| **LazyGit** | existing >= 0.64.0 → Homebrew-managed stale formula upgrade → checksum-verified official release (`/usr/local/bin` on Linux, then `~/.local/bin` fallback on all supported OSes) | The managed `git.diffRenderers` schema is silently ignored before 0.64, so this is a minimum-version repair rather than a general upgrade |
 | **tree-sitter-cli** | npm via mise (preferred, timeout 180) → cargo fallback | npm is faster; cargo needs libclang to compile. Same binary either way |
 | **bw (Bitwarden CLI)** | npm global (preferred) or system npm fallback | always npm, the dispatch is mise-npm vs system-npm |
 
@@ -969,6 +970,7 @@ Notable cascading-fallback patterns:
 | **mise binary** | curl `https://mise.run` (preferred) → direct binary download from `mise.jdx.dev/mise-latest-linux-${arch}` → musl variant (forced when glibc < 2.28) |
 | **Neovim (macOS)** | existing version ≥ minimum → Apple Silicon Homebrew install → checksum-verified official arm64 release fallback; Intel uses the official x86_64 release directly when installation is needed |
 | **Neovim (Linux)** | apt → GitHub release tarball when too old (`/opt/nvim` + symlink) → user-tarball to `~/.local` → `neovim-releases` fork (oldEL glibc 2.17 rebuild) |
+| **LazyGit** | existing version ≥ 0.64.0 → targeted Homebrew upgrade when formula-managed → checksum-verified official release to `/usr/local/bin` on Linux → user fallback to `~/.local/bin` (also the macOS non-brew/PATH-shadow fallback) |
 | **Most Linux CLIs in base/devtools/networking_tools** | apt/yum (sudo) → user-level GitHub release musl tarball to `~/.local/bin`. Several have arch-specific brew-on-aarch64 branch (`eza`, `git-delta`) |
 | **Rust (mise)** | configured mirror → official `static.rust-lang.org` → on oldEL: `rustup-init` directly |
 | **Cursor `.deb` (Linux)** | `get_url` with retries=4 (large file, GFW-prone) — single mechanism but heavily retried |
@@ -1012,7 +1014,7 @@ agents + plugins moved forward. But ~30 GitHub-release-installed CLIs
 stay pinned to install time forever. This is **partially mitigated**
 by:
 
-- These tools on **macOS** generally go via brew, which `cat_brew` covers; Neovim's Intel/minimum-version release fallback is the exception
+- These tools on **macOS** generally go via brew, which `cat_brew` covers; Neovim and LazyGit have narrow minimum-version release fallbacks
 - On **Linux non-noRoot**, distro packages get apt-upgrade outside the repo
 - The gap is sharpest on **noRoot Linux** where GitHub releases are
   the only install path AND there's no upgrade automation
@@ -1144,7 +1146,7 @@ list.
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh` (always) | same | base |
-| **lazygit** | brew (via `lazyvim_deps`) | PPA → GitHub release | lazyvim_deps |
+| **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **libreoffice** (`soffice`) | brew cask | apt (`libreoffice-writer/calc/impress`, no-recommends) | devtools |

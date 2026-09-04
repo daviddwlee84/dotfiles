@@ -134,13 +134,93 @@
     cmd: "{{ ansible_facts['env']['HOME'] }}/.fzf/install --bin"
     creates: "{{ ansible_facts['env']['HOME'] }}/.fzf/bin/fzf"
 
-# lazygit
-- name: Check if lazygit is installed
-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
-  ansible.builtin.command: lazygit --version
-  register: lazygit_check
+# LazyGit >= 0.64 is required by dot_config/lazygit/config.yml: that release
+# renamed git.pagers to git.diffRenderers. Older binaries silently ignore the
+# managed renderer and show a raw diff, so presence-only checks are insufficient.
+- name: Check current LazyGit version
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+  ansible.builtin.shell: >-
+    lazygit --version 2>/dev/null
+    | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+'
+    | head -1
+    | cut -d= -f2
+  args:
+    executable: /bin/bash
+  register: lazygit_version_check
   changed_when: false
   failed_when: false
+  check_mode: false
+
+- name: Set LazyGit version fact
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+  ansible.builtin.set_fact:
+    lazygit_current_version: >-
+      {{ lazygit_version_check.stdout | default('0.0.0', true) | trim or '0.0.0' }}
+
+- name: Display current LazyGit version
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+  ansible.builtin.debug:
+    msg: "Current LazyGit version: {{ lazygit_current_version }} (required: >= {{ lazygit_min_version }})"
+
+# Minimum-version exception to the repo's install-only policy. Detect the
+# install style before upgrading: `brew upgrade` errors for non-formula installs
+# and a fake brew stub can return success for every command while doing nothing.
+- name: Detect Homebrew-managed LazyGit below minimum version
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+    - lazygit_current_version is version(lazygit_min_version, '<')
+  ansible.builtin.shell: |
+    [ -n "$(brew --prefix 2>/dev/null)" ] || exit 1
+    brew list --formula lazygit >/dev/null 2>&1
+  args:
+    executable: /bin/bash
+  register: lazygit_brew_managed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Report Homebrew LazyGit minimum-version upgrade in check mode
+  when:
+    - lazygit_current_version is version(lazygit_min_version, '<')
+    - lazygit_brew_managed.rc | default(1) == 0
+    - ansible_check_mode
+  ansible.builtin.debug:
+    msg: "Would run brew upgrade lazygit to satisfy >= {{ lazygit_min_version }}"
+
+- name: Upgrade Homebrew-managed LazyGit to minimum version
+  when:
+    - lazygit_current_version is version(lazygit_min_version, '<')
+    - lazygit_brew_managed.rc | default(1) == 0
+    - not ansible_check_mode
+  ansible.builtin.command: brew upgrade lazygit
+  register: lazygit_brew_upgrade
+  changed_when: true
+  failed_when: false
+
+- name: Re-check LazyGit version after Homebrew upgrade attempt
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+    - lazygit_current_version is version(lazygit_min_version, '<')
+  ansible.builtin.shell: >-
+    lazygit --version 2>/dev/null
+    | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+'
+    | head -1
+    | cut -d= -f2
+  args:
+    executable: /bin/bash
+  register: lazygit_brew_version_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Set effective LazyGit version after Homebrew attempt
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+  ansible.builtin.set_fact:
+    lazygit_effective_version: >-
+      {{ lazygit_brew_version_check.stdout
+         | default(lazygit_current_version, true)
+         | trim
+         or lazygit_current_version }}
 
 # The lazygit PPA (ppa:lazygit-team/release) was deprecated upstream in 2021
 # (jesseduffield/lazygit#1399) — it has no Release file for focal+ and adding
@@ -171,8 +251,8 @@
   loop_control:
     label: "{{ item.path }}"
 
-- name: Set lazygit release architecture
-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+- name: Set LazyGit release architecture
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
   ansible.builtin.set_fact:
     lazygit_arch: >-
       {{
@@ -181,107 +261,247 @@
         else ''
       }}
 
-- name: Install lazygit from GitHub releases (system-level)
+- name: Install LazyGit from GitHub releases (system-level)
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
-    - lazygit_check.rc != 0
+    - lazygit_effective_version is version(lazygit_min_version, '<')
     - lazygit_arch | trim != ''
+    - not ansible_check_mode
   become: true
   tags: [sudo]
   block:
-    - name: Get latest lazygit release (system)
+    - name: Get latest LazyGit release (system)
       ansible.builtin.uri:
         url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
         return_content: true
+        timeout: 30
       register: lazygit_release
 
-    - name: Download lazygit binary (system)
+    - name: Set LazyGit system release asset name
+      ansible.builtin.set_fact:
+        lazygit_system_asset_name: >-
+          lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ lazygit_arch }}.tar.gz
+
+    - name: Select LazyGit system release asset
+      ansible.builtin.set_fact:
+        lazygit_system_asset: >-
+          {{
+            (
+              lazygit_release.json.assets
+              | selectattr('name', 'equalto', lazygit_system_asset_name)
+              | list
+              | first
+            ) | default({})
+          }}
+
+    - name: Validate LazyGit system release asset
+      ansible.builtin.assert:
+        that:
+          - lazygit_system_asset.browser_download_url is defined
+          - lazygit_system_asset.digest is defined
+          - lazygit_system_asset.digest is match('^sha256:[0-9a-f]{64}$')
+        fail_msg: >-
+          The latest LazyGit release does not contain {{ lazygit_system_asset_name }}
+          with a SHA-256 digest
+
+    - name: Download LazyGit binary (system)
       ansible.builtin.get_url:
-        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
+        url: "{{ lazygit_system_asset.browser_download_url }}"
         dest: /tmp/lazygit.tar.gz
+        checksum: "{{ lazygit_system_asset.digest }}"
         mode: '0644'
         timeout: 120
       retries: 3
       delay: 5
 
-    - name: Extract lazygit (system)
-      ansible.builtin.unarchive:
-        src: /tmp/lazygit.tar.gz
-        dest: /usr/local/bin
-        remote_src: true
-        extra_opts:
+    - name: Extract LazyGit (system)
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tar
+          - -xzf
+          - /tmp/lazygit.tar.gz
+          - -C
+          - /usr/local/bin
           - lazygit
 
-    - name: Clean up lazygit tarball (system)
-      ansible.builtin.file:
-        path: /tmp/lazygit.tar.gz
-        state: absent
+    - name: Check installed LazyGit system release version
+      ansible.builtin.shell: >-
+        /usr/local/bin/lazygit --version 2>/dev/null
+        | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+'
+        | head -1
+        | cut -d= -f2
+      args:
+        executable: /bin/bash
+      register: lazygit_system_release_version
+      changed_when: false
+
+    - name: Validate installed LazyGit system release version
+      ansible.builtin.assert:
+        that:
+          - lazygit_system_release_version.stdout is version(lazygit_min_version, '>=')
+        fail_msg: >-
+          Installed LazyGit {{ lazygit_system_release_version.stdout | default('unknown', true) }}
+          is older than required {{ lazygit_min_version }}
   rescue:
-    - name: Warn lazygit system install failed
+    - name: Warn LazyGit system install failed
       ansible.builtin.debug:
-        msg: "lazygit system-level installation failed — skipping"
-
-    - name: Clean up lazygit temp files (system rescue)
+        msg: "LazyGit system-level installation failed — continuing with the user-level fallback"
+  always:
+    - name: Clean up LazyGit system release archive
       ansible.builtin.file:
         path: /tmp/lazygit.tar.gz
         state: absent
 
-# User-level install (no sudo required) - runs if system install was skipped
-- name: Re-check if lazygit is installed after system install attempt
-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
-  ansible.builtin.command: lazygit --version
-  register: lazygit_recheck
+- name: Re-check LazyGit version after system install attempt
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+    - lazygit_effective_version is version(lazygit_min_version, '<')
+  ansible.builtin.shell: >-
+    lazygit --version 2>/dev/null
+    | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+'
+    | head -1
+    | cut -d= -f2
+  args:
+    executable: /bin/bash
+  register: lazygit_system_version_check
   changed_when: false
   failed_when: false
+  check_mode: false
 
-- name: Install lazygit from GitHub releases (user-level, no sudo)
+- name: Set LazyGit version after system install attempt
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+  ansible.builtin.set_fact:
+    lazygit_post_system_version: >-
+      {{ lazygit_system_version_check.stdout
+         | default(lazygit_effective_version, true)
+         | trim
+         or lazygit_effective_version }}
+
+- name: Report LazyGit user-level release fallback in check mode
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
-    - lazygit_recheck.rc != 0
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+    - lazygit_post_system_version is version(lazygit_min_version, '<')
     - lazygit_arch | default('') | trim != ''
+    - ansible_check_mode
+  ansible.builtin.debug:
+    msg: "Would install the latest official LazyGit release to ~/.local/bin"
+
+# User-level install runs when Homebrew/system installation was unavailable,
+# failed, or remains shadowed by an older binary on PATH.
+- name: Install LazyGit from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+    - lazygit_post_system_version is version(lazygit_min_version, '<')
+    - lazygit_arch | default('') | trim != ''
+    - not ansible_check_mode
   block:
-    - name: Get latest lazygit release (user)
+    - name: Get latest LazyGit release (user)
       ansible.builtin.uri:
         url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
         return_content: true
+        timeout: 30
       register: lazygit_release_user
 
-    - name: Ensure ~/.local/bin exists
+    - name: Set LazyGit user release asset name
+      ansible.builtin.set_fact:
+        lazygit_user_asset_name: >-
+          lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_{{ 'darwin' if ansible_facts['os_family'] == 'Darwin' else 'linux' }}_{{ lazygit_arch }}.tar.gz
+
+    - name: Select LazyGit user release asset
+      ansible.builtin.set_fact:
+        lazygit_user_asset: >-
+          {{
+            (
+              lazygit_release_user.json.assets
+              | selectattr('name', 'equalto', lazygit_user_asset_name)
+              | list
+              | first
+            ) | default({})
+          }}
+
+    - name: Validate LazyGit user release asset
+      ansible.builtin.assert:
+        that:
+          - lazygit_user_asset.browser_download_url is defined
+          - lazygit_user_asset.digest is defined
+          - lazygit_user_asset.digest is match('^sha256:[0-9a-f]{64}$')
+        fail_msg: >-
+          The latest LazyGit release does not contain {{ lazygit_user_asset_name }}
+          with a SHA-256 digest
+
+    - name: Ensure ~/.local/bin exists for LazyGit
       ansible.builtin.file:
         path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
         state: directory
         mode: '0755'
 
-    - name: Download lazygit binary (user)
+    - name: Download LazyGit binary (user)
       ansible.builtin.get_url:
-        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
+        url: "{{ lazygit_user_asset.browser_download_url }}"
         dest: /tmp/lazygit.tar.gz
+        checksum: "{{ lazygit_user_asset.digest }}"
         mode: '0644'
         timeout: 120
       retries: 3
       delay: 5
 
-    - name: Extract lazygit to user bin (user)
-      ansible.builtin.unarchive:
-        src: /tmp/lazygit.tar.gz
-        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
-        remote_src: true
-        extra_opts:
+    - name: Extract LazyGit to user bin
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tar
+          - -xzf
+          - /tmp/lazygit.tar.gz
+          - -C
+          - "{{ ansible_facts['env']['HOME'] }}/.local/bin"
           - lazygit
 
-    - name: Clean up lazygit tarball (user)
-      ansible.builtin.file:
-        path: /tmp/lazygit.tar.gz
-        state: absent
-  rescue:
-    - name: Warn lazygit user install failed
-      ansible.builtin.debug:
-        msg: "lazygit user-level installation failed — skipping"
+    - name: Check installed LazyGit user release version
+      ansible.builtin.shell: >-
+        {{ ansible_facts['env']['HOME'] }}/.local/bin/lazygit --version 2>/dev/null
+        | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+'
+        | head -1
+        | cut -d= -f2
+      args:
+        executable: /bin/bash
+      register: lazygit_user_version
+      changed_when: false
 
-    - name: Clean up lazygit temp files (user rescue)
+    - name: Validate installed LazyGit user release version
+      ansible.builtin.assert:
+        that:
+          - lazygit_user_version.stdout is version(lazygit_min_version, '>=')
+        fail_msg: >-
+          Installed LazyGit {{ lazygit_user_version.stdout | default('unknown', true) }}
+          is older than required {{ lazygit_min_version }}
+  rescue:
+    - name: Warn LazyGit user install failed
+      ansible.builtin.debug:
+        msg: "LazyGit user-level installation failed — the final version check will report the stale binary"
+  always:
+    - name: Clean up LazyGit user release archive
       ansible.builtin.file:
         path: /tmp/lazygit.tar.gz
         state: absent
+
+- name: Validate effective LazyGit version
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
+    - lazygit_arch | default('') | trim != ''
+    - not ansible_check_mode
+  ansible.builtin.shell: >-
+    PATH="{{ ansible_facts['env']['HOME'] }}/.local/bin:$PATH"
+    lazygit --version 2>/dev/null
+    | grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+'
+    | head -1
+    | cut -d= -f2
+  args:
+    executable: /bin/bash
+  register: lazygit_final_version
+  changed_when: false
+  failed_when: >-
+    lazygit_final_version.rc != 0
+    or (lazygit_final_version.stdout | default('0.0.0', true) | trim or '0.0.0')
+       is version(lazygit_min_version, '<')
 
 # tree-sitter-cli
 - name: Check if tree-sitter --version works (any install path)

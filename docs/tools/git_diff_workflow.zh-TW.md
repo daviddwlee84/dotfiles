@@ -58,6 +58,10 @@ git:
       command: delta --dark --paging=never --syntax-theme base16-256 -s
 ```
 
+`lazyvim_deps` role 會強制 LazyGit >= 0.64.0。若舊版由 Homebrew 管理，會只
+升級該 formula；如果其他安裝來源或 PATH shadow 仍暴露舊版，則改用經
+checksum 驗證的官方 release。這是狹義的最低版本修復，不是一般升級政策。
+
 這使 LazyGit 與既有的「`delta` 優先」CLI 設定保持一致，也避免遷移結果與
 chezmoi 管理的檔案形成 drift。
 

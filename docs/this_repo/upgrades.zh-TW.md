@@ -22,6 +22,7 @@
 - `.chezmoiexternal.toml.tmpl` 條目的 `refreshPeriod = "168h"` — chezmoi 自身會在 apply 時每週重新抓取一次。那是有界限的「輕推」，並非已安裝二進位檔的升級機制。
 - 帶有 `state: present` 的 `homebrew_cask` 條目的 Homebrew cask 會凍結在該版本，直到 Brewfile 雜湊 (hash) 變動強制以 `--no-upgrade` 重新 bundle。仍然是 install-only；真正會推進它們的是 `upgrade-brew`。
 - 由 macOS 官方 release fallback 安裝的 Neovim 位於 Homebrew 之外，因此 `upgrade-brew` 不會刷新它。role 只會在目前生效的 `nvim` 低於 `neovim_min_version` 時替換；否則需從官方 archive 手動更新 fallback。只有在 `PATH` 上沒有其他已符合最低版本的 `nvim` 時，移除 `~/.local/bin/nvim` 後重新 apply 才會重裝。既有 Homebrew Neovim 仍由 `upgrade-brew` 管理。
+- LazyGit 也因託管設定使用 `git.diffRenderers` 而強制最低版本 >= 0.64.0。舊 Homebrew formula 會執行定向的 `brew upgrade lazygit`；其他過舊或被 PATH shadow 的安裝則 fallback 到 `~/.local/bin` 中經 checksum 驗證的官方 release。達到最低版本後，一般更新仍由 `upgrade-brew` 或原安裝來源負責。
 
 ## 進入點
 

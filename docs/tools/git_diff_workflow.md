@@ -53,6 +53,11 @@ git:
       command: delta --dark --paging=never --syntax-theme base16-256 -s
 ```
 
+The `lazyvim_deps` role enforces LazyGit >= 0.64.0. It upgrades an old
+Homebrew-managed formula directly, then falls back to the checksum-verified
+official release when another install or PATH shadow still exposes an older
+binary. This is a narrow minimum-version repair, not a general upgrade policy.
+
 This keeps LazyGit aligned with the existing `delta`-first CLI setup while
 preventing migration drift against the chezmoi-managed file.
 
