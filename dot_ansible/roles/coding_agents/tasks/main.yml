@@ -205,9 +205,14 @@
   when:
     - ansible_facts["os_family"] == "Darwin"
     - codex_macos_brew_check.rc != 0
+  # `no-quarantine` because the cask payload is not just an app bundle: it
+  # ships a `codex-path/` directory of vendored CLIs that Codex prepends to
+  # PATH inside the shell it runs commands in. See the de-quarantine task
+  # below and pitfalls/codex-cask-quarantine-gatekeeper-rg-prompt.md.
   community.general.homebrew_cask:
     name: codex
     state: present
+    install_options: no-quarantine
 
 - name: Get Homebrew prefix (macOS)
   when: ansible_facts["os_family"] == "Darwin"
@@ -240,7 +245,7 @@
     - not codex_macos_bin_stat.stat.exists
   # `homebrew_cask: state=present` is a no-op while the receipt is intact, so
   # reinstall explicitly rather than round-tripping through uninstall.
-  ansible.builtin.command: brew reinstall --cask codex
+  ansible.builtin.command: brew reinstall --cask --no-quarantine codex
   register: codex_macos_reinstall
   changed_when: codex_macos_reinstall.rc == 0
   failed_when: false
@@ -254,6 +259,38 @@
     follow: true
   register: codex_macos_bin_recheck
   failed_when: not codex_macos_bin_recheck.stat.exists
+
+# The Codex cask is not just an app bundle: it ships a `codex-path/` directory
+# of vendored CLIs (ripgrep among them) that Codex PREPENDS to PATH inside the
+# shell it runs commands in, so `rg` there shadows the Homebrew formula. Every
+# file in a cask payload carries `com.apple.quarantine`, and the first exec of
+# each one pops a Gatekeeper `"rg" is an app downloaded from the Internet`
+# dialog — mid-agent-turn, for a binary the user never installed by hand.
+# `no-quarantine` above only covers a fresh install; `brew upgrade --cask`
+# (what `just upgrade-brew` runs) re-quarantines the new payload, so sweep on
+# every apply as well. See
+# pitfalls/codex-cask-quarantine-gatekeeper-rg-prompt.md
+- name: Strip Gatekeeper quarantine from the Codex cask payload (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  # Probe brew by OUTPUT, not exit status — a stub `brew` returns 0 for every
+  # subcommand. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md
+  # `xattr -r -p` exits 1 whenever ANY walked file lacks the attribute, so the
+  # presence test has to be on stdout being non-empty, not on the exit code.
+  ansible.builtin.shell: |
+    set -u
+    prefix="$(brew --prefix 2>/dev/null)"
+    [ -n "$prefix" ] || exit 0
+    room="$prefix/Caskroom/codex"
+    [ -d "$room" ] || exit 0
+    if [ -n "$(xattr -r -p com.apple.quarantine "$room" 2>/dev/null)" ]; then
+      xattr -dr com.apple.quarantine "$room"
+      echo CHANGED
+    fi
+  args:
+    executable: /bin/bash
+  register: codex_macos_dequarantine
+  changed_when: "'CHANGED' in codex_macos_dequarantine.stdout"
+  failed_when: false
 
 - name: Check if OpenAI Codex CLI is installed (Linux)
   when:
