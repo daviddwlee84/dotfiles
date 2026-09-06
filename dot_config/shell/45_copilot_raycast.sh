@@ -141,8 +141,10 @@ _copilot_raycast_probe_base() { printf '%s' "${COPILOT_RAYCAST_PROBE_BASE:-$(_co
 # vendor ranking (Claude > Codex > GPT > Gemini) but keeps ALL of them, and adds
 # a within-family tier so opus lands above sonnet above haiku. Ties are broken by
 # `sort -Vr` on the id, i.e. newest version first.
+# $1 = model id, $2 = its model_picker_category (optional, unknown-vendor only).
 _copilot_raycast_rank() {
   case "$1" in
+    claude-fable-*)  printf '60' ;;
     claude-opus-*)   printf '59' ;;
     claude-sonnet-*) printf '58' ;;
     claude-haiku-*)  printf '57' ;;
@@ -153,9 +155,34 @@ _copilot_raycast_rank() {
     gemini-*pro*)    printf '25' ;;
     gemini-*flash*)  printf '24' ;;
     gemini-*)        printf '23' ;;
-    gpt-*mini*|o1*mini*|o3*mini*|o4*mini*) printf '34' ;;
-    gpt-*|o1*|o3*|o4*)                     printf '35' ;;
-    *)               printf '10' ;;
+    # GPT/o-series stay together as one vendor band, but the live category is
+    # the within-band truth: a future gpt-6-luna (lightweight) must not sort
+    # above an older Sol (powerful) merely because 6 > 5.6. Name heuristics are
+    # only the category-missing fallback.
+    gpt-*|o[0-9]*)
+      case "${2:-}" in
+        powerful)    printf '39' ;;
+        versatile)   printf '37' ;;
+        lightweight) printf '34' ;;
+        *)
+          case "$1" in *mini*) printf '34' ;; *) printf '35' ;; esac
+          ;;
+      esac ;;
+    # xAI, between OpenAI and Google to match the main rankers' vendor order.
+    grok-*)
+      case "${2:-}" in
+        powerful) printf '32' ;; lightweight) printf '29' ;; *) printf '30' ;;
+      esac ;;
+    # Unknown vendors stay in the fallback band below every known vendor, but
+    # Copilot's tier still orders them relative to one another. $2 is the
+    # catalog's model_picker_category when available.
+    *)
+      case "${2:-}" in
+        powerful)    printf '16' ;;
+        versatile)   printf '14' ;;
+        lightweight) printf '12' ;;
+        *)           printf '10' ;;
+      esac ;;
   esac
 }
 
@@ -166,7 +193,9 @@ _copilot_raycast_temp() {
     0|off|false|no) printf 'false'; return 0 ;;
   esac
   case "$1" in
-    gpt-*|o1*|o3*|o4*|*codex*|mai-*) printf 'false' ;;
+    # grok was checked and deliberately left on the `true` default — the `false`
+    # arm is for reasoning-only endpoints, and grok accepts temperature.
+    gpt-*|o[0-9]*|*codex*|mai-*) printf 'false' ;;
     *)                               printf 'true' ;;
   esac
 }
@@ -203,7 +232,14 @@ _copilot_raycast_catalog() {
             (if .capabilities.supports.tool_calls  == true then "1" else "0" end),
             (if (.capabilities.supports.reasoning_effort | type) == "array"
                 and (.capabilities.supports.reasoning_effort | length) > 0
-             then "1" else "0" end)
+             then "1" else "0" end),
+            # 8th column. Added together with the `read` list in
+            # _copilot_raycast_scan — see the IFS note above before
+            # touching either of them.
+            # The upstream tier taxonomy; only used to give an unknown vendor
+            # a sensible band instead of dumping it below Gemini.
+            (if (.model_picker_category // "") == "" then "unknown"
+             else .model_picker_category end)
           ] | @tsv' 2>/dev/null \
     | command grep -v '\[1m\]'
 }
@@ -264,12 +300,14 @@ _copilot_raycast_scan() {
   [ -n "$cat" ] || return 1
   dir="$(command mktemp -d "${TMPDIR:-/tmp}/copilot-raycast.XXXXXX")" || return 1
   printf '%s\n' "$cat" | command cut -f1 | _copilot_raycast_sweep "$dir"
-  local id name vendor ctx vis tools reff verdict
-  printf '%s\n' "$cat" | while IFS="$(printf '\t')" read -r id name vendor ctx vis tools reff; do
+  local id name vendor ctx vis tools reff tier verdict
+  printf '%s\n' "$cat" | while IFS="$(printf '\t')" read -r id name vendor ctx vis tools reff tier; do
     verdict="$(command head -n 1 "$dir/$id" 2>/dev/null)"
     [ -n "$verdict" ] || verdict='no_response'
+    # Deliberately still NINE columns out — the tier is a ranking input, not
+    # part of this function's wire format, so `awk -F'\t' '$9 == "ok"'` holds.
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$(_copilot_raycast_rank "$id")" "$id" "$name" "$vendor" \
+      "$(_copilot_raycast_rank "$id" "$tier")" "$id" "$name" "$vendor" \
       "$ctx" "$vis" "$tools" "$reff" "$verdict"
   done | command sort -k1,1nr -k2,2Vr
   command rm -rf -- "$dir"

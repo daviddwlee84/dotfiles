@@ -668,6 +668,9 @@ _copilot_default_model() {
   elif [ -f "$(_copilot_model_state)" ]; then
     command head -n 1 "$(_copilot_model_state)"
   else
+    # Backward-compatible offline fallback. This is NOT an entitlement claim:
+    # both Sol and Astra are currently restricted in the live Copilot catalog;
+    # use `copilot-model --auto` whenever the catalog is reachable.
     printf '%s' "gpt-5.6-sol[1m]"
   fi
 }
@@ -1951,12 +1954,24 @@ EOF
 # model as long as one is served. Claude/Gemini remain useful last-resort
 # Responses Lite fallbacks.
 _copilot_codex_pick_best_model() {
-  local models preferred c
-  models="$(command cat | command sed 's/\[1m\]$//' | command sort -u)"
+  local models preferred c rows tier remaining_models remaining_rows
+  # Same two-stage policy as _copilot_pick_best_model (tier pre-pass, then the
+  # curated allowlist, then lexical), but in Codex's vendor order: OpenAI first,
+  # then Claude, then grok, then Gemini. $1 (optional) = raw catalog JSON.
+  models="$(command cat | command sed 's/\[1m\]$//' \
+    | command grep -vE -- '-fast$' | command sort -u)"
   [ -n "$models" ] || return 1
+  rows=''
+  [ -n "${1:-}" ] && rows="$(printf '%s' "$1" | _copilot_tier_rows \
+    | _copilot_tier_rows_for_ids "$models")"
+
+  tier="$(_copilot_tier_prepass '^(gpt-|o[0-9])' "$rows" "$models" \
+    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-5.6-luna gpt-5.4-mini gpt-5-mini || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
 
   for preferred in \
-    gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
     gpt-5.6-luna gpt-5.4-mini gpt-5-mini
   do
     if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
@@ -1964,13 +1979,20 @@ _copilot_codex_pick_best_model() {
       return 0
     fi
   done
-  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command grep -viE 'mini|nano|luna' \
-        | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^(gpt-|o[0-9])' | command grep -viE 'mini|nano|luna|-fast$' \
+        | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^(gpt-|o[0-9])' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  tier="$(_copilot_tier_prepass '^claude-' "$rows" "$models" \
+    claude-fable-5 \
+    claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 \
+    claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 \
+    claude-opus-4-5 claude-haiku-4-5 || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
 
   for preferred in \
     claude-fable-5 \
@@ -1983,16 +2005,35 @@ _copilot_codex_pick_best_model() {
       return 0
     fi
   done
-  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
+  # xAI — no allowlist on purpose, see _copilot_pick_best_model.
+  tier="$(_copilot_tier_best_complete '^grok-' "$rows" "$models" || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^grok-' | command grep -viE 'mini|nano|lite|-fast$' \
+        | _copilot_latest_model)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^grok-' | _copilot_latest_model)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  tier="$(_copilot_tier_best_complete '^gemini-' "$rows" "$models" 2>/dev/null || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
   c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command grep -viE 'flash' \
-        | command sort | command tail -1)"
+        | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
-  printf '%s\n' "$models" | command sort | command tail -1
+  # Any remaining vendor (for example MAI) still gets its catalog tier before
+  # the offline lexical catch-all. Known vendor rows are excluded because their
+  # ordering above is deliberate and must not be interleaved here.
+  remaining_models="$(printf '%s\n' "$models" | command grep -vE '^(claude|gpt|grok|gemini)-' || true)"
+  remaining_rows="$(printf '%s\n' "$rows" \
+    | command awk -F'\t' '$2 !~ /^(claude|gpt|grok|gemini)-/')"
+  tier="$(_copilot_tier_best_complete '.*' "$remaining_rows" "$remaining_models" 2>/dev/null || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
+  printf '%s\n' "$models" | command sort -V | command tail -1
 }
 
 # Effective SpecStory Codex command, matching SpecStory's own precedence.
@@ -2060,7 +2101,7 @@ codex-copilot() {
     -h|--help)
       printf '%s\n' "Usage: codex-copilot [--no-specstory] [codex args...]"
       printf '%s\n' "  One-off Codex session on the local Copilot Responses gateway."
-      printf '%s\n' "  Auto model: OpenAI/Codex > Claude > Gemini > other served chat models."
+      printf '%s\n' "  Auto model: OpenAI/Codex > Claude > grok > Gemini > other served chat models."
       printf '%s\n' "  Alias: codex-copilot-once"
       return 0 ;;
   esac
@@ -2079,16 +2120,12 @@ codex-copilot() {
     return 1
   }
   for arg in "$@"; do
+    [ "$arg" = "--" ] && break
     case "$arg" in -m|--model|-m=*|--model=*) explicit_model=1 ;; esac
   done
   if [ "$explicit_model" -eq 0 ]; then
-    models="$(printf '%s' "$catalog" | jq -r '
-      .data[]?
-      | select((.policy.state // "enabled") != "disabled")
-      | select(.model_picker_enabled != false)
-      | select((.capabilities.type // "chat") != "embeddings")
-      | .id // empty' 2>/dev/null | command sort -u)"
-    model="$(printf '%s\n' "$models" | _copilot_codex_pick_best_model)" || {
+    models="$(printf '%s' "$catalog"       | _copilot_auto_candidate_ids "$(_copilot_entitlement_baseline_model)")"
+    model="$(printf '%s\n' "$models" | _copilot_codex_pick_best_model "$catalog")" || {
       printf '%s\n' "codex-copilot: no usable chat model in the live gateway catalog" >&2
       return 1
     }
@@ -2145,6 +2182,11 @@ codex-copilot() {
   if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
     command env GITHUB_COPILOT_API_KEY=dummy specstory run codex -c "$cmd$provider_args"
   else
+    # Mirror the approval posture the specstory path inherits from `codex_cmd`.
+    _copilot_codex_has_sandbox_flag "$@" \
+      || set -- --sandbox danger-full-access "$@"
+    _copilot_codex_has_approval_flag "$@" \
+      || set -- --ask-for-approval never "$@"
     command env GITHUB_COPILOT_API_KEY=dummy codex \
       -c 'model_provider="copilot_api"' \
       -c 'model_providers.copilot_api.name="OpenAI"' \
@@ -2181,8 +2223,15 @@ codex-copilot-once() { codex-copilot "$@"; }
 #
 # Deriving the base command from the config keeps specstory the single source of
 # truth for BOTH branches: change `claude_cmd` there and both paths follow.
-# `--no-specstory` deliberately does NOT inherit it (opting out of specstory
-# means opting out of its config too).
+# `--no-specstory` still does NOT inherit the COMMAND — no custom binary, no
+# configured flags, nothing that would drag `--resume` or an --append-system-prompt
+# into a path the user explicitly asked to keep raw. It only asserts the same
+# PERMISSION POSTURE (see _copilot_claude_has_permission_flag), because that
+# posture is a property of this wrapper — a trusted, hands-off localhost gateway
+# — not of specstory. Without that, `claude-copilot --no-specstory` silently
+# dropped to ~/.claude/settings.json's defaultMode while the specstory path ran
+# in bypass: same wrapper, opposite permission mode, no warning. The Windows
+# port has always injected it directly (Copilot.psm1); this matches it.
 
 # Effective `claude_cmd`, honouring specstory's own precedence:
 #   project ./.specstory/cli/config.toml > user ~/.specstory/cli/config.toml
@@ -2201,6 +2250,108 @@ _copilot_specstory_claude_cmd() {
     if [ -n "$cmd" ]; then break; fi
   done
   printf '%s' "${cmd:-claude}"
+}
+
+# A wrapper-only --fast that appears after Claude arguments is almost certainly
+# misplaced. Respect prompt/data boundaries so literal prompt text never trips it.
+_copilot_claude_has_late_fast() {
+  local a leading=1 skip=0
+  for a in "$@"; do
+    if [ "$leading" -eq 1 ]; then
+      case "$a" in
+        --fast|--no-specstory|--specstory) continue ;;
+        *) leading=0 ;;
+      esac
+    fi
+    [ "$a" = "--" ] && return 1
+    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
+    case "$a" in
+      --append-system-prompt|--system-prompt|--settings|--model|--permission-mode|--permission-prompts|--permission-prompt-tool)
+        skip=1 ;;
+      --fast) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# True when argv already states a permission posture, so the wrapper must not
+# add a second, contradictory one. Keep in sync with the Windows twin
+# Test-CopilotClaudePermissionFlag.
+_copilot_claude_has_permission_flag() {
+  local a skip=0
+  for a in "$@"; do
+    # `--` ends options even when it follows -p; it is not -p's data value.
+    [ "$a" = "--" ] && return 1
+    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
+    case "$a" in
+      --append-system-prompt|--system-prompt|--settings|--model)
+        skip=1 ;;
+      --dangerously-skip-permissions|--restricted|\
+      --permission-mode|--permission-mode=*|\
+      --permission-prompts|--permission-prompts=*|\
+      --permission-prompt-tool|--permission-prompt-tool=*) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# True only for an explicit posture that must OVERRIDE bypass, not for bypass
+# itself. The SpecStory base command may already contain the seeded bypass; in
+# that case merely declining to add a second token is insufficient — strip the
+# configured token before appending the user's explicit mode.
+_copilot_claude_has_nonbypass_permission_flag() {
+  local a skip=0
+  for a in "$@"; do
+    [ "$a" = "--" ] && return 1
+    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
+    case "$a" in
+      --append-system-prompt|--system-prompt|--settings|--model)
+        skip=1 ;;
+      --restricted|\
+      --permission-mode|--permission-mode=*|\
+      --permission-prompts|--permission-prompts=*|\
+      --permission-prompt-tool|--permission-prompt-tool=*) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+_copilot_claude_drop_bypass_token() {
+  # Only rewrite the exact repo-seeded command. Arbitrary project/user
+  # `claude_cmd` strings own their permission posture; parsing/reconstructing
+  # shell text here can silently corrupt prompt data or tokens after `--`.
+  case "$1" in
+    'claude --dangerously-skip-permissions') printf '%s\n' 'claude' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+# Codex has TWO independent permission axes. Detect them separately: a caller
+# who asks for `--sandbox read-only` still wants the wrapper's no-prompt approval
+# default, and a caller who asks for `--ask-for-approval untrusted` still wants
+# the wrapper's full-access sandbox default. The compound modes cover both.
+_copilot_codex_has_approval_flag() {
+  local a
+  for a in "$@"; do
+    [ "$a" = "--" ] && return 1
+    case "$a" in
+      -a|-a?*|--ask-for-approval|--ask-for-approval=*|--approve-for-me|\
+      --full-auto|--dangerously-bypass-approvals-and-sandbox) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+_copilot_codex_has_sandbox_flag() {
+  local a
+  for a in "$@"; do
+    [ "$a" = "--" ] && return 1
+    case "$a" in
+      -s|-s?*|--sandbox|--sandbox=*|--approve-for-me|\
+      --full-auto|--dangerously-bypass-approvals-and-sandbox) return 0 ;;
+    esac
+  done
+  return 1
 }
 
 # Single-quote ONE argument for embedding in specstory's `-c` command STRING.
@@ -2227,10 +2378,14 @@ _copilot_shquote() {
 #   claude-copilot --fast          # this session uses a live-catalog fast sibling
 #   claude-copilot --no-specstory  # raw claude, no markdown auto-save
 _copilot_claude_model_arg() {
-  local arg expect=0 found=''
+  local arg expect=0 skip=0 found=''
   for arg in "$@"; do
+    [ "$arg" = "--" ] && break
     if [ "$expect" -eq 1 ]; then found="$arg"; expect=0; continue; fi
+    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
     case "$arg" in
+      --append-system-prompt|--system-prompt|--settings|--permission-mode|--permission-prompts|--permission-prompt-tool)
+        skip=1 ;;
       --model) expect=1 ;;
       --model=*) found="${arg#--model=}" ;;
     esac
@@ -2300,23 +2455,39 @@ claude-copilot() {
     esac
   done
 
+  if _copilot_claude_has_late_fast "$@"; then
+    printf '%s\n' "claude-copilot: '--fast' must come before other arguments; refusing to forward it." >&2
+    return 2
+  fi
   if [ "$fast" -eq 1 ]; then
-    local explicit_model base_model fast_model
-    if ! command -v jq >/dev/null 2>&1; then
+    local explicit_model base_model fast_model _fast_arg
+    for _fast_arg in "$@"; do
+      if [ "$_fast_arg" = "--" ]; then
+        printf '%s\n' "claude-copilot: --fast cannot be combined with '--' (the resolved --model would become prompt data)." >&2
+        return 2
+      fi
+    done
+    if [ -n "${_copilot_resolved_fast_for_once:-}" ]; then
+      # claude-copilot-once already resolved/pinned this exact sibling. Reuse it
+      # so a catalog/routing TTL boundary cannot make launch disagree with drift.
+      fast_model="$_copilot_resolved_fast_for_once"
+      base_model="$fast_model"
+    elif ! command -v jq >/dev/null 2>&1; then
       printf '%s\n' "claude-copilot: --fast needs jq; using the standard model." >&2
     else
       if ! _copilot_alive; then copilot-proxy start || return 1; fi
       _copilot_require_shim || return 1
       explicit_model="$(_copilot_claude_model_arg "$@")"
       base_model="$(_copilot_claude_fast_base_model "$explicit_model")"
-      if fast_model="$(_copilot_fast_model_for "$base_model")" && [ -n "$fast_model" ]; then
-        # Appended last so it overrides an explicit earlier --model while still
-        # using that value as the base model whose sibling was resolved.
-        set -- "$@" --model "$fast_model"
-        printf '%s\n' "claude-copilot: --fast -> $fast_model (session only)" >&2
-      else
-        printf '%s\n' "claude-copilot: --fast unavailable for ${base_model:-the selected model}; using the standard model." >&2
-      fi
+      fast_model="$(_copilot_fast_model_for "$base_model" 2>/dev/null || true)"
+    fi
+    if [ -n "$fast_model" ]; then
+      # Appended last so it overrides an explicit earlier --model while still
+      # using that value as the base model whose sibling was resolved.
+      set -- "$@" --model "$fast_model"
+      printf '%s\n' "claude-copilot: --fast -> $fast_model (session only)" >&2
+    elif command -v jq >/dev/null 2>&1; then
+      printf '%s\n' "claude-copilot: --fast unavailable for ${base_model:-the selected model}; using the standard model." >&2
     fi
   fi
   (
@@ -2330,20 +2501,33 @@ claude-copilot() {
     trap '_copilot_model_guard_restore' EXIT
 
     if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
-      if [ "$#" -gt 0 ]; then
-        # Rebuild what `-c` clobbers: the configured base command (ITS flags left
-        # unquoted so specstory splits them normally) + each of our args quoted.
-        local _cc_cmd _cc_arg
-        _cc_cmd="$(_copilot_specstory_claude_cmd)"
-        for _cc_arg in "$@"; do
-          _cc_cmd="$_cc_cmd $(_copilot_shquote "$_cc_arg")"
-        done
-        copilot-run specstory run claude -c "$_cc_cmd"
-      else
-        copilot-run specstory run claude
+      # Always rebuild the complete command, including zero-argument sessions.
+      # Otherwise a custom bare claude_cmd prompts at zero args while the same
+      # wrapper with --resume gets bypass — the pitfall this block exists to fix.
+      local _cc_cmd _cc_arg
+      _cc_cmd="$(_copilot_specstory_claude_cmd)"
+      if _copilot_claude_has_nonbypass_permission_flag "$@"; then
+        _cc_cmd="$(_copilot_claude_drop_bypass_token "$_cc_cmd")"
+      elif ! _copilot_claude_has_permission_flag "$@" \
+           && [ "$_cc_cmd" != 'claude --dangerously-skip-permissions' ]; then
+        # Assert the wrapper's unattended posture independently of a custom
+        # SpecStory command, matching Windows. Arbitrary command text is never
+        # rewritten; an existing non-seeded bypass may be duplicated harmlessly.
+        _cc_cmd="$_cc_cmd --dangerously-skip-permissions"
       fi
+      for _cc_arg in "$@"; do
+        _cc_cmd="$_cc_cmd $(_copilot_shquote "$_cc_arg")"
+      done
+      copilot-run specstory run claude -c "$_cc_cmd"
     else
-      copilot-run claude "$@"
+      # Same permission posture as the specstory path, which gets it from
+      # `claude_cmd` in specstory's config. Placed BEFORE "$@" so an explicit
+      # user flag still wins inside claude's own parser.
+      if _copilot_claude_has_permission_flag "$@"; then
+        copilot-run claude "$@"
+      else
+        copilot-run claude --dangerously-skip-permissions "$@"
+      fi
     fi
   )
 }
@@ -2576,16 +2760,46 @@ claude-copilot-once() {
     _cco_was_on=1
   fi
 
-  if [ "$_cco_was_on" = "0" ]; then
-    local _cco_explicit _cco_model _cco_arg _cco_fast=0 _cco_fast_model=''
-    _cco_explicit="$(_copilot_claude_model_arg "$@")"
-    for _cco_arg in "$@"; do [ "$_cco_arg" = "--fast" ] && _cco_fast=1; done
-    if [ -n "$_cco_explicit" ] || [ "$_cco_fast" -eq 1 ]; then
-      _cco_model="$(_copilot_claude_fast_base_model "$_cco_explicit")"
-      if [ "$_cco_fast" -eq 1 ]; then
-        _cco_fast_model="$(_copilot_fast_model_for "$_cco_model" 2>/dev/null || true)"
-        [ -n "$_cco_fast_model" ] && _cco_model="$_cco_fast_model"
+  # The model this launch will actually use. Computed BEFORE the pinned/unpinned
+  # split so both branches agree: the drift check below has to compare the pin
+  # against what --fast is about to ask for, not against the global default.
+  # Leading options only, matching claude-copilot's own parser — a bare --fast
+  # buried in a prompt string (`-p "...--fast..."`) must not count.
+  local _cco_explicit _cco_model='' _cco_arg _cco_fast=0 _cco_fast_model=''
+  for _cco_arg in "$@"; do
+    case "$_cco_arg" in
+      --fast) _cco_fast=1 ;;
+      --no-specstory|--specstory) ;;
+      *) break ;;
+    esac
+  done
+  if [ "$_cco_fast" -eq 1 ]; then
+    for _cco_arg in "$@"; do
+      if [ "$_cco_arg" = "--" ]; then
+        printf '%s\n' "claude-copilot-once: --fast cannot be combined with '--' (the resolved --model would become prompt data)." >&2
+        return 2
       fi
+    done
+  fi
+  if _copilot_claude_has_late_fast "$@"; then
+    printf '%s\n' "claude-copilot-once: '--fast' must come before other arguments; refusing to forward it." >&2
+    printf '%s\n' "  try:  claude-copilot-once --fast $*" >&2
+    return 2
+  fi
+  if [ "$_cco_fast" -eq 1 ]; then _copilot_require_shim || return 1; fi
+  _cco_explicit="$(_copilot_claude_model_arg "$@")"
+  if [ -n "$_cco_explicit" ] || [ "$_cco_fast" -eq 1 ]; then
+    _cco_model="$(_copilot_claude_fast_base_model "$_cco_explicit")"
+    if [ "$_cco_fast" -eq 1 ]; then
+      # Idempotent on an id that is already a fast sibling, so re-running
+      # --fast against a fast pin resolves to that same pin (no drift).
+      _cco_fast_model="$(_copilot_fast_model_for "$_cco_model" 2>/dev/null || true)"
+      [ -n "$_cco_fast_model" ] && _cco_model="$_cco_fast_model"
+    fi
+  fi
+
+  if [ "$_cco_was_on" = "0" ]; then
+    if [ -n "$_cco_model" ]; then
       copilot-here on "$_cco_model" || return 1
     else
       copilot-here on || return 1
@@ -2598,14 +2812,24 @@ claude-copilot-once() {
     # Already pinned here. If the pin drifted from current defaults (model bump,
     # proxy moved), offer to refresh it in place; otherwise leave it untouched.
     # Either way it was already ON, so it stays ON on exit (no revert, no trap).
-    local _drift; _drift="$(_copilot_here_drift)"
+    local _drift; _drift="$(_copilot_here_drift "$_cco_model")"
     if [ -n "$_drift" ]; then
       printf '%s\n' "claude-copilot-once: this project's copilot-here pin looks stale:" >&2
       printf '%s\n' "$_drift" >&2
       if _copilot_confirm "  override with current defaults? (keep = default) [y/N]"; then
-        copilot-here on || return 1
+        if [ -n "$_cco_model" ]; then
+          copilot-here on "$_cco_model" || return 1
+        else
+          copilot-here on || return 1
+        fi
       else
         printf '%s\n' "claude-copilot-once: kept the existing pin (stays ON on exit)." >&2
+        if [ "$_cco_fast" -eq 1 ]; then
+          # settings.local.json outranks process env for the keys it holds, so
+          # --fast can only move the main model this session.
+          printf '%s\n' "  --fast still applies to the session's main model, but the pinned" >&2
+          printf '%s\n' "  ANTHROPIC_DEFAULT_* role models stay on the non-fast ids." >&2
+        fi
       fi
     else
       printf '%s\n' "claude-copilot-once: copilot-here already ON here — leaving the pin in place on exit."
@@ -2613,6 +2837,15 @@ claude-copilot-once() {
   fi
 
   # 3. One session — specstory-wrapped + arg passthrough (reuses claude-copilot).
+  # Pass the already-resolved fast id through one internal, session-only env so
+  # the inner wrapper does not re-query catalog/routing and race the pin decision.
+  # Bash and zsh both dynamically scope locals into called shell functions.
+  # This avoids an ambient/exported env knob that could override an unrelated
+  # direct claude-copilot --fast invocation.
+  local _copilot_resolved_fast_for_once=''
+  if [ "$_cco_fast" -eq 1 ] && [ -n "$_cco_fast_model" ]; then
+    _copilot_resolved_fast_for_once="$_cco_fast_model"
+  fi
   claude-copilot "$@"
   local _rc=$?
 
@@ -2666,6 +2899,10 @@ _copilot_confirm() {
 # subset (that is how three keys silently went unchecked). Note the asymmetry is
 # deliberate: keys present in the file but absent from the want-set are NOT drift,
 # because `on` merges and never removes them (only `off` does).
+# Drift of THIS project's pin against what a launch would want right now.
+# $1 (optional) = the model that launch will actually use. Without it the
+# want-side is the global default, which knows nothing about --fast or about the
+# pin itself — so a fast pin would always look "stale" against its own sibling.
 _copilot_here_drift() {
   local settings=".claude/settings.local.json"
   [ -f "$settings" ] || return 1
@@ -2673,7 +2910,11 @@ _copilot_here_drift() {
   # ANTHROPIC_BASE_URL is only set while the pin is ON — absent → nothing to do.
   [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" ] || return 1
   local want out
-  want="$(_copilot_env_json)" || return 1
+  if [ -n "${1:-}" ]; then
+    want="$(_copilot_env_json_for_model "$1")" || return 1
+  else
+    want="$(_copilot_env_json)" || return 1
+  fi
   out="$(jq -r --argjson want "$want" '
     (.env // {}) as $cur
     | [ $want
@@ -2695,12 +2936,251 @@ _copilot_model_catalog() {
   command curl -fsS --max-time 5 "$(_copilot_base)/v1/models" 2>/dev/null
 }
 
+_copilot_catalog_valid() {
+  command -v jq >/dev/null 2>&1 || return 1
+  jq -e '(.data | type) == "array"' >/dev/null 2>&1
+}
+
 _copilot_catalog_ids() {
   if command -v jq >/dev/null 2>&1; then
     jq -r '.data[]?.id // empty' 2>/dev/null | command sort -u
   else
     command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command sort -u
   fi
+}
+
+# The entitlement floor is an explicitly selected/persisted model, never the
+# built-in fallback (which may itself be unavailable on a lower plan).
+_copilot_entitlement_baseline_model() {
+  local settings='.claude/settings.local.json' state pinned=''
+  if [ -f "$settings" ] && command -v jq >/dev/null 2>&1 \
+     && [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" ]; then
+    pinned="$(jq -r '.env.ANTHROPIC_MODEL // empty' "$settings" 2>/dev/null)"
+    if [ -n "$pinned" ]; then printf '%s' "$pinned"; return 0; fi
+  fi
+  if [ -n "${COPILOT_CLAUDE_MODEL:-}" ]; then
+    printf '%s' "$COPILOT_CLAUDE_MODEL"
+  else
+    state="$(_copilot_model_state)"
+    [ -f "$state" ] && command head -n 1 "$state"
+  fi
+}
+
+# Selectable ids whose advertised plan set is no narrower than the baseline.
+# If no explicit baseline exists, require the broadest restriction set found in
+# this catalog (or an unrestricted entry). This does not claim restricted_to is
+# perfect entitlement proof; it prevents auto from knowingly widening beyond a
+# model the user already selected, while manual model ids remain unrestricted.
+_copilot_auto_candidate_ids() {
+  local baseline
+  baseline="$(_copilot_strip_context_hint "${1:-}")"
+  command -v jq >/dev/null 2>&1 || return 1
+  jq -r --arg current "$baseline" '
+    def eligible:
+      select((.policy.state // "enabled") != "disabled")
+      | select(.model_picker_enabled != false)
+      | select((.capabilities.type // "chat") != "embeddings");
+    def plans: (.billing.restricted_to // []);
+    [.data[]? | eligible] as $served
+    | [$served[] | select(((.id // "") | endswith("-fast")) | not)] as $all
+    | ($all | map(plans) | add // [] | unique) as $universe
+    | (first($served[] | select(.id == $current) | plans) // null) as $cur
+    | (if $cur == null or ($cur | length) == 0 then $universe else $cur end) as $need
+    | $all[]
+    | (plans) as $have
+    | select(($have | length) == 0
+             or all($need[]; . as $p | $have | index($p) != null))
+    | .id' 2>/dev/null | command sort -u
+}
+
+# The catalog rows a *derived* selection may consider. Mirrors the Windows
+# Get-CopilotSelectableModelIds predicate: no disabled policy, nothing the model
+# picker hides, no embeddings. Deliberately NOT applied to `-l`, `-L/--details`,
+# `--json` or manual id resolution — diagnostics must show everything, and
+# pinning a non-picker model by name has to stay possible.
+_copilot_selectable_ids() {
+  command -v jq >/dev/null 2>&1 || { _copilot_catalog_ids; return; }
+  jq -r '
+    .data[]?
+    | select((.policy.state // "enabled") != "disabled")
+    | select(.model_picker_enabled != false)
+    | select((.capabilities.type // "chat") != "embeddings")
+    | .id // empty' 2>/dev/null | command sort -u
+}
+
+# Capability-tier rows for the ranker, "TIER<TAB>ID", best tier = 3.
+#
+# `model_picker_category` is Copilot's own tier taxonomy and it lines up exactly
+# with OpenAI's *durable* capability tiers — Sol and Astra are `powerful`, Terra
+# is `versatile`, Luna is `lightweight`. That matters because generation and
+# tier advance independently: gpt-6-astra is the gen-6 flagship while Terra and
+# Luna stayed on 5.6, so "higher version wins" would happily promote a future
+# gpt-6-luna over gpt-5.6-sol. Ranking on the tier first is what makes that
+# impossible. It also tiers grok/gemini/mai, which we keep no allowlist for.
+#
+# `-fast` siblings are excluded by name, not by the picker predicate: they are
+# picker-enabled AND inherit their standard sibling's category (gpt-5.6-sol-fast
+# is `powerful`), so a tier-only rank would happily pin one as the main model.
+#
+# An older fork that does not surface the field emits no rows at all, which
+# makes the pre-pass a silent no-op and leaves the historical ranker untouched.
+_copilot_tier_rows() {
+  command -v jq >/dev/null 2>&1 || return 0
+  jq -r '
+    .data[]?
+    | select((.policy.state // "enabled") != "disabled")
+    | select(.model_picker_enabled != false)
+    | select((.capabilities.type // "chat") != "embeddings")
+    | select(((.id // "") | endswith("-fast")) | not)
+    | (.model_picker_category // "") as $c
+    | (if   $c == "powerful"    then 3
+       elif $c == "versatile"   then 2
+       elif $c == "lightweight" then 1
+       else 0 end) as $t
+    | select($t > 0)
+    | "\($t)\t\(.id)"' 2>/dev/null
+}
+
+# Generation of a model id, as a `sort -V`-comparable string. Only the leading
+# numeric run counts, so the tier codename never leaks into the comparison:
+# gpt-6-astra and gpt-6-nova are both "6" (same generation, so neither is
+# "newer"), gpt-5.6-sol is "5.6", claude-opus-4-8 is "4.8". Digit-dash-digit is
+# normalised to a dot first, because Anthropic spells minor versions with `-`.
+_copilot_model_version() {
+  local tail
+  case "$1" in
+    gpt-*) tail="${1#gpt-}" ;;
+    o[0-9]*) tail="${1#o}" ;;
+    gemini-*) tail="${1#gemini-}" ;;
+    grok-*) tail="${1#grok-}" ;;
+    mai-code-*) tail="${1#mai-code-}" ;;
+    claude-fable-*) tail="${1#claude-fable-}" ;;
+    claude-opus-*) tail="${1#claude-opus-}" ;;
+    claude-sonnet-*) tail="${1#claude-sonnet-}" ;;
+    claude-haiku-*) tail="${1#claude-haiku-}" ;;
+    *) return 1 ;;
+  esac
+  # Only a numeric run at the START of the recognized generation slot counts.
+  # gpt-oss-120b therefore has no generation; it is not "GPT-120".
+  printf '%s' "$tail" \
+    | command sed -En 's/^([0-9]+([.-][0-9]+)*).*/\1/p' \
+    | command tr '-' '.'
+}
+
+# Intersect catalog-derived rows on stdin with a newline-separated candidate
+# list. Rankers accept both on purpose (catalog supplies metadata; stdin scopes
+# eligibility), so neither source may silently widen the other.
+_copilot_tier_rows_for_ids() {
+  local ids="$1"
+  {
+    printf '%s\n' "$ids"
+    printf '%s\n' '__COPILOT_TIER_ROWS__'
+    command cat
+  } | command awk -F'\t' '
+    $0 == "__COPILOT_TIER_ROWS__" { rows=1; next }
+    !rows { ids[$0]=1; next }
+    ids[$2] { print }'
+}
+
+# Newest id on stdin by recognized generation first, full id second. IDs with
+# no generation (for example grok-code-fast-1) sort below grok-4.6 instead of
+# winning merely because "code" is lexically after "4".
+_copilot_latest_model() {
+  local id
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    printf '%s\t%s\n' "$(_copilot_model_version "$id" 2>/dev/null || true)" "$id"
+  done | command sort -t"$(printf '\t')" -k1,1V -k2,2V \
+    | command tail -1 | command cut -f2-
+}
+
+# Best id matching an ERE among tier rows on stdin: highest tier first, then the
+# version-greatest id inside that tier. `sort -V`, never plain `sort`, so
+# gpt-10-x beats gpt-9-x and claude-opus-4-10 beats claude-opus-4-8.
+_copilot_tier_best() {
+  local rows top
+  rows="$(command awk -F'\t' -v re="$1" '$2 ~ re' 2>/dev/null)"
+  [ -n "$rows" ] || return 1
+  top="$(printf '%s\n' "$rows" | command cut -f1 | command sort -n | command tail -1)"
+  [ -n "$top" ] || return 1
+  printf '%s\n' "$rows" | command awk -F'\t' -v t="$top" '$1==t{print $2}' \
+    | while IFS= read -r id; do
+        printf '%s\t%s\n' "$(_copilot_model_version "$id")" "$id"
+      done \
+    | command sort -t"$(printf '\t')" -k1,1V -k2,2V \
+    | command tail -1 | command cut -f2-
+}
+
+# Tier ordering is safe only when EVERY scoped id in that vendor has a row.
+# Partial metadata must degrade to the curated/lexical fallback: otherwise a
+# lightweight new id with metadata can outrank a known flagship whose category
+# happens to be absent in an older/mixed catalog.
+_copilot_tier_best_complete() {
+  local re="$1" rows="$2" models="$3" candidates covered
+  candidates="$(printf '%s\n' "$models" | command grep -E "$re" || true)"
+  [ -n "$candidates" ] || return 1
+  covered="$(printf '%s\n' "$rows" | command awk -F'\t' -v re="$re" '$2 ~ re {print $2}')"
+  [ "$(printf '%s\n' "$candidates" | command sort -u)" =     "$(printf '%s\n' "$covered" | command sort -u)" ] || return 1
+  printf '%s\n' "$rows" | _copilot_tier_best "$re"
+}
+
+# Tier pre-pass for one vendor arm. $1=ERE $2=tier rows $3=served ids $4..=that
+# arm's allowlist. Prints the winner, or nothing when the allowlist should own
+# the decision. Set COPILOT_MODEL_EXPLAIN=1 to trace on fd 2.
+_copilot_tier_prepass() {
+  local re="$1" rows="$2" served="$3" pick known top_known newest pick_v known_v pick_tier known_tier
+  shift 3
+  [ -n "$rows" ] || return 1
+  pick="$(_copilot_tier_best_complete "$re" "$rows" "$served")" || return 1
+  [ -n "$pick" ] || return 1
+
+  # An id we curate by name is never promoted here — the allowlist loop that
+  # follows owns it. That is precisely what keeps the allowlist an override:
+  # demote a model by moving it down the list, promote it by moving it up.
+  for known in "$@"; do
+    if [ "$pick" = "$known" ]; then
+      [ -n "${COPILOT_MODEL_EXPLAIN:-}" ] && \
+        printf '  %-12s : top tier -> %s, which the allowlist owns -> allowlist wins\n' \
+          "$re" "$pick" >&2
+      return 1
+    fi
+  done
+
+  # Only beat the curated set when genuinely newer than the best allowlisted id
+  # actually being served, so an unknown same-generation sibling cannot displace
+  # a vetted pick.
+  top_known=''
+  pick_tier="$(printf '%s\n' "$rows" | command awk -F'\t' -v id="$pick" '$2==id{print $1; exit}')"
+  for known in "$@"; do
+    known_tier="$(printf '%s\n' "$rows" | command awk -F'\t' -v id="$known" '$2==id{print $1; exit}')"
+    if [ "$known_tier" = "$pick_tier" ] \
+       && printf '%s\n' "$served" | command grep -qxF "$known"; then
+      if [ -z "$top_known" ]; then
+        top_known="$known"
+      else
+        top_known="$(printf '%s\n%s\n' "$top_known" "$known" | command sort -V | command tail -1)"
+      fi
+    fi
+  done
+  if [ -n "$top_known" ]; then
+    # Compare GENERATIONS, not ids: `sort -V` breaks a numeric tie alphabetically,
+    # so an unknown same-generation sibling (gpt-6-nova next to an allowlisted
+    # gpt-6-astra) would otherwise win purely on its codename.
+    pick_v="$(_copilot_model_version "$pick")"
+    known_v="$(_copilot_model_version "$top_known")"
+    newest="$(printf '%s\n%s\n' "$pick_v" "$known_v" | command sort -V | command tail -1)"
+    if [ -z "$pick_v" ] || [ "$pick_v" = "$known_v" ] || [ "$newest" != "$pick_v" ]; then
+      [ -n "${COPILOT_MODEL_EXPLAIN:-}" ] && \
+        printf '  %-12s : top tier -> %s (gen %s), not newer than served %s (gen %s) -> allowlist wins\n' \
+          "$re" "$pick" "${pick_v:-?}" "$top_known" "${known_v:-?}" >&2
+      return 1
+    fi
+  fi
+
+  [ -n "${COPILOT_MODEL_EXPLAIN:-}" ] && \
+    printf '  %-12s : top tier -> %s (newer than served %s) -> pre-pass wins\n' \
+      "$re" "$pick" "${top_known:-<none>}" >&2
+  printf '%s' "$pick"
 }
 
 _copilot_strip_context_hint() {
@@ -2781,9 +3261,25 @@ _copilot_first_served() {
 # deliberately placing lightweight Luna behind the older flagship/coding tiers.
 # Reads newline-separated raw ids on stdin and prints one raw id.
 _copilot_pick_best_model() {
-  local models preferred c
-  models="$(command cat | command sed 's/\[1m\]$//' | command sort -u)"
+  local models preferred c rows tier remaining_models remaining_rows
+  # $1 (optional) = raw catalog JSON. With it, each vendor arm first runs the
+  # capability-tier pre-pass so a genuinely newer flagship wins without waiting
+  # for someone to hand-edit the allowlist; without it (offline, or a fork too
+  # old to report model_picker_category) the historical allowlist + lexical
+  # ranker runs unchanged. See _copilot_tier_rows for why tier beats version.
+  models="$(command cat | command sed 's/\[1m\]$//' \
+    | command grep -vE -- '-fast$' | command sort -u)"
   [ -n "$models" ] || return 1
+  rows=''
+  [ -n "${1:-}" ] && rows="$(printf '%s' "$1" | _copilot_tier_rows \
+    | _copilot_tier_rows_for_ids "$models")"
+
+  tier="$(_copilot_tier_prepass '^claude-' "$rows" "$models" \
+    claude-fable-5 \
+    claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 \
+    claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 \
+    claude-opus-4-5 claude-haiku-4-5 || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
 
   for preferred in \
     claude-fable-5 \
@@ -2796,11 +3292,16 @@ _copilot_pick_best_model() {
       return 0
     fi
   done
-  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
+  tier="$(_copilot_tier_prepass '^(gpt-|o[0-9])' "$rows" "$models" \
+    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-5.6-luna gpt-5.4-mini gpt-5-mini || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
+
   for preferred in \
-    gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
     gpt-5.6-luna gpt-5.4-mini gpt-5-mini
   do
     if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
@@ -2809,21 +3310,41 @@ _copilot_pick_best_model() {
     fi
   done
 
-  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command grep -viE 'mini|nano|luna' \
-        | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^(gpt-|o[0-9])' | command grep -viE 'mini|nano|luna|-fast$' \
+        | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^(gpt-|o[0-9])' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
+  # xAI. No allowlist on purpose — grok bumps versions faster than we can track,
+  # and the tier rows already rank it correctly when the catalog is available.
+  tier="$(_copilot_tier_best_complete '^grok-' "$rows" "$models" || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^grok-' | command grep -viE 'mini|nano|lite|-fast$' \
+        | _copilot_latest_model)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^grok-' | _copilot_latest_model)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  tier="$(_copilot_tier_best_complete '^gemini-' "$rows" "$models" 2>/dev/null || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
   c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command grep -viE 'flash' \
-        | command sort | command tail -1)"
+        | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
-  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort | command tail -1)"
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort -V | command tail -1)"
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
-  printf '%s\n' "$models" | command sort | command tail -1
+  # Any remaining vendor (for example MAI) still gets its catalog tier before
+  # the offline lexical catch-all. Known vendor rows are excluded because their
+  # ordering above is deliberate and must not be interleaved here.
+  remaining_models="$(printf '%s\n' "$models" | command grep -vE '^(claude|gpt|grok|gemini)-' || true)"
+  remaining_rows="$(printf '%s\n' "$rows" \
+    | command awk -F'\t' '$2 !~ /^(claude|gpt|grok|gemini)-/')"
+  tier="$(_copilot_tier_best_complete '.*' "$remaining_rows" "$remaining_models" 2>/dev/null || true)"
+  if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
+  printf '%s\n' "$models" | command sort -V | command tail -1
 }
 
 # Build the full Claude Code role profile for one selected main model. Native
@@ -2833,40 +3354,52 @@ _copilot_pick_best_model() {
 _copilot_model_profile_json() {
   command -v jq >/dev/null 2>&1 || return 1
   local selected="${1:-$(_copilot_default_model)}" catalog="${2:-}" models raw main
-  local fable_raw opus_raw sonnet_raw haiku_raw
+  local fable_raw opus_raw sonnet_raw haiku_raw grok_rows
   if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
-  if [ -n "$catalog" ]; then models="$(printf '%s' "$catalog" | _copilot_catalog_ids)"; else models=''; fi
+  # Derived role models go through the picker predicate (Windows parity with
+  # Get-CopilotModelProfile); an explicitly named model is still honoured above.
+  if [ -n "$catalog" ]; then
+    models="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids "$selected")"
+  else models=''; fi
   raw="$(_copilot_strip_context_hint "$selected")"
   main="$(_copilot_model_for_claude "$selected" "$catalog")"
 
   case "$raw" in
     claude-*)
-      fable_raw="$(_copilot_first_served "$models" claude-fable-5 2>/dev/null || true)"
-      [ -n "$fable_raw" ] || fable_raw="$(printf '%s\n' "$models" | command grep '^claude-fable-' | command sort | command tail -1)"
+      fable_raw="$(printf '%s\n' "$models" | command grep '^claude-fable-' | _copilot_latest_model)"
       [ -n "$fable_raw" ] || fable_raw="$raw"
 
-      opus_raw="$(_copilot_first_served "$models" \
-        claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
-        2>/dev/null || true)"
-      [ -n "$opus_raw" ] || opus_raw="$(printf '%s\n' "$models" | command grep '^claude-opus-' | command sort | command tail -1)"
+      opus_raw="$(printf '%s\n' "$models" | command grep '^claude-opus-' | _copilot_latest_model)"
       [ -n "$opus_raw" ] || opus_raw="$raw"
 
-      sonnet_raw="$(_copilot_first_served "$models" \
-        claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 2>/dev/null || true)"
-      [ -n "$sonnet_raw" ] || sonnet_raw="$(printf '%s\n' "$models" | command grep '^claude-sonnet-' | command sort | command tail -1)"
+      sonnet_raw="$(printf '%s\n' "$models" | command grep '^claude-sonnet-' | _copilot_latest_model)"
       [ -n "$sonnet_raw" ] || sonnet_raw="$raw"
 
-      haiku_raw="$(_copilot_first_served "$models" claude-haiku-4-5 2>/dev/null || true)"
-      [ -n "$haiku_raw" ] || haiku_raw="$(printf '%s\n' "$models" | command grep '^claude-haiku-' | command sort | command tail -1)"
+      haiku_raw="$(printf '%s\n' "$models" | command grep '^claude-haiku-' | _copilot_latest_model)"
       [ -n "$haiku_raw" ] || haiku_raw="$raw"
       ;;
-    gpt-*|*codex*)
+    gpt-*|o[0-9]*|*codex*)
       fable_raw="$raw"; opus_raw="$raw"
       sonnet_raw="$(_copilot_first_served "$models" gpt-5.6-terra 2>/dev/null || true)"
       [ -n "$sonnet_raw" ] || sonnet_raw="$raw"
       haiku_raw="$(_copilot_first_served "$models" \
         gpt-5.6-luna gpt-5.4-mini gpt-5-mini 2>/dev/null || true)"
       [ -n "$haiku_raw" ] || haiku_raw="$raw"
+      ;;
+    grok-*)
+      # No curated grok roles — derive them from the tier rows instead.
+      fable_raw="$raw"; opus_raw="$raw"
+      grok_rows="$(printf '%s' "$catalog" | _copilot_tier_rows \
+        | _copilot_tier_rows_for_ids "$models")"
+      sonnet_raw="$(_copilot_tier_best_complete '^grok-' "$grok_rows" "$models" 2>/dev/null || true)"
+      if [ -n "$sonnet_raw" ]; then
+        haiku_raw="$(printf '%s\n' "$grok_rows" \
+          | command awk -F'\t' '$1==1 && $2 ~ /^grok-/{print $2}' \
+          | command sort -V | command tail -1)"
+        [ -n "$haiku_raw" ] || haiku_raw="$sonnet_raw"
+      else
+        sonnet_raw="$raw"; haiku_raw="$raw"
+      fi
       ;;
     *)
       fable_raw="$raw"; opus_raw="$raw"; sonnet_raw="$raw"; haiku_raw="$raw"
@@ -2906,9 +3439,83 @@ _copilot_print_model_profile() {
 # Example:
 #   copilot-model opus-5           # fuzzy → claude-opus-5 (the default; opus-4-8 etc. work too)
 #   copilot-model 'opus-5[1m]'     # same + 1M-context hint for Claude Code
-#   copilot-model --auto           # Claude; else Sol > Terra > older flagships > Luna
+#   copilot-model --auto           # tier-aware Claude > OpenAI > grok > Gemini
 #   copilot-model -l               # list available (live from proxy)
 #   copilot-model -c               # print current (+ where it came from)
+# Detailed listing for copilot-model. `-l` stays the bare-id, pipeable form
+# (and the offline fallback); this is its long sibling. Explicit parameters are
+# required: a nested function would leak globally in both Bash and zsh while
+# relying on dynamic-scope locals that disappear after copilot-model returns.
+# $1 = validated catalog JSON, $2 = current model, $3 = entitlement baseline.
+_copilot_model_details() {
+  local catalog="$1" current rows auto fast_routing fast_models baseline="${3:-}"
+  local id tier price ctx out eff plans state _t mark fast
+  current="$(_copilot_strip_context_hint "$2")"
+  # One shim request and one jq parse for the whole table, not one per row.
+  fast_routing="$(_copilot_fast_routing_json 2>/dev/null || true)"
+  fast_models=''
+  [ -n "$fast_routing" ] && fast_models="$(printf '%s' "$fast_routing" \
+    | jq -r '.mappings | keys[]?' 2>/dev/null || true)"
+  auto="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids "$baseline" \
+    | _copilot_pick_best_model "$catalog" 2>/dev/null || true)"
+  printf '%-2s %-33s %-11s %-9s %7s %6s %-13s %-4s %-11s %s\n' \
+    '' ID TIER PRICE CTX OUT EFFORT FAST PLANS STATE
+  rows="$(printf '%s' "$catalog" | jq -r '
+    def number_or_null:
+      if type == "number" then .
+      elif type == "string" and test("^[0-9]+$") then tonumber
+      else null end;
+    def human: number_or_null as $n
+      | if $n == null then "-" elif $n >= 1000 then "\(($n/1000|floor))k" else ($n|tostring) end;
+    .data[]?
+    | (.capabilities.limits // {}) as $l
+    | (.capabilities.supports.reasoning_effort // []) as $e
+    | [ .id,
+        (.model_picker_category // "-"),
+        (.model_picker_price_category // "-"),
+        ($l.max_context_window_tokens | human),
+        ($l.max_output_tokens | human),
+        (if ($e | length) == 0 then "-"
+         elif ($e | length) == 1 then $e[0]
+         else "\($e[0])..\($e[-1])" end),
+        ((.billing.restricted_to // []) as $p
+         | if ($p | length) == 0 then "all"
+           elif ($p | index("free")) then "free+"
+           elif ($p | index("pro")) then "pro+"
+           elif ($p | index("pro_plus")) then "pro_plus+"
+           elif ($p | index("business")) then "business+"
+           elif ($p | index("enterprise")) then "enterprise+"
+           elif ($p | index("max")) then "max"
+           else ($p | join(",")) end),
+        (if (.policy.state // "enabled") == "disabled" then "disabled"
+         elif .model_picker_enabled == false then "nopick"
+         elif .preview == true then "preview"
+         else "ok" end),
+        (if (.model_picker_category // "") == "powerful" then 3
+         elif (.model_picker_category // "") == "versatile" then 2
+         elif (.model_picker_category // "") == "lightweight" then 1
+         else 0 end) ]
+    | @tsv' 2>/dev/null | command sort -t"$(printf '\t')" -k9,9nr -k1,1Vr)" || {
+    printf '%s\n' "copilot-model: could not render catalog metadata" >&2
+    return 1
+  }
+  printf '%s\n' "$rows" | while IFS="$(printf '\t')" read -r id tier price ctx out eff plans state _t; do
+    [ -n "$id" ] || continue
+    mark=''
+    [ "$id" = "$current" ] && mark='*'
+    [ "$id" = "$auto" ] && mark="$mark->"
+    case "$id" in
+      *-fast) fast='self' ;;
+      *)
+        fast='-'
+        printf '%s\n' "$fast_models" | command grep -qxF "$id" && fast='yes'
+        ;;
+    esac
+    printf '%-2s %-33s %-11s %-9s %7s %6s %-13s %-4s %-11s %s\n' \
+      "$mark" "$id" "$tier" "$price" "$ctx" "$out" "$eff" "$fast" "$plans" "$state"
+  done
+}
+
 copilot-model() {
   if [ -n "$ZSH_VERSION" ]; then
     emulate -L zsh
@@ -2939,8 +3546,10 @@ copilot-model() {
         claude-fable-5 \
         claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
         claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 claude-haiku-4-5 \
+        gpt-6-astra \
         gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5 gpt-5.4 gpt-5.3-codex \
-        gpt-5.4-mini gpt-5-mini
+        gpt-5.4-mini gpt-5-mini \
+        grok-4.6 grok-4.5
       printf '%s\n' "copilot-model: proxy not reachable — showing fallback list" >&2
     fi
   }
@@ -2954,11 +3563,60 @@ copilot-model() {
     fi
   }
 
-  local arg="${1:-}"
+  local arg="${1:-}" explain_auto=0
+  # `--why` alone is a dry run; after `--auto` it explains the same decision
+  # and then falls through to the normal write path.
+  [ "$arg" = "--auto" ] && [ "${2:-}" = "--why" ] && explain_auto=1
   case "$arg" in
     -l|--list)
       catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+      if [ -n "$catalog" ] && ! printf '%s' "$catalog" | _copilot_catalog_valid; then catalog=''; fi
       _copilot_model_list
+      return 0 ;;
+    -L|--details)
+      catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+      if [ -z "$catalog" ] || ! printf '%s' "$catalog" | _copilot_catalog_valid; then
+        printf '%s\n' "copilot-model: --details needs a reachable proxy and jq" >&2
+        return 1
+      fi
+      _copilot_model_details "$catalog" "$(_copilot_model_current 2>/dev/null || true)" \
+        "$(_copilot_entitlement_baseline_model)" || return 1
+      return 0 ;;
+    --json)
+      catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+      if [ -z "$catalog" ] || ! printf '%s' "$catalog" | _copilot_catalog_valid; then
+        printf '%s\n' "copilot-model: --json needs a reachable proxy and valid JSON catalog" >&2
+        return 1
+      fi
+      printf '%s' "$catalog" | jq . || return 1
+      return 0 ;;
+    --why)
+      # Dry run: explain what --auto WOULD pick, write nothing.
+      catalog="$(_copilot_model_catalog 2>/dev/null || true)"
+      if [ -z "$catalog" ] || ! printf '%s' "$catalog" | _copilot_catalog_valid; then
+        printf '%s\n' "copilot-model: --why needs a reachable proxy and valid JSON catalog" >&2
+        return 1
+      fi
+      local _why_sel _why_pick
+      _why_sel="$(printf '%s' "$catalog"         | _copilot_auto_candidate_ids "$(_copilot_entitlement_baseline_model)")"
+      if [ -z "$_why_sel" ]; then
+        printf '%s\n' "copilot-model: --why found no selectable chat model in the live catalog" >&2
+        return 1
+      fi
+      printf '%s\n' "copilot-model: --auto reasoning (dry run, nothing written)" >&2
+      printf '  catalog      : %s models, %s selectable\n' \
+        "$(printf '%s' "$catalog" | _copilot_catalog_ids | command wc -l | command tr -d ' ')" \
+        "$(printf '%s\n' "$_why_sel" | command wc -l | command tr -d ' ')" >&2
+      _why_pick="$(printf '%s\n' "$_why_sel" \
+        | COPILOT_MODEL_EXPLAIN=1 _copilot_pick_best_model "$catalog")" || {
+        printf '%s\n' "copilot-model: --why could not pick a model" >&2
+        return 1
+      }
+      [ -n "$_why_pick" ] || {
+        printf '%s\n' "copilot-model: --why could not pick a model" >&2
+        return 1
+      }
+      printf '  -> %s\n' "$(_copilot_model_for_claude "$_why_pick" "$catalog")" >&2
       return 0 ;;
     -c|--current)
       if [ "$target" = "local" ]; then
@@ -2983,9 +3641,15 @@ copilot-model() {
       fi
       return 0 ;;
     -h|--help)
-      printf '%s\n' "Usage: copilot-model [<model-id>|-l|-c|--auto]"
-      printf '%s\n' "  --auto  pick best from live served list: Claude; else capability-ranked OpenAI"
-      printf '%s\n' "          (Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex > Luna > mini)"
+      printf '%s\n' "Usage: copilot-model [<model-id>|-l|-L|-c|--auto|--why|--json]"
+      printf '%s\n' "  -l      bare served ids (pipeable; static fallback when offline)"
+      printf '%s\n' "  -L      the same list with tier/price/context/plan metadata"
+      printf '%s\n' "  --json  raw /v1/models from the proxy"
+      printf '%s\n' "  --why   explain what --auto would pick, without writing"
+      printf '%s\n' "  --auto  pick best from the live served list, ranked by capability tier"
+      printf '%s\n' "          (powerful > versatile > lightweight, newest generation first),"
+      printf '%s\n' "          vendor order Claude > OpenAI > grok > Gemini. A curated"
+      printf '%s\n' "          per-vendor allowlist overrides the tier ranking."
       printf '%s\n' "  Writes ./.claude/settings.local.json when copilot-here is on,"
       printf '%s\n' "  else the global state file used by claude-copilot / copilot-run."
       return 0 ;;
@@ -2996,7 +3660,7 @@ copilot-model() {
   fi
 
   catalog="$(_copilot_model_catalog 2>/dev/null || true)"
-  local models want resolved
+  local models want resolved selectable
   models="$(_copilot_model_list 2>/dev/null)"
 
   # --auto requires the live catalog. Never silently choose a static Claude id
@@ -3004,11 +3668,30 @@ copilot-model() {
   # Use when a sticky pin (e.g. gemini from a Claude-less geo day) is stale, or
   # when Anthropic is filtered out and you want the best Codex/GPT instead.
   if [ "$arg" = "--auto" ] || [ "$arg" = "-a" ]; then
-    if [ -z "$catalog" ] || [ -z "$models" ]; then
-      printf '%s\n' "copilot-model: --auto needs a reachable proxy and live /v1/models catalog" >&2
+    if [ -z "$catalog" ] || ! printf '%s' "$catalog" | _copilot_catalog_valid; then
+      printf '%s\n' "copilot-model: --auto needs a reachable proxy and valid /v1/models catalog" >&2
       return 1
     fi
-    resolved="$(printf '%s\n' "$models" | _copilot_pick_best_model)" || {
+    # Only the AUTOMATIC pick is filtered — a disabled / picker-hidden /
+    # embeddings id must never be persisted into a pin the gateway then
+    # rejects. `-l`, `-L`, `--json` and naming a model by hand still see
+    # everything. Mirrors Get-CopilotSelectableModelIds on the Windows side.
+    selectable="$(printf '%s' "$catalog"       | _copilot_auto_candidate_ids "$(_copilot_entitlement_baseline_model)")"
+    if [ -z "$selectable" ]; then
+      printf '%s\n' "copilot-model: --auto found no selectable chat model in the live catalog" >&2
+      return 1
+    fi
+    if [ "$explain_auto" -eq 1 ]; then
+      printf '%s\n' "copilot-model: --auto reasoning" >&2
+      printf '  catalog      : %s models, %s selectable\n' \
+        "$(printf '%s' "$catalog" | _copilot_catalog_ids | command wc -l | command tr -d ' ')" \
+        "$(printf '%s\n' "$selectable" | command wc -l | command tr -d ' ')" >&2
+      resolved="$(printf '%s\n' "$selectable" \
+        | COPILOT_MODEL_EXPLAIN=1 _copilot_pick_best_model "$catalog")"
+    else
+      resolved="$(printf '%s\n' "$selectable" | _copilot_pick_best_model "$catalog")"
+    fi
+    [ -n "$resolved" ] || {
       printf '%s\n' "copilot-model: --auto could not pick a model" >&2
       return 1
     }
@@ -3016,7 +3699,8 @@ copilot-model() {
     case "$resolved" in
       claude-*) printf '%s\n' "copilot-model: --auto → $resolved  (Claude preferred)" >&2 ;;
       gpt-*|*codex*|o[0-9]*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude; capability-ranked OpenAI)" >&2 ;;
-      gemini-*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/OpenAI; best Gemini)" >&2 ;;
+      grok-*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/OpenAI; best grok)" >&2 ;;
+      gemini-*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/OpenAI/grok; best Gemini)" >&2 ;;
       *) printf '%s\n' "copilot-model: --auto → $resolved" >&2 ;;
     esac
     # $resolved already set — fall through to the write path below

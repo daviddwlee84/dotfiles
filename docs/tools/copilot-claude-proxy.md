@@ -323,7 +323,7 @@ HTTP status (including an auth rejection) proves network reachability, while
 timeouts and TLS certificate failures remain distinct. `codex_apps` is a
 remote ChatGPT MCP, not an Apple-Silicon-only Codex Desktop bridge.
 
-### `claude-copilot [--no-specstory] [claude args...]` — one-off session
+### `claude-copilot [--fast] [--no-specstory] [claude args...]` — one-off session
 
 Layer 1: run a single Claude Code session on the proxy with **zero file
 writes**. Auto-starts the proxy if it isn't answering, then launches `claude`
@@ -343,8 +343,14 @@ project-level settings files — but **not** an active `copilot-here` pin in
   in force for `claude-copilot --resume <id>` and not just for a bare
   `claude-copilot` — the two used to disagree, see
   [`pitfalls/specstory-custom-command-drops-configured-flags.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-custom-command-drops-configured-flags.md).
-  `--no-specstory` deliberately does *not* inherit it (opting out of specstory
-  opts out of its config too).
+  `--no-specstory` still inherits **none of that command** (no alternate binary,
+  resume flag, or extra prompt), but the raw path now asserts the same trusted
+  `--dangerously-skip-permissions` posture itself. An explicit
+  `--permission-mode` / `--permission-prompts` / `--restricted` replaces the
+  repo-seeded bypass. A custom project/user `claude_cmd` is never rewritten:
+  the wrapper appends its default bypass when no alternate mode was requested,
+  while any permission flags already embedded in that custom command remain the
+  command owner's responsibility. This matches the Windows wrapper.
 - Revert = nothing to revert; plain `claude` next time is untouched.
 - Claude Code itself can still write one global key: `/model` + **Enter** saves
   the highlighted custom id to `~/.claude/settings.json`. An EXIT guard removes
@@ -369,19 +375,27 @@ leave a sticky pin behind.
   returns non-zero if the proxy isn't answering.
 - **Prior-pin safe:** if `copilot-here` is already `on` here, the existing pin is
   left in place on exit (nothing is unpinned that you didn't ask for). If that
-  pin has gone **stale** — it differs from what `copilot-here on` would write
-  now, e.g. an unavailable Claude id after the account moved to the OpenAI
-  fallback, or a pin written before the Fable key was added — it prints the
-  drift and asks whether to refresh it in place (`copilot-here on`) or keep it.
+  pin has gone **stale** — it differs from what this launch's
+  `copilot-here on <model>` would write now, e.g. an unavailable Claude id after
+  the account moved to the OpenAI fallback, or a pin written before the Fable key
+  was added — it prints the drift and asks whether to refresh it in place or
+  keep it. `--fast` is resolved *before* that comparison, so a fast pin no longer
+  offers to downgrade itself to the standard sibling; a standard pin instead
+  shows the honest standard → fast upgrade.
   The answer defaults to **keep** (and keeps automatically on a non-interactive
   stdin). Drift is computed by diffing the live file against the exact env block
   `copilot-here on` would merge (`_copilot_env_json`, the single source of truth
   for both), so it is precisely "the keys `on` would change" — no hand-picked
   subset that can silently fall behind. Keys present in the file but not in that
   block are *not* drift: `on` merges and never removes (only `off` removes).
-  `copilot-here status` prints the same drift report.
+  `copilot-here status` prints the global-default form of the same drift report.
+  If a `--fast` refresh is declined, the session's main model still goes fast,
+  but the pinned `ANTHROPIC_DEFAULT_*` role ids remain unchanged because
+  `settings.local.json` outranks process env.
 - The session itself is just `claude-copilot "$@"`, so specstory auto-save,
-  `--no-specstory`, and `-c` (continue) all work the same way.
+  `--no-specstory`, and `-c` (continue) all work the same way. Wrapper flags such
+  as `--fast` must precede Claude arguments; a later token is refused with a
+  correction hint so prompt text containing `--fast` is never consumed.
 - On exit it reminds you the proxy is still up and how to `copilot-proxy stop`.
 
 ### `copilot-run <cmd...>` — generic env injector
@@ -426,9 +440,10 @@ This is a separate picker from Claude Code's `copilot-model --auto`: that path
 remains Claude-first, while only this Codex launcher is OpenAI-first.
 
 - If the caller supplies `-m` / `--model`, that value wins. Otherwise the live
-  raw gateway catalog is ranked as OpenAI/Codex first (`Sol > Terra > GPT-5.5 >
-  GPT-5.4 > GPT-5.3 Codex > Luna > mini`), then Claude, Gemini, and any remaining
-  chat model. Embedding and disabled models are excluded.
+  raw gateway catalog uses the same tier-aware policy as `copilot-model`, but in
+  Codex's vendor order: OpenAI/Codex first, then Claude, grok, Gemini, and any
+  remaining chat model. Embedding, disabled, picker-hidden, and `-fast` main
+  candidates are excluded.
 - The launcher supplies the selected model's live context and prompt limits and
   pins `model_catalog_json` to a versioned cache of `codex debug models
   --bundled`. Codex's global `~/.codex/models_cache.json` is not provider-scoped;
@@ -447,8 +462,10 @@ remains Claude-first, while only this Codex launcher is OpenAI-first.
   Explicit later `-c` arguments can still override either per invocation.
 - When SpecStory is installed, the launcher defaults to `specstory run codex`.
   It preserves the effective `codex_cmd` (project config > user config > bare
-  `codex`) before appending provider/model/user arguments. Use
-  `--no-specstory` for raw Codex.
+  `codex`) before appending provider/model/user arguments. The raw
+  `--no-specstory` path independently asserts the same
+  `--ask-for-approval never --sandbox danger-full-access` posture unless the
+  caller supplied an approval/sandbox policy of their own.
 
 Codex intentionally does not get a `copilot-here` equivalent. Official Codex
 configuration allows project `.codex/config.toml` for trusted project settings,
@@ -508,7 +525,7 @@ so plain `claude` (and `scode`/`svibe` panes, which just run
   backend paired with a proxy-only user model is called out with the cleanup
   command.
 
-### `copilot-model [<id>|-l|-c|--auto]`
+### `copilot-model [<id>|-l|-L|-c|--auto|--why|--json]`
 
 Switches the pinned Copilot model. Requires `jq`. Write target — never the
 committed `.claude/settings.json`:
@@ -535,17 +552,48 @@ Behavior:
 - Validated against the live proxy `/v1/models` (a static discovery list remains
   available for manual picking while offline); typos and ambiguous prefixes are
   rejected. `--auto` never writes from that offline list.
-- `--auto` / `-a` requires a live catalog. It prefers Claude
-  (`Fable > Opus > Sonnet > Haiku`), then ranks OpenAI by capability:
-  `Sol > Terra > GPT-5.5 > GPT-5.4 > GPT-5.3 Codex > Luna > mini`, then Gemini.
-  Luna deliberately follows older flagships because it is the lightweight tier.
-  The Sol/Terra/Luna intent follows OpenAI's
+- `--auto` / `-a` requires a live catalog. It rejects policy-disabled,
+  picker-hidden, embedding-only, and `-fast` entries, then follows the vendor
+  order Claude > OpenAI > grok > Gemini. Inside a vendor it reads Copilot's
+  `model_picker_category` (`powerful > versatile > lightweight`) and compares
+  generations only inside the winning tier. A curated per-vendor allowlist wins
+  on known ids and same-generation siblings; an unknown newer flagship can win
+  without waiting for a dotfiles update. Missing category metadata (an older
+  proxy) degrades to the historical allowlist rather than guessing.
+  Automatic selection also uses the explicitly pinned/persisted current model
+  as an entitlement floor: a candidate's `restricted_to` set must be at least as
+  broad. With no explicit baseline, only the broadest/unrestricted catalog
+  entries are considered. Manual model selection remains unrestricted.
+- OpenAI generation and capability tier are independent: Astra succeeds Sol as
+  the flagship, while Terra and Luna remain on 5.6. Therefore `gpt-6-astra`
+  outranks `gpt-5.6-sol`, but a hypothetical lightweight `gpt-6-luna` would not.
+  The intent follows OpenAI's
   [current model guidance](https://developers.openai.com/api/docs/guides/latest-model).
+  The Copilot catalog currently restricts Astra to `pro_plus` / Business /
+  Enterprise / Max and exposes a 1,000,000-token context with an 872,000-token
+  prompt ceiling (smaller than Sol's 1,050,000 / 922,000); it also starts at
+  `reasoning_effort=low`, with no `none` mode. The backward-compatible
+  offline fallback remains `gpt-5.6-sol[1m]`; that is not an entitlement
+  guarantee — check the live PLANS column with `copilot-model -L`.
+  `restricted_to` is advisory catalog metadata: `--auto` cannot prove the
+  active billing target/organization, so a later entitlement rejection still
+  requires choosing another served model manually.
 - No argument → `fzf` picker. `-c` prints the main model, source layer, and
-  the complete role profile.
-- A local pin writes the complete role set. For an OpenAI profile:
-  Main/Fable/Opus = Sol, Sonnet = Terra, Haiku/background = Luna. Missing tiers
-  fall back to the selected main, never an unserved hard-coded id.
+  complete role profile. `-l` is the pipeable bare-id list; `-L` / `--details`
+  shows the live tier, price category, context/output limits, reasoning range,
+  fast sibling, eligible plan, and picker state. `*` marks the current model and
+  `->` the authoritative automatic pick. Rows are grouped by tier/generation for
+  comparison; their display order does not replace vendor/allowlist policy.
+- `--why` performs a dry-run explanation without writing; `--auto --why` emits
+  the explanation and then writes. `--json` returns the raw live `/v1/models`
+  payload. That HTTP catalog is distinct from the shim's `/_shim/fast-routing`
+  endpoint and from Codex's generated on-disk
+  `~/.cache/copilot-proxy/codex-models/codex-cli_<version>.json`.
+- A local pin writes the complete role set. For the current OpenAI profile:
+  Main/Fable/Opus = Astra (or the selected main), Sonnet = Terra,
+  Haiku/background = Luna. Missing tiers fall back to the selected main, never
+  an unserved hard-coded id. Grok has no static version allowlist; the newest
+  served model in its highest reported tier wins.
 - The global state file stays a backward-compatible one-line main id; wrappers
   derive the live role profile when they inject env. Changes take effect on the
   next `claude` launch and do **not** require restarting the proxy.
@@ -554,6 +602,8 @@ Recommended sequence:
 
 ```sh
 copilot-proxy start
+copilot-model --why        # explain the automatic pick; write nothing
+copilot-model -L            # inspect live tier/price/context/plan metadata
 copilot-model --auto        # save the main model / refresh a live project pin
 copilot-model -c            # inspect main + Fable/Opus/Sonnet/Haiku
 copilot-here on             # sticky project, or use claude-copilot-once

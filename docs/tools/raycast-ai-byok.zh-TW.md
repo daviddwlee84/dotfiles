@@ -235,9 +235,15 @@ metadata 的對應關係：`capabilities.limits.max_context_window_tokens` → `
 `system_message` 在 `/v1/models` 裡沒有對應欄位，而每個 Copilot chat model 都吃得下
 system message，所以固定寫 `true`。
 
-模型依 `_copilot_pick_best_model` 同一套排序輸出（Claude 優先；否則依能力排
-Sol > Terra > 舊旗艦 > Luna > mini，再才是 Gemini；Claude 家族內
-Fable > Opus > Sonnet > Haiku，同分時版本新的在前），並依 `.vendor` 分組加註解。註解用的是
+模型保留與 `_copilot_pick_best_model` 相同的 vendor 分組順序：Claude、Codex、GPT、
+**grok**、Gemini；Claude 內部為 Fable > Opus > Sonnet > Haiku，同分時版本新的在前。
+明確 vendor band 讓檔案易讀；未知 vendor 則依 catalog 的 `model_picker_category`
+（`powerful > versatile > lightweight`）在 fallback band 內互相比較；所有未知 vendor
+仍刻意放在已知 Gemini band 後，維持穩定的 vendor grouping。
+Grok 排在 GPT 後、Gemini 前；GPT/o-series 與 grok band 內也使用同一個 catalog tier，
+避免新版 lightweight id 排到舊版 powerful 之前。Grok 並刻意維持
+`temperature: supported` —— grok 接受
+temperature，不像 reasoning-only 的 GPT/Codex endpoints —— 最後依 `.vendor` 分組加註解。註解用的是
 `/v1/models` 給的原始 vendor 字串，所以 `gpt-5.4` 會落在 `# --- OpenAI ---` 而
 `gpt-5-mini` 落在 `# --- Azure OpenAI ---` —— 那真的是目錄裡寫的，純外觀問題。
 

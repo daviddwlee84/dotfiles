@@ -258,10 +258,16 @@ supported) → `abilities.reasoning_effort`. `system_message` has no counterpart
 `/v1/models`, and every Copilot chat model accepts one, so it is a constant
 `true`.
 
-Models are emitted in the same ranking `_copilot_pick_best_model` uses (Claude
-first; otherwise capability-ranked OpenAI — Sol > Terra > older flagships > Luna
-> mini — then Gemini, with Fable > Opus > Sonnet > Haiku for Claude; ties broken
-newest-version-first) and grouped by `.vendor` with comment headings. Those
+Models preserve the same vendor grouping as `_copilot_pick_best_model`: Claude,
+Codex, GPT, **grok**, then Gemini, with Fable > Opus > Sonnet > Haiku inside
+Claude and newest-version-first tie breaks. The explicit vendor bands keep the
+file easy to scan; an unknown vendor falls into a catalog-derived
+`model_picker_category` sub-band (`powerful > versatile > lightweight`). All
+unknown vendors deliberately remain below the known Gemini band, preserving the
+stable vendor grouping. Grok sits below GPT and above Gemini. Inside the
+GPT/o-series and grok bands, the same catalog tier keeps a newer lightweight id
+below an older powerful one. Grok stays `temperature: supported` deliberately — unlike the reasoning-only GPT/Codex
+endpoints, grok accepts temperature — and is grouped by `.vendor` with comment headings. Those
 headings use the raw vendor string from `/v1/models`, so `gpt-5.4` lands under
 `# --- OpenAI ---` while `gpt-5-mini` lands under `# --- Azure OpenAI ---` —
 that is genuinely what the catalogue says; purely cosmetic.

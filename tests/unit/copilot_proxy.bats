@@ -660,9 +660,11 @@ SH
     _copilot_require_shim() { return 0; }
     _copilot_model_catalog() { printf '%s' '{\"data\":[{\"id\":\"gpt-5.6-sol\",\"capabilities\":{\"limits\":{\"max_prompt_tokens\":922000}}}]}'; }
     copilot-run env | grep -cE '^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=' || true"
-  run bash -c "$body"
+  # The suite itself may be running inside claude-copilot; pin the fixture's
+  # launch model instead of inheriting the outer session's fast/proxy env.
+  run env COPILOT_CLAUDE_MODEL=gpt-5.6-sol COPILOT_PROXY_QUIET=0 bash -c "$body"
   [ "$output" = "0" ]
-  run env COPILOT_PROXY_QUIET=1 bash -c "$body"
+  run env COPILOT_CLAUDE_MODEL=gpt-5.6-sol COPILOT_PROXY_QUIET=1 bash -c "$body"
   [ "$output" = "4" ]
 }
 
@@ -751,6 +753,23 @@ SH
   [ ! -e "$TMP/home/.claude/settings.json" ]
 }
 
+@test "claude-copilot --fast reuses a concrete once resolution" {
+  run bash -c "
+    source '$SHELL_LIB'
+    _copilot_resolved_fast_for_once=gpt-cached-fast
+    _copilot_fast_model_for() { printf called >>'$TMP/resolver-calls'; return 1; }
+    _copilot_claude_launch_model() { printf '%s' gpt-cached-fast; }
+    _copilot_assert_pinned_compact_safe() { return 0; }
+    _copilot_model_guard_begin() { return 0; }
+    _copilot_model_guard_restore() { return 0; }
+    copilot-run() { printf '<%s>' "\$@"; printf '
+'; }
+    claude-copilot --no-specstory --fast"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--model><gpt-cached-fast>"* ]]
+  [ ! -e "$TMP/resolver-calls" ]
+}
+
 @test "claude-copilot --fast falls back to the requested standard model" {
   mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
   printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
@@ -767,6 +786,16 @@ SH
   [ "$(printf '%s\n' "$output" | grep -c '<gpt-explicit>')" -eq 1 ]
 }
 
+@test "claude-copilot --fast refuses end-of-options before model injection" {
+  run bash -c "source '$SHELL_LIB'; claude-copilot --fast -p -- --model-looking-prompt"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--fast cannot be combined with '--'"* ]]
+
+  run bash -c "source '$SHELL_LIB'; claude-copilot --fast --no-specstory --verbose --fast"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"must come before other arguments"* ]]
+}
+
 @test "claude-copilot-once builds its temporary pin for the explicit launch model" {
   mkdir -p "$TMP/proj"
   run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
@@ -778,6 +807,302 @@ SH
   [ "$status" -eq 0 ]
   [[ "$output" == *"pin=on|gpt-5-mini"* ]]
   [[ "$output" == *"pin=off|"* ]]
+}
+
+# --- --fast against an existing pin ---------------------------------------------
+#
+# `--fast` used to be handled ONLY in the not-yet-pinned branch, so a project
+# already pinned to a fast model compared itself against the *global* default and
+# always reported bogus drift ("gpt-5.6-sol-fast[1m] -> gpt-5.6-sol[1m]"), with
+# `y` actively downgrading the pin off fast. The desired model is now computed
+# before the pinned/unpinned split and fed to both.
+
+# Write a pin whose env block is exactly what `copilot-here on $1` would produce.
+write_pin() {
+  mkdir -p "$TMP/proj/.claude"
+  bash -c "source '$SHELL_LIB'
+    _copilot_base() { printf '%s' 'http://localhost:4141'; }
+    _copilot_fast_model_for() { case \"\$1\" in *-fast*) printf '%s' \"\$1\";; *'[1m]') printf '%s-fast[1m]' \"\${1%%'[1m]'}\";; *) printf '%s-fast' \"\$1\";; esac; }
+    _copilot_model_catalog() { printf ''; }
+    jq -n --argjson e \"\$(_copilot_env_json_for_model '$1')\" '{env: \$e}'" \
+    > "$TMP/proj/.claude/settings.local.json"
+}
+
+# The stubs every drift test shares: no network, a deterministic fast sibling,
+# and a global default that is deliberately the NON-fast model.
+drift_env() {
+  cat <<STUBS
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_base() { printf '%s' 'http://localhost:4141'; }
+    _copilot_model_catalog() { printf ''; }
+    _copilot_fast_model_for() { case "\$1" in *-fast*) printf '%s' "\$1";; *'[1m]') printf '%s-fast[1m]' "\${1%%'[1m]'}";; *) printf '%s-fast' "\$1";; esac; }
+    _copilot_default_model() { printf '%s' 'gpt-5.6-sol[1m]'; }
+    _copilot_confirm() { printf 'CONFIRM-ASKED\n'; return 1; }
+    copilot-here() { printf 'pin=%s|%s\n' "\$1" "\$2"; }
+    claude-copilot() { return 0; }
+STUBS
+}
+
+@test "claude-copilot-once --fast does not report drift against its own fast pin" {
+  write_pin 'gpt-5.6-sol-fast[1m]'
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    claude-copilot-once --fast --no-specstory"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"looks stale"* ]]
+  [[ "$output" != *"CONFIRM-ASKED"* ]]
+  [[ "$output" == *"already ON here"* ]]
+}
+
+@test "claude-copilot-once --fast offers the honest upgrade against a standard pin" {
+  write_pin 'gpt-5.6-sol[1m]'
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    _copilot_confirm() { printf 'CONFIRM-ASKED\n'; return 0; }
+    claude-copilot-once --fast --no-specstory"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"looks stale"* ]]
+  [[ "$output" == *"gpt-5.6-sol[1m] -> gpt-5.6-sol-fast[1m]"* ]]
+  # accepting must pin the FAST model, not re-pin the plain default
+  [[ "$output" == *"pin=on|gpt-5.6-sol-fast[1m]"* ]]
+}
+
+@test "claude-copilot-once without --fast still surfaces a stale fast pin" {
+  # Crash residue: there is no EXIT trap by design, so a killed session can leave
+  # a fast pin behind. Without --fast the sol-fast -> sol diff is TRUE, and
+  # accepting it correctly downgrades.
+  write_pin 'gpt-5.6-sol-fast[1m]'
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    _copilot_confirm() { printf 'CONFIRM-ASKED\n'; return 0; }
+    claude-copilot-once --no-specstory"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"looks stale"* ]]
+  [[ "$output" == *"gpt-5.6-sol-fast[1m] -> gpt-5.6-sol[1m]"* ]]
+  [[ "$output" == *"pin=on|"* ]]
+}
+
+@test "claude-copilot-once explains what declining a --fast refresh leaves behind" {
+  write_pin 'gpt-5.6-sol[1m]'
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    claude-copilot-once --fast --no-specstory"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"kept the existing pin"* ]]
+  [[ "$output" == *"ANTHROPIC_DEFAULT_* role models stay on the non-fast ids"* ]]
+}
+
+@test "claude-copilot-once takes --fast only as a leading option" {
+  # A literal --fast inside a prompt string must not pin the fast model, and a
+  # late --fast is refused instead of silently differing from claude-copilot.
+  mkdir -p "$TMP/proj"
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    claude-copilot-once --no-specstory -p 'compare --fast and slow'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pin=on|"* ]]
+  [[ "$output" != *"pin=on|gpt-5.6-sol-fast"* ]]
+  [[ "$output" != *"must come before"* ]]
+
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    claude-copilot-once --no-specstory --resume abc --fast"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"'--fast' must come before other arguments"* ]]
+  [[ "$output" != *"session ended"* ]]
+
+  # After -- it is prompt/data, not the wrapper option.
+  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
+    $(drift_env)
+    claude-copilot-once --no-specstory -p -- --fast"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"must come before"* ]]
+}
+
+# --- permission posture on the raw (--no-specstory) path -------------------------
+#
+# Bypass used to come only from specstory's `claude_cmd`, so --no-specstory
+# silently dropped to ~/.claude/settings.json's defaultMode: same wrapper,
+# opposite permission mode, no warning.
+
+perm_run() {
+  bash -c '''
+    source "$1"; shift
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    copilot-run() { printf "<%s>" "$@"; printf "\n"; }
+    claude-copilot "$@"
+  ''' _ "$SHELL_LIB" "$@"
+}
+
+@test "configured-command bypass scrubber never mutates quoted prompt data" {
+  run bash -c '
+    source "$1"
+    _copilot_claude_drop_bypass_token "$2"
+    _copilot_claude_drop_bypass_token "$3"
+  ' _ "$SHELL_LIB" \
+    'claude --dangerously-skip-permissions' \
+    'claude --append-system-prompt "--dangerously-skip-permissions"'
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "claude" ]
+  [ "${lines[1]}" = 'claude --append-system-prompt "--dangerously-skip-permissions"' ]
+
+  run bash -c 'source "$1"; _copilot_claude_drop_bypass_token "$2"' \
+    _ "$SHELL_LIB" \
+    'claude --append-system-prompt "explain --dangerously-skip-permissions safely" --dangerously-skip-permissions --verbose'
+  [ "$status" -eq 0 ]
+  [ "$output" = 'claude --append-system-prompt "explain --dangerously-skip-permissions safely" --dangerously-skip-permissions --verbose' ]
+}
+
+@test "claude-copilot SpecStory path lets an explicit permission mode replace seeded bypass" {
+  mkdir -p "$TMP/bin" "$TMP/home"
+  printf '#!/bin/sh\n' > "$TMP/bin/specstory"
+  chmod +x "$TMP/bin/specstory"
+  run env HOME="$TMP/home" PATH="$TMP/bin:$PATH" COPILOT_CLAUDE_MODEL=gpt-5.6-sol bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_claude_launch_model() { printf '%s' gpt-5.6-sol; }
+    _copilot_assert_pinned_compact_safe() { return 0; }
+    _copilot_model_guard_begin() { return 0; }
+    _copilot_model_guard_restore() { return 0; }
+    _copilot_specstory_claude_cmd() { printf '%s' 'claude --dangerously-skip-permissions'; }
+    copilot-run() { printf '<%s>' \"\$@\"; printf '\n'; }
+    claude-copilot --permission-mode plan"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--permission-mode"* ]]
+  [[ "$output" != *"--dangerously-skip-permissions"* ]]
+}
+
+@test "claude-copilot SpecStory path asserts bypass for a custom command" {
+  mkdir -p "$TMP/bin" "$TMP/home"
+  printf '#!/bin/sh\n' > "$TMP/bin/specstory"
+  chmod +x "$TMP/bin/specstory"
+  run env HOME="$TMP/home" PATH="$TMP/bin:$PATH" COPILOT_CLAUDE_MODEL=gpt-5.6-sol bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_claude_launch_model() { printf '%s' gpt-5.6-sol; }
+    _copilot_assert_pinned_compact_safe() { return 0; }
+    _copilot_model_guard_begin() { return 0; }
+    _copilot_model_guard_restore() { return 0; }
+    _copilot_specstory_claude_cmd() { printf '%s' 'claude --verbose'; }
+    copilot-run() { printf '<%s>' \"\$@\"; printf '\n'; }
+    claude-copilot --resume session-id"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"claude --verbose --dangerously-skip-permissions"* ]]
+  [[ "$output" == *"--resume"* ]]
+
+  run env HOME="$TMP/home" PATH="$TMP/bin:$PATH" COPILOT_CLAUDE_MODEL=gpt-5.6-sol bash -c "
+    source '$SHELL_LIB'
+    _copilot_alive() { return 0; }
+    _copilot_claude_launch_model() { printf '%s' gpt-5.6-sol; }
+    _copilot_assert_pinned_compact_safe() { return 0; }
+    _copilot_model_guard_begin() { return 0; }
+    _copilot_model_guard_restore() { return 0; }
+    _copilot_specstory_claude_cmd() { printf '%s' 'claude --verbose'; }
+    copilot-run() { printf '<%s>' \"\$@\"; printf '\n'; }
+    claude-copilot"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<-c><claude --verbose --dangerously-skip-permissions>"* ]]
+}
+
+@test "claude-copilot --no-specstory asserts the same permission posture" {
+  run perm_run --no-specstory
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--dangerously-skip-permissions>"* ]]
+}
+
+@test "claude-copilot --no-specstory does not duplicate an explicit bypass" {
+  run perm_run --no-specstory --dangerously-skip-permissions
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | grep -o -- '--dangerously-skip-permissions' | wc -l | tr -d ' ')" = "1" ]
+}
+
+@test "claude-copilot --no-specstory yields to an explicit --permission-mode" {
+  run perm_run --no-specstory --permission-mode plan
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--permission-mode>"* ]]
+  [[ "$output" != *"--dangerously-skip-permissions"* ]]
+}
+
+@test "claude permission detection never treats prompt data as an option" {
+  run perm_run --no-specstory -p -- --permission-mode=plan
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--dangerously-skip-permissions>"* ]]
+
+  run perm_run --no-specstory -p --permission-mode=plan
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--permission-mode=plan>"* ]]
+  [[ "$output" != *"--dangerously-skip-permissions"* ]]
+
+  run perm_run --no-specstory --restricted
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--restricted>"* ]]
+  [[ "$output" != *"--dangerously-skip-permissions"* ]]
+
+  run perm_run --no-specstory --permission-prompts none
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--permission-prompts><none>"* ]]
+  [[ "$output" != *"--dangerously-skip-permissions"* ]]
+
+  run perm_run --no-specstory --allow-dangerously-skip-permissions
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--allow-dangerously-skip-permissions>"* ]]
+  # --allow... enables bypass as a possible mode; it does not select a
+  # different active posture, so the wrapper's bypass default still applies.
+  [[ "$output" == *"<--dangerously-skip-permissions>"* ]]
+}
+
+codex_perm_run() {
+  bash -c '''
+    source "$1"; shift
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf ""; }
+    codex() { printf "<%s>" "$@"; printf "\n"; }
+    command() { if [ "$1" = env ]; then shift 2; codex "$@"; else builtin command "$@"; fi; }
+    codex-copilot "$@"
+  ''' _ "$SHELL_LIB" "$@"
+}
+
+@test "codex-copilot --no-specstory asserts the same approval posture" {
+  run codex_perm_run --no-specstory -m gpt-5.6-sol
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--ask-for-approval><never>"* ]]
+  [[ "$output" == *"<--sandbox><danger-full-access>"* ]]
+}
+
+@test "codex-copilot --no-specstory yields to an explicit approval policy" {
+  run codex_perm_run --no-specstory -m gpt-5.6-sol --ask-for-approval untrusted
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"<never>"* ]]
+  [[ "$output" == *"<untrusted>"* ]]
+}
+
+@test "codex approval and sandbox defaults are independent axes" {
+  run codex_perm_run --no-specstory -m gpt-5.6-sol --sandbox read-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--ask-for-approval><never>"* ]]
+  [[ "$output" == *"<--sandbox><read-only>"* ]]
+  [[ "$output" != *"<danger-full-access>"* ]]
+
+  run codex_perm_run --no-specstory -m gpt-5.6-sol --ask-for-approval untrusted
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--sandbox><danger-full-access>"* ]]
+  [[ "$output" != *"<never>"* ]]
+
+  run codex_perm_run --no-specstory -m gpt-5.6-sol -s read-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<-s><read-only>"* ]]
+  [[ "$output" != *"<danger-full-access>"* ]]
+
+  run codex_perm_run --no-specstory -m gpt-5.6-sol --approve-for-me
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<--approve-for-me>"* ]]
+  [[ "$output" != *"<never>"* ]]
+  [[ "$output" != *"<danger-full-access>"* ]]
 }
 
 @test "copilot-here off cleans stale user model even when no local pin exists" {
@@ -820,7 +1145,8 @@ SH
   printf '%s\n' '{"plansDirectory":"./.claude/plans"}' > "$TMP/proj/.claude/settings.json"
   printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
 
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" \
+    ANTHROPIC_BASE_URL= ANTHROPIC_AUTH_TOKEN= ANTHROPIC_MODEL= COPILOT_CLAUDE_MODEL= bash -c "
     cd '$TMP/proj'
     source '$SHELL_LIB'
     copilot-here status"
@@ -839,7 +1165,8 @@ SH
   printf '%s\n' '{"model":"gpt-test"}' > "$TMP/home/.claude/settings.json"
   printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
 
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
+  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" \
+    ANTHROPIC_BASE_URL= ANTHROPIC_AUTH_TOKEN= ANTHROPIC_MODEL= COPILOT_CLAUDE_MODEL= bash -c "
     cd '$TMP/proj'
     source '$SHELL_LIB'
     _copilot_claude_launch_report"
@@ -1226,18 +1553,351 @@ JS
   [ "$(jq -r '.env.ANTHROPIC_BASE_URL' "$TMP/proj/.claude/settings.local.json")" = "http://localhost:4142" ]
 }
 
-@test "pick_best_model: Sol is the strongest OpenAI fallback" {
+@test "pick_best_model: Sol is the strongest OpenAI fallback (offline, no catalog)" {
   run bash -c "printf '%s\n' gpt-5.3-codex gpt-5.6-luna gpt-5.5 gpt-5.6-terra gpt-5.6-sol \
     | { source '$SHELL_LIB'; _copilot_pick_best_model; }"
   [ "$status" -eq 0 ]
   [ "$output" = "gpt-5.6-sol" ]
 }
 
-@test "pick_best_model: old flagships outrank lightweight Luna" {
+@test "pick_best_model: old flagships outrank lightweight Luna (offline, no catalog)" {
   run bash -c "printf '%s\n' gpt-5.6-luna gpt-5.4-mini gpt-5.3-codex gpt-5.4 gpt-5.5 \
     | { source '$SHELL_LIB'; _copilot_pick_best_model; }"
   [ "$status" -eq 0 ]
   [ "$output" = "gpt-5.5" ]
+}
+
+# --- capability-tier ranking ---------------------------------------------------
+#
+# The catalog's `model_picker_category` is Copilot's own tier taxonomy and lines
+# up with OpenAI's DURABLE tiers (Sol/Astra = powerful, Terra = versatile, Luna =
+# lightweight). Generation and tier advance independently — gpt-6-astra is the
+# gen-6 flagship while Terra and Luna stayed on 5.6 — so ranking on the version
+# alone would promote a future gpt-6-luna over gpt-5.6-sol. These tests pin that
+# down; `tier_cat` below builds a catalog of `id:category` pairs.
+
+tier_cat() {
+  local first=1 pair id cat
+  printf '{"data":['
+  for pair in "$@"; do
+    id="${pair%%:*}"; cat="${pair#*:}"
+    [ $first -eq 1 ] || printf ','
+    first=0
+    printf '{"id":"%s","model_picker_category":"%s","capabilities":{"type":"chat"}}' "$id" "$cat"
+  done
+  printf ']}'
+}
+
+# Rank a catalog through the real ranker, feeding it its own selectable ids.
+tier_rank() {
+  local fn="$1"; shift
+  local cat; cat="$(tier_cat "$@")"
+  bash -c "source '$SHELL_LIB'
+    cat='$cat'
+    printf '%s\n' \"\$(printf '%s' \"\$cat\" | _copilot_selectable_ids)\" | $fn \"\$cat\""
+}
+
+@test "tier ranking: a newer flagship wins even before it reaches the allowlist" {
+  # gpt-7-helios stands in for "the next family we have not curated yet".
+  run tier_rank _copilot_pick_best_model \
+    gpt-7-helios:powerful gpt-6-astra:powerful gpt-5.6-sol:powerful gpt-5.6-terra:versatile
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-7-helios" ]
+}
+
+@test "tier ranking: gpt-6-astra is picked over gpt-5.6-sol" {
+  run tier_rank _copilot_pick_best_model \
+    gpt-6-astra:powerful gpt-5.6-sol:powerful gpt-5.6-terra:versatile gpt-5.6-luna:lightweight
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra" ]
+}
+
+@test "tier ranking: a newer LIGHTWEIGHT never displaces a served flagship" {
+  # The regression that a version-only pre-pass would cause. gpt-6-luna is
+  # newer than gpt-5.6-sol but a whole tier below it.
+  run tier_rank _copilot_pick_best_model gpt-6-luna:lightweight gpt-5.6-sol:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "tier ranking: a newer VERSATILE never displaces a served flagship" {
+  run tier_rank _copilot_pick_best_model gpt-6-terra:versatile gpt-5.6-sol:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "tier ranking: an unknown same-generation sibling loses to the curated pick" {
+  # gpt-6-nova sorts after gpt-6-astra under `sort -V` purely on its codename,
+  # so the pre-pass must compare GENERATIONS, not ids.
+  run tier_rank _copilot_pick_best_model \
+    gpt-6-nova:powerful gpt-6-astra:powerful gpt-5.6-sol:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra" ]
+}
+
+@test "tier ranking: a -fast sibling is never selected as the main model" {
+  # gpt-5.6-sol-fast is picker-enabled AND inherits `powerful`, so only the
+  # explicit -fast exclusion keeps it out. --fast is a separate, session axis.
+  run tier_rank _copilot_pick_best_model gpt-5.6-sol-fast:powerful gpt-5.6-sol:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "tier ranking: partial category coverage degrades instead of promoting a lower tier" {
+  # Sol deliberately lacks category metadata while the hypothetical newer Luna
+  # has it. The pre-pass must stand down; partial metadata is not evidence that
+  # Luna is the best model in the vendor.
+  run tier_rank _copilot_pick_best_model gpt-7-luna:lightweight gpt-5.6-sol:
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "tier ranking: generation comes from the model slot, not any later number" {
+  run tier_rank _copilot_pick_best_model gpt-oss-120b:powerful gpt-6-astra:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra" ]
+}
+
+@test "tier ranking: generation precedes Claude family spelling inside one tier" {
+  run tier_rank _copilot_pick_best_model \
+    claude-fable-6:powerful claude-opus-5:powerful claude-fable-5:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "claude-fable-6" ]
+}
+
+@test "tier prepass ignores newer known models from a lower tier" {
+  cat_json="$(tier_cat gpt-7-helios:powerful gpt-5-legacy:powerful gpt-8-luna:lightweight)"
+  run env TEST_CATALOG="$cat_json" bash -c "source '$SHELL_LIB'
+    models=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_selectable_ids)
+    rows=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_tier_rows | _copilot_tier_rows_for_ids \"\$models\")
+    _copilot_tier_prepass '^gpt-' \"\$rows\" \"\$models\" gpt-8-luna gpt-5-legacy"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-7-helios" ]
+}
+
+@test "tier ranking: a catalog without the category degrades to the allowlist" {
+  # An older fork that does not report model_picker_category must leave the
+  # historical ranker untouched rather than guessing.
+  run tier_rank _copilot_pick_best_model gpt-6-astra: gpt-5.6-sol: gpt-5.6-terra:
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra" ]   # from the allowlist head, not the pre-pass
+}
+
+@test "tier ranking: Claude keeps Opus when only a newer lower tier appears" {
+  run tier_rank _copilot_pick_best_model \
+    claude-haiku-6:lightweight claude-opus-5:powerful claude-sonnet-5:versatile
+  [ "$status" -eq 0 ]
+  [ "$output" = "claude-opus-5" ]
+}
+
+@test "tier ranking: Grok fallback prefers a parsed generation over lexical code names" {
+  cat_json='{"data":[
+    {"id":"grok-code-fast-1","capabilities":{"type":"chat"}},
+    {"id":"grok-4.6","capabilities":{"type":"chat"}}]}'
+  run env TEST_CATALOG="$cat_json" bash -c "source '$SHELL_LIB'
+    printf '%s' \"\$TEST_CATALOG\" | _copilot_selectable_ids \\
+      | _copilot_pick_best_model \"\$TEST_CATALOG\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "grok-4.6" ]
+}
+
+@test "tier ranking: grok is selected with no allowlist, newest version first" {
+  run tier_rank _copilot_pick_best_model grok-4.5:versatile grok-4.6:versatile
+  [ "$status" -eq 0 ]
+  [ "$output" = "grok-4.6" ]
+}
+
+@test "Raycast rank keeps lightweight new ids below powerful older ids" {
+  raycast_lib="$SOURCE_DIR/dot_config/shell/45_copilot_raycast.sh"
+  run bash -c '
+    source "$1"
+    printf "%s %s %s %s" \
+      "$(_copilot_raycast_rank gpt-5.6-sol powerful)" \
+      "$(_copilot_raycast_rank gpt-6-luna lightweight)" \
+      "$(_copilot_raycast_rank grok-5 powerful)" \
+      "$(_copilot_raycast_rank grok-6-lite lightweight)"
+  ' _ "$raycast_lib"
+  [ "$status" -eq 0 ]
+  [ "$output" = "39 34 32 29" ]
+
+  run bash -c 'source "$1"; printf "%s %s" "$(_copilot_raycast_rank claude-fable-5 powerful)" "$(_copilot_raycast_rank claude-haiku-4-5 lightweight)"' _ "$raycast_lib"
+  [ "$status" -eq 0 ]
+  [ "$output" = "60 57" ]
+
+  run bash -c 'source "$1"; _copilot_raycast_temp o5' _ "$raycast_lib"
+  [ "$status" -eq 0 ]
+  [ "$output" = "false" ]
+}
+
+@test "tier ranking: o-series reasoning models stay in the OpenAI arm" {
+  run tier_rank _copilot_pick_best_model o4:powerful gemini-10-pro:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "o4" ]
+
+  run tier_rank _copilot_codex_pick_best_model o4:powerful claude-opus-5:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "o4" ]
+}
+
+@test "tier ranking: grok outranks Gemini but loses to OpenAI" {
+  run tier_rank _copilot_pick_best_model \
+    grok-4.6:versatile gemini-3.8-flash:versatile
+  [ "$status" -eq 0 ]
+  [ "$output" = "grok-4.6" ]
+
+  run tier_rank _copilot_pick_best_model \
+    grok-4.6:versatile gpt-5.6-sol:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "tier ranking: Gemini and remaining vendors honor catalog tier before version" {
+  # A newer lightweight must not beat an older powerful model in the same vendor.
+  run tier_rank _copilot_pick_best_model \
+    gemini-10-flash:lightweight gemini-9-pro:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gemini-9-pro" ]
+
+  run tier_rank _copilot_pick_best_model \
+    mai-code-2.0-flash:lightweight mai-code-1.1:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "mai-code-1.1" ]
+}
+
+@test "tier ranking: a sole -fast id is rejected instead of re-entering a lexical fallback" {
+  run tier_rank _copilot_pick_best_model gpt-5.6-sol-fast:powerful
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+
+  run tier_rank _copilot_codex_pick_best_model gpt-5.6-sol-fast:powerful
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "tier ranking: the Codex ranker keeps OpenAI first and grok before Gemini" {
+  run tier_rank _copilot_codex_pick_best_model \
+    claude-opus-5:powerful gpt-5.6-sol:powerful
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+
+  run tier_rank _copilot_codex_pick_best_model \
+    claude-opus-5:powerful grok-4.6:versatile
+  [ "$status" -eq 0 ]
+  [ "$output" = "claude-opus-5" ]
+
+  run tier_rank _copilot_codex_pick_best_model \
+    grok-4.6:versatile gemini-3.8-flash:versatile
+  [ "$status" -eq 0 ]
+  [ "$output" = "grok-4.6" ]
+}
+
+@test "tier ranking never widens beyond the candidate ids on stdin" {
+  cat_json="$(tier_cat gpt-7-helios:powerful gpt-5.6-sol:powerful)"
+  run env TEST_CATALOG="$cat_json" bash -c "source '$SHELL_LIB'
+    printf '%s\n' gpt-5.6-sol | _copilot_pick_best_model \"\$TEST_CATALOG\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol" ]
+}
+
+@test "claude model argument parser ignores only explicit prompt data" {
+  run bash -c "source '$SHELL_LIB'
+    printf '<%s>\n' \"\$(_copilot_claude_model_arg -p -- --model=gpt-prompt)\"
+    printf '<%s>\n' \"\$(_copilot_claude_model_arg -p hello --model gpt-real)\"
+    printf '<%s>\n' \"\$(_copilot_claude_model_arg -p --model gpt-option)\""
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "<>" ]
+  [ "${lines[1]}" = "<gpt-real>" ]
+  [ "${lines[2]}" = "<gpt-option>" ]
+}
+
+@test "model_version: generation parsing survives every vendor's spelling" {
+  run bash -c "source '$SHELL_LIB'
+    for m in gpt-6-astra gpt-6-nova gpt-5.6-sol claude-opus-4-8 claude-opus-5 grok-4.6 mai-code-1.1-flash; do
+      printf '%s=%s ' \"\$m\" \"\$(_copilot_model_version \"\$m\")\"
+    done"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra=6 gpt-6-nova=6 gpt-5.6-sol=5.6 claude-opus-4-8=4.8 claude-opus-5=5 grok-4.6=4.6 mai-code-1.1-flash=1.1 " ]
+}
+
+@test "entitlement baseline falls through a base-only partial project pin" {
+  mkdir -p "$TMP/proj/.claude" "$TMP/state/copilot-proxy"
+  printf '%s\n' '{"env":{"ANTHROPIC_BASE_URL":"http://localhost:4142"}}' \
+    > "$TMP/proj/.claude/settings.local.json"
+  printf '%s\n' 'gpt-state' > "$TMP/state/copilot-proxy/model"
+  run env XDG_STATE_HOME="$TMP/state" COPILOT_CLAUDE_MODEL=gpt-env bash -c "
+    cd '$TMP/proj'; source '$SHELL_LIB'; _copilot_entitlement_baseline_model"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-env" ]
+}
+
+@test "auto candidates never narrow the persisted model's advertised plan set" {
+  catalog='{"data":[
+    {"id":"gpt-6-astra","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5.6-sol","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5.6-terra","billing":{"restricted_to":["pro","pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5.6-luna","billing":{"restricted_to":["free","edu","pro","pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5-mini","capabilities":{"type":"chat"}}]}'
+
+  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids gpt-5.6-terra"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"gpt-6-astra"* ]]
+  [[ "$output" != *"gpt-5.6-sol"* ]]
+  [[ "$output" == *"gpt-5.6-terra"* ]]
+
+  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    ids=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids gpt-5.6-sol)
+    printf '%s\\n' \"\$ids\" | _copilot_pick_best_model \"\$TEST_CATALOG\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra" ]
+
+  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    ids=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids '')
+    printf '%s\\n' \"\$ids\" | _copilot_pick_best_model \"\$TEST_CATALOG\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-luna" ]
+}
+
+@test "auto candidates use a fast sibling as the entitlement baseline" {
+  catalog='{"data":[
+    {"id":"gpt-6-astra","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5.6-sol","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5.6-sol-fast","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
+    {"id":"gpt-5.6-luna","billing":{"restricted_to":["free","pro","pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}}]}'
+  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
+    ids=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids gpt-5.6-sol-fast)
+    printf '%s\\n' \"\$ids\" | _copilot_pick_best_model \"\$TEST_CATALOG\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-6-astra" ]
+}
+
+@test "selectable_ids drops embeddings, disabled policy and picker-hidden models" {
+  cat_json='{"data":[
+    {"id":"gpt-5.6-sol","capabilities":{"type":"chat"}},
+    {"id":"text-embedding-3-small","capabilities":{"type":"embeddings"}},
+    {"id":"gpt-blocked","capabilities":{"type":"chat"},"policy":{"state":"disabled"}},
+    {"id":"gpt-hidden","capabilities":{"type":"chat"},"model_picker_enabled":false}]}'
+  run bash -c "source '$SHELL_LIB'; printf '%s' '$cat_json' | _copilot_selectable_ids | tr '\n' ' '"
+  [ "$status" -eq 0 ]
+  [ "$output" = "gpt-5.6-sol " ]
+}
+
+@test "model profile: grok roles are derived from the tier rows" {
+  cat_json="$(tier_cat grok-4.6:versatile grok-3-mini:lightweight)"
+  run bash -c "source '$SHELL_LIB'; _copilot_model_profile_json 'grok-4.6' '$cat_json' | jq -r '.sonnet + \" \" + .haiku'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "grok-4.6 grok-3-mini" ]
+}
+
+@test "model profile: Grok fast sibling does not invalidate complete role tiers" {
+  cat_json='{"data":[
+    {"id":"grok-4.6","model_picker_category":"versatile","capabilities":{"type":"chat"}},
+    {"id":"grok-4.6-fast","model_picker_category":"versatile","capabilities":{"type":"chat"}},
+    {"id":"grok-3-mini","model_picker_category":"lightweight","capabilities":{"type":"chat"}}]}'
+  run env TEST_CATALOG="$cat_json" bash -c "source '$SHELL_LIB'
+    _copilot_model_profile_json grok-4.6 \"\$TEST_CATALOG\" | jq -r '.sonnet + \" \" + .haiku'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "grok-4.6 grok-3-mini" ]
 }
 
 @test "model_for_claude: context metadata controls the [1m] hint" {
@@ -1282,6 +1942,18 @@ JS
   [ "$output" = "gpt-5.5[1m]" ]
 }
 
+@test "model profile: Claude fallback uses version sort for 4-10" {
+  cat_json='{"data":[
+    {"id":"claude-fable-5","capabilities":{"type":"chat"}},
+    {"id":"claude-fable-6","capabilities":{"type":"chat"}},
+    {"id":"claude-opus-4-9","capabilities":{"type":"chat"}},
+    {"id":"claude-opus-4-10","capabilities":{"type":"chat"}}]}'
+  run env TEST_CATALOG="$cat_json" bash -c "source '$SHELL_LIB'
+    _copilot_model_profile_json claude-fable-6 \"\$TEST_CATALOG\" | jq -r .opus"
+  [ "$status" -eq 0 ]
+  [ "$output" = "claude-opus-4-10" ]
+}
+
 @test "model profile: native Claude roles use their strongest served families" {
   local catalog='{"data":[{"id":"claude-fable-5","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"claude-opus-5","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"claude-sonnet-5","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"claude-haiku-4-5","capabilities":{"limits":{"max_context_window_tokens":200000}}}]}'
   run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'
@@ -1299,12 +1971,125 @@ JS
   [ "$output" = "gpt-5.6-sol[1m]|gpt-5.6-sol[1m]|gpt-5.6-terra[1m]|gpt-5.6-luna|gpt-5.6-luna|922000|unset" ]
 }
 
+# --- copilot-model metadata surfacing -------------------------------------------
+#
+# `-l` flattens the catalog to bare ids, which threw away exactly the fields the
+# tier ranker now depends on — so there was no way to audit what --auto chose.
+
+details_catalog() {
+  cat <<'JSON'
+{"data":[
+ {"id":"gpt-6-astra","model_picker_category":"powerful","model_picker_price_category":"very_high",
+  "billing":{"restricted_to":["pro_plus","max"]},
+  "capabilities":{"type":"chat","limits":{"max_context_window_tokens":1000000,"max_output_tokens":128000},
+  "supports":{"reasoning_effort":["low","medium","high","max"]}}},
+ {"id":"gpt-5.6-sol","model_picker_category":"powerful","model_picker_price_category":"high",
+  "capabilities":{"type":"chat","limits":{"max_context_window_tokens":1050000,"max_output_tokens":128000},
+  "supports":{"reasoning_effort":["none","max"]}}},
+ {"id":"gpt-5.6-luna","model_picker_category":"lightweight","model_picker_price_category":"low",
+  "capabilities":{"type":"chat","limits":{"max_context_window_tokens":1050000,"max_output_tokens":128000}}},
+ {"id":"text-embedding-3-small","capabilities":{"type":"embeddings"},"model_picker_enabled":false}]}
+JSON
+}
+
+@test "copilot-model --details renders the tier table and marks the --auto pick" {
+  run bash -c "cd '$TMP'; source '$SHELL_LIB'
+    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
+    _copilot_fast_routing_json() { printf '%s' '{"mappings":{}}'; }
+    copilot-model --details"
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == *"TIER"*"PRICE"*"CTX"*"PLANS"*"STATE"* ]]
+  # tier order, newest generation first inside the tier
+  [[ "${lines[1]}" == *"gpt-6-astra"*"powerful"*"very_high"*"1000k"*"pro_plus+"* ]]
+  [[ "${lines[1]}" == "->"* ]]
+  [[ "${lines[2]}" == *"gpt-5.6-sol"*"powerful"* ]]
+  [[ "${lines[3]}" == *"gpt-5.6-luna"*"lightweight"* ]]
+  # embeddings are LISTED (diagnostics show everything) but flagged
+  [[ "$output" == *"text-embedding-3-small"*"nopick"* ]]
+}
+
+@test "copilot-model --why explains the pick and writes nothing" {
+  mkdir -p "$TMP/state/copilot-proxy"
+  printf '%s\n' 'gpt-5.4[1m]' > "$TMP/state/copilot-proxy/model"
+  run env XDG_STATE_HOME="$TMP/state" bash -c "cd '$TMP'; source '$SHELL_LIB'
+    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
+    copilot-model --why"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"dry run, nothing written"* ]]
+  [[ "$output" == *"gpt-6-astra"* ]]
+  # the state file must be untouched
+  [ "$(cat "$TMP/state/copilot-proxy/model")" = "gpt-5.4[1m]" ]
+}
+
+@test "copilot-model --auto --why explains and then writes" {
+  mkdir -p "$TMP/state/copilot-proxy"
+  printf '%s\n' 'gpt-5.4[1m]' > "$TMP/state/copilot-proxy/model"
+  run env XDG_STATE_HOME="$TMP/state" bash -c "cd '$TMP'; source '$SHELL_LIB'
+    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
+    copilot-model --auto --why"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"copilot-model: --auto reasoning"* ]]
+  [[ "$output" != *"dry run, nothing written"* ]]
+  [ "$(cat "$TMP/state/copilot-proxy/model")" = "gpt-6-astra[1m]" ]
+}
+
+@test "copilot-model --json passes the catalog through" {
+  run bash -c "cd '$TMP'; source '$SHELL_LIB'
+    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
+    copilot-model --json | jq -r '.data | length'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "4" ]
+}
+
+@test "copilot-model --why fails cleanly when every catalog entry is vetoed" {
+  vetoed='{"data":[
+    {"id":"gpt-disabled","policy":{"state":"disabled"},"capabilities":{"type":"chat"}},
+    {"id":"gpt-hidden","model_picker_enabled":false,"capabilities":{"type":"chat"}},
+    {"id":"text-embedding-3-small","capabilities":{"type":"embeddings"}}]}'
+  run env TEST_CATALOG="$vetoed" bash -c "cd '$TMP'; source '$SHELL_LIB'
+    _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+    copilot-model --why"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"found no selectable chat model"* ]]
+  [[ "$output" != *"  -> "* ]]
+}
+
+@test "copilot-model metadata flags reject malformed JSON and accept numeric strings" {
+  for flag in --details --json --why --auto; do
+    run env TEST_CATALOG='<html>gateway error</html>' bash -c "cd '$TMP'; source '$SHELL_LIB'
+      _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+      copilot-model $flag"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"valid"*"catalog"* || "$output" == *"reachable proxy"* ]]
+  done
+
+  string_limits='{"data":[{"id":"gpt-6-astra","model_picker_category":"powerful",
+    "capabilities":{"type":"chat","limits":{"max_context_window_tokens":"1000000","max_output_tokens":"128000"}}}]}'
+  run env TEST_CATALOG="$string_limits" bash -c "cd '$TMP'; source '$SHELL_LIB'
+    _copilot_model_catalog() { printf '%s' \"\$TEST_CATALOG\"; }
+    _copilot_fast_routing_json() { printf '%s' '{\"mappings\":{}}'; }
+    copilot-model --details"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"1000k"*"128k"* ]]
+}
+
+@test "copilot-model metadata flags fail cleanly without a proxy" {
+  local flag
+  for flag in --details --json --why; do
+    run bash -c "cd '$TMP'; source '$SHELL_LIB'
+      _copilot_model_catalog() { printf ''; }
+      copilot-model $flag"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"needs a reachable proxy"* ]]
+  done
+}
+
 @test "copilot-model --auto: refuses an offline static fallback" {
   run bash -c "cd '$TMP'; export XDG_STATE_HOME='$TMP/state'; source '$SHELL_LIB'
     _copilot_model_catalog() { return 1; }
     copilot-model --auto"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"needs a reachable proxy and live /v1/models catalog"* ]]
+  [[ "$output" == *"needs a reachable proxy and valid /v1/models catalog"* ]]
   [ ! -f "$TMP/state/copilot-proxy/model" ]
 }
 

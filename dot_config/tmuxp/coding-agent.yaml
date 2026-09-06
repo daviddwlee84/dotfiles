@@ -1,6 +1,6 @@
 # Coding agent workspace layout
 #
-# Window 1 "editor": nvim (75%) | specstory run (25%) -- 3:1 ratio
+# Window 1 "editor": nvim (75%) | specstory run claude (25%) -- 3:1 ratio
 # Window 2 "monitor": btop for system monitoring
 #
 # ── Usage ────────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ windows:
       main-pane-width: 75%
     panes:
       - shell_command: nvim
-      - shell_command: specstory run
+      - shell_command: specstory run claude
 
   - window_name: monitor
     panes:

@@ -103,7 +103,8 @@ opener was a second, easily-missed site:
 
 ```sh
 grep -rn 'specstory run\( \|$\)' --include='*.sh' --include='*.tmpl' \
-  --include='*.toml' --include='*.py' dot_config/ dot_dotfiles/ scripts/ \
+  --include='*.toml' --include='*.py' --include='*.yaml' --include='*.yml' \
+  --include='*.kdl' dot_config/ dot_dotfiles/ scripts/ \
   | grep -vE 'specstory run [a-z]'
 ```
 
