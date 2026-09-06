@@ -444,11 +444,10 @@ fi
 if [ -z "$plist" ]; then
   echo "[No plist found for $label — Press Enter]"; read -r _; exit 0
 fi
-sudo_prefix=""
 case "$plist" in
-  /Library/*|/System/*) sudo_prefix="sudo " ;;
+  /Library/*|/System/*) env SUDO_EDITOR="${EDITOR:-vi}" sudoedit "$plist" ;;
+  *) "${EDITOR:-vi}" "$plist" ;;
 esac
-$sudo_prefix "${EDITOR:-vi}" "$plist"
 '''
 mode = "execute"
 

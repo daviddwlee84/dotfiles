@@ -164,7 +164,7 @@ mode = "execute"
 [actions.edit_sshd_config]
 description = "Edit /etc/ssh/sshd_config in $EDITOR"
 command = """
-sudo "${EDITOR:-vi}" /etc/ssh/sshd_config
+env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/ssh/sshd_config
 """
 mode = "execute"
 

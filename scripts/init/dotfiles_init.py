@@ -516,6 +516,13 @@ PROMPTS: tuple[Prompt, ...] = (
                     "Bash side ships with oh-my-bash + ble.sh for a UX close to zsh; on macOS\n"
                     "the bash role also brew-installs bash 5.x (system bash 3.2 is too old for\n"
                     "OMB plugins) when bash is selected. See docs/shells/bash.md.")),
+    Prompt("preferredEditor", "choice", "Preferences",
+           "Default external editor",
+           "Independent of shell Vim mode. micro uses familiar non-modal keys; code/cursor wait for the file to close. Change later with editorcfg.",
+           default="nvim",
+           prompt_text="Preferred external editor (nvim|micro|vim|nano|code|cursor)",
+           choices=("nvim", "micro", "vim", "nano", "code", "cursor"),
+           comment="External editor preference; independent of enableVimMode. Local editorcfg choices override this default."),
     Prompt("enableVimMode", "bool", "Preferences",
            "Vim mode in shells & tmux",
            "zsh-vi-mode plugin, bash `set -o vi`, ble.sh vi_imap/vi_nmap, tmux mode-keys vi, vim-tmux-navigator C-h/j/k/l. Does NOT touch Neovim or editor configs (VSCode/Cursor/Codex/OpenCode). Full catalog: docs/this_repo/vim-mode.md.",

@@ -1,5 +1,7 @@
 # 自訂別名與 Shell 函式
 
+`editorcfg`（status/list/use/reset/doctor）與 `dotfiles-editor` 是受管 executable；`09_editor.sh` 設定 EDITOR／VISUAL。`v` 仍直接使用 Neovim。見 [編輯器選擇](../tools/editor.zh-TW.md)。
+
 本 dotfiles repo 中所定義的自訂別名 (alias) 與 shell 函式 (function) 的快速參考。
 
 !!! note "Terminology rule (zh-TW pages)"

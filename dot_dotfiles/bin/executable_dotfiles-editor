@@ -1,0 +1,4 @@
+#!/bin/sh
+# shellcheck disable=SC1091
+. "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/editor.sh" || exit 2
+editorcfg_launch "$@"

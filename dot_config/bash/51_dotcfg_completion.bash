@@ -17,7 +17,7 @@ installPythonUvTools installJsCliTools installDotnetTools installAuditd \
 installIacTools installMediaTools installBitwarden installBrewApps \
 installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools \
 useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot \
-motdStyle primaryShell enableVimMode"
+motdStyle primaryShell preferredEditor enableVimMode"
 
     if [[ "$cur" == -* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

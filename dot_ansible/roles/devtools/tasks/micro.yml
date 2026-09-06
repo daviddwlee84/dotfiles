@@ -1,0 +1,30 @@
+---
+- name: Install Micro (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: micro
+    state: present
+
+- name: Install Micro (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: micro
+    state: present
+
+- name: Check Micro availability (Linux)
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  ansible.builtin.shell: command -v micro
+  register: micro_available
+  changed_when: false
+  failed_when: false
+
+- name: Install verified Micro release at user level (Linux fallback)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - micro_available.rc != 0
+  ansible.builtin.script: install-micro.sh
+  args:
+    executable: /bin/sh
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/micro"

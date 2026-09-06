@@ -463,6 +463,10 @@ upgrade-flatpak:
 upgrade-warp:
     ./scripts/upgrade_tools.sh warp
 
+# Verified user-level Linux Micro releases only; brew/apt use their own upgrades.
+upgrade-micro:
+    ./scripts/upgrade_tools.sh micro
+
 # Linux-only: `atuin update` (re-runs setup.atuin.sh on failure). macOS atuin is in upgrade-brew.
 upgrade-atuin:
     ./scripts/upgrade_tools.sh atuin

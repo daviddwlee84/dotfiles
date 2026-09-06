@@ -32,7 +32,7 @@ image_bound = [ 30000, 30000 ]
 rules = [
   # 目錄：提供多種 opener 給 O 選
   # Note: Use url = "*/" for directories (recommended), not mime = "inode/directory"
-  { url = "*/", use = ["edit", "git", "marimo_dir", "agent", "open"] },
+  { url = "*/", use = ["nvim_dir", "git", "marimo_dir", "agent", "open"] },
 
   # Python 檔：提供 marimo sandbox
   { url = "*.py", use = ["edit", "marimo_py_sandbox", "open", "code"] },
@@ -49,8 +49,11 @@ rules = [
 # -----------------------
 [opener]
 
-# --- edit：nvim，會把 cwd 切到目標（dir）或檔案所在資料夾（file）
+# Text files follow editorcfg; directory browsing remains an explicit nvim action.
 edit = [
+  { run = '"${EDITOR:-dotfiles-editor}" %s', block = true, desc = "Preferred editor" },
+]
+nvim_dir = [
   { run = """sh -lc '
 t="$1"
 if [ -d "$t" ]; then

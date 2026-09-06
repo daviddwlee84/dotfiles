@@ -24,6 +24,11 @@ Three side-effects worth knowing about:
 
 ## Entry points
 
+Micro: Homebrew uses `just upgrade-brew`, apt uses a targeted OS package upgrade,
+and the verified Linux user-level fallback uses `just upgrade-micro` (category
+`micro`, included in `all`). The latter requires an installer receipt and an
+active PATH match; it never overwrites a package-managed binary.
+
 ```bash
 just upgrade-all          # externals → brew → mise → uv → npm → cargo → go → dotnet → gem → flatpak → warp → agents → plugins
 just upgrade-dry-run      # same, but commands are printed, not executed
@@ -47,6 +52,7 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 
 | Category | What actually happens |
 | --- | --- |
+| `micro` | Upgrades only the active, receipt-backed Linux release in `~/.local/bin` using the official archive checksum; otherwise skips. Brew/apt installs stay with their package manager. Runs after `herdr` and before `agents`. |
 | `externals` | `chezmoi upgrade` (the chezmoi binary itself) + `chezmoi apply --refresh-externals` (force-refresh the 168h externals: oh-my-zsh, TPM, pi-agents, toolkami.rb, fzf). First because a chezmoi version bump may change how later steps behave. |
 | `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile` *without* `--no-upgrade` → `Brewfile.{darwin,linux}` → `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) so cask pkg installers that shell out to `sudo /usr/sbin/installer` find a live ticket. |
 | `mise` | `mise self-update --yes` + `mise upgrade` (honours the version constraints in `~/.config/mise/config.toml`). `self-update` warns, rather than fails, when mise was installed via brew/apt. |
@@ -80,7 +86,8 @@ flowchart LR
     flatpak["flatpak<br/>(--user update)"] --> warp
     warp["warp<br/>(Linux apt-only)"] --> atuin
     atuin["atuin<br/>(brew or setup.atuin.sh)"] --> herdr
-    herdr["herdr<br/>(update --handoff, self-managed)"] --> agents
+    herdr["herdr<br/>(update --handoff, self-managed)"] --> micro
+    micro["micro<br/>(verified user-level Linux release)"] --> agents
     agents["agents<br/>(self-update + installer fallbacks)"] --> plugins
     plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> yazi_plugins
     yazi_plugins["yazi-plugins<br/>(ya pkg upgrade)"] --> summary((Summary))

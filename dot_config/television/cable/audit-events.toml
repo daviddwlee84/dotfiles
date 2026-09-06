@@ -128,7 +128,8 @@ mode = "execute"
 description = "Edit /etc/audit/rules.d/ in $EDITOR"
 command = """
 if [ -d /etc/audit/rules.d ]; then
-  exec sudo "${EDITOR:-vi}" /etc/audit/rules.d
+  rule=$(find /etc/audit/rules.d -maxdepth 1 -type f -name '*.rules' | fzf --prompt='Audit rule > ')
+  [ -n "$rule" ] && exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit "$rule"
 else
   echo "/etc/audit/rules.d/ not found — is auditd installed?"; read -r _
 fi

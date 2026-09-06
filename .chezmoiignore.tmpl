@@ -134,6 +134,9 @@ pyrightconfig.json
 .shellrc.adhoc
 .shellrc.secrets
 
+# User-owned editor choice; applying the init default must not overwrite it.
+.config/dotfiles/editor-choice
+
 # Per-machine git overrides (host-specific [safe], [credential],
 # [http.proxy], etc.). Same self-managed pattern as .zshrc.adhoc:
 # silently included by ~/.gitconfig (`[include] path = ~/.gitconfig.local`)

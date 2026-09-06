@@ -1160,6 +1160,7 @@ list.
 | **marimo** | uv tool (`[recommended,mcp]`) | uv tool | python_uv_tools |
 | **markitdown** (`[docx,xlsx,pptx]`) | uv tool | uv tool | python_uv_tools |
 | **mas** | brew (shared Brewfile, macOS only) | n/a | Brewfile.tmpl |
+| **micro** | brew | apt / verified user-level release (no-root, RedHat) | devtools; [editorcfg](../tools/editor.md), `just upgrade-micro` for release installs |
 | **mise** | curl `mise.run` | curl `mise.run` → direct binary → musl variant | bootstrap |
 | **mlflow** | uv tool | uv tool | python_uv_tools |
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |

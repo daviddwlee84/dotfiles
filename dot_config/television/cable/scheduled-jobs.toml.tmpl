@@ -240,10 +240,10 @@ case "$row" in
     unit=$(printf '%s\\n' "$row" | grep -oE 'UNIT=[^ ]+' | cut -d= -f2)
     exec sudo systemctl edit --full "$unit"
     ;;
-  '[etc-crontab]'*) exec sudo "${EDITOR:-vi}" /etc/crontab ;;
+  '[etc-crontab]'*) exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/crontab ;;
   '[cron.d:'*)
     f=$(printf '%s\\n' "$row" | sed -E 's/^\\[cron.d:([^]]+)\\].*/\\1/')
-    exec sudo "${EDITOR:-vi}" "/etc/cron.d/$f" ;;
+    exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit "/etc/cron.d/$f" ;;
   *) echo "no edit handler for this row type"; read -r _ ;;
 esac
 """

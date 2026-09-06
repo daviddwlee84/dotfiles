@@ -1,5 +1,7 @@
 # Yazi 檔案管理員
 
+文字檔編輯使用 [editorcfg](editor.zh-TW.md)，包含 Micro 與等待關閉的 GUI preset；目錄編輯保留明確命名的 Neovim 入口。
+
 Yazi 是 shell `y` helper 與 Herdr `prefix+Y` launcher 使用的終端檔案管理員。
 `y` 會在離開 Yazi 後把父 shell 切到最後瀏覽的目錄；Herdr popup 則是刻意設計成
 一次性工具，不會改變 agent pane 的 cwd。

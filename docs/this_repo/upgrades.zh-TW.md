@@ -1,5 +1,7 @@
 # 升級 — 顯式且需主動觸發的工具更新
 
+Micro：Homebrew 用 `just upgrade-brew`，apt 使用單套件升級；受管 Linux user-level release 用 `just upgrade-micro`（也在 `all` 的 `micro` category）。後者必須有 installer receipt 且 PATH 指向該 binary，不會覆蓋套件管理器的安裝。
+
 !!! note "Terminology rule (zh-TW pages)"
     技術名詞首次出現以「中文 (English original)」格式呈現，例：依賴注入
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文
@@ -49,6 +51,7 @@ just upgrade-<category>   # 單獨執行一個類別
 
 | 類別 | 實際發生的事 |
 | --- | --- |
+| `micro` | 只升級 PATH 目前使用、具有安裝 receipt 的 `~/.local/bin` Linux release，驗證官方 archive checksum；其他情況略過。Brew／apt 安裝仍由原套件管理器負責。執行於 `herdr` 之後、`agents` 之前。 |
 | `externals` | `chezmoi upgrade`（chezmoi 二進位檔本身）+ `chezmoi apply --refresh-externals`（強制刷新 168h externals：oh-my-zsh、TPM、pi-agents、toolkami.rb、fzf）。放在最前面是因為 chezmoi 版本提升可能改變後續步驟的行為。 |
 | `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile`（**不**加 `--no-upgrade`）→ `Brewfile.{darwin,linux}` → `brew cleanup`。macOS 透過 [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) 預先暖機共享 sudo 會話 (session)，讓會 shell out 到 `sudo /usr/sbin/installer` 的 cask pkg 安裝程式能找到有效的 sudo ticket。 |
 | `mise` | `mise self-update --yes` + `mise upgrade`（遵守 `~/.config/mise/config.toml` 中的版本約束 (constraint)）。當 mise 是透過 brew/apt 安裝時，`self-update` 會發出警示 (warning) 而非失敗。 |

@@ -2,6 +2,9 @@
 # Developer CLI tools role
 # Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, doxx, libreoffice, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch, mosh, chafa, poppler, sevenzip (7zz), resvg (yazi preview deps)
 
+- name: Install Micro non-modal editor
+  ansible.builtin.import_tasks: micro.yml
+
 # =============================================================================
 # macOS - all via Homebrew
 # =============================================================================

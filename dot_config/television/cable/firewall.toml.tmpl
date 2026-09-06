@@ -231,15 +231,15 @@ mode = "execute"
 description = "Edit firewall config (best-effort detection)"
 command = """
 if [ -d /etc/ufw ]; then
-  exec sudo "${EDITOR:-vi}" /etc/ufw/before.rules
+  exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/ufw/before.rules
 elif [ -d /etc/nftables.d ] || [ -f /etc/nftables.conf ]; then
-  exec sudo "${EDITOR:-vi}" /etc/nftables.conf
+  exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/nftables.conf
 elif [ -d /etc/iptables ]; then
-  exec sudo "${EDITOR:-vi}" /etc/iptables/rules.v4
+  exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/iptables/rules.v4
 elif [ -d /etc/firewalld ]; then
-  exec sudo "${EDITOR:-vi}" /etc/firewalld/firewalld.conf
+  exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/firewalld/firewalld.conf
 elif [ -f /etc/pf.conf ]; then
-  exec sudo "${EDITOR:-vi}" /etc/pf.conf
+  exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/pf.conf
 else
   echo "no firewall config found"; read -r _
 fi

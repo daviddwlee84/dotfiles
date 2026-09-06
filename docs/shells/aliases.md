@@ -41,6 +41,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## Editor
 
+`editorcfg` (`status/list/use/reset/doctor`) and `dotfiles-editor` are deployed
+executables, not aliases. `09_editor.sh` publishes the launcher in EDITOR/VISUAL;
+direct `v` remains Neovim. See [editor selection](../tools/editor.md).
+
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `v` | alias | `dot_config/shell/10_aliases.sh` | Open Neovim (`nvim`) |

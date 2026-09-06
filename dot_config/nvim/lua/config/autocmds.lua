@@ -31,16 +31,22 @@
 -- Toggle manually with `:QuickEditMode` if you need to flip it mid-session.
 -- ---------------------------------------------------------------------------
 
+local function normalize_quick_edit_path(path)
+  local resolved = vim.uv.fs_realpath(path) or path
+  if vim.fn.has("win32") == 1 then
+    resolved = resolved:gsub("\\", "/"):lower()
+  end
+  return resolved
+end
+
 local function tempdir_prefixes()
   local prefixes = { "/tmp/", "/var/folders/", "/private/var/folders/", "/private/tmp/" }
-  local tmpdir = vim.env.TMPDIR
-  if tmpdir and tmpdir ~= "" then
-    -- normalise: ensure trailing slash, resolve symlinks
-    local resolved = vim.uv.fs_realpath(tmpdir) or tmpdir
-    if not resolved:match("/$") then
-      resolved = resolved .. "/"
+  for _, key in ipairs({ "TMPDIR", "TEMP", "TMP" }) do
+    local tmpdir = vim.env[key]
+    if tmpdir and tmpdir ~= "" then
+      local resolved = normalize_quick_edit_path(tmpdir):gsub("/+$", "") .. "/"
+      table.insert(prefixes, resolved)
     end
-    table.insert(prefixes, resolved)
   end
   return prefixes
 end
@@ -49,7 +55,7 @@ local function is_quick_edit_path(path)
   if not path or path == "" then
     return false
   end
-  local resolved = vim.uv.fs_realpath(path) or path
+  local resolved = normalize_quick_edit_path(path)
 
   -- Path under a known tempdir
   for _, prefix in ipairs(tempdir_prefixes()) do
@@ -59,7 +65,7 @@ local function is_quick_edit_path(path)
   end
 
   -- Known scratch-file basenames regardless of location
-  local base = vim.fn.fnamemodify(resolved, ":t")
+  local base = vim.fn.fnamemodify(path, ":t")
   local patterns = {
     "^crontab%.", -- crontab -e -> /tmp/crontab.XXXXXX/crontab on some systems
     "^COMMIT_EDITMSG$", -- git commit (.git/COMMIT_EDITMSG)

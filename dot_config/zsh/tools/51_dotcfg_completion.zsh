@@ -16,7 +16,7 @@ _dotcfg_keys=(
     installIacTools installMediaTools installBitwarden installBrewApps
     installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools
     useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot
-    motdStyle primaryShell enableVimMode
+    motdStyle primaryShell preferredEditor enableVimMode
 )
 
 _dotcfg() {

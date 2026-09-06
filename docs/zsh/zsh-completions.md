@@ -144,8 +144,13 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 
 ### F. In-house CLIs (this repo)
 
+`editorcfg` uses paired hand-written `69_editorcfg_completion.zsh` / `.bash`
+files (verbs and presets); the filename-only `dotfiles-editor` launcher uses each
+shell's file completion. Both are deployed shell CLIs (strategy B).
+
 | CLI | Source | Framework | Strategy | Files |
 |---|---|---|---|---|
+| `editorcfg` / `dotfiles-editor` | `dot_dotfiles/bin/executable_editorcfg` / `executable_dotfiles-editor` | POSIX sh | B | paired `69_editorcfg_completion.zsh` / `.bash`; file completion for the launcher |
 | `mi-router` | `dot_dotfiles/bin/executable_mi-router` | tyro | A (lazy autoload) | `dot_config/shell/47_mi_router.sh` (gen + mtime check); refresh helper `mi-router-update-completion` |
 | `mi-dhcp-bind` | `dot_dotfiles/bin/executable_mi-dhcp-bind` | tyro | A (lazy autoload) | `dot_config/shell/46_mi_dhcp_bind.sh` (gen + mtime check); refresh helper `mi-dhcp-bind-update-completion` |
 | `reyee` | `dot_dotfiles/bin/executable_reyee` | tyro | A (lazy autoload) | `dot_config/shell/48_reyee.sh` (gen + mtime check); refresh helper `reyee-update-completion` |

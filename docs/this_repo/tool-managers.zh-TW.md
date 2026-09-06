@@ -1,5 +1,7 @@
 # 工具管理器 (tool managers) — 誰安裝什麼
 
+Micro 隨 devtools 安裝：macOS 用 brew，Linux 用 apt／驗證 checksum 的 user-level release（no-root、RedHat）。Release 以 `just upgrade-micro` 升級。見 [編輯器選擇](../tools/editor.zh-TW.md)。
+
 !!! note "Terminology rule (zh-TW pages)"
     技術名詞首次出現以「中文 (English original)」格式呈現，例：依賴注入
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文
@@ -1057,6 +1059,7 @@ agent-specific 升級路徑。
 | **maccy** | brew cask | n/a | Brewfile.darwin |
 | **marimo** | uv tool(`[recommended,mcp]`) | uv tool | python_uv_tools |
 | **mas** | brew(共用 Brewfile,僅 macOS) | n/a | Brewfile.tmpl |
+| **micro** | brew | apt／驗證 checksum 的 user-level release（no-root、RedHat） | devtools；[editorcfg](../tools/editor.zh-TW.md)，release 用 `just upgrade-micro` |
 | **mise** | curl `mise.run` | curl `mise.run` → 直接 binary → musl 變體 | bootstrap |
 | **mlflow** | uv tool | uv tool | python_uv_tools |
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |

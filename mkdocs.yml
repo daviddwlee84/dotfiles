@@ -67,6 +67,7 @@ plugins:
         - locale: zh-TW
           name: 繁體中文 (zh-TW)
           nav_translations:
+            Default editor and Micro: 預設編輯器與 Micro
             # Top-level sections
             Home: 首頁
             Playbooks: 工作流程
@@ -426,6 +427,7 @@ nav:
       - Shell logging (log_shared.sh): this_repo/shell-logging.md
       - Sudo session: this_repo/sudo-session.md
       - Vim mode (catalog + opt-out): this_repo/vim-mode.md
+      - Default editor and Micro: tools/editor.md
       - Fleet apply: this_repo/fleet-apply.md
       - fleet-apply vs fabric: this_repo/fleet-apply-vs-fabric.md
       - Azure dev VM (az-dev-vm): this_repo/az-dev-vm.md

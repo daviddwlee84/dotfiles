@@ -43,6 +43,7 @@ ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=false
 ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_MOTD_STYLE=figlet
 ARG CHEZMOI_PRIMARY_SHELL=zsh
+ARG CHEZMOI_PREFERRED_EDITOR=nvim
 ARG CHEZMOI_ENABLE_VIM_MODE=true
 ARG CHEZMOI_REPO=daviddwlee84
 # <<< dotfiles-init:args <<<
@@ -191,6 +192,7 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
     --promptChoice "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)=${CHEZMOI_MOTD_STYLE}" \
     --promptChoice "Primary interactive shell (zsh|bash)=${CHEZMOI_PRIMARY_SHELL}" \
+    --promptChoice "Preferred external editor (nvim|micro|vim|nano|code|cursor)=${CHEZMOI_PREFERRED_EDITOR}" \
     --promptBool "Enable vim-style modal editing in shells (zsh-vi-mode, set -o vi, ble.sh vi-mode) and tmux vim navigation (vim-tmux-navigator C-h/j/k/l, mode-keys vi); does NOT affect Neovim=${CHEZMOI_ENABLE_VIM_MODE}"
 # <<< dotfiles-init:init-run <<<
 

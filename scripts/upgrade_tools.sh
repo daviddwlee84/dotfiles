@@ -89,7 +89,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin herdr agents plugins yazi-plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin herdr micro agents plugins yazi-plugins)
 
 usage() {
   cat <<EOF
@@ -1158,6 +1158,19 @@ cat_plugins() {
 }
 
 # ============================================================================
+# Micro's verified user-level release only. Package-manager installs are upgraded
+# through brew / apt / Scoop; never overwrite them with a downloaded binary.
+# ============================================================================
+cat_micro() {
+  if [[ ! -f "$HOME/.local/share/dotfiles/micro-release" ]] \
+    || [[ "$(command -v micro 2>/dev/null)" != "$HOME/.local/bin/micro" ]]; then
+    info "Micro release install not active — use its package manager (brew / apt / Scoop)"
+    return "$SKIP_RC"
+  fi
+  _run sh "$_REPO_ROOT/dot_ansible/roles/devtools/files/install-micro.sh" --upgrade
+}
+
+# ============================================================================
 # Main: dispatch selected categories in defined order
 # ============================================================================
 hr
@@ -1188,6 +1201,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         warp) run_category warp cat_warp ;;
         atuin) run_category atuin cat_atuin ;;
         herdr) run_category herdr cat_herdr ;;
+        micro) run_category micro cat_micro ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
         yazi-plugins) run_category yazi-plugins cat_yazi_plugins ;;

@@ -51,6 +51,8 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 
 ## What's enabled on THIS machine
 
+- **External editor** — init default `{{ get . "preferredEditor" | default "nvim" }}` (independent of `enableVimMode`); `editorcfg status/list/use/reset/doctor` manages the local override. `EDITOR`/`VISUAL` name `dotfiles-editor`, which resolves and waits on each invocation. Micro is baseline devtools; code/cursor presets add `--wait`. See `docs/tools/editor.md`. Local `editor-choice` is not chezmoi-managed.
+
 (Rendered from this host's selections. For live truth: `chezmoi data | jq`.)
 {{- if dig "installCodingAgents" false . }}
 - **Coding agents** — Claude Code, Pi (`pi`), Oh My Pi (`omp`), the `pia` Git-managed harness-combo manager, OpenCode, Cursor, Codex, Gemini, Copilot (configs + CLIs). `pia doctor` checks the stack; `pia list --tree` / `pia use pi/base` select presets. The external checkout is `~/.local/share/pi-agents`; `08_pi_agents.sh` makes its canonical commands beat mise/Bun shadows, while runtime state and credentials stay elsewhere. See `docs/tools/pi-agents.md`, `docs/tools/agent-overlays.md`, `docs/tools/agent-skills.md`.

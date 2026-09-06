@@ -190,6 +190,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `noRoot` | false | Skip sudo-requiring tasks (for servers without root access). Linux only. |
 | `motdStyle` | `figlet` | SSH login banner style: `figlet` (~6 lines, default), `fastfetch-slim` (figlet + fastfetch w/o logo, ~10 lines), `fastfetch-full` (full distro logo + everything, ~22 lines). Runtime override: `MOTD_STYLE=...` in `~/.zshrc.adhoc`. See [docs/zsh/motd.md](docs/zsh/motd.md). |
 | `primaryShell` | `zsh` | Primary interactive shell: `zsh` (default, full-featured) or `bash` (oh-my-bash + ble.sh, close-to-zsh UX). Both `~/.zshrc` and `~/.bashrc` deploy on every host; this only governs which shell `chsh` switches to as the login shell. See [docs/shells/bash.md](docs/shells/bash.md) for the bash side's known gaps and tradeoffs. |
+| `preferredEditor` | `nvim` | Independent external editor: nvim / micro / vim / nano / code / cursor. Micro is included in devtools; switch with `editorcfg`. See [editor selection](docs/tools/editor.md). |
 | `enableVimMode` | true | Vim-style modal editing in shells (zsh-vi-mode, `set -o vi`, ble.sh) + tmux vim navigation. Does NOT affect Neovim. See [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md). |
 <!-- /dotfiles-init:prompts -->
 

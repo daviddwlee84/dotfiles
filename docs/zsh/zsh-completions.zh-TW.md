@@ -1,5 +1,7 @@
 # Zsh 補全最佳實踐
 
+`editorcfg` 的 verbs／presets 由成對的 `69_editorcfg_completion.zsh`／`.bash` 補全；只接收檔名的 `dotfiles-editor` 使用兩個 shell 的檔案補全。兩者皆為受管 shell CLI（策略 B）。
+
 本 dotfiles 專案中 zsh 自動補全 (tab completion) 的組織方式。
 
 !!! note "Terminology rule (zh-TW pages)"

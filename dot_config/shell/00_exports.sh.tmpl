@@ -3,16 +3,7 @@
 # "$XDG_CONFIG_HOME/shell" sh.
 # Profile: {{ .profile }} (OS: {{ .chezmoi.os }}, arch: {{ .chezmoi.arch }})
 
-# Editor
-# if [[ -n $SSH_CONNECTION ]]; then
-#     export EDITOR='vim'
-# else
-#     export EDITOR='nvim'
-# fi
-# Let's always use nvim (but sometimes, when the latency is high,
-# some animation might be slow)
-export EDITOR='nvim'
-export VISUAL="$EDITOR"
+# Editor selection is initialized by 09_editor.sh after PATH setup.
 
 # Language
 export LANG="en_US.UTF-8"

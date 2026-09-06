@@ -165,7 +165,7 @@ mode = "execute"
 [actions.edit_fstab]
 description = "Edit /etc/fstab"
 command = """
-exec sudo "${EDITOR:-vi}" /etc/fstab
+exec env SUDO_EDITOR="${EDITOR:-vi}" sudoedit /etc/fstab
 """
 mode = "execute"
 

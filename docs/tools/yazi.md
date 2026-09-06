@@ -1,5 +1,7 @@
 # Yazi File Manager
 
+Text-file editing now follows [editorcfg](editor.md), including Micro and waiting GUI presets. Directory editing remains an explicitly named Neovim action.
+
 Yazi is the terminal file manager used by the shell `y` helper and the Herdr
 `prefix+Y` launcher. `y` changes the parent shell to the directory where Yazi
 exits; the Herdr popup is intentionally disposable and leaves the agent pane's
