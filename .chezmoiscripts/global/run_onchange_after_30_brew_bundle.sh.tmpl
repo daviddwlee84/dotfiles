@@ -2,14 +2,18 @@
 {{ $installBrewApps := false }}{{ if hasKey . "installBrewApps" }}{{ $installBrewApps = .installBrewApps }}{{ end -}}
 {{ $installAiDesktopApps := false }}{{ if hasKey . "installAiDesktopApps" }}{{ $installAiDesktopApps = .installAiDesktopApps }}{{ end -}}
 {{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
+{{ $installMole := false }}{{ if hasKey . "installMole" }}{{ $installMole = .installMole }}{{ end -}}
 # Run brew bundle when Brewfiles change
-# Runs when general Brew apps are enabled, or on macOS when AI/gaming desktop apps are enabled
+# Runs when general Brew apps are enabled, or on macOS when AI/gaming desktop apps
+# or mole are enabled. Each of those has Brewfile entries of its own, so any one
+# of them being on must still reach `brew bundle` even with installBrewApps=false.
 # Profile: {{ .profile }}
 # installBrewApps: {{ $installBrewApps }}
 # installAiDesktopApps: {{ $installAiDesktopApps }}
 # installGamingApps: {{ $installGamingApps }}
+# installMole: {{ $installMole }}
 
-{{ if and (not $installBrewApps) (or (ne .chezmoi.os "darwin") (and (not $installAiDesktopApps) (not $installGamingApps))) -}}
+{{ if and (not $installBrewApps) (or (ne .chezmoi.os "darwin") (and (not $installAiDesktopApps) (not $installGamingApps) (not $installMole))) -}}
 # Brew app installation is disabled for this profile
 # To enable, run: chezmoi init --force
 exit 0

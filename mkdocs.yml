@@ -115,6 +115,7 @@ plugins:
             Clipboard: 剪貼簿
             Television (tv): Television (tv)
             btop (system monitor): btop (系統監控)
+            mole (macOS cleanup / analyze / purge): mole (macOS 清理 / 分析 / 清除產物)
             TV vs fzf: TV vs fzf
             Glow (markdown reader): Glow (Markdown 閱讀器)
             Gum (shell prompts): Gum (shell prompt 工具箱)
@@ -371,6 +372,7 @@ nav:
           - "appsrc (install-source detector)": tools/appsrc.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md
+          - mole (macOS cleanup / analyze / purge): tools/mole.md
       - chezmoi conventions:
           - chezmoi prefixes: tools/chezmoi-prefixes.md
           - chezmoi templating: tools/chezmoi-templating.md

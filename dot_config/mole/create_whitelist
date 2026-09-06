@@ -1,0 +1,45 @@
+# ~/.config/mole/whitelist — paths `mo clean` must never touch.
+#
+# READ THIS BEFORE EDITING (upstream replacement semantics, mole V1.7.5+):
+# the mere EXISTENCE of this file makes mole drop its entire built-in
+# DEFAULT_WHITELIST_PATTERNS list (lib/core/base.sh) — the file is treated as
+# the complete set, not as an addition. Only SAFETY_WHITELIST_PATTERNS
+# (Spotlight / FontRegistry / CloudKit / pypoetry virtualenvs / FINDER_METADATA)
+# still merge unconditionally, so those are deliberately not repeated here.
+# That is why the first block below re-lists upstream's own defaults verbatim:
+# delete a line from it and you silently lose that protection. Upstream
+# documents the trap itself at lib/core/base.sh:188-192.
+#
+# Format: one absolute path or glob per line; `#` comments; `~` and $HOME are
+# expanded; no `..`, no `//`; entries must be absolute after expansion.
+# `mo clean --whitelist` rewrites this file interactively, which is why chezmoi
+# seeds it with `create_` and then never touches it again. To re-baseline:
+#   cp ~/.config/mole/whitelist "$(chezmoi source-path ~/.config/mole/whitelist)"
+# See docs/tools/mole.md.
+
+# --- upstream DEFAULT_WHITELIST_PATTERNS, re-listed (see header) -------------
+$HOME/Library/Caches/ms-playwright*
+$HOME/.gradle/caches/*
+$HOME/.gradle/daemon/*
+$HOME/.ollama/models/*
+$HOME/Library/Caches/com.nssurge.surge-mac/*
+$HOME/Library/Application Support/com.nssurge.surge-mac/*
+$HOME/Library/Caches/org.R-project.R/R/renv/*
+$HOME/Library/Caches/JetBrains*
+$HOME/Library/Caches/com.jetbrains.toolbox*
+$HOME/Library/Caches/tealdeer/tldr-pages
+$HOME/Library/Application Support/JetBrains*
+$HOME/Library/Caches/com.apple.finder
+$HOME/Library/Mobile Documents*
+
+# --- this repo's own bootstrap surfaces -------------------------------------
+# uv is the bootstrap for every PEP723 script here (fleet, tsnet, mlf, yth,
+# ytmv, pqsum, dotfiles_init) and for `just` recipes that shell out to them.
+# mole targets ~/.cache/uv in lib/clean/dev.sh; a cold cache turns the next
+# `chezmoi apply` into a full re-download.
+$HOME/.cache/uv/*
+# bun runs dot_config/shell/copilot-throttle-shim.js on every copilot-proxy call.
+$HOME/.bun/install/cache/*
+# mise owns real runtime installs under here, not just cached downloads
+# (mole targets .local/share/mise/installs/pnpm specifically).
+$HOME/.local/share/mise/*

@@ -1,0 +1,17 @@
+# ~/.config/mole/purge_paths — extra roots `mo purge` scans for dev build
+# artifacts (node_modules, target, .venv, build, dist, …).
+#
+# One path per line; `#` comments; `~` is expanded. When this file has entries
+# they REPLACE mole's own project discovery (lib/clean/project.sh), so list every
+# root you want scanned, not just the new one.
+#
+# `mo purge --paths` rewrites this file interactively, which is why chezmoi seeds
+# it with `create_` and then never touches it again. To re-baseline:
+#   cp ~/.config/mole/purge_paths "$(chezmoi source-path ~/.config/mole/purge_paths)"
+# See docs/tools/mole.md.
+
+# Main repo checkout root.
+~/Documents/Program
+# worktrunk / dev-cli park their git worktrees here, and those carry their own
+# node_modules / target / .venv copies — the whole reason purge is worth running.
+~/Worktrees

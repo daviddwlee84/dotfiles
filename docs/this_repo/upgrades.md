@@ -20,6 +20,7 @@ Three side-effects worth knowing about:
 - Homebrew casks that carry a `homebrew_cask` entry with `state: present` freeze to that version until a Brewfile hash change forces a re-bundle with `--no-upgrade`. Still install-only; `upgrade-brew` is what actually bumps them.
 - Neovim installed by the macOS official-release fallback is outside Homebrew, so `upgrade-brew` does not refresh it. The role replaces it only when the active `nvim` falls below `neovim_min_version`; otherwise update that fallback manually from the official archive. Removing `~/.local/bin/nvim` and re-applying reinstalls it only when no other `nvim` on `PATH` already satisfies the minimum. Existing Homebrew Neovim installs remain owned by `upgrade-brew`.
 - LazyGit is similarly version-gated at >= 0.64.0 because the managed config uses `git.diffRenderers`. An older Homebrew formula receives a targeted `brew upgrade lazygit`; other stale or shadowed installs fall back to the checksum-verified official release in `~/.local/bin`. Once the minimum is met, normal updates remain the responsibility of `upgrade-brew` or the install source.
+- **mole ships its own updater — never run it here.** `mo update` reinstalls into `/usr/local/bin`, which is exactly where Homebrew keeps its `mole` / `mo` symlinks, so the two fight over the same paths. `mo update` belongs to the `install.sh` channel only; the Homebrew install this repo declares is owned by `upgrade-brew`, and there is deliberately no `just upgrade-mole`. See [mole](../tools/mole.md).
 
 ## Entry points
 

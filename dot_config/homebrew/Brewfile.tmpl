@@ -38,6 +38,18 @@ brew "daviddwlee84/tap/dev-cli"
 brew "gopls"
 {{ end -}}
 
+# mole — macOS cleanup / uninstall / disk analyze, plus `mo purge` for dev build
+# artifacts (node_modules, target, .venv). homebrew-core formula, GPL-3.0.
+# macOS-only upstream and not a porting candidate: install.sh refuses anything
+# but darwin and cmd/analyze is //go:build darwin with a stub that exits 1
+# elsewhere — see ../../docs/tools/mole.md. NOTE: homebrew-core ships arm64
+# bottles only, so an Intel mac builds it from source (build dep: go, ~1-2 min).
+# hasKey guard: this prompt is newer than some hosts' chezmoi.toml.
+{{ $installMole := false }}{{ if hasKey . "installMole" }}{{ $installMole = .installMole }}{{ end -}}
+{{ if and (eq .chezmoi.os "darwin") $installMole -}}
+brew "mole"
+{{ end -}}
+
 # The following formulas support the general macOS GUI app bundle.
 {{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
 # Mac App Store CLI (needed for mas entries in Brewfile.darwin)

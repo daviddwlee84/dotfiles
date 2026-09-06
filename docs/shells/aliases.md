@@ -815,6 +815,18 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ---
 
+## mole
+
+> [`mole`](../tools/mole.md) helpers (`installMole`, **macOS only** — the fragment self-disables when `mole` is not on `$PATH`). `mo` is upstream's own short entrypoint and is deliberately not aliased over.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `moa [dir]` | function | `dot_config/shell/33_mole.sh` | `mo analyze` scoped to `dir` (default: cwd). Bare `mo analyze` explores `$HOME` |
+| `moclean [args…]` | function | `dot_config/shell/33_mole.sh` | `mo clean --dry-run` first, print the plan, then confirm before the real run. `mo clean` alone deletes with no confirmation step |
+| `mowl` | function | `dot_config/shell/33_mole.sh` | Print the effective entries of `~/.config/mole/{whitelist,purge_paths}` plus the edit / re-baseline commands (both are chezmoi `create_` seeds) |
+
+---
+
 ## Claude Code
 
 > Project-local Claude Code config helpers. Requires `jq` only for the merge path (when the target file already exists).

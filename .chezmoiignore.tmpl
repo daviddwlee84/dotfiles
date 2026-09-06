@@ -185,6 +185,16 @@ pyrightconfig.json
 .config/summarize/**
 {{- end }}
 
+# mole config seeds — only manage on macOS when installMole=true. mole is
+# macOS-only upstream (install.sh refuses non-darwin), so Linux never has a
+# consumer for these. hasKey guard so hosts whose chezmoi.toml predates the
+# installMole prompt don't error.
+{{- $installMole := false }}{{ if hasKey . "installMole" }}{{ $installMole = .installMole }}{{ end }}
+{{- if or (ne .chezmoi.os "darwin") (not $installMole) }}
+.config/mole
+.config/mole/**
+{{- end }}
+
 # Rime user config — only manage when installInputMethod=true, and only the tree
 # for this OS (macOS/Squirrel reads ~/Library/Rime, Linux/ibus-rime reads
 # ~/.config/ibus/rime). The portable bodies live in .chezmoitemplates/rime/ and

@@ -79,6 +79,9 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 {{- if dig "installMediaTools" false . }}
 - **Media** — ffmpeg, ImageMagick, exiftool, libvips.
 {{- end }}
+{{- if dig "installMole" false . }}
+- **mole** (`mo`, macOS only) — `mo purge` reclaims dev build artifacts (`node_modules`, `target`, `.venv`) across the roots listed in `~/.config/mole/purge_paths`; `mo analyze` is a disk explorer, `mo clean` clears caches (always `--dry-run` first, or use the `moclean` wrapper). Helpers in `33_mole.sh`: `moa`, `moclean`, `mowl`. Both config files are chezmoi `create_` seeds, and the whitelist **replaces** rather than extends mole's built-in defaults. See `docs/tools/mole.md`.
+{{- end }}
 {{- if dig "installMediaControl" false . }}
 - **Media control** — nowplaying-cli + switchaudio-osx (macOS) / playerctl (Linux); unlocks full `sysplay`/`sysnow` (built-in `sysvol`/`sysmute` work regardless).
 {{- end }}

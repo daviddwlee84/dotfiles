@@ -116,6 +116,17 @@ installMediaControl = {{ promptBoolOnce . "installMediaControl" "Install system 
 # （書名/作者/簡介）。calibre 是較肥的 GUI app（數百 MB）；不裝也能用其他格式的
 # 預覽，且若你已手動裝過 calibre，預覽會自動生效。詳見 docs/tools/yazi-previews.md。
 installCalibre = {{ promptBoolOnce . "installCalibre" "Install calibre (e-book manager; enables .mobi/.azw/.azw3 metadata previews in yazi)" false }}
+# 是否安裝 mole（macOS 系統清理 / 磁碟分析 / 清除 dev build artifacts）。
+# `mo purge` 掃 node_modules/target/.venv 這類建置產物，`mo analyze` 是磁碟
+# 瀏覽器，`mo clean` 清快取（務必先 --dry-run）。上游只支援 macOS：install.sh
+# 拒絕非 darwin，cmd/analyze 是 //go:build darwin，所以 Linux 直接 false。
+# 受管的 ~/.config/mole/whitelist 會「取代」上游預設白名單，別直接刪。
+# 詳見 docs/tools/mole.md。
+{{ if eq .chezmoi.os "darwin" -}}
+installMole = {{ promptBoolOnce . "installMole" "Install mole (macOS cleanup, disk analyze, dev build-artifact purge)" false }}
+{{ else -}}
+installMole = false
+{{ end -}}
 # 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
 # Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。
 {{ if or (eq $profile "macos") (eq $profile "ubuntu_desktop") -}}

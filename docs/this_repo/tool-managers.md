@@ -1163,6 +1163,7 @@ list.
 | **mise** | curl `mise.run` | curl `mise.run` → direct binary → musl variant | bootstrap |
 | **mlflow** | uv tool | uv tool | python_uv_tools |
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |
+| **mole** (`mo`) | brew formula, gated on `installMole` | n/a — macOS-only upstream | Brewfile.tmpl |
 | **mosh** | brew | apt | devtools |
 | **mtr** | brew | apt/yum | networking_tools |
 | **nmap** | brew | apt/yum | networking_tools |

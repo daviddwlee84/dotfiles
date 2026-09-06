@@ -153,6 +153,10 @@ regen opencode "completion zsh" "completion bash"
 regen omp "completions zsh" "completions bash"
 regen pia "completion zsh" "completion bash" "$HOME/.local/share/pi-agents/bin/pia" "$HOME/.local/share/pi-agents/.git/index"
 regen translate "completion zsh" "completion bash"
+# mole: macOS-only upstream, so this is a no-op on Linux (regen skips a tool
+# that is not on PATH). `mole completion zsh` emits `#compdef mole mo`, which
+# covers the short `mo` entrypoint too.
+regen mole "completion zsh" "completion bash"
 regen dev "completion zsh" "completion bash"
 regen summarize "completion zsh" "completion bash"
 

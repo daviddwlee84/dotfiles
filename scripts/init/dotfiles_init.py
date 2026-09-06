@@ -360,6 +360,20 @@ PROMPTS: tuple[Prompt, ...] = (
                     "yazi 透過 view-ebook 用 ebook-meta 預覽 Kindle .mobi/.azw/.azw3 的中繼資料\n"
                     "（書名/作者/簡介）。calibre 是較肥的 GUI app（數百 MB）；不裝也能用其他格式的\n"
                     "預覽，且若你已手動裝過 calibre，預覽會自動生效。詳見 docs/tools/yazi-previews.md。")),
+    Prompt("installMole", "bool", "System & apps",
+           "mole (macOS cleanup / analyze / purge)",
+           "brew formula `mole` (`mo`). `mo purge` reclaims dev build artifacts "
+           "(node_modules, target, .venv), `mo analyze` is a disk explorer, "
+           "`mo clean` clears caches. macOS-only upstream. See docs/tools/mole.md.",
+           default=False,
+           condition=When(os=frozenset({"darwin"})), else_value=False,
+           prompt_text="Install mole (macOS cleanup, disk analyze, dev build-artifact purge)",
+           comment=("是否安裝 mole（macOS 系統清理 / 磁碟分析 / 清除 dev build artifacts）。\n"
+                    "`mo purge` 掃 node_modules/target/.venv 這類建置產物，`mo analyze` 是磁碟\n"
+                    "瀏覽器，`mo clean` 清快取（務必先 --dry-run）。上游只支援 macOS：install.sh\n"
+                    "拒絕非 darwin，cmd/analyze 是 //go:build darwin，所以 Linux 直接 false。\n"
+                    "受管的 ~/.config/mole/whitelist 會「取代」上游預設白名單，別直接刪。\n"
+                    "詳見 docs/tools/mole.md。")),
     Prompt("installBrewApps", "bool", "System & apps",
            "Homebrew GUI apps",
            "Terminals, browsers, utilities via Brewfile (excl. AI desktop). Desktop-class profiles only (macos / ubuntu_desktop).",
@@ -526,6 +540,7 @@ PROMPTS: tuple[Prompt, ...] = (
 BUNDLES: dict[str, dict[str, object]] = {
     "personal-mac": {
         "installCodingAgents": True,
+        "installMole": True,
         "installLlmTools": True,
         "installSummarize": True,
         "installAiDesktopApps": True,
@@ -540,6 +555,7 @@ BUNDLES: dict[str, dict[str, object]] = {
     },
     "work-mac": {
         "installCodingAgents": True,
+        "installMole": True,
         "installSummarize": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
