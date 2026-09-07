@@ -70,6 +70,12 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 | `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → refresh installed `claude-hud` via [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
 | `yazi-plugins` | `ya pkg upgrade` — bumps Yazi plugins (`piper.yazi`, `duckdb.yazi`, `git.yazi`, …) declared in [`dot_config/yazi/package.toml`](../../dot_config/yazi/package.toml) to their latest upstream revs. `SKIPPED` when `ya` or the lockfile is absent. Install-only `chezmoi apply` pins the committed revs via `ya pkg install`; after upgrading, copy the regenerated `~/.config/yazi/package.toml` back into the chezmoi source to persist the new revs. Current `git.yazi` activates on Yazi 26.8.15+; the managed guard safely no-ops on older hosts. See [`docs/tools/yazi.md`](../tools/yazi.md). |
 
+Mason-managed Neovim tools (including the shared Prettier fallback) have a separate
+upgrade path: run `:MasonUpdate`, wait for completion, then `:MasonInstall prettier`
+to reinstall from the refreshed registry. `:MasonUpdate` alone updates metadata;
+`just upgrade-plugins` updates Neovim plugins but not installed Mason tool versions.
+LazyVim's `ensure_installed` only fills missing tools.
+
 ### Run order
 
 ```mermaid

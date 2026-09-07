@@ -34,6 +34,7 @@ If you want to know:
 | **mise** | Runtime versions: `node`, `bun`, `rust`, `go`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
 | **npm** (global) | JS CLIs (Pi, copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli, summarize on Linux) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`); Pi's stable prefix is handled by `agents` |
+| **Mason** (Neovim tools) | Editor-local language servers, linters, formatters; shared Prettier fallback | LazyVim defaults/extras + `dot_config/nvim/lua/exact_plugins/mason.lua` | Manual `:MasonUpdate`, then `:MasonInstall prettier`; not `upgrade-plugins` |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
 | **go** (`go install`) | Go CLIs: `translate`, `dev`, `gopls` (**Linux only** — macOS installs them via Homebrew) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
@@ -411,6 +412,13 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | `neovim` | `neovim` ≥ 0.11.2 (healthy installs are left untouched) | macOS: Apple Silicon brew formula (`state: present`) → checksum-verified official macOS release to `~/.local` when still missing/old; Intel goes directly to the official release · Linux: apt → GitHub release tarball if too old (`/opt/nvim` + `/usr/local/bin/nvim` symlink) → user-level tarball to `~/.local`; **oldEL** pulls from `neovim/neovim-releases` (glibc 2.17 rebuild repo). No snap (dropped 2026-06 — see [linux-package-sources.md → snap in this repo](../linux-package-sources.md#snap-in-this-repo)). See [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
 | `lazyvim_deps` | `fzf`, `lazygit` >= 0.64.0, `tree-sitter`, `node` | macOS: brew for the four packages; stale brew LazyGit gets a targeted formula upgrade, then a checksum-verified official release fallback to `~/.local/bin` if the active binary remains old. **Also** runs config-driven `mise install --yes` (the only thing that installs `go`/`rust` from `dot_config/mise/config.toml.tmpl` on Darwin) · Linux: mise (`node@lts` general; `node@20` + `rust@stable` on armv7l); fzf built from chezmoi external clone; LazyGit brew detection → checksum-verified system release → user release fallback (its PPA was deprecated upstream in 2021 and is purged); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
+
+Mason manages editor tools inside Neovim's data directory (`~/.local/share/nvim/mason`
+by default). LazyVim merges `ensure_installed` from its defaults, language extras,
+and `dot_config/nvim/lua/exact_plugins/mason.lua`, which adds Prettier. Missing tools
+install when Mason loads in Neovim; existing versions are left alone. Conform
+prefers project-local Prettier, then the Mason copy on Neovim's PATH. Project
+dependencies should pin their own version for CI consistency.
 
 #### 3.7 Networking + IaC + LLM + media (`networking_tools`, `iac_tools`, `llm_tools`, `media_tools`)
 
@@ -1006,6 +1014,7 @@ manually removed and re-installed.
 | **fontconfig / libfuse2 / libnotify-bin / playerctl / wmctrl / xdotool / wl-clipboard / xclip / xsel** | System packages, no upgrade automation | apt-upgrade |
 | **auditd rules** | Config files, not a "tool" with versions | Edit rule template, re-apply |
 | **claude-hud / LazyVim plugins / TPM plugins / pre-commit / tldr cache / gh extensions** | **Covered** by `cat_plugins` in upgrade_tools.sh | `just upgrade-plugins` |
+| **Mason tools** (including Prettier) | LazyVim installs missing tools only; plugin upgrades do not upgrade tool versions | In Neovim, `:MasonUpdate`, wait for completion, then `:MasonInstall prettier` (or the selected tool) |
 
 **Why this matters**: a developer who runs `just upgrade-all` on a Linux
 host gets brew + mise + uv + npm + cargo + dotnet + gem + flatpak +
@@ -1189,6 +1198,7 @@ list.
 | **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
 | **poppler** (`pdftoppm`) | brew | apt (`poppler-utils`) | devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **pre-commit** | `uv tool install --python 3.13` | same | security_tools |
+| **prettier** | Mason (Neovim-local) | Mason (Neovim-local) | LazyVim `ensure_installed`; Conform prefers project-local `node_modules/.bin/prettier` |
 | **procps** | (system) | apt | bootstrap (Linux) |
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
 | **python-dotenv[cli]** | uv tool | uv tool | python_uv_tools |
@@ -1285,6 +1295,10 @@ Is the tool needed BEFORE ansible runs?
 
 Is it a runtime / language interpreter (node, ruby, python, rust, go, dotnet)?
 ├── Yes → mise (dot_config/mise/config.toml.tmpl) — except python (use uv)
+└── No → continue
+
+Is it a formatter / language server used primarily inside Neovim?
+├── Yes → Mason via LazyVim ensure_installed; prefer project-local versions when provided
 └── No → continue
 
 Is it a Python CLI tool?
