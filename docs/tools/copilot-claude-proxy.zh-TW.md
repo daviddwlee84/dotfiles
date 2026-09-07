@@ -463,9 +463,10 @@ host 不具可攜性。因此正式 helper 沿用已認證的 localhost gateway�
   同一 vendor 讀 Copilot 的 `model_picker_category`（`powerful > versatile > lightweight`），
   只在勝出的 tier 內比較世代。已知 id 與同世代 sibling 仍由 curated allowlist 決定；
   未知但更新世代的旗艦可以不等 dotfiles 更新就勝出。舊 proxy 沒有 category metadata
-  時會退回既有 allowlist，不會猜測。Auto 也把目前明確 pin／persist 的 model 當作
-  entitlement floor：候選的 `restricted_to` 集合不得更窄；沒有明確 baseline 時只考慮
-  catalog 中最廣泛或 unrestricted 的 entries。手動指定 model 不受此限制。
+  時會退回既有 allowlist，不會猜測。Auto 候選只取決於該次 live catalog，不受先前的
+  model、project pin 或 state file 是否存在影響。方案標籤（`restricted_to`）與價格
+  只供診斷，不代表目前帳號的 entitlement。Main、衍生角色、`--why`、details 的 auto
+  marker 及未指定模型的 `codex-copilot` 都使用同一組可選候選。
 - OpenAI 的世代與 capability tier 是兩個獨立維度：Astra 接替 Sol 的旗艦位置，Terra / Luna
   仍留在 5.6。因此 `gpt-6-astra` 高於 `gpt-5.6-sol`，但假想的輕量
   `gpt-6-luna` 不會。意圖依照 OpenAI 的
@@ -489,6 +490,11 @@ host 不具可攜性。因此正式 helper 沿用已認證的 localhost gateway�
   靜態版本 allowlist；使用其最高 tier 中最新的 served model。
 - global state 仍是向後相容的單行 main id；wrapper 在啟動時依 live catalog 產生角色
   profile。Local pin 會寫入完整角色組。切換後只需重開 Claude Code，不用重啟 proxy。
+
+若舊版 auto 在已有旗艦的 catalog 下仍存入 `gpt-5-mini`，部署並 reload 修正後的
+shell fragment，再執行一次 `copilot-model --auto` 即可重新選擇。不必刪除 state file 或
+project settings：舊模型不再限制新的候選。`--why` 可以不寫入地預覽同一個選擇；
+真正的 entitlement 拒絕仍由 gateway 負責。
 
 建議順序：
 

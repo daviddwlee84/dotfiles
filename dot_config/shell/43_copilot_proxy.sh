@@ -2124,7 +2124,7 @@ codex-copilot() {
     case "$arg" in -m|--model|-m=*|--model=*) explicit_model=1 ;; esac
   done
   if [ "$explicit_model" -eq 0 ]; then
-    models="$(printf '%s' "$catalog"       | _copilot_auto_candidate_ids "$(_copilot_entitlement_baseline_model)")"
+    models="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids)"
     model="$(printf '%s\n' "$models" | _copilot_codex_pick_best_model "$catalog")" || {
       printf '%s\n' "codex-copilot: no usable chat model in the live gateway catalog" >&2
       return 1
@@ -2949,48 +2949,12 @@ _copilot_catalog_ids() {
   fi
 }
 
-# The entitlement floor is an explicitly selected/persisted model, never the
-# built-in fallback (which may itself be unavailable on a lower plan).
-_copilot_entitlement_baseline_model() {
-  local settings='.claude/settings.local.json' state pinned=''
-  if [ -f "$settings" ] && command -v jq >/dev/null 2>&1 \
-     && [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" ]; then
-    pinned="$(jq -r '.env.ANTHROPIC_MODEL // empty' "$settings" 2>/dev/null)"
-    if [ -n "$pinned" ]; then printf '%s' "$pinned"; return 0; fi
-  fi
-  if [ -n "${COPILOT_CLAUDE_MODEL:-}" ]; then
-    printf '%s' "$COPILOT_CLAUDE_MODEL"
-  else
-    state="$(_copilot_model_state)"
-    [ -f "$state" ] && command head -n 1 "$state"
-  fi
-}
-
-# Selectable ids whose advertised plan set is no narrower than the baseline.
-# If no explicit baseline exists, require the broadest restriction set found in
-# this catalog (or an unrestricted entry). This does not claim restricted_to is
-# perfect entitlement proof; it prevents auto from knowingly widening beyond a
-# model the user already selected, while manual model ids remain unrestricted.
+# Automatic candidates depend only on this catalog, never on a previous model
+# or its billing.restricted_to set (neither proves the current account's plan).
+# Keep session-only fast siblings out of automatic main and derived role picks.
 _copilot_auto_candidate_ids() {
-  local baseline
-  baseline="$(_copilot_strip_context_hint "${1:-}")"
   command -v jq >/dev/null 2>&1 || return 1
-  jq -r --arg current "$baseline" '
-    def eligible:
-      select((.policy.state // "enabled") != "disabled")
-      | select(.model_picker_enabled != false)
-      | select((.capabilities.type // "chat") != "embeddings");
-    def plans: (.billing.restricted_to // []);
-    [.data[]? | eligible] as $served
-    | [$served[] | select(((.id // "") | endswith("-fast")) | not)] as $all
-    | ($all | map(plans) | add // [] | unique) as $universe
-    | (first($served[] | select(.id == $current) | plans) // null) as $cur
-    | (if $cur == null or ($cur | length) == 0 then $universe else $cur end) as $need
-    | $all[]
-    | (plans) as $have
-    | select(($have | length) == 0
-             or all($need[]; . as $p | $have | index($p) != null))
-    | .id' 2>/dev/null | command sort -u
+  _copilot_selectable_ids | command sed '/-fast$/d'
 }
 
 # The catalog rows a *derived* selection may consider. Mirrors the Windows
@@ -3359,7 +3323,7 @@ _copilot_model_profile_json() {
   # Derived role models go through the picker predicate (Windows parity with
   # Get-CopilotModelProfile); an explicitly named model is still honoured above.
   if [ -n "$catalog" ]; then
-    models="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids "$selected")"
+    models="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids)"
   else models=''; fi
   raw="$(_copilot_strip_context_hint "$selected")"
   main="$(_copilot_model_for_claude "$selected" "$catalog")"
@@ -3446,9 +3410,9 @@ _copilot_print_model_profile() {
 # (and the offline fallback); this is its long sibling. Explicit parameters are
 # required: a nested function would leak globally in both Bash and zsh while
 # relying on dynamic-scope locals that disappear after copilot-model returns.
-# $1 = validated catalog JSON, $2 = current model, $3 = entitlement baseline.
+# $1 = validated catalog JSON, $2 = current model.
 _copilot_model_details() {
-  local catalog="$1" current rows auto fast_routing fast_models baseline="${3:-}"
+  local catalog="$1" current rows auto fast_routing fast_models
   local id tier price ctx out eff plans state _t mark fast
   current="$(_copilot_strip_context_hint "$2")"
   # One shim request and one jq parse for the whole table, not one per row.
@@ -3456,7 +3420,7 @@ _copilot_model_details() {
   fast_models=''
   [ -n "$fast_routing" ] && fast_models="$(printf '%s' "$fast_routing" \
     | jq -r '.mappings | keys[]?' 2>/dev/null || true)"
-  auto="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids "$baseline" \
+  auto="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids \
     | _copilot_pick_best_model "$catalog" 2>/dev/null || true)"
   printf '%-2s %-33s %-11s %-9s %7s %6s %-13s %-4s %-11s %s\n' \
     '' ID TIER PRICE CTX OUT EFFORT FAST PLANS STATE
@@ -3579,8 +3543,7 @@ copilot-model() {
         printf '%s\n' "copilot-model: --details needs a reachable proxy and jq" >&2
         return 1
       fi
-      _copilot_model_details "$catalog" "$(_copilot_model_current 2>/dev/null || true)" \
-        "$(_copilot_entitlement_baseline_model)" || return 1
+      _copilot_model_details "$catalog" "$(_copilot_model_current 2>/dev/null || true)" || return 1
       return 0 ;;
     --json)
       catalog="$(_copilot_model_catalog 2>/dev/null || true)"
@@ -3598,7 +3561,7 @@ copilot-model() {
         return 1
       fi
       local _why_sel _why_pick
-      _why_sel="$(printf '%s' "$catalog"         | _copilot_auto_candidate_ids "$(_copilot_entitlement_baseline_model)")"
+      _why_sel="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids)"
       if [ -z "$_why_sel" ]; then
         printf '%s\n' "copilot-model: --why found no selectable chat model in the live catalog" >&2
         return 1
@@ -3676,7 +3639,7 @@ copilot-model() {
     # embeddings id must never be persisted into a pin the gateway then
     # rejects. `-l`, `-L`, `--json` and naming a model by hand still see
     # everything. Mirrors Get-CopilotSelectableModelIds on the Windows side.
-    selectable="$(printf '%s' "$catalog"       | _copilot_auto_candidate_ids "$(_copilot_entitlement_baseline_model)")"
+    selectable="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids)"
     if [ -z "$selectable" ]; then
       printf '%s\n' "copilot-model: --auto found no selectable chat model in the live catalog" >&2
       return 1

@@ -40,7 +40,7 @@ Both packages share the same token file
 ```sh
 copilot-proxy auth      # one-time: GitHub device login (stores a ghu_ token)
 copilot-proxy start
-copilot-model --auto    # Claude if served; otherwise Sol/Terra/Luna by role
+copilot-model --auto    # best live main + role profile, independent of previous state
 
 claude-copilot          # one-off session on the proxy (auto-starts it; no file writes)
 claude-copilot --fast   # same, using a live-catalog fast sibling when available
@@ -560,10 +560,11 @@ Behavior:
   on known ids and same-generation siblings; an unknown newer flagship can win
   without waiting for a dotfiles update. Missing category metadata (an older
   proxy) degrades to the historical allowlist rather than guessing.
-  Automatic selection also uses the explicitly pinned/persisted current model
-  as an entitlement floor: a candidate's `restricted_to` set must be at least as
-  broad. With no explicit baseline, only the broadest/unrestricted catalog
-  entries are considered. Manual model selection remains unrestricted.
+  Automatic candidates depend only on that live catalog, never on the previous
+  model, project pin, or whether the state file exists. Billing plan labels
+  (`restricted_to`) and price metadata are diagnostic only, not evidence of the
+  current account's entitlement. Main selection, derived roles, `--why`, the
+  details auto marker, and implicit `codex-copilot` use the same eligible set.
 - OpenAI generation and capability tier are independent: Astra succeeds Sol as
   the flagship, while Terra and Luna remain on 5.6. Therefore `gpt-6-astra`
   outranks `gpt-5.6-sol`, but a hypothetical lightweight `gpt-6-luna` would not.
@@ -597,6 +598,12 @@ Behavior:
 - The global state file stays a backward-compatible one-line main id; wrappers
   derive the live role profile when they inject env. Changes take effect on the
   next `claude` launch and do **not** require restarting the proxy.
+
+If an older auto-selection saved `gpt-5-mini` despite available flagships, deploy
+and reload the corrected shell fragment, then run `copilot-model --auto` again.
+There is no need to delete the state file or project settings: the old selection
+is no longer used to restrict new candidates. `--why` previews the same decision
+without writing; actual entitlement rejections remain the gateway's responsibility.
 
 Recommended sequence:
 

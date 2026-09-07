@@ -1819,56 +1819,21 @@ tier_rank() {
   [ "$output" = "gpt-6-astra=6 gpt-6-nova=6 gpt-5.6-sol=5.6 claude-opus-4-8=4.8 claude-opus-5=5 grok-4.6=4.6 mai-code-1.1-flash=1.1 " ]
 }
 
-@test "entitlement baseline falls through a base-only partial project pin" {
-  mkdir -p "$TMP/proj/.claude" "$TMP/state/copilot-proxy"
-  printf '%s\n' '{"env":{"ANTHROPIC_BASE_URL":"http://localhost:4142"}}' \
-    > "$TMP/proj/.claude/settings.local.json"
-  printf '%s\n' 'gpt-state' > "$TMP/state/copilot-proxy/model"
-  run env XDG_STATE_HOME="$TMP/state" COPILOT_CLAUDE_MODEL=gpt-env bash -c "
-    cd '$TMP/proj'; source '$SHELL_LIB'; _copilot_entitlement_baseline_model"
+@test "auto candidates ignore billing audiences but retain every policy veto" {
+  local catalog
+  catalog="$(auto_regression_catalog | jq -c '.data += [
+    {id:"gpt-9-disabled", policy:{state:"disabled"}},
+    {id:"gpt-9-hidden", model_picker_enabled:false},
+    {id:"text-embedding-test", capabilities:{type:"embeddings"}},
+    {id:"gpt-9-fast", model_picker_enabled:true}
+  ]')"
+  run bash -c '. "$1"; printf "%s" "$2" | _copilot_auto_candidate_ids' _ "$SHELL_LIB" "$catalog"
   [ "$status" -eq 0 ]
-  [ "$output" = "gpt-env" ]
-}
-
-@test "auto candidates never narrow the persisted model's advertised plan set" {
-  catalog='{"data":[
-    {"id":"gpt-6-astra","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5.6-sol","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5.6-terra","billing":{"restricted_to":["pro","pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5.6-luna","billing":{"restricted_to":["free","edu","pro","pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5-mini","capabilities":{"type":"chat"}}]}'
-
-  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
-    printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids gpt-5.6-terra"
-  [ "$status" -eq 0 ]
-  [[ "$output" != *"gpt-6-astra"* ]]
-  [[ "$output" != *"gpt-5.6-sol"* ]]
-  [[ "$output" == *"gpt-5.6-terra"* ]]
-
-  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
-    ids=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids gpt-5.6-sol)
-    printf '%s\\n' \"\$ids\" | _copilot_pick_best_model \"\$TEST_CATALOG\""
-  [ "$status" -eq 0 ]
-  [ "$output" = "gpt-6-astra" ]
-
-  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
-    ids=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids '')
-    printf '%s\\n' \"\$ids\" | _copilot_pick_best_model \"\$TEST_CATALOG\""
-  [ "$status" -eq 0 ]
-  [ "$output" = "gpt-5.6-luna" ]
-}
-
-@test "auto candidates use a fast sibling as the entitlement baseline" {
-  catalog='{"data":[
-    {"id":"gpt-6-astra","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5.6-sol","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5.6-sol-fast","billing":{"restricted_to":["pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}},
-    {"id":"gpt-5.6-luna","billing":{"restricted_to":["free","pro","pro_plus","business","enterprise","max"]},"capabilities":{"type":"chat"}}]}'
-  run env TEST_CATALOG="$catalog" bash -c "source '$SHELL_LIB'
-    ids=\$(printf '%s' \"\$TEST_CATALOG\" | _copilot_auto_candidate_ids gpt-5.6-sol-fast)
-    printf '%s\\n' \"\$ids\" | _copilot_pick_best_model \"\$TEST_CATALOG\""
-  [ "$status" -eq 0 ]
-  [ "$output" = "gpt-6-astra" ]
+  [ "${#lines[@]}" -eq 6 ]
+  [[ "$output" == *"gpt-6-astra"* ]]
+  [[ "$output" == *"gpt-5.6-sol"* ]]
+  [[ "$output" != *"gpt-9"* ]]
+  [[ "$output" != *"embedding"* ]]
 }
 
 @test "selectable_ids drops embeddings, disabled policy and picker-hidden models" {
@@ -1976,6 +1941,226 @@ tier_rank() {
 # `-l` flattens the catalog to bare ids, which threw away exactly the fields the
 # tier ranker now depends on — so there was no way to audit what --auto chose.
 
+# Non-nested plan labels reproduce the real regression: the old floor required
+# free, edu AND individual_trial, leaving only unrestricted Mini before ranking.
+auto_regression_catalog() {
+  jq -nc '
+    def entry($id; $tier; $ctx; $prompt; $plans):
+      {id:$id, model_picker_category:$tier, billing:{restricted_to:$plans},
+       capabilities:{type:"chat", limits:{max_context_window_tokens:$ctx,
+         max_prompt_tokens:$prompt, max_output_tokens:($ctx-$prompt)}}};
+    ["pro_plus","business","enterprise","max"] as $paid
+    | {object:"list", data:[
+        entry("gpt-6-astra"; "powerful"; 1000000; 872000; $paid),
+        entry("gpt-5.6-sol"; "powerful"; 1050000; 922000; $paid),
+        entry("gpt-5.6-terra"; "versatile"; 1050000; 922000; (["pro"]+$paid)),
+        entry("gpt-5.6-luna"; "lightweight"; 1050000; 922000; (["free","edu","pro"]+$paid)),
+        entry("gpt-5.4"; "powerful"; 1050000; 922000; (["individual_trial","pro"]+$paid)),
+        entry("gpt-5-mini"; "lightweight"; 264000; 200000; [])
+      ]}'
+}
+
+prepare_auto_regression() {
+  AUTO_ROOT="$TMP/$1"
+  mkdir -p "$AUTO_ROOT/home" "$AUTO_ROOT/state/copilot-proxy" "$AUTO_ROOT/tmp"
+  auto_regression_catalog > "$AUTO_ROOT/catalog.json"
+  printf '%s\n' '{"models":[]}' > "$AUTO_ROOT/bundled.json"
+  local TMP="$AUTO_ROOT"
+  write_fake_codex
+  # Never let a missed stub launch an agent, installer, or real HTTP request.
+  local exe
+  for exe in curl claude specstory bun npm; do
+    printf '%s\n' '#!/bin/sh' 'printf "unexpected external command: %s\n" "$0" >&2; exit 99' > "$TMP/bin/$exe"
+    chmod +x "$TMP/bin/$exe"
+  done
+  local initial=''
+  case "${2:-fresh}" in
+    mini|project) initial=gpt-5-mini ;;
+    sol) initial='gpt-5.6-sol[1m]' ;;
+    fast) initial='gpt-5.6-sol-fast[1m]' ;;
+    stale) initial=gpt-no-longer-served ;;
+  esac
+  [ -z "$initial" ] || printf '%s\n' "$initial" > "$AUTO_ROOT/state/copilot-proxy/model"
+  case "${2:-fresh}" in
+    native|project)
+      mkdir -p "$AUTO_ROOT/proj/.claude"
+      jq -n --arg mode "$2" '{permissions:{allow:["Read"]}, env:{UNRELATED:"keep"}}
+        | if $mode == "project" then
+            .env += {ANTHROPIC_BASE_URL:"http://localhost:4142", ANTHROPIC_MODEL:"gpt-5-mini",
+              ANTHROPIC_DEFAULT_SONNET_MODEL:"gpt-5-mini", CLAUDE_CODE_AUTO_COMPACT_WINDOW:"200000"}
+          else .model = "claude-sonnet-5" end' > "$AUTO_ROOT/proj/.claude/settings.local.json"
+      cp -p "$AUTO_ROOT/proj/.claude/settings.local.json" "$AUTO_ROOT/original-settings.json"
+      ;;
+  esac
+}
+
+auto_command() {
+  local shell="$1"; shift
+  local opts=()
+  case "$shell" in bash) opts=(--noprofile --norc) ;; zsh) opts=(-f) ;; esac
+  env -i PATH="$AUTO_ROOT/bin:$PATH" HOME="$AUTO_ROOT/home" \
+    XDG_STATE_HOME="$AUTO_ROOT/state" XDG_CONFIG_HOME="$AUTO_ROOT/config" \
+    XDG_CACHE_HOME="$AUTO_ROOT/cache" TMPDIR="$AUTO_ROOT/tmp/" \
+    TEST_AUTO_ROOT="$AUTO_ROOT" TEST_SHELL_LIB="$SHELL_LIB" \
+    "$shell" "${opts[@]}" -c '
+      cd "$TEST_AUTO_ROOT/proj" || exit
+      . "$TEST_SHELL_LIB"
+      _copilot_model_catalog() { command cat "$TEST_AUTO_ROOT/catalog.json"; }
+      _copilot_fast_routing_json() { printf "%s" "{\"mappings\":{}}"; }
+      _copilot_alive() { return 0; }
+      _copilot_require_shim() { return 0; }
+      _copilot_client_base() { printf "%s" "http://localhost:4142"; }
+      _copilot_codex_catalog_file() { printf "%s" "$TEST_AUTO_ROOT/bundled.json"; }
+      "$@"
+    ' auto-regression "$@"
+}
+
+check_public_auto_recovery() {
+  local shell="$1" state
+  for state in fresh mini sol fast stale native project; do
+    prepare_auto_regression "$shell-$state" "$state"
+    run auto_command "$shell" copilot-model --auto
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'main   : gpt-6-astra[1m]'* ]]
+    [[ "$output" == *'sonnet : gpt-5.6-terra[1m]'* ]]
+    [[ "$output" == *'haiku  : gpt-5.6-luna[1m]'* ]]
+    if [ "$state" = project ]; then
+      [ "$(cat "$AUTO_ROOT/state/copilot-proxy/model")" = gpt-5-mini ]
+      jq -e '.env as $e | $e.ANTHROPIC_MODEL == "gpt-6-astra[1m]"
+        and $e.ANTHROPIC_DEFAULT_FABLE_MODEL == "gpt-6-astra[1m]"
+        and $e.ANTHROPIC_DEFAULT_OPUS_MODEL == "gpt-6-astra[1m]"
+        and $e.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-5.6-terra[1m]"
+        and $e.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-5.6-luna[1m]"
+        and $e.ANTHROPIC_SMALL_FAST_MODEL == "gpt-5.6-luna[1m]"
+        and $e.CLAUDE_CODE_AUTO_COMPACT_WINDOW == "872000"
+        and $e.UNRELATED == "keep" and .permissions.allow == ["Read"]' \
+        "$AUTO_ROOT/proj/.claude/settings.local.json" >/dev/null
+    else
+      [ "$(cat "$AUTO_ROOT/state/copilot-proxy/model")" = 'gpt-6-astra[1m]' ]
+      [ "$(wc -l < "$AUTO_ROOT/state/copilot-proxy/model" | tr -d ' ')" = 1 ]
+      if [ "$state" = native ]; then
+        cmp "$AUTO_ROOT/original-settings.json" "$AUTO_ROOT/proj/.claude/settings.local.json"
+      else
+        [ ! -e "$AUTO_ROOT/proj/.claude/settings.local.json" ]
+      fi
+    fi
+    # Rerun through the same public command, not an id-only ranker test.
+    run auto_command "$shell" copilot-model -a
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'gpt-6-astra[1m]'* ]]
+  done
+}
+
+@test "auto public recovery: Bash selects Astra regardless of previous state" {
+  check_public_auto_recovery bash
+}
+
+@test "auto public recovery: zsh selects Astra regardless of previous state" {
+  command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
+  check_public_auto_recovery zsh
+}
+
+@test "auto public diagnostics agree without modifying current state in Bash and zsh" {
+  local shell scenario rel
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    for scenario in fresh mini project; do
+      prepare_auto_regression "$shell-diagnostics-$scenario" "$scenario"
+      for rel in state/copilot-proxy/model proj/.claude/settings.local.json; do
+        if [ -f "$AUTO_ROOT/$rel" ]; then
+          touch -t 200101010000 "$AUTO_ROOT/$rel"
+          cp -p "$AUTO_ROOT/$rel" "$AUTO_ROOT/$rel.before"
+        fi
+      done
+      run auto_command "$shell" copilot-model --why
+      [ "$status" -eq 0 ]
+      [[ "$output" == *'  -> gpt-6-astra[1m]'* ]]
+      run auto_command "$shell" copilot-model --details
+      [ "$status" -eq 0 ]
+      [[ "$output" == *'-> gpt-6-astra'* ]]
+      [[ "$output" == *'pro_plus+'* ]]
+      for rel in state/copilot-proxy/model proj/.claude/settings.local.json; do
+        if [ -f "$AUTO_ROOT/$rel.before" ]; then
+          cmp "$AUTO_ROOT/$rel.before" "$AUTO_ROOT/$rel"
+          [ ! "$AUTO_ROOT/$rel" -nt "$AUTO_ROOT/$rel.before" ]
+        else
+          [ ! -e "$AUTO_ROOT/$rel" ]
+        fi
+      done
+    done
+  done
+}
+
+@test "auto public commands reevaluate changing policy instead of sticking to a prior pick" {
+  local shell disabled expected
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    prepare_auto_regression "$shell-policy"
+    for disabled in false true false; do
+      auto_regression_catalog | jq --argjson disabled "$disabled" \
+        '(.data[] | select(.id == "gpt-6-astra")).policy.state =
+          (if $disabled then "disabled" else "enabled" end)' > "$AUTO_ROOT/catalog.json"
+      expected='gpt-6-astra[1m]'
+      [ "$disabled" = false ] || expected='gpt-5.6-sol[1m]'
+      run auto_command "$shell" copilot-model --auto --why
+      [ "$status" -eq 0 ]
+      [ "$(cat "$AUTO_ROOT/state/copilot-proxy/model")" = "$expected" ]
+    done
+  done
+}
+
+@test "auto public Codex selection uses Astra metadata without persistence" {
+  local shell scenario
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    for scenario in fresh mini; do
+      prepare_auto_regression "$shell-codex-$scenario" "$scenario"
+      run auto_command "$shell" codex-copilot --no-specstory exec 'two words'
+      [ "$status" -eq 0 ]
+      [[ "$output" == *'=<gpt-6-astra>'* ]]
+      [[ "$output" == *'=<model_context_window=1000000>'* ]]
+      [[ "$output" == *'=<model_auto_compact_token_limit=872000>'* ]]
+      [[ "$output" == *'=<two words>'* ]]
+      if [ "$scenario" = fresh ]; then
+        [ ! -e "$AUTO_ROOT/state/copilot-proxy/model" ]
+      else
+        [ "$(cat "$AUTO_ROOT/state/copilot-proxy/model")" = gpt-5-mini ]
+      fi
+      [ ! -e "$AUTO_ROOT/proj/.codex" ]
+      [ ! -e "$AUTO_ROOT/proj/.claude/settings.local.json" ]
+    done
+    run auto_command "$shell" codex-copilot --no-specstory -m gpt-5-mini exec 'explicit main'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'=<gpt-5-mini>'* ]]
+    [[ "$output" != *'--auto ->'* ]]
+  done
+}
+
+@test "auto public commands reject catalogs without eligible candidates" {
+  local shell kind
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    for kind in disabled hidden embeddings fast empty; do
+      prepare_auto_regression "$shell-no-candidates-$kind"
+      auto_regression_catalog | jq --arg kind "$kind" '
+        if $kind == "empty" then .data = []
+        else .data |= map(
+          if $kind == "disabled" then .policy.state = "disabled"
+          elif $kind == "hidden" then .model_picker_enabled = false
+          elif $kind == "embeddings" then .capabilities.type = "embeddings"
+          else .id += "-fast" end) end' > "$AUTO_ROOT/catalog.json"
+      run auto_command "$shell" copilot-model --auto
+      [ "$status" -ne 0 ]
+      run auto_command "$shell" copilot-model --why
+      [ "$status" -ne 0 ]
+      run auto_command "$shell" codex-copilot --no-specstory exec 'must not launch'
+      [ "$status" -ne 0 ]
+      [[ "$output" != *'arg[0]'* ]]
+      [ ! -e "$AUTO_ROOT/state/copilot-proxy/model" ]
+    done
+  done
+}
+
 details_catalog() {
   cat <<'JSON'
 {"data":[
@@ -1993,10 +2178,9 @@ JSON
 }
 
 @test "copilot-model --details renders the tier table and marks the --auto pick" {
-  run bash -c "cd '$TMP'; source '$SHELL_LIB'
-    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
-    _copilot_fast_routing_json() { printf '%s' '{"mappings":{}}'; }
-    copilot-model --details"
+  prepare_auto_regression details
+  details_catalog > "$AUTO_ROOT/catalog.json"
+  run auto_command bash copilot-model --details
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" == *"TIER"*"PRICE"*"CTX"*"PLANS"*"STATE"* ]]
   # tier order, newest generation first inside the tier
@@ -2009,28 +2193,25 @@ JSON
 }
 
 @test "copilot-model --why explains the pick and writes nothing" {
-  mkdir -p "$TMP/state/copilot-proxy"
-  printf '%s\n' 'gpt-5.4[1m]' > "$TMP/state/copilot-proxy/model"
-  run env XDG_STATE_HOME="$TMP/state" bash -c "cd '$TMP'; source '$SHELL_LIB'
-    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
-    copilot-model --why"
+  prepare_auto_regression why
+  details_catalog > "$AUTO_ROOT/catalog.json"
+  printf '%s\n' 'gpt-5.4[1m]' > "$AUTO_ROOT/state/copilot-proxy/model"
+  run auto_command bash copilot-model --why
   [ "$status" -eq 0 ]
   [[ "$output" == *"dry run, nothing written"* ]]
   [[ "$output" == *"gpt-6-astra"* ]]
-  # the state file must be untouched
-  [ "$(cat "$TMP/state/copilot-proxy/model")" = "gpt-5.4[1m]" ]
+  [ "$(cat "$AUTO_ROOT/state/copilot-proxy/model")" = "gpt-5.4[1m]" ]
 }
 
 @test "copilot-model --auto --why explains and then writes" {
-  mkdir -p "$TMP/state/copilot-proxy"
-  printf '%s\n' 'gpt-5.4[1m]' > "$TMP/state/copilot-proxy/model"
-  run env XDG_STATE_HOME="$TMP/state" bash -c "cd '$TMP'; source '$SHELL_LIB'
-    _copilot_model_catalog() { $(details_catalog | tr -d '\n' | sed "s/'/'\\\\\\\\''/g; s|^|printf '%s' '|; s|$|'|"); }
-    copilot-model --auto --why"
+  prepare_auto_regression explain-auto
+  details_catalog > "$AUTO_ROOT/catalog.json"
+  printf '%s\n' 'gpt-5.4[1m]' > "$AUTO_ROOT/state/copilot-proxy/model"
+  run auto_command bash copilot-model --auto --why
   [ "$status" -eq 0 ]
   [[ "$output" == *"copilot-model: --auto reasoning"* ]]
   [[ "$output" != *"dry run, nothing written"* ]]
-  [ "$(cat "$TMP/state/copilot-proxy/model")" = "gpt-6-astra[1m]" ]
+  [ "$(cat "$AUTO_ROOT/state/copilot-proxy/model")" = "gpt-6-astra[1m]" ]
 }
 
 @test "copilot-model --json passes the catalog through" {
