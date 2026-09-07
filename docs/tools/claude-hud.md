@@ -14,10 +14,17 @@ disagree with each other. Install / upgrade mechanics live in
 
 | Thing | Location |
 |---|---|
-| Config (SSOT) | [`dot_claude/plugins/claude-hud/config.json`](../../dot_claude/plugins/claude-hud/config.json) — a plain managed file; live edits are reverted on `chezmoi apply` |
+| Config (SSOT) | [`dot_claude/plugins/private_claude-hud/config.json`](../../dot_claude/plugins/private_claude-hud/config.json) — a plain managed file; live edits are reverted on `chezmoi apply` |
 | `statusLine.command` | the `overlay` heredoc in [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) |
 | Install / refresh | [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py), via `just upgrade-plugins` |
 | Full flag schema | `src/config.ts` inside the versioned cache dir |
+
+The source directory has the `private_` attribute: the deployed directory is
+still `~/.claude/plugins/claude-hud/`, with mode `0700`. HUD v0.8.0 sets that
+mode when writing its version cache. Keeping a plain source directory would
+make chezmoi try to restore `0755`, causing a directory overwrite prompt with
+no content-diff option. Cache files remain HUD-owned and unmanaged. See the
+[directory overwrite pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-folder-overwrite-every-apply.md).
 
 The plugin is deliberately **disabled** in `enabledPlugins`. The HUD still
 renders because `statusLine.command` globs the cache path and execs
@@ -25,6 +32,38 @@ renders because `statusLine.command` globs the cache path and execs
 casualty is `/claude-hud:setup` and `/claude-hud:configure` — which you would
 not want anyway, since anything they write gets reverted on the next apply.
 Edit the config source instead.
+
+## Enabled information and conditional visibility
+
+The 2026-09-07 audit found v0.8.0 installed and still the latest official
+[release](https://github.com/jarrodwatts/claude-hud/releases/tag/v0.8.0).
+These settings supplement the existing model, context, usage, cost, speed,
+activity, memory, session-token, compaction, and timestamp displays:
+
+| Setting | Managed value | What appears |
+|---|---|---|
+| `showClaudeCodeVersion` | `true` | `CC v…`, the **Claude Code** version, after a successful binary probe |
+| `showAuth` | `true` | Detected subscription plan or authentication method |
+| `showProvider` | `true` | Provider label before the model; custom proxies can set `providerName` |
+| `showAdvisor` | `true` | Advisor model when recorded in the session transcript |
+| `showOutputStyle` | `true` | `style: …` when Claude supplies an output style |
+| `showAuthUser` | default `false` | Account name remains hidden |
+| `showClockSeconds` | default `false` | Wall-clock seconds remain hidden |
+
+`showProvider` also controls placement: upstream can already append an
+auto-detected provider with the flag off; enabling it puts the label before
+the model and honors a custom `providerName`.
+
+Enabling a field does not invent missing data. The HUD's **own** version has
+no native display switch; inspect its cache `package.json` or its entry in
+`~/.claude/plugins/installed_plugins.json` instead.
+
+If `CC v…` is absent despite `showClaudeCodeVersion: true`, check the HUD's
+`.claude-code-version-cache.json`: v0.8.0 persists failed probes as
+`"version": null` and reuses them while the binary path/mtime match. The
+2026-09-07 incident recovered `CC v2.1.261` after removing only that failed
+cache. See [version missing despite enabled flag](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-version-missing-with-show-version-enabled.md)
+for a guarded recovery; no recurring cache deletion or upstream patch is installed.
 
 ## `Tokens` is a running total, not a water level
 
@@ -183,25 +222,28 @@ Why it matters in money: letting the TTL lapse means the prefix is re-billed as
 prefix. `promptCacheTtlSeconds` defaults to 300 and should match the TTL your
 requests actually use.
 
-## First-line truncation follows a fixed order
+## First-line order and narrow-window wrapping
 
-Segments render in this native order, and the line is cut at terminal width:
+In v0.8.0, the renderer wraps lines at ` | ` / ` │ ` separators when terminal
+width is known. It keeps the model badge together; a single segment wider
+than the pane is truncated with `...`. It does **not** simply discard all
+segments after the first line fills. This supersedes the older description
+of whole-line truncation. Source: [render/index.ts](https://github.com/jarrodwatts/claude-hud/blob/v0.8.0/src/render/index.ts).
 
-```text
-model, project, advisor, sessionName, version, extra, duration, cost, speed, auth
-```
+Width comes from `COLUMNS`, stdout/stderr terminal columns, or configured
+`maxWidth`. With no width available, HUD does not proactively wrap; the
+outer terminal/Claude UI determines what fits. We retain automatic width
+and expanded layout. Narrow panes can therefore use more HUD rows.
 
-`cost` is 8th of 10, so it is among the first things to disappear — you get
-`Cost $…` while a random session slug survives. Do not fix this by switching
-elements off; reorder instead. `orderFirstLineParts` emits listed segments in
-your order and **appends every unlisted key after them**, so a partial list
-works and whatever lands last is what truncation eats:
+`projectLineOrder` controls reading priority; unlisted keys are appended.
+The managed order places cost and the Claude Code version before secondary
+labels, without disabling the remaining information:
 
 ```json
 "projectLineOrder": [
   "model", "project", "duration", "cost",
-  "extra", "advisor", "speed", "auth",
-  "sessionName", "version"
+  "version", "advisor", "speed", "auth",
+  "extra", "sessionName"
 ]
 ```
 

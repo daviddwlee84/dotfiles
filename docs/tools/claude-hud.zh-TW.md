@@ -11,7 +11,7 @@ prompt 上方那幾行 HUD：model badge、context bar、cost、cache 倒數、�
 
 | 項目 | 位置 |
 |---|---|
-| 設定（SSOT） | [`dot_claude/plugins/claude-hud/config.json`](../../dot_claude/plugins/claude-hud/config.json) —— 純受管檔案；直接改實機檔案會在 `chezmoi apply` 時被還原 |
+| 設定（SSOT） | [`dot_claude/plugins/private_claude-hud/config.json`](../../dot_claude/plugins/private_claude-hud/config.json) —— 純受管檔案；直接改實機檔案會在 `chezmoi apply` 時被還原 |
 | `statusLine.command` | [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) 裡的 `overlay` heredoc |
 | 安裝／刷新 | [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py)，經由 `just upgrade-plugins` |
 | 完整 flag schema | 帶版本的快取目錄裡的 `src/config.ts` |
@@ -20,6 +20,39 @@ prompt 上方那幾行 HUD：model badge、context bar、cost、cache 倒數、�
 `statusLine.command` 直接 glob 快取路徑並執行 `dist/index.js`，完全不經過外掛載入器。
 唯一的代價是 `/claude-hud:setup` 與 `/claude-hud:configure` —— 而你本來也不該用它們，
 因為它們寫入的東西會在下次 apply 被還原。請改設定原始檔。
+
+## 目錄權限與顯示項目
+
+來源目錄使用 `private_` 屬性，部署路徑仍為 `~/.claude/plugins/claude-hud/`，
+權限是 `0700`。這與 HUD v0.8.0 寫版本快取時的權限一致，避免 chezmoi 反覆要求
+覆寫資料夾卻沒有文字 diff 選項。快取由 HUD 自行管理。
+[目錄覆寫 pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-folder-overwrite-every-apply.md)。
+
+2026-09-07 檢查時，本機已安裝的 v0.8.0 仍是
+[最新正式版](https://github.com/jarrodwatts/claude-hud/releases/tag/v0.8.0)。
+除原有的模型、context、usage、費用、速度、活動、記憶體與 session 資訊外：
+
+| 設定 | 目前值 | 顯示條件 |
+|---|---|---|
+| `showClaudeCodeVersion` | `true` | 成功探測後顯示 `CC v…`，這是 Claude Code 的版本 |
+| `showAuth` | `true` | 有可辨識的訂閱方案或登入方式 |
+| `showProvider` | `true` | provider 排在模型前面；自訂代理可另設 `providerName` |
+| `showAdvisor` | `true` | transcript 記錄了 advisor 模型 |
+| `showOutputStyle` | `true` | Claude 提供了 output style |
+| `showAuthUser` | 預設 `false` | 帳號名稱保持隱藏 |
+| `showClockSeconds` | 預設 `false` | 不增加時鐘秒數 |
+
+`showProvider` 也控制位置：即使關閉，上游仍可能在模型後面附加自動辨識的 provider；
+開啟後移到模型前面，並支援自訂 `providerName`。
+
+開啟選項不會補出缺少的資料。HUD 自身版本沒有原生顯示開關，可從快取的
+`package.json` 或 `~/.claude/plugins/installed_plugins.json` 查詢。
+
+若版本顯示已開啟卻看不到 `CC v…`，檢查 HUD 的 `.claude-code-version-cache.json`。
+v0.8.0 會把探測失敗存成 `"version": null`，只要 binary 路徑與 mtime 沒變就持續沿用。
+本次移除失敗快取後已恢復 `CC v2.1.261`。
+[版本缺失 pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/claude-hud-version-missing-with-show-version-enabled.md)
+提供只清除失敗快取的操作；沒有安裝週期性刪除機制或修改上游程式。
 
 ## `Tokens` 是累計值，不是水位
 
@@ -161,24 +194,25 @@ claude-hud 內部沒有計時器。數值只有在 **Claude Code 重新呼叫 st
 `cache_read`（0.1×）重新計費 —— 在 prefix 上是 12.5 倍的差距。`promptCacheTtlSeconds`
 預設 300，應與你的 request 實際使用的 TTL 一致。
 
-## 第一行的截斷遵循固定順序
+## 第一行順序與窄視窗換行
 
-segment 依此原生順序渲染，並在終端寬度處被切斷：
+v0.8.0 在已知終端寬度時，會按 ` | `／` │ ` 分隔符換行，並保持 model badge
+完整。只有單一片段比視窗更寬時才用 `...` 截斷；不會把第一行容納不下的其餘片段
+全部丟棄。這取代了舊文件對整行截斷的描述。
+[上游實作](https://github.com/jarrodwatts/claude-hud/blob/v0.8.0/src/render/index.ts)。
 
-```text
-model, project, advisor, sessionName, version, extra, duration, cost, speed, auth
-```
+寬度依序來自 `COLUMNS`、stdout/stderr 終端欄數或 `maxWidth` 設定。
+完全無法取得寬度時，HUD 不主動換行，顯示結果取決於外層 Claude／終端 UI。
+目前保留自動寬度與 expanded 排版，因此窄視窗可能增加 HUD 行數。
 
-`cost` 排在 10 個中的第 8 個，所以它會是最早消失的項目之一 —— 你會看到 `Cost $…`
-而一個隨機 session slug 反而活著。不要用關掉元素來解決，改成重新排序。
-`orderFirstLineParts` 會依你給的順序輸出列出的 segment，並**把所有未列出的 key 接在其後**，
-所以 partial list 就夠用，而排在最後的就是被截斷時最先犧牲的：
+`projectLineOrder` 決定閱讀順序，未列出的項目接在最後。目前將費用與 Claude Code
+版本排在其他標籤前面：
 
 ```json
 "projectLineOrder": [
   "model", "project", "duration", "cost",
-  "extra", "advisor", "speed", "auth",
-  "sessionName", "version"
+  "version", "advisor", "speed", "auth",
+  "extra", "sessionName"
 ]
 ```
 

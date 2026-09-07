@@ -88,11 +88,11 @@ flowchart LR
 
 `claude-hud` 沒被放進 [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl)：它使用了帶版本的快取 (cache) 路徑，並會改寫 `~/.claude/plugins/installed_plugins.json`，所以放在顯式的 `plugins` 升級路徑比放在 chezmoi externals 更合適。Upstream `v0.0.12+` 也把使用量渲染切換到 Claude Code 的官方 stdin `rate_limits`，這代表升級後舊有的、由憑證推導出的 `Max` 標誌可能會消失。
 
-由於安裝路徑走的是 `claude_hud_sync.py --only-if-missing`（install-only，遵循整個 repo 的 install/upgrade 分離原則），一台從來沒跑過 `just upgrade-plugins` 的機器會無聲地停在它第一次安裝時的版本 —— 這台主機就從 2026-03 的 `0.0.11` 一路留到 2026-07，而 upstream 當時已經到 `v0.6.0`。可辨識的徵兆：另一台機器的 HUD 顯示了你這台沒有的元素。`0.0.11` 之後新增的元素幾乎都是 **opt-in、預設 `false`**，所以光升級不會有任何可見變化；這些 flag 位於 [`dot_claude/plugins/claude-hud/config.json`](../../dot_claude/plugins/claude-hud/config.json)。`0.0.11` 之後值得注意的新增項目：`showCost`（v0.0.12）、`showPromptCache` + `promptCacheTtlSeconds`（v0.1.0，TTL 預設 300 秒）、`showEffortLevel`（依 stdin 的 `effort` 顯示 `ultracode`/`xhigh`）、`showSkills`、`showMcp`、`showSessionTokens`、`showCompactions`、`showSessionStartDate`、`showLastResponseAt`，以及 `language: "zh-Hant"`（v0.4.0）。
+由於安裝路徑走的是 `claude_hud_sync.py --only-if-missing`（install-only，遵循整個 repo 的 install/upgrade 分離原則），一台從來沒跑過 `just upgrade-plugins` 的機器會無聲地停在它第一次安裝時的版本 —— 這台主機就從 2026-03 的 `0.0.11` 一路留到 2026-07，而 upstream 當時已經到 `v0.6.0`。可辨識的徵兆：另一台機器的 HUD 顯示了你這台沒有的元素。`0.0.11` 之後新增的元素幾乎都是 **opt-in、預設 `false`**，所以光升級不會有任何可見變化；這些 flag 位於 [`dot_claude/plugins/private_claude-hud/config.json`](../../dot_claude/plugins/private_claude-hud/config.json)。`0.0.11` 之後值得注意的新增項目：`showCost`（v0.0.12）、`showPromptCache` + `promptCacheTtlSeconds`（v0.1.0，TTL 預設 300 秒）、`showEffortLevel`（依 stdin 的 `effort` 顯示 `ultracode`/`xhigh`）、`showSkills`、`showMcp`、`showSessionTokens`、`showCompactions`、`showSessionStartDate`、`showLastResponseAt`，以及 `language: "zh-Hant"`（v0.4.0）。
 
 升級**不需要**啟用該 plugin —— `claude_hud_sync.py` 從不讀取 `enabledPlugins`，而 `claude-hud@claude-hud` 是刻意設為 `false` 的（見 [lsp.md](../tools/lsp.md) § 透過 Claude Code 外掛）。statusline 會以 `sort -V | tail -1` 選取最新的快取版本，因此舊版目錄會原地保留，要回退只需刪掉較新的那個目錄。
 
-如何正確解讀這些已啟用的元素本身就是一個主題 —— `Tokens` 是累計值而非水位且不含 subagent，`Cost` 來源不同且包含它們，cache 倒數是會在閒置時凍住的快照，而第一行是依固定 segment 順序截斷、`cost` 排在 10 個中的第 8 個。這些全部整理在 [tools/claude-hud.md](../tools/claude-hud.md)。
+如何正確解讀這些已啟用的元素本身就是一個主題 —— `Tokens` 是累計值而非水位且不含 subagent，`Cost` 來源不同且包含它們，cache 倒數是會在閒置時凍住的快照，而 v0.8.0 在已知寬度時會按 segment 換行，單一超長片段才截斷。目前將費用與 Claude Code 版本排在次要標籤前面，並啟用方案／登入方式、provider、advisor 與 output style（有資料才顯示）。這些全部整理在 [tools/claude-hud.md](../tools/claude-hud.md)。
 
 ## 語意：盡力而為，並非全有全無
 

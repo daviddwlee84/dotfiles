@@ -27,18 +27,22 @@
     "showSessionStartDate": true,
     "showLastResponseAt": true,
     "contextValue": "both",
-    "sevenDayThreshold": 0
+    "sevenDayThreshold": 0,
+    "showAuth": true,
+    "showProvider": true,
+    "showAdvisor": true,
+    "showOutputStyle": true
   },
   "projectLineOrder": [
     "model",
     "project",
     "duration",
     "cost",
-    "extra",
+    "version",
     "advisor",
     "speed",
     "auth",
-    "sessionName",
-    "version"
+    "extra",
+    "sessionName"
   ]
 }

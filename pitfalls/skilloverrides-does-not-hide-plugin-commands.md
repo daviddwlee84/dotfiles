@@ -104,7 +104,7 @@ nothing we use goes through the plugin loader:
 Trade-off: `/claude-hud:setup` and `/claude-hud:configure` stop resolving. Flip
 `enabledPlugins` back to `true` (or toggle in `/plugin`) for the rare
 reconfigure. Day-to-day config is a managed file at
-`dot_claude/plugins/claude-hud/config.json`.
+`dot_claude/plugins/private_claude-hud/config.json`.
 
 ## Scale check before you bother
 

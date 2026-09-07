@@ -318,6 +318,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **Coding Agents** (optional): Claude Code with official Pyright/`gopls` LSP plugins, Pi, Oh My Pi (`omp`), the Git-managed `pia` harness-combo manager, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli; wrapper-managed SpecStory sessions carry a `DEV_AGENT_RUN_ID`, finalize explicitly armed transcripts only after the writer exits, and use Claude `SessionEnd` only as a lightweight observer; the local Copilot gateway includes content-free timing metrics, adaptive 4→8 admission control with live tuning, SSE keepalives, followable logs, and Claude auto-compaction sized from each model's live prompt ceiling
 - **Coding Agents** (optional): Claude Code with official Pyright/`gopls` LSP plugins, Pi, Oh My Pi (`omp`), the Git-managed `pia` harness-combo manager, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli; wrapper-managed SpecStory sessions carry a `DEV_AGENT_RUN_ID`, finalize explicitly armed transcripts only after the writer exits, and use Claude `SessionEnd` only as a lightweight observer; the local Copilot gateway includes content-free timing metrics, adaptive 4→8 admission control with live tuning, SSE keepalives, Responses terminal-event validation, and followable logs
 - **Agent pane discovery**: `tv agent-panes` channel + tmux `prefix + a` popup — find which Claude/Codex/OpenCode/Cursor sessions are running in any tmux pane and jump straight to them; companion `recon` (Claude-only fast popup) installed via cargo. See [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)
+- **Claude HUD**: model/context, cost, Claude Code version, subscription/auth method, provider, advisor, and output style when available. The private HUD directory matches upstream's `0700` cache permissions, avoiding repeated directory overwrite prompts. See [claude-hud](docs/tools/claude-hud.md).
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
 - **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks
 - **Input Methods** (optional): McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux)
@@ -406,10 +407,11 @@ docs, rationale, run-order diagram, and extension guide live in
 When installed, `just upgrade-plugins` also refreshes `claude-hud` to the
 latest upstream release. Upstream `claude-hud` `v0.0.12+` now follows Claude
 Code's official stdin `rate_limits` only, so the old credential-derived `Max`
-plan badge may disappear after upgrade. Install is deliberately install-only,
+plan badge may disappear after upgrade; the separate `showAuth` option now
+displays the detected plan/auth method. Install is deliberately install-only,
 so a host that never runs this recipe stays on its seeded version indefinitely;
 most HUD elements added since are opt-in and live in
-`dot_claude/plugins/claude-hud/config.json`. See
+`dot_claude/plugins/private_claude-hud/config.json`. See
 [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md).
 
 ## Multi-host apply (`just fleet-apply`)
