@@ -121,10 +121,10 @@ repos:
   # Two scopes, two severities:
   #   1. scripts/**/*.sh — strict (severity=warning), always green. Recursive
   #      coverage matters: lib/ is inlined into run-scripts, adhoc/ contains
-  #      machine diagnostics, and ios/ contains a deployed POSIX-sh bootstrap.
+  #      machine diagnostics.
   #      Let shellcheck infer the language from each shebang (or its
   #      `shellcheck shell=` directive) instead of forcing bash — otherwise the
-  #      iSH bootstrap's POSIX portability would not actually be checked.
+  #      POSIX helpers would not actually be checked for portability.
   #   2. dot_config/{shell,bash}/ — relaxed (severity=error), only blocks
   #      on actual bugs while we gradually clean up the 40-odd preexisting
   #      warnings. Drop to severity=warning once `just lint-shell` is clean.

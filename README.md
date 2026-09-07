@@ -1,5 +1,11 @@
 # dotfiles
 
+Lightweight companions: [iSH](https://github.com/daviddwlee84/dotfiles-iSH) and
+[OpenWrt / ImmortalWrt](https://github.com/daviddwlee84/dotfiles-OpenWrt).
+iSH setup and troubleshooting have moved to the iSH repository; do not apply this
+full Unix stack there. In `dotfiles-all`, this repository is checked out as
+`dotfiles-unix/`; its GitHub name remains `dotfiles`.
+
 Cross-platform development environment setup using **chezmoi** + **ansible**.
 
 - **chezmoi**: manages config files (dotfiles)
