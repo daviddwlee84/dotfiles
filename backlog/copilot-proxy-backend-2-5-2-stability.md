@@ -15,7 +15,7 @@ The live Mac proxy was not upgraded or restarted. Ubuntu's default package stays
 2.3.4; its original config and credential bytes were verified unchanged after testing.
 
 The isolated trial ran on `ssh david_ubuntu`, Node 24.18.0 / Bun 1.3.14, with a
-separately installed Codex 0.153.4 and shared shim SHA-256
+separately installed Codex 0.153.4, Astra at low reasoning effort, and shared shim SHA-256
 `d0912c4fef76d74896e161b03cd64d28a0b1f6597cf7490d5613840efe014749`.
 Both package archives had all 35 packaged files compared against installed bytes.
 The actual 2.5.2 config migration also passed with custom 123456/234567ms deadlines,
@@ -50,8 +50,8 @@ owned process groups even if their leader already exited. Private artifacts are
 retained on Ubuntu at `/tmp/copilot-dogfood-20260908.FinAl7`; they include credential
 copies and must not be committed or shared as a directory. The budget is exhausted.
 
-Offline verification: full Unix Bats **150/150 passed**; harness edge-case tests
-passed separately; Windows Copilot Pester **232 passed / one native-only skip**,
+Offline verification: full Unix Bats **150/150 passed**; all seven harness edge-case
+tests passed separately; final Windows Copilot Pester **234 passed / one native-only skip**,
 plus final shared integration **8/8** and focused final-change checks. Windows
 PSScriptAnalyzer and bilingual docs build passed. Unix strict docs build fails
 with the same nav/i18n + llmstxt warnings reproduced on isolated unchanged HEAD;
