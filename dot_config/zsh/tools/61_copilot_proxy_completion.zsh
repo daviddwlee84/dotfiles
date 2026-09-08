@@ -5,7 +5,7 @@
 
 _copilot_proxy() {
   local -a actions periods scopes
-  actions=(start stop restart status doctor test logs auth reinstall shim limiter whoami usage quota stats events bench update help)
+  actions=(start stop restart status doctor test logs auth reinstall shim limiter whoami usage quota stats events bench update rollback help)
   periods=(day week month)
   scopes=(normal benchmark all)
   if (( CURRENT == 2 )); then

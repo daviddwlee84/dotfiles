@@ -76,7 +76,7 @@ Codex ──OpenAI /v1/responses──────────▶ the same :4142
 
 - Claude Code speaks only the **Anthropic Messages API** (`/v1/messages`).
 - The fork uses Copilot's native Anthropic path for Claude ids and translates
-  Claude Code requests to the **Responses API** for GPT ids. The pinned `2.3.4`
+  Claude Code requests to the **Responses API** for GPT ids. Since `2.3.4`, the
   forwards Claude Code's `output_config.effort` to `reasoning.effort`, preserves
   reasoning state, and handles the GPT-5.6 request shape.
 - The original (`copilot-api@0.7.0`) always translates through
@@ -138,7 +138,8 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
 | `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
-| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.3.4` pin. While set, `update VERSION` refuses to change persisted state. |
+| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.5.2` pin. While set, update/rollback refuse to change persisted state. |
+| `COPILOT_ASTRA_COMPACT_RATIO` | `0.70` | New Astra sessions/pins compact against this fraction of the live prompt ceiling; numeric `0 < ratio <= 1`. Explicit client compact settings take precedence. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_SHIM_MIN` | `4` | adaptive concurrency floor and startup limit |
 | `COPILOT_SHIM_MAX` | `8` | adaptive ceiling; set equal to `MIN` for a fixed cap |
@@ -171,13 +172,17 @@ enabled but cannot start, launchers fail closed instead of silently bypassing
 measurement; `copilot-proxy shim off` is the explicit direct-to-`:4141`
 break-glass mode.
 
-Before upstream model bytes are exposed, the shim retries the **same buffered
-request and model** on network failures or HTTP 403/429/500/502/503/504. An
-upstream `408 user_request_timeout` while reading the buffered request body gets
-at most one replay; persistent large-body failures are not multiplied across the
-general retry budget. HTTP 402, bare 401 and policy 422 pass through once. Queue waiters and retry backoff are
-client-cancel aware, so an abandoned request cannot retain a permit ahead of
-live work. Every successful streamed response must have the SSE media type,
+Before upstream model bytes are exposed, the shim permits at most two backend
+dispatches: one initial request and one replay of the same body/model. A confirmed
+body-read `408 user_request_timeout` and eligible completed HTTP failures may
+use that replay; permission/auth/policy rejections do not. A local timeout or
+broken connection leaves upstream work unknown and is never automatically replayed.
+Cancellation while queued or in backoff removes the request. After dispatch,
+canceling the client keeps the permit while the backend response drains; it
+cannot admit replacement work until that execution settles.
+Codex launchers set request/stream retries to `0/0` with the shim, and `3/1` in
+explicit direct mode. Caller `-c` overrides remain later in argv on both the
+direct and SpecStory paths. Every successful streamed response must have the SSE media type,
 including responses inside the grace window. For slow streams the shim sends
 SSE comments while queueing/retrying; if that pre-header pipeline then yields a
 non-2xx or a non-SSE HTTP 200, it emits the native Anthropic Messages or OpenAI
@@ -245,33 +250,54 @@ Copilot-protocol risks remain; the package is still unofficial and has a small
 maintainer surface.
 
 `copilot-proxy update --check` queries canonical npm (configured registry only
-as a warned fallback) and never installs. `update VERSION` accepts exact semver
-only, verifies npm's SHA-512 tarball integrity, installs and smoke-tests a
-staging prefix, atomically swaps it, and keeps `pkg.previous`. If a previously
-running proxy fails to start after the swap, the old package selection and
-prefix are restored and restarted. The selected `{spec, integrity, registry,
-selected_at}` lives in `$XDG_STATE_HOME/copilot-proxy/package.json`.
+as a warned fallback) and never installs. `update VERSION` requires exact semver,
+verifies the downloaded SHA-512 archive, installs **that same local archive**,
+checks the installed version and runs a help smoke test before touching the live
+prefix. Trusted first installs use the same artifact path; stale manager locks
+cannot vouch for different runtime bytes. The built-in target is
+[`@jeffreycao/copilot-api@2.5.2`](https://github.com/caozhiyuan/copilot-api/releases/tag/v2.5.2),
+SRI `sha512-bMVpuniekbKKq0LMtmZZJKjDVpaOODAHs19akwkP/hyGfgcx+YK0X22jfB46lQb0p9EoywDrJMyTcAfLr18jEQ==`.
+An existing selection remains authoritative until `copilot-proxy update 2.5.2`.
 
-The audited built-in release is `@jeffreycao/copilot-api@2.3.4`: tag commit
-[`a515535`](https://github.com/caozhiyuan/copilot-api/commit/a51553569ba071e0c9a8329f8f5ccac2482a3945),
-npm tarball SHA-1 `643f59e0c257db613954738f02300c0a7ceebfeb`, SRI
-`sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ==`,
-35 files, and npm Trusted Publisher provenance from
-[release run 32856658249](https://github.com/caozhiyuan/copilot-api/actions/runs/32856658249).
-A host with a persisted older selection moves deliberately with
-`copilot-proxy update 2.3.4`; verified exact rollback targets remain
-`copilot-proxy update 2.3.0` and `copilot-proxy update 2.1.0`.
+Update retains a private `pkg.rollback.*` generation containing the previous
+package/selection, backend config, consistent backend/metrics SQLite images,
+deployed wrapper/shim and selected launch settings. The selected
+`{spec, integrity, registry, selected_at}` remains in
+`$XDG_STATE_HOME/copilot-proxy/package.json`; its sibling `rollback` identifies
+the recoverable generation. An already running Unix service is restarted, with
+automatic package/config recovery if the candidate fails startup or selection.
 
-On a **normal install** (not `update`), the pinned selection is cross-checked
-against what actually landed in the prefix. `package-lock.json` is consulted
-only when its recorded `version` matches the installed one: the install prefix
-is mixed-manager by design — `bun add` writes `bun.lock`, while the npm CA-stack
-fallback writes `package-lock.json` and nothing ever removes it — so an old lock
-routinely describes a version that is no longer installed. Without that gate the
-check compares two different versions' genuine hashes and refuses every start
-([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-stale-package-lock-integrity.md)).
-When no lock applies, the fallback compares npm registry metadata for the
-**installed** version. Both refusal messages print `on disk:` and `pinned:`.
+`copilot-proxy rollback` works offline. It restores the previous package,
+selection and original `responsesTransport`/`upstreamTransport` fields, while
+preserving unrelated current config, current credentials and post-upgrade usage.
+The rejected package and post-upgrade config remain available for diagnosis;
+database snapshots are recovery evidence and are **not** automatically restored.
+The command reports the retained deployment snapshot: restore its matching
+wrapper/shim and launch settings separately, then reload the shell. A snapshot
+captures files present at update time, so retain old deployment files **before**
+deploying a changed wrapper when you need an earlier shim generation.
+
+For isolated Ubuntu dogfood, `scripts/copilot_proxy/dogfood.py prepare` accepts
+`--root`, absolute `--node`/`--bun`, `--shim`, `--archive-2-3-4` and
+`--archive-2-5-2`; `run` uses that root and the runtime paths. The dedicated trial
+uses only Ubuntu's local credential copy, separate config/SQLite/metrics and
+recorded PIDs. The default `--expected-host David-Ubuntu` guard runs before
+creating a trial directory or copying credentials; listener PIDs must match the
+trial child before inference. It permits 12 logical requests / 24 physical dispatches total,
+with `--proxy-env` only when explicitly needed by that host. Baseline and candidate
+use the same shim/client policy. Switching immutable trial slots restores the
+whole matching bundle without touching the default installation or Mac session.
+
+If the initial client execution fails, `verify-candidate` can use only the
+unspent portion of that same budget, once; allocations use exclusive creation
+and are not reset by rerunning. The default client sandbox is `workspace-write`.
+An explicit `--sandbox-mode danger-full-access` matches the normal launcher
+posture on hosts where bubblewrap cannot initialize; it changes only the test
+process and provides **no OS filesystem sandbox**. The trial directory then
+remains a workflow convention, not a security boundary. Results from differing
+client policies are functional validation, not a controlled performance comparison.
+Trial directories contain private credential/config copies and must not be shared
+or committed wholesale. See the [implementation and measured Ubuntu results](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/copilot-proxy-backend-2-5-2-stability.md).
 
 ### `copilot-proxy doctor [--live]` (alias: `test`)
 
@@ -644,12 +670,20 @@ The role variables are read at Claude Code startup, so
 ```
 
 `ANTHROPIC_AUTH_TOKEN` is ignored by the proxy but must be set.
-`CLAUDE_CODE_AUTO_COMPACT_WINDOW` is the selected model's provider prompt
-ceiling, not its full context size. For example, a 1.05M-context GPT model with
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` is derived from the selected model's provider
+prompt ceiling, not its full context size. For example, a 1.05M-context GPT model with
 128k maximum output advertises a 922k prompt ceiling. The `[1m]` suffix keeps the
 HUD/full-window classification correct while this variable makes compaction run
 before the gateway rejects the request. Set `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`
 yourself only when you want to compact earlier.
+Astra uses `floor(live prompt ceiling × COPILOT_ASTRA_COMPACT_RATIO)`, initially
+70%: 872,000 becomes 610,400 tokens. This is a pilot setting, not a proven fix
+for remote body-read 408. Claude's 100,000-token minimum remains enforced;
+Codex requires a positive derived limit. Missing metadata retains the existing
+client fallback with a warning. Explicit `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
+(within the live ceiling) and Codex `-c model_auto_compact_token_limit=...` win.
+Only new launches and refreshed managed pins change; true context metadata,
+`[1m]`, existing safe pins and active session history remain intact.
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` cuts background chatter (helps with
 rate limits). Do **not** paste this into the committed `.claude/settings.json` —
 use `copilot-here on` instead.
@@ -781,10 +815,15 @@ response itself after `COPILOT_SHIM_PING_AFTER_MS` of silence and emits SSE
 *comment* frames (`: copilot-shim keepalive`, discarded by every spec-compliant
 parser, so invisible to both the Anthropic and OpenAI SDKs) every
 `COPILOT_SHIM_PING_MS` until real bytes arrive — covering queue time, think
-time, and mid-stream reasoning gaps alike. `COPILOT_SHIM_STALL_MS` bounds each
-attempt: a pre-header stall is aborted and retried transparently (nothing but
-comment frames has reached the client), a mid-stream stall fails the response
-with a real error instead of hanging.
+time, and mid-stream reasoning gaps alike. The backend owns its normal
+300-second header/inactivity deadlines; the shim has a 330-second finite fallback.
+A shim timeout or broken backend connection retains an `unknown` permit and
+reports recovery required. It never replays an execution that might still run.
+Health reports active/draining/unknown, actual artifact versions and deadline
+ordering; all-unknown admission fails promptly. Outstanding leases persist in
+`metrics.sqlite.admission.json`, so restarting only the shim cannot erase them.
+After tracked work settles, controlled `copilot-proxy restart` confirms both
+processes have exited before clearing that marker. Do not delete it manually.
 
 | Env | Default | Meaning |
 |---|---|---|
@@ -792,7 +831,9 @@ with a real error instead of hanging.
 | `COPILOT_SHIM_MAX` | `8` | adaptive ceiling; set equal to `MIN` for a fixed cap |
 | `COPILOT_SHIM_PING_MS` | `15000` | keepalive interval; `0` disables |
 | `COPILOT_SHIM_PING_AFTER_MS` | `10000` | silence tolerated before the SSE response is committed early |
-| `COPILOT_SHIM_STALL_MS` | `240000` | silence that counts as a wedged upstream; `0` disables |
+| `COPILOT_SHIM_STALL_MS` | `330000` | positive finite outer header/inactivity fallback; must exceed the backend deadlines |
+| `COPILOT_SHIM_RETRIES` | `1` | at most one replay, two total dispatches per ingress |
+| `COPILOT_SHIM_HOST` | `127.0.0.1` | listener address; the default is loopback only |
 
 Fast non-2xx responses keep their real status and headers, so a
 `400 model_not_supported` or `401 IDE token expired` still reports itself
@@ -802,10 +843,12 @@ Once the SSE response is committed, a late non-2xx can only be delivered as a
 protocol-native terminal event, so don't shrink `COPILOT_SHIM_PING_AFTER_MS` to
 zero.
 
-For `/responses`, the shim also verifies that the upstream SSE reaches one of
-`response.completed`, `response.failed`, or `response.incomplete`. An EOF before
-those terminal events is recorded as `upstream_protocol_eof` instead of a
-successful request. This is diagnostic: the shim never fabricates a completion.
+For `/responses`, only `response.completed` counts as successful SSE completion;
+`response.failed`, `response.incomplete` and missing terminal events are separate
+failures, even with HTTP 200. Non-streaming JSON is classified by protocol result.
+Metrics record compact classification/source, request byte counts, attempts,
+timeout owner and drain outcome without storing bodies or credentials. The shim
+never fabricates a completion.
 If the fork log shows a matching `WebSocket error`, set
 `useResponsesApiWebSocket` to `false` in its data-dir `config.json` and restart;
 the fork does not automatically fall back from a failed WebSocket to HTTP. See
@@ -870,7 +913,7 @@ is required, fall back to the original:
 Older fork releases could forward Claude Code's `context_management` field to
 an endpoint that rejected it with 400
 ([caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)). The
-The pinned `2.3.4` GPT-5.6 path suppresses that incompatible field and relies on Responses
+The GPT-5.6 path since `2.3.4` suppresses that incompatible field and relies on Responses
 reasoning/context handling instead. This avoids the 400, but Anthropic's exact
 context-editing and prompt-cache semantics are not reproduced; long-session
 behavior remains a compatibility surface to watch.

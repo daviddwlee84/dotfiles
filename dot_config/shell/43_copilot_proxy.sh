@@ -73,7 +73,9 @@
 #   COPILOT_API_PKG      default: unset       - temporary highest-priority
 #                                               package override. Otherwise use
 #                                               persisted selection, then built-in
-#                                               @jeffreycao/copilot-api@2.3.4.
+#                                               @jeffreycao/copilot-api@2.5.2.
+#   COPILOT_ASTRA_COMPACT_RATIO default: 0.70 - fraction of live Astra prompt
+#                                               capacity for new client sessions
 #   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
 #                                               by the original package (the fork
 #                                               has no rate limiter)
@@ -87,8 +89,8 @@
 # --- shared constants / helpers -------------------------------------------------
 
 _copilot_port() { printf '%s' "${COPILOT_PROXY_PORT:-4141}"; }
-_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.3.4'; }
-_copilot_builtin_integrity() { printf '%s' 'sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ=='; }
+_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.5.2'; }
+_copilot_builtin_integrity() { printf '%s' 'sha512-bMVpuniekbKKq0LMtmZZJKjDVpaOODAHs19akwkP/hyGfgcx+YK0X22jfB46lQb0p9EoywDrJMyTcAfLr18jEQ=='; }
 _copilot_pkg_selection_state() { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/package.json"; }
 _copilot_pkg() {
   if [ -n "${COPILOT_API_PKG:-}" ]; then printf '%s' "$COPILOT_API_PKG"; return; fi
@@ -168,6 +170,17 @@ _copilot_pkg_ready() {
   [ "$(command head -n 1 "$stamp" 2>/dev/null)" = "$(_copilot_pkg)" ]
 }
 
+_copilot_kill_install_tree() {
+  local parent="$1" child
+  # A verified archive no longer contains the package name in argv. Follow
+  # this installer's descendants instead of matching every install on the host.
+  command ps -axo pid=,ppid= | command awk -v parent="$parent" '$2 == parent {print $1}' |
+    while IFS= read -r child; do
+      _copilot_kill_install_tree "$child"
+      kill -9 "$child" 2>/dev/null || true
+    done
+}
+
 # One package-install attempt in $1. $2 = "noproxy" strips the proxy env,
 # "npm" uses npm without proxy env (a useful fallback when Bun rejects a TUN /
 # MITM certificate chain), and anything else runs Bun with the ambient env.
@@ -179,7 +192,8 @@ _copilot_pkg_ready() {
 # start hang too. Never let one escape.
 _copilot_pkg_install_try() {
   local dir="$1" mode="$2" budget="$3" pkg pid i=0 log
-  pkg="$(_copilot_pkg)"
+  # A supplied archive is the exact artifact already checked by the updater.
+  pkg="${4:-$(_copilot_pkg)}"
   log="${TMPDIR:-/tmp}/copilot-pkg-install-$$.log"
   if [ "$mode" = "noproxy" ]; then
     ( cd "$dir" 2>/dev/null && command env \
@@ -212,9 +226,8 @@ _copilot_pkg_install_try() {
   # we report the timeout ourselves, and a raw job-control message here reads like
   # a crash. Kill the whole process group's `bun add` too — the subshell's child
   # is the one actually holding the cache lock.
-  { kill -9 "$pid" 2>/dev/null
-    command pkill -9 -f "bun add.*$(_copilot_pkg_name)" 2>/dev/null
-    command pkill -9 -f "npm install.*$(_copilot_pkg_name)" 2>/dev/null
+  { _copilot_kill_install_tree "$pid"
+    kill -9 "$pid" 2>/dev/null
     wait "$pid" 2>/dev/null
   } 2>/dev/null
   command rm -f -- "$log"
@@ -227,6 +240,39 @@ _copilot_ensure_pkg() {
   spec="$(_copilot_pkg)"; prefix="$(_copilot_pkg_prefix)"; bin="$(_copilot_pkg_bin)"
 
   _copilot_pkg_ready && return 0
+
+  # Trusted fork selections use the very same verified archive as explicit
+  # updates. A registry/lockfile hash by itself is not evidence about disk bytes.
+  local trusted stage saved
+  trusted="$(_copilot_expected_integrity)"
+  if [ -n "$trusted" ]; then
+    command mkdir -p "$(command dirname "$prefix")" || return 1
+    stage="$(command mktemp -d "$prefix.stage.XXXXXX")" || return 1
+    if ! _copilot_stage_verified "${spec##*@}" "$stage" "$trusted"; then
+      command rm -rf -- "$stage"; return 1
+    fi
+    saved=""
+    if [ -e "$prefix" ]; then
+      saved="$(command mktemp -d "$prefix.rollback.XXXXXX")" || return 1
+      _copilot_snapshot_runtime "$saved" || return 1
+      command mv "$prefix" "$saved/pkg" || return 1
+    fi
+    if ! command mv "$stage" "$prefix"; then
+      [ -z "$saved" ] || command mv "$saved/pkg" "$prefix"
+      return 1
+    fi
+    if [ -n "$saved" ]; then
+      local recovery_state
+      recovery_state="$(_copilot_rollback_state)"
+      command mkdir -p "$(command dirname "$recovery_state")" || return 1
+      if ! (umask 077; printf '%s\n' "$saved" >"$recovery_state.tmp.$$") \
+          || ! command mv "$recovery_state.tmp.$$" "$recovery_state"; then
+        _copilot_restore_generation "$saved" || return 1
+        return 1
+      fi
+    fi
+    return 0
+  fi
 
   if ! command -v bun >/dev/null 2>&1; then
     printf '%s\n' "copilot-proxy: bun not found (needs bun via mise)." >&2
@@ -271,46 +317,8 @@ _copilot_ensure_pkg() {
     printf '%s\n' "copilot-proxy: install finished but $bin is missing." >&2
     return 1
   fi
-  # For the built-in or persisted pin, cross-check the version that is actually
-  # ON DISK against the trusted selection. Bun verifies registry integrity itself;
-  # this covers the npm fallback path and a Bun-only lock.
-  #
-  # The `package-lock.json` entry is evidence ONLY when its `version` matches the
-  # installed one. npm writes that lock and never removes it, while a later `bun
-  # add` writes `bun.lock` and leaves package-lock.json untouched — so a prefix
-  # that once took the npm fallback keeps a lock pinning the OLD version's
-  # integrity forever. Comparing that against the new pin fails 100% of the time
-  # and wedges every start with "integrity does not match the trusted pin", even
-  # though the correct version is installed. Version-gate it, or don't read it.
-  # See pitfalls/copilot-proxy-stale-package-lock-integrity.md
-  local expected_integrity actual_integrity installed_version lock_version integrity_meta
-  expected_integrity="$(_copilot_expected_integrity)"
-  if [ -n "$expected_integrity" ] && command -v jq >/dev/null 2>&1; then
-    installed_version="$(_copilot_pkg_actual_version 2>/dev/null || true)"
-    actual_integrity=""
-    if [ -f "$prefix/package-lock.json" ] && [ -n "$installed_version" ]; then
-      lock_version="$(jq -r --arg p "node_modules/$(_copilot_pkg_name)" '.packages[$p].version // empty' "$prefix/package-lock.json" 2>/dev/null)"
-      if [ "$lock_version" = "$installed_version" ]; then
-        actual_integrity="$(jq -r --arg p "node_modules/$(_copilot_pkg_name)" '.packages[$p].integrity // empty' "$prefix/package-lock.json" 2>/dev/null)"
-      fi
-    fi
-    if [ -n "$actual_integrity" ]; then
-      if [ "$actual_integrity" != "$expected_integrity" ]; then
-        printf '%s\n' "copilot-proxy: installed package integrity does not match the trusted pin." >&2
-        printf '%s\n' "  on disk: $(_copilot_pkg_name)@$installed_version   pinned: $spec" >&2
-        return 1
-      fi
-    else
-      # No usable lock entry — verify the INSTALLED version against the registry.
-      integrity_meta="$(_copilot_registry_metadata "${installed_version:-${spec##*@}}" 2>/dev/null || true)"
-      actual_integrity="$(printf '%s' "$integrity_meta" | jq -r '.dist.integrity // empty' 2>/dev/null)"
-      if [ -z "$actual_integrity" ] || [ "$actual_integrity" != "$expected_integrity" ]; then
-        printf '%s\n' "copilot-proxy: could not verify the installed package against trusted npm integrity." >&2
-        printf '%s\n' "  on disk: $(_copilot_pkg_name)@${installed_version:-unknown}   pinned: $spec" >&2
-        return 1
-      fi
-    fi
-  fi
+  # Explicit unpinned/custom package overrides retain their original installer
+  # path. Built-in and persisted integrity pins returned through verified staging.
   printf '%s\n' "$spec" >"$(_copilot_pkg_stamp)"
 }
 
@@ -360,18 +368,11 @@ _copilot_update_check() {
     printf '%s\n' "  update available: copilot-proxy update $latest"
 }
 
-_copilot_update_exact() {
-  local version="$1"
-  if [ -n "${COPILOT_API_PKG:-}" ]; then
-    printf '%s\n' "copilot-proxy: COPILOT_API_PKG is active; refusing to mutate persisted selection." >&2
-    return 1
-  fi
-  printf '%s' "$version" | command grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || {
-    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.3.4)." >&2; return 1; }
+_copilot_stage_verified() {
+  local version="$1" stage="$2" trusted="${3:-}" _tool
   for _tool in jq curl openssl bun; do command -v "$_tool" >/dev/null 2>&1 || {
     printf '%s\n' "copilot-proxy: update requires $_tool." >&2; return 1; }; done
-
-  local meta spec integrity tarball registry prefix stage previous archive digest expected
+  local meta spec integrity tarball registry archive digest expected staged_version
   meta="$(_copilot_registry_metadata "$version")" || { printf '%s\n' "copilot-proxy: version $version was not found." >&2; return 1; }
   spec="@jeffreycao/copilot-api@$version"
   integrity="$(printf '%s' "$meta" | jq -r '.dist.integrity // empty')"
@@ -379,65 +380,213 @@ _copilot_update_exact() {
   registry="$(printf '%s' "$tarball" | command sed -E 's#(https?://[^/]+).*#\1#')"
   [ -n "$integrity" ] && [ -n "$tarball" ] || { printf '%s\n' "copilot-proxy: registry metadata lacks tarball integrity." >&2; return 1; }
   case "$integrity" in sha512-*) ;; *) printf '%s\n' "copilot-proxy: unsupported integrity algorithm: $integrity" >&2; return 1 ;; esac
-
-  prefix="$(_copilot_pkg_prefix)"; stage="$prefix.stage.$$"; previous="$prefix.previous"; archive="${TMPDIR:-/tmp}/copilot-api-$version-$$.tgz"
-  command rm -rf -- "$stage"
-  command mkdir -p "$stage" || return 1
+  if [ -n "$trusted" ] && [ "$integrity" != "$trusted" ]; then
+    printf '%s\n' 'copilot-proxy: registry integrity does not match the trusted pin.' >&2
+    return 1
+  fi
+  command chmod 700 "$stage" || return 1
+  archive="$stage/verified-package.tgz"
   printf '%s\n' '{"name":"copilot-api-runner","private":true,"version":"0.0.0"}' >"$stage/package.json"
   printf '%s\n' "copilot-proxy: downloading and verifying $spec ..."
-  if ! command curl -fsSL --max-time 60 "$tarball" -o "$archive"; then command rm -rf -- "$stage"; return 1; fi
+  command curl -fsSL --max-time 60 "$tarball" -o "$archive" || return 1
   digest="$(command openssl dgst -sha512 -binary "$archive" | command openssl base64 -A)"
   expected="${integrity#sha512-}"
-  command rm -f -- "$archive"
   if [ "$digest" != "$expected" ]; then
-    command rm -rf -- "$stage"
     printf '%s\n' "copilot-proxy: SHA-512 integrity mismatch; refusing the update." >&2
     return 1
   fi
-
-  if ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" env 90; then
+  # Install THIS archive, never resolve $spec a second time after verification.
+  if ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" env 90 "$archive"; then
     command rm -rf -- "$stage/node_modules" "$stage/bun.lock" "$stage/package-lock.json"
-    if ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" noproxy 90; then
+    if ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" noproxy 90 "$archive"; then
       command rm -rf -- "$stage/node_modules" "$stage/bun.lock" "$stage/package-lock.json"
       if ! command -v npm >/dev/null 2>&1 \
-         || ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" npm 90; then
-        command rm -rf -- "$stage"
+         || ! COPILOT_API_PKG="$spec" _copilot_pkg_install_try "$stage" npm 90 "$archive"; then
         return 1
       fi
     fi
   fi
-  [ -x "$stage/node_modules/.bin/copilot-api" ] || { command rm -rf -- "$stage"; return 1; }
-  local staged_version
+  [ -x "$stage/node_modules/.bin/copilot-api" ] || return 1
   staged_version="$(jq -r '.version // empty' "$stage/node_modules/@jeffreycao/copilot-api/package.json" 2>/dev/null)"
-  [ "$staged_version" = "$version" ] || { command rm -rf -- "$stage"; printf '%s\n' "copilot-proxy: staged version mismatch ($staged_version)." >&2; return 1; }
-  "$stage/node_modules/.bin/copilot-api" --help >/dev/null 2>&1 || { command rm -rf -- "$stage"; printf '%s\n' "copilot-proxy: staged binary failed its help smoke test." >&2; return 1; }
+  [ "$staged_version" = "$version" ] || { printf '%s\n' "copilot-proxy: staged version mismatch ($staged_version)." >&2; return 1; }
+  "$stage/node_modules/.bin/copilot-api" --help >/dev/null 2>&1 || { printf '%s\n' "copilot-proxy: staged binary failed its help smoke test." >&2; return 1; }
+  printf '%s\n' "$integrity" >"$stage/.verified-integrity"
+  printf '%s\n' "$registry" >"$stage/.verified-registry"
   printf '%s\n' "$spec" >"$stage/.installed-spec"
+}
 
-  local was_running sf state_backup
-  was_running=0
-  sf="$(_copilot_pkg_selection_state)"
-  state_backup="$(_copilot_pkg_selection_state).previous"
-  _copilot_alive && was_running=1
-  [ "$was_running" -eq 0 ] || copilot-proxy stop || return 1
-  command rm -rf -- "$previous"
-  [ ! -e "$prefix" ] || command mv "$prefix" "$previous" || return 1
-  command mv "$stage" "$prefix" || { [ ! -e "$previous" ] || command mv "$previous" "$prefix"; return 1; }
-  command rm -f -- "$state_backup"
-  [ ! -f "$sf" ] || command cp -f "$sf" "$state_backup"
-  if ! _copilot_write_selection "$spec" "$integrity" "$registry"; then
-    command rm -rf -- "$prefix"; [ ! -e "$previous" ] || command mv "$previous" "$prefix"; return 1
+_copilot_rollback_state() { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/rollback"; }
+
+_copilot_runtime_present() {
+  _copilot_alive && return 0
+  # A dead health endpoint can still have a live worker and retained leases.
+  # Include process evidence so update/rollback stop that generation first.
+  [ -f "$(_copilot_pidfile)" ] && return 0
+  [ -f "$(_copilot_shim_pidfile)" ] && return 0
+  [ -f "$(_copilot_admission_state)" ] && return 0
+  [ -z "$(_copilot_port_pids "$(_copilot_port)" || true)" ] || return 0
+  [ -z "$(_copilot_port_pids "$(_copilot_shim_port)" || true)" ] || return 0
+  return 1
+}
+
+# Restricted snapshots are recovery evidence, not a backup to restore wholesale:
+# tokens and current SQLite files must survive a rollback. Read-only SQLite
+# serialization captures committed WAL content in one consistent image.
+_copilot_snapshot_runtime() {
+  local bundle="$1" backend_home="${COPILOT_API_HOME:-$HOME/.local/share/copilot-api}" cf db mf f
+  cf="$backend_home/config.json"
+  db="${COPILOT_API_SQLITE_DB_PATH:-$backend_home/copilot-api.sqlite}"
+  mf="${COPILOT_SHIM_METRICS_DB:-${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/metrics.sqlite}"
+  command chmod 700 "$bundle" || return 1
+  (umask 077
+    jq -n --arg prefix "$(_copilot_pkg_prefix)" --arg config "$cf" \
+      --arg selection "$(_copilot_pkg_selection_state)" \
+      '{prefix:$prefix,config:$config,selection:$selection}' >"$bundle/paths.json" || exit 1
+    if [ -f "$cf" ]; then
+      jq -e 'type == "object"' "$cf" >/dev/null || exit 1
+      command cp -p "$cf" "$bundle/config.json" || exit 1
+      : >"$bundle/config.present"
+    else printf '{}\n' >"$bundle/config.json"; fi
+    if [ -f "$(_copilot_pkg_selection_state)" ]; then
+      command cp -p "$(_copilot_pkg_selection_state)" "$bundle/selection.json" || exit 1
+    elif [ -f "$(_copilot_pkg_stamp)" ]; then
+      # Restore the old effective selection even when it originally came from
+      # the old wrapper's built-in default. Otherwise rollback's next start
+      # would see the new default and immediately reinstall the candidate.
+      local old_spec old_integrity=''
+      old_spec="$(command head -n1 "$(_copilot_pkg_stamp)")"
+      [ ! -f "$(_copilot_pkg_prefix)/.verified-integrity" ] || old_integrity="$(command head -n1 "$(_copilot_pkg_prefix)/.verified-integrity")"
+      if [ "$old_spec" = '@jeffreycao/copilot-api@2.3.4' ] && [ -z "$old_integrity" ]; then
+        old_integrity='sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ=='
+      fi
+      jq -n --arg spec "$old_spec" --arg integrity "$old_integrity" \
+        '{spec:$spec,integrity:$integrity,registry:"",restored_from:"installed-spec"}' >"$bundle/selection.json" || exit 1
+    fi
+    command mkdir "$bundle/deployed" || exit 1
+    for f in 43_copilot_proxy.sh copilot-throttle-shim.js; do
+      [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/shell/$f" ] || \
+        command cp -p "${XDG_CONFIG_HOME:-$HOME/.config}/shell/$f" "$bundle/deployed/$f" || exit 1
+    done
+    if [ -f "$(_copilot_shim_state)" ]; then
+      command cp -p "$(_copilot_shim_state)" "$bundle/shim-state" || exit 1
+    fi
+    jq -n 'env | with_entries(select(.key | IN(
+      "COPILOT_PROXY_SHIM", "COPILOT_PROXY_PORT", "COPILOT_SHIM_HOST",
+      "COPILOT_SHIM_PORT", "COPILOT_SHIM_MIN", "COPILOT_SHIM_MAX", "COPILOT_SHIM_RETRIES",
+      "COPILOT_SHIM_BACKOFF_MS", "COPILOT_SHIM_STALL_MS", "COPILOT_SHIM_PING_MS",
+      "COPILOT_SHIM_PING_AFTER_MS", "COPILOT_ASTRA_COMPACT_RATIO")))' >"$bundle/environment.json" || exit 1
+    for f in "$db" "$mf"; do
+      [ -f "$f" ] || continue
+      local label=backend
+      [ "$f" != "$mf" ] || label=metrics
+      command bun -e '
+        import { Database } from "bun:sqlite";
+        const db = new Database(process.argv[1], {readonly:true});
+        db.exec("BEGIN");
+        await Bun.write(process.argv[2], db.serialize());
+        db.close();
+      ' "$f" "$bundle/$label.sqlite" || exit 1
+    done
+  )
+}
+
+_copilot_restore_generation() {
+  local bundle="$1" prefix cf sf rejected tmp
+  prefix="$(_copilot_pkg_prefix)"
+  [ -f "$bundle/paths.json" ] && [ "$(jq -r '.prefix' "$bundle/paths.json")" = "$prefix" ] || return 1
+  cf="$(jq -r '.config' "$bundle/paths.json")"; sf="$(jq -r '.selection' "$bundle/paths.json")"
+  # Validate/configure recovery before moving the live candidate. Unknown JSON
+  # never turns into an empty replacement, and failed artifacts remain inspectable.
+  if [ -f "$cf" ]; then
+    jq -e 'type == "object"' "$cf" >/dev/null || return 1
+    command cp -p "$cf" "$bundle/post-upgrade-config.json" || return 1
+    tmp="$(command mktemp "$cf.rollback.XXXXXX")" || return 1
+    jq --slurpfile old "$bundle/config.json" '
+      reduce ["responsesTransport", "upstreamTransport"][] as $key (.;
+        if ($old[0] | has($key)) then .[$key] = $old[0][$key] else del(.[$key]) end)
+    ' "$cf" >"$tmp" || { command rm -f -- "$tmp"; return 1; }
+    command chmod 600 "$tmp" && command mv "$tmp" "$cf" || return 1
+  elif [ -f "$bundle/config.present" ]; then
+    command mkdir -p "$(command dirname "$cf")" || return 1
+    command cp -p "$bundle/config.json" "$cf" || return 1
   fi
+  rejected="$(command mktemp -d "$prefix.rejected.XXXXXX")" || return 1
+  [ ! -e "$prefix" ] || command mv "$prefix" "$rejected/pkg" || return 1
+  [ ! -e "$bundle/pkg" ] || command mv "$bundle/pkg" "$prefix" || {
+    [ ! -e "$rejected/pkg" ] || command mv "$rejected/pkg" "$prefix"; return 1; }
+  if [ -f "$bundle/selection.json" ]; then
+    command mkdir -p "$(command dirname "$sf")" || return 1
+    command cp -p "$bundle/selection.json" "$sf" || return 1
+  else command rm -f -- "$sf"; fi
+  printf '%s\n' "copilot-proxy: restored package, selection and transport settings; retained rejected files: $rejected"
+  printf '%s\n' "  deployed wrapper/shim and launch settings snapshot: $bundle (restore the matching deployment separately)"
+}
 
+_copilot_rollback() {
+  [ -z "${COPILOT_API_PKG:-}" ] || { printf '%s\n' 'copilot-proxy: unset COPILOT_API_PKG before rollback.' >&2; return 1; }
+  local state bundle was_running=0
+  state="$(_copilot_rollback_state)"
+  [ -f "$state" ] || { printf '%s\n' 'copilot-proxy: no saved update generation to roll back.' >&2; return 1; }
+  bundle="$(command head -n 1 "$state")"
+  [ -d "$bundle/pkg" ] || { printf '%s\n' 'copilot-proxy: previous package generation is unavailable.' >&2; return 1; }
+  _copilot_runtime_present && was_running=1
+  [ "$was_running" -eq 0 ] || copilot-proxy stop || return 1
+  _copilot_restore_generation "$bundle" || return 1
+  command rm -f -- "$state"
+  [ "$was_running" -eq 0 ] || copilot-proxy start
+}
+
+_copilot_update_exact() {
+  local version="$1" spec prefix stage bundle trusted='' was_running=0 state
+  if [ -n "${COPILOT_API_PKG:-}" ]; then
+    printf '%s\n' "copilot-proxy: COPILOT_API_PKG is active; refusing to mutate persisted selection." >&2
+    return 1
+  fi
+  printf '%s' "$version" | command grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || {
+    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.5.2)." >&2; return 1; }
+  spec="@jeffreycao/copilot-api@$version"; prefix="$(_copilot_pkg_prefix)"
+  [ "$spec" != "$(_copilot_builtin_pkg)" ] || trusted="$(_copilot_builtin_integrity)"
+  command mkdir -p "$(command dirname "$prefix")" || return 1
+  stage="$(command mktemp -d "$prefix.stage.XXXXXX")" || return 1
+  if ! _copilot_stage_verified "$version" "$stage" "$trusted"; then command rm -rf -- "$stage"; return 1; fi
+  _copilot_runtime_present && was_running=1
+  [ "$was_running" -eq 0 ] || copilot-proxy stop || return 1
+  bundle="$(command mktemp -d "$prefix.rollback.XXXXXX")" || return 1
+  if ! _copilot_snapshot_runtime "$bundle"; then
+    printf '%s\n' 'copilot-proxy: recovery snapshot failed; old package retained.' >&2
+    [ "$was_running" -eq 0 ] || copilot-proxy start
+    return 1
+  fi
+  [ ! -e "$prefix" ] || command mv "$prefix" "$bundle/pkg" || return 1
+  if ! command mv "$stage" "$prefix"; then
+    [ ! -e "$bundle/pkg" ] || command mv "$bundle/pkg" "$prefix"
+    [ "$was_running" -eq 0 ] || copilot-proxy start
+    return 1
+  fi
+  if ! _copilot_write_selection "$spec" "$(command head -n1 "$prefix/.verified-integrity")" "$(command head -n1 "$prefix/.verified-registry")"; then
+    _copilot_restore_generation "$bundle" || return 1
+    [ "$was_running" -eq 0 ] || copilot-proxy start
+    return 1
+  fi
   if [ "$was_running" -eq 1 ] && ! copilot-proxy start; then
     printf '%s\n' "copilot-proxy: new version failed startup; rolling back." >&2
-    copilot-proxy stop >/dev/null 2>&1 || true
-    command rm -rf -- "$prefix"
-    [ ! -e "$previous" ] || command mv "$previous" "$prefix"
-    if [ -f "$state_backup" ]; then command mv -f "$state_backup" "$sf"; else command rm -f -- "$sf"; fi
+    copilot-proxy stop || {
+      printf '%s\n' "copilot-proxy: failed candidate has not stopped; recovery snapshot retained at $bundle." >&2
+      return 1
+    }
+    _copilot_restore_generation "$bundle" || return 1
     copilot-proxy start || printf '%s\n' "copilot-proxy: rollback restored files but the old proxy did not restart." >&2
     return 1
   fi
-  printf '%s\n' "copilot-proxy: selected and installed $spec (previous generation: $previous)"
+  state="$(_copilot_rollback_state)"
+  if ! (umask 077; printf '%s\n' "$bundle" >"$state.tmp.$$") || ! command mv "$state.tmp.$$" "$state"; then
+    [ "$was_running" -eq 0 ] || copilot-proxy stop || return 1
+    _copilot_restore_generation "$bundle" || return 1
+    [ "$was_running" -eq 0 ] || copilot-proxy start
+    return 1
+  fi
+  printf '%s\n' "copilot-proxy: selected and installed $spec (recovery snapshot: $bundle)"
+  printf '%s\n' '  Offline package/config recovery: copilot-proxy rollback; credentials and current usage are preserved.'
 }
 
 # --- throttle + metrics shim (default, in front of the fork) --------------------
@@ -612,7 +761,20 @@ _copilot_shim_start() {
       sleep 1; w=$((w + 1))
     done
   fi
+  local backend_version backend_headers=300000 backend_inactivity=300000 transport_config
+  backend_version="$(_copilot_pkg_actual_version 2>/dev/null || printf unknown)"
+  transport_config="${COPILOT_API_HOME:-$HOME/.local/share/copilot-api}/config.json"
+  if [ -f "$transport_config" ] && command -v jq >/dev/null 2>&1; then
+    backend_headers="$(jq -r '(.upstreamTransport // .responsesTransport // {}) |
+      (.headersTimeoutMs // .headersTimeoutMsV2) |
+      if type == "number" and . >= 1 then floor else 300000 end' "$transport_config" 2>/dev/null)"
+    backend_inactivity="$(jq -r '(.upstreamTransport // .responsesTransport // {}) | .streamInactivityTimeoutMs |
+      if type == "number" and . >= 1 then floor else 300000 end' "$transport_config" 2>/dev/null)"
+  fi
   COPILOT_SHIM_PORT="$port" COPILOT_SHIM_UPSTREAM="$(_copilot_base)" \
+    COPILOT_SHIM_BACKEND_VERSION="$backend_version" \
+    COPILOT_SHIM_BACKEND_HEADERS_TIMEOUT_MS="${backend_headers:-300000}" \
+    COPILOT_SHIM_BACKEND_INACTIVITY_TIMEOUT_MS="${backend_inactivity:-300000}" \
     nohup bun "$script" >"$(_copilot_shim_logfile)" 2>&1 &
   printf '%s\n' "$!" >"$(_copilot_shim_pidfile)"
   local i=0
@@ -625,16 +787,56 @@ _copilot_shim_start() {
   return 1
 }
 
-# Stop the shim.
+# Stop only the tracked PID and listeners on this instance's port. A failed
+# health endpoint is not process-termination evidence; retained admission may
+# only be cleared after this check has confirmed both processes exited.
+_copilot_stop_listener() {
+  local kind="$1" port="$2" pidf="$3" pids tracked='' pid cmd i
+  command -v lsof >/dev/null 2>&1 || {
+    printf '%s\n' 'copilot-proxy: lsof is required to confirm a controlled stop; retained admission was not cleared.' >&2
+    return 1
+  }
+  [ ! -f "$pidf" ] || tracked="$(command head -n1 "$pidf")"
+  pids="$(printf '%s\n%s\n' "$tracked" "$(_copilot_port_pids "$port" || true)" | command sed '/^$/d' | command sort -u)"
+  printf '%s\n' "$pids" | while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    case "$pid" in *[!0-9]*) return 1 ;; esac
+    cmd="$(command ps -p "$pid" -o command= 2>/dev/null || true)"
+    [ -n "$cmd" ] || continue
+    case "$kind:$cmd " in
+      shim:*copilot-throttle-shim.js*) ;;
+      backend:*copilot-api*"--port $port "*) ;;
+      *) printf '%s\n' "copilot-proxy: refusing to stop unexpected process $pid on $port." >&2; return 1 ;;
+    esac
+    kill "$pid" 2>/dev/null || return 1
+  done || return 1
+  i=0
+  while [ "$i" -lt 5 ]; do
+    if printf '%s\n' "$pids" | while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      # A zombie has terminated and cannot own upstream work.
+      case "$(command ps -p "$pid" -o stat= 2>/dev/null | command tr -d ' ')" in
+        ''|Z*) ;; *) return 1 ;;
+      esac
+    done; then
+      if [ -z "$(_copilot_port_pids "$port" || true)" ]; then
+        command rm -f -- "$pidf"
+        return 0
+      fi
+    fi
+    sleep 1; i=$((i + 1))
+  done
+  printf '%s\n' "copilot-proxy: $kind process has not exited; retained admission was not cleared." >&2
+  return 1
+}
+
+_copilot_admission_state() {
+  printf '%s.admission.json' "${COPILOT_SHIM_METRICS_DB:-${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/metrics.sqlite}"
+}
+
+# A shim-only stop must preserve its persisted unfinished leases.
 _copilot_shim_stop() {
-  local pidf; pidf="$(_copilot_shim_pidfile)"
-  if [ -f "$pidf" ]; then
-    local pid; pid="$(command cat "$pidf" 2>/dev/null)"
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null
-    command rm -f -- "$pidf"
-  fi
-  command pkill -f "copilot-throttle-shim.js" 2>/dev/null
-  return 0
+  _copilot_stop_listener shim "$(_copilot_shim_port)" "$(_copilot_shim_pidfile)"
 }
 
 _copilot_metrics_cli() {
@@ -1047,24 +1249,20 @@ copilot-proxy() {
       return 1
       ;;
     stop)
-      # Tear down the shim first (harmless if not running).
-      _copilot_shim_stop
-      # Prefer the tracked pid; fall back to a broad match.
-      if [ -f "$pidf" ]; then
-        local pid; pid="$(cat "$pidf" 2>/dev/null)"
-        [ -n "$pid" ] && kill "$pid" 2>/dev/null
-        command rm -f -- "$pidf"
-      fi
-      command pkill -f "copilot-api.*--port $port" 2>/dev/null
-      sleep 1
-      if _copilot_alive; then
-        printf '%s\n' "copilot-proxy: still answering on $port (another instance?)" >&2
+      local backend_evidence=0
+      [ ! -f "$pidf" ] || backend_evidence=1
+      [ -z "$(_copilot_port_pids "$port" || true)" ] || backend_evidence=1
+      _copilot_shim_stop || return 1
+      _copilot_stop_listener backend "$port" "$pidf" || return 1
+      if [ -f "$(_copilot_admission_state)" ] && [ "$backend_evidence" -eq 0 ]; then
+        printf '%s\n' 'copilot-proxy: backend PID evidence is missing; retained admission requires process verification before recovery.' >&2
         return 1
       fi
+      command rm -f -- "$(_copilot_admission_state)" || return 1
       printf '%s\n' "copilot-proxy: stopped (port $port free)"
       ;;
     restart)
-      copilot-proxy stop
+      copilot-proxy stop || return 1
       copilot-proxy start
       ;;
     status)
@@ -1604,6 +1802,7 @@ EOF
         *) _copilot_update_exact "$2" ;;
       esac
       ;;
+    rollback) _copilot_rollback ;;
     reinstall)
       # Force a clean re-install of the pinned spec (normally only needed if the
       # prefix got corrupted — a version bump re-installs on its own via the stamp).
@@ -1705,6 +1904,7 @@ EOF
       printf '%s\n' "  limiter status | set --min N --max N --limit N | reset   live, process-local"
       printf '%s\n' "  bench [--model ID] [--runs 1..10] [--max-output 32..2048] [--concurrency 1..4] [--json]"
       printf '%s\n' "  update --check | update VERSION   inspect latest or install an exact verified version"
+      printf '%s\n' "  rollback                         restore previous package/transport; keep current credentials and usage"
       printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, Claude catalog (direct vs via"
       printf '%s\n' "                        Clash), upstream reachability and Codex Apps."
       printf '%s\n' "                        --live probes Apps and costs 1 inference quota unit."
@@ -2094,7 +2294,7 @@ _copilot_codex_catalog_file() {
 # remain untouched. The alias-like sibling below exists for Claude wrapper
 # muscle memory; both names have identical zero-persistence semantics.
 codex-copilot() {
-  local ss="auto" arg explicit_model=0 model='' catalog='' models=''
+  local ss="auto" arg explicit_model=0 explicit_compact=0 model='' flag_model='' catalog='' models='' next_model=0 next_config=0 config_arg config_key
   case "${1:-}" in
     --no-specstory) ss="never"; shift ;;
     --specstory)    shift ;;
@@ -2121,8 +2321,30 @@ codex-copilot() {
   }
   for arg in "$@"; do
     [ "$arg" = "--" ] && break
-    case "$arg" in -m|--model|-m=*|--model=*) explicit_model=1 ;; esac
+    if [ "$next_model" -eq 1 ]; then flag_model="$arg"; next_model=0; continue; fi
+    config_arg=''
+    if [ "$next_config" -eq 1 ]; then
+      config_arg="$arg"; next_config=0
+    else
+      case "$arg" in --config=*|-c=*) config_arg="${arg#*=}" ;; esac
+    fi
+    if [ -n "$config_arg" ]; then
+      config_key="$(printf '%s' "${config_arg%%=*}" | command sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+      case "$config_key" in
+        model) model="$(printf '%s' "${config_arg#*=}" | jq -Rr 'fromjson? // .')"; explicit_model=1 ;;
+        model_auto_compact_token_limit) explicit_compact=1 ;;
+      esac
+      continue
+    fi
+    case "$arg" in
+      -m|--model) explicit_model=1; next_model=1 ;;
+      -m=*|--model=*) explicit_model=1; flag_model="${arg#*=}" ;;
+      -c|--config) next_config=1 ;;
+    esac
   done
+  # Codex's dedicated --model field overrides config assignments independent
+  # of argv order; use that same model for the derived compact/context metadata.
+  [ -z "$flag_model" ] || model="$flag_model"
   if [ "$explicit_model" -eq 0 ]; then
     models="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids)"
     model="$(printf '%s\n' "$models" | _copilot_codex_pick_best_model "$catalog")" || {
@@ -2140,14 +2362,20 @@ codex-copilot() {
   # Keep these overrides per-process/per-invocation. `name = OpenAI` is an
   # upstream gateway requirement; the dummy key only satisfies Codex's provider
   # auth contract and is ignored by our unauthenticated localhost listener.
-  local base cmd context='' compact=''
+  local base cmd context='' compact='' compact_rc=0 request_retries=3 stream_retries=1
   base="$(_copilot_client_base)"
   cmd="$(_copilot_specstory_codex_cmd)"
+  if _copilot_shim_enabled; then request_retries=0; stream_retries=0; fi
   if [ -n "$model" ]; then
     context="$(printf '%s' "$catalog" | jq -r --arg id "$model" '
       first(.data[]? | select(.id == $id) | .capabilities.limits.max_context_window_tokens) // empty' 2>/dev/null)"
-    compact="$(printf '%s' "$catalog" | jq -r --arg id "$model" '
-      first(.data[]? | select(.id == $id) | .capabilities.limits.max_prompt_tokens) // empty' 2>/dev/null)"
+    if [ "$explicit_compact" -eq 0 ]; then
+      compact="$(_copilot_compact_budget "$model" "$catalog" 1)" || compact_rc=$?
+      case "$compact_rc" in
+        3|4) return 1 ;;
+        2) printf '%s\n' "codex-copilot: compact ceiling unavailable for $model; retaining client fallback" >&2 ;;
+      esac
+    fi
   fi
   # Prepend discovered metadata; any explicit user `-c` remains later in argv
   # and therefore retains normal Codex CLI precedence.
@@ -2171,8 +2399,8 @@ codex-copilot() {
     -c 'model_providers.copilot_api.requires_openai_auth=true' \
     -c 'model_providers.copilot_api.supports_websockets=false' \
     -c 'model_providers.copilot_api.wire_api="responses"' \
-    -c 'model_providers.copilot_api.request_max_retries=3' \
-    -c 'model_providers.copilot_api.stream_max_retries=1' \
+    -c "model_providers.copilot_api.request_max_retries=$request_retries" \
+    -c "model_providers.copilot_api.stream_max_retries=$stream_retries" \
     -c 'model_providers.copilot_api.stream_idle_timeout_ms=300000' \
     -c 'features.remote_compaction_v2=true' \
     -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]'
@@ -2195,8 +2423,8 @@ codex-copilot() {
       -c 'model_providers.copilot_api.requires_openai_auth=true' \
       -c 'model_providers.copilot_api.supports_websockets=false' \
       -c 'model_providers.copilot_api.wire_api="responses"' \
-      -c 'model_providers.copilot_api.request_max_retries=3' \
-      -c 'model_providers.copilot_api.stream_max_retries=1' \
+      -c "model_providers.copilot_api.request_max_retries=$request_retries" \
+      -c "model_providers.copilot_api.stream_max_retries=$stream_retries" \
       -c 'model_providers.copilot_api.stream_idle_timeout_ms=300000' \
       -c 'features.remote_compaction_v2=true' \
       -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]' \
@@ -2430,7 +2658,7 @@ _copilot_assert_pinned_compact_safe() {
   pinned="$(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // empty' "$settings" 2>/dev/null)"
   case "$pinned" in ''|*[!0-9]*) return 0 ;; esac
   catalog="$(_copilot_model_catalog 2>/dev/null || true)"
-  limit="$(_copilot_claude_compact_window "$model" "$catalog" 2>/dev/null)" || return 0
+  limit="$(_copilot_prompt_ceiling "$model" "$catalog" 2>/dev/null)" || return 0
   if [ "$pinned" -gt "$limit" ]; then
     printf '%s\n' "claude-copilot: active copilot-here pin has compact window $pinned, but $model allows $limit." >&2
     printf '%s\n' "  run: copilot-model $(_copilot_strip_context_hint "$model")   (then restart Claude Code)" >&2
@@ -2562,7 +2790,9 @@ _copilot_env_json_for_model() {
   if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
   profile="$(_copilot_model_profile_json "$selected" "$catalog")" || return 1
   compact="$(_copilot_claude_compact_window "$selected" "$catalog")" || compact_rc=$?
-  if [ "$compact_rc" -eq 3 ]; then
+  if [ "$compact_rc" -eq 4 ]; then
+    return 1
+  elif [ "$compact_rc" -eq 3 ]; then
     printf '%s\n' "copilot-proxy: $(_copilot_strip_context_hint "$selected") has a prompt ceiling below Claude Code's 100000-token minimum" >&2
     return 1
   elif [ "$compact_rc" -ne 0 ]; then
@@ -3151,12 +3381,9 @@ _copilot_strip_context_hint() {
   printf '%s' "${1%\[1m\]}"
 }
 
-# Claude Code exposes one process-wide auto-compact capacity, separate from the
-# [1m] model hint used for its HUD/full context classification. Feed it the
-# provider's real prompt ceiling so its own default ~95% trigger fires before
-# Copilot rejects the request. Exit 2 = unavailable; 3 = known but below
-# Claude Code's configurable 100k minimum (unsafe to round upward).
-_copilot_claude_compact_window() {
+# The raw provider ceiling is also used by the pin-safety check; do not compare
+# an existing explicit pin against the experimental smaller Astra budget.
+_copilot_prompt_ceiling() {
   local requested="${1:-}" catalog="${2:-}" raw value
   [ -n "$requested" ] || return 2
   raw="$(_copilot_strip_context_hint "$requested")"
@@ -3179,8 +3406,50 @@ _copilot_claude_compact_window() {
       end
   ' 2>/dev/null)"
   case "$value" in ''|*[!0-9]*) return 2 ;; esac
-  [ "$value" -ge 100000 ] || return 3
-  if [ "$value" -gt 1000000 ]; then value=1000000; fi
+  [ "$value" -ge 1 ] || return 2
+  printf '%s' "$value"
+}
+
+# Exit 2 = unavailable, 3 = below the client's minimum, 4 = invalid ratio.
+# Keep true context metadata intact; this is only a new-session compact budget.
+_copilot_compact_budget() {
+  local model="$1" catalog="$2" minimum="${3:-1}" ceiling ratio value
+  ceiling="$(_copilot_prompt_ceiling "$model" "$catalog")" || return $?
+  case "$(_copilot_strip_context_hint "$model")" in
+    gpt-6-astra|gpt-6-astra-fast)
+      ratio="${COPILOT_ASTRA_COMPACT_RATIO:-0.70}"
+      if ! printf '%s' "$ratio" | jq -e 'type == "number" and . > 0 and . <= 1' >/dev/null 2>&1; then
+        printf '%s\n' 'copilot-proxy: COPILOT_ASTRA_COMPACT_RATIO must be a number greater than 0 and at most 1.' >&2
+        return 4
+      fi
+      value="$(jq -nr --argjson ceiling "$ceiling" --argjson ratio "$ratio" '$ceiling * $ratio | floor')" ;;
+    *) value="$ceiling" ;;
+  esac
+  if [ "$value" -lt "$minimum" ]; then
+    printf '%s\n' "copilot-proxy: compact budget $value is below the client's $minimum-token minimum." >&2
+    return 3
+  fi
+  printf '%s' "$value"
+}
+
+_copilot_claude_compact_window() {
+  local model="$1" catalog="${2:-}" value explicit_ceiling
+  if [ "$#" -lt 2 ]; then catalog="$(_copilot_model_catalog 2>/dev/null || true)"; fi
+  if [ -n "${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-}" ]; then
+    value="$CLAUDE_CODE_AUTO_COMPACT_WINDOW"
+    if ! printf '%s' "$value" | jq -e 'type == "number" and . == floor and . >= 100000 and . <= 1000000' >/dev/null 2>&1; then
+      printf '%s\n' 'copilot-proxy: CLAUDE_CODE_AUTO_COMPACT_WINDOW must be an integer from 100000 to 1000000.' >&2
+      return 4
+    fi
+    explicit_ceiling="$(_copilot_prompt_ceiling "$model" "$catalog" 2>/dev/null || true)"
+    if [ -n "$explicit_ceiling" ] && [ "$value" -gt "$explicit_ceiling" ]; then
+      printf '%s\n' "copilot-proxy: explicit compact window $value exceeds the live prompt ceiling $explicit_ceiling." >&2
+      return 4
+    fi
+  else
+    value="$(_copilot_compact_budget "$model" "$catalog" 100000)" || return $?
+  fi
+  [ "$value" -le 1000000 ] || value=1000000
   printf '%s' "$value"
 }
 
@@ -3732,7 +4001,9 @@ copilot-model() {
     tmp="$(mktemp "${TMPDIR:-/tmp}/copilot-model.XXXXXX")" || return 1
     profile="$(_copilot_model_profile_json "$resolved" "$catalog")" || { command rm -f -- "$tmp"; return 1; }
     compact="$(_copilot_claude_compact_window "$resolved" "$catalog")" || compact_rc=$?
-    if [ "$compact_rc" -eq 3 ]; then
+    if [ "$compact_rc" -eq 4 ]; then
+      return 1
+    elif [ "$compact_rc" -eq 3 ]; then
       command rm -f -- "$tmp"
       printf '%s\n' "copilot-model: $(_copilot_strip_context_hint "$resolved") has a prompt ceiling below Claude Code's 100000-token minimum" >&2
       return 1

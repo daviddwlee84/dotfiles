@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
 // copilot-throttle-shim.js — a tiny streaming reverse proxy that sits IN FRONT
 // of the local copilot-api fork (default :4141). It provides the request
 // compatibility fixes shared by Codex/Claude Code and stops GitHub's enterprise
@@ -15,10 +16,10 @@ import { dirname, join } from "node:path";
 //                    │   pressure; 403/429 returns it to MIN for a cooldown.
 //                    │   Bursts queue instead of hitting the backend together.
 //                    │
-//                    ├─ transparent retry on 403/429/500/502/503/504 + network
-//                    │   errors, jittered backoff, BEFORE any response body is
-//                    │   streamed — so the agent never sees the transient 403
-//                    │   ("Please run /login"). GET/HEAD (health, /v1/models)
+//                    ├─ one bounded replay of classified, completed transient
+//                    │   errors before model output. Ambiguous local connection
+//                    │   failures quarantine admission instead of replaying work.
+//                    │   GET/HEAD (health, /v1/models)
 //                    │   bypass both, so liveness checks stay instant.
 //                    │
 //                    └─ SSE keepalive + stall watchdog: an OpenAI reasoning
@@ -49,23 +50,30 @@ import { dirname, join } from "node:path";
 // Managed by copilot-proxy (see 43_copilot_proxy.sh: `copilot-proxy shim on`).
 // Config via env (all optional):
 //   COPILOT_SHIM_PORT       listen port                    (default 4142)
+//   COPILOT_SHIM_HOST       listen address                 (default 127.0.0.1)
 //   COPILOT_SHIM_UPSTREAM   upstream base URL              (default http://localhost:4141)
 //   COPILOT_SHIM_MIN        adaptive concurrency floor       (default 4)
 //   COPILOT_SHIM_MAX        adaptive concurrency ceiling     (default 8)
-//   COPILOT_SHIM_RETRIES    retry attempts on transient    (default 3)
+//   COPILOT_SHIM_RETRIES    retry attempts on transient    (default 1, maximum 3)
 //   COPILOT_SHIM_BACKOFF_MS base backoff ms, doubles/try   (default 500)
 //   COPILOT_SHIM_PING_MS    keepalive interval, 0=off      (default 15000)
 //   COPILOT_SHIM_PING_AFTER_MS  silence tolerated before the SSE response is
 //                           committed and pings start      (default 10000)
-//   COPILOT_SHIM_STALL_MS   silence that counts as a wedged upstream: the
-//                           attempt is aborted (retried when no bytes have
-//                           reached the client yet), 0=off (default 240000)
+//   COPILOT_SHIM_STALL_MS   finite outer inactivity fallback (default 330000).
+//                           A local timeout is not replayed: execution is unknown.
+//   COPILOT_SHIM_BACKEND_HEADERS_TIMEOUT_MS / _BACKEND_INACTIVITY_TIMEOUT_MS
+//                           effective backend deadlines (default 300000 each)
+//   COPILOT_SHIM_BACKEND_VERSION actual launched package version (else unknown)
 //   COPILOT_SHIM_METRICS_DB request timing database (default:
 //                           $XDG_STATE_HOME/copilot-proxy/metrics.sqlite)
 //   COPILOT_API_SQLITE_DB_PATH upstream token database override
 
 const PORT = Number(process.env.COPILOT_SHIM_PORT ?? 4142);
+const HOST = process.env.COPILOT_SHIM_HOST || "127.0.0.1";
 const UPSTREAM = (process.env.COPILOT_SHIM_UPSTREAM ?? "http://localhost:4141").replace(/\/+$/, "");
+const SHIM_VERSION = createHash("sha256").update(readFileSync(import.meta.path)).digest("hex");
+const BACKEND_VERSION = /^[\w.+-]{1,80}$/.test(process.env.COPILOT_SHIM_BACKEND_VERSION ?? "")
+  ? process.env.COPILOT_SHIM_BACKEND_VERSION : "unknown";
 const HARD_MAX_CONCURRENCY = 32;
 const positiveInt = (value, fallback, max = Number.MAX_SAFE_INTEGER) => {
   const parsed = Number(value);
@@ -74,12 +82,15 @@ const positiveInt = (value, fallback, max = Number.MAX_SAFE_INTEGER) => {
 const STARTUP_MAX = positiveInt(process.env.COPILOT_SHIM_MAX, 8, HARD_MAX_CONCURRENCY);
 const STARTUP_MIN = Math.min(STARTUP_MAX,
   positiveInt(process.env.COPILOT_SHIM_MIN, 4, HARD_MAX_CONCURRENCY));
-const RETRIES = Math.max(0, Number(process.env.COPILOT_SHIM_RETRIES ?? 3));
+const retrySetting = Number(process.env.COPILOT_SHIM_RETRIES ?? 1);
+const RETRIES = Number.isInteger(retrySetting) && retrySetting >= 0 ? Math.min(retrySetting, 3) : 1;
 const BACKOFF_MS = Math.max(0, Number(process.env.COPILOT_SHIM_BACKOFF_MS ?? 500));
 const PING_MS = Math.max(0, Number(process.env.COPILOT_SHIM_PING_MS ?? 15000));
 const PING_AFTER_MS = Math.max(0, Number(process.env.COPILOT_SHIM_PING_AFTER_MS ?? 10000));
-const STALL_MS = Math.max(0, Number(process.env.COPILOT_SHIM_STALL_MS ?? 240000));
-const RETRY_STATUS = new Set([403, 429, 500, 502, 503, 504]);
+const STALL_MS = positiveInt(process.env.COPILOT_SHIM_STALL_MS, 330000);
+const BACKEND_HEADERS_MS = positiveInt(process.env.COPILOT_SHIM_BACKEND_HEADERS_TIMEOUT_MS, 300000);
+const BACKEND_INACTIVITY_MS = positiveInt(process.env.COPILOT_SHIM_BACKEND_INACTIVITY_TIMEOUT_MS, 300000);
+const RETRY_STATUS = new Set([500, 502, 503]);
 const REQUEST_BODY_TIMEOUT_STATUS = 408;
 const REQUEST_BODY_TIMEOUT_RETRIES = 1;
 const MAX_BACKOFF_MS = 30000;
@@ -89,6 +100,7 @@ const ADAPT_INCREASE_INTERVAL_MS = 60000;
 const ADAPT_THROTTLE_COOLDOWN_MS = 300000;
 const ERROR_BODY_TIMEOUT_MS = 2000;
 const ERROR_BODY_MAX_BYTES = 2048;
+const JSON_OBSERVE_MAX_BYTES = 1024 * 1024;
 const RETENTION_MS = 90 * 86400 * 1000;
 const FAST_ROUTING_TTL_MS = 5 * 60 * 1000;
 const FAST_ROUTING_TIMEOUT_MS = 2000;
@@ -125,6 +137,8 @@ export function metricsDbPath() {
   return process.env.COPILOT_SHIM_METRICS_DB ?? xdgPath("state", "copilot-proxy", "metrics.sqlite");
 }
 
+export function admissionBarrierPath() { return `${metricsDbPath()}.admission.json`; }
+
 export function tokenDbPath() {
   return process.env.COPILOT_API_SQLITE_DB_PATH ?? xdgPath("data", "copilot-api", "copilot-api.sqlite");
 }
@@ -155,10 +169,26 @@ export function openMetricsDb(path = metricsDbPath()) {
   );
   CREATE INDEX IF NOT EXISTS request_metrics_created_idx ON request_metrics(created_at_ms);
   CREATE INDEX IF NOT EXISTS request_metrics_scope_model_idx ON request_metrics(scope, model, created_at_ms);`);
+  // Additive migration: historical rows remain explicitly unclassified.
+  const columns = new Set(db.query("PRAGMA table_info(request_metrics)").all().map((row) => row.name));
+  for (const [name, type] of Object.entries({
+    outcome_version: "INTEGER", terminal_event: "TEXT", terminal_error_category: "TEXT",
+    request_kind: "TEXT", request_kind_source: "TEXT", received_bytes: "INTEGER",
+    forwarded_bytes: "INTEGER", timeout_owner: "TEXT", drain_outcome: "TEXT",
+    backend_version: "TEXT", shim_version: "TEXT", reasoning_effort: "TEXT",
+  })) {
+    if (!columns.has(name)) db.exec(`ALTER TABLE request_metrics ADD COLUMN ${name} ${type}`);
+  }
+  db.exec(`CREATE TABLE IF NOT EXISTS request_attempts (
+    trace_id TEXT NOT NULL, attempt INTEGER NOT NULL, started_at_ms INTEGER NOT NULL,
+    ended_at_ms INTEGER, status INTEGER, outcome TEXT, timeout_owner TEXT,
+    PRIMARY KEY(trace_id, attempt)
+  );`);
   return db;
 }
 
 export function pruneMetrics(db, now = Date.now()) {
+  db.query("DELETE FROM request_attempts WHERE started_at_ms < ?").run(now - RETENTION_MS);
   return db.query("DELETE FROM request_metrics WHERE created_at_ms < ?").run(now - RETENTION_MS);
 }
 
@@ -177,11 +207,20 @@ function requestMetadata(pathname, body, headers) {
   try {
     payload = JSON.parse(typeof body === "string" ? body : new TextDecoder().decode(body));
   } catch {}
+  const responses = /^\/(?:v1\/)?responses(?:\/compact)?$/.test(pathname);
+  const explicitCompact = pathname.endsWith("/responses/compact")
+    || payload.compaction_trigger != null || payload.metadata?.compaction_trigger != null
+    || headers.has("compaction_trigger");
   return {
     endpoint: pathname,
     model: typeof payload?.model === "string" ? payload.model : null,
     streaming: payload?.stream === true,
     scope: headers.get("x-copilot-benchmark") === "1" ? "benchmark" : "normal",
+    request_kind: explicitCompact ? "compact" : responses ? "responses" : pathname.includes("messages") ? "messages" : "unknown",
+    request_kind_source: pathname.endsWith("/responses/compact") ? "endpoint"
+      : explicitCompact ? "protocol_metadata" : responses ? "endpoint_compact_unknown" : "endpoint",
+    reasoning_effort: ["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(payload.reasoning?.effort)
+      ? payload.reasoning.effort : null,
   };
 }
 
@@ -196,11 +235,39 @@ export function createMetricTracker(meta, db = undefined, clock = () => performa
   let permitAt = null;
   let firstAt = null;
   let attempts = 0;
+  let attemptFinalized = false;
   let finished = false;
   const state = { ...meta };
   return {
     traceId: meta.traceId,
-    attempt() { attempts++; },
+    attempt() {
+      attempts++;
+      attemptFinalized = false;
+      try {
+        metricDb?.query("INSERT OR IGNORE INTO request_attempts (trace_id,attempt,started_at_ms) VALUES (?,?,?)")
+          .run(meta.traceId, attempts, Date.now());
+      } catch (error) { logNonFatal("attempt metrics write failed", error); }
+      return attempts;
+    },
+    attemptOutcome(status, outcome, timeoutOwner = null) {
+      if (attemptFinalized || !attempts) return;
+      attemptFinalized = true;
+      try {
+        metricDb?.query("UPDATE request_attempts SET ended_at_ms=?,status=?,outcome=?,timeout_owner=? WHERE trace_id=? AND attempt=?")
+          .run(Date.now(), status, outcome, timeoutOwner, meta.traceId, attempts);
+      } catch (error) { logNonFatal("attempt metrics write failed", error); }
+    },
+    annotate(values) {
+      Object.assign(state, values);
+      // A protocol error may be returned while its unexpected body drains.
+      // Update cleanup diagnostics without rewriting the client-visible result.
+      if (finished && Object.hasOwn(values, "drain_outcome")) {
+        try {
+          metricDb?.query("UPDATE request_metrics SET drain_outcome=?,timeout_owner=COALESCE(?,timeout_owner) WHERE trace_id=?")
+            .run(values.drain_outcome, values.timeout_owner ?? null, meta.traceId);
+        } catch (error) { logNonFatal("drain metrics write failed", error); }
+      }
+    },
     acquired() { if (permitAt === null) permitAt = clock(); },
     firstByte() { if (firstAt === null) firstAt = clock(); },
     finalize(status, errorKind = null) {
@@ -210,8 +277,10 @@ export function createMetricTracker(meta, db = undefined, clock = () => performa
         const ended = clock();
         metricDb?.query(`INSERT OR IGNORE INTO request_metrics
           (trace_id,created_at_ms,endpoint,model,scope,streaming,status,attempts,retries,
-           queue_ms,upstream_headers_ms,first_byte_ms,stream_ms,e2e_ms,error_kind)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+           queue_ms,upstream_headers_ms,first_byte_ms,stream_ms,e2e_ms,error_kind,
+           outcome_version,terminal_event,terminal_error_category,request_kind,request_kind_source,
+           received_bytes,forwarded_bytes,timeout_owner,drain_outcome,backend_version,shim_version,reasoning_effort)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
             state.traceId, wall, state.endpoint, state.model, state.scope,
             state.streaming ? 1 : 0, status, attempts, Math.max(0, attempts - 1),
             permitAt === null ? null : permitAt - started,
@@ -219,6 +288,11 @@ export function createMetricTracker(meta, db = undefined, clock = () => performa
             firstAt === null ? null : firstAt - started,
             firstAt === null ? null : ended - firstAt,
             ended - started, errorKind,
+            2, state.terminal_event ?? null, state.terminal_error_category ?? null,
+            state.request_kind ?? "unknown", state.request_kind_source ?? "unknown",
+            state.received_bytes ?? null, state.forwarded_bytes ?? null,
+            state.timeout_owner ?? null, state.drain_outcome ?? null,
+            BACKEND_VERSION, SHIM_VERSION, state.reasoning_effort ?? null,
           );
       } catch (error) { logNonFatal("metrics write failed", error); }
     },
@@ -317,13 +391,17 @@ export function queryStats(options = {}) {
     timing[field] = { p50: percentile(values, .5), p90: percentile(values, .9), max: percentile(values, 1) };
   }
   const clientCancels = rows.filter((r) => r.error_kind === "client_cancel").length;
-  const errors = rows.filter((r) => r.error_kind || !(r.status >= 200 && r.status < 400)).length;
+  const unverified = (r) => r.error_kind === "response_unverified"
+    || (!r.outcome_version && /^\/(?:v1\/)?responses(?:\/compact)?$/.test(r.endpoint)
+      && r.status >= 200 && r.status < 400 && !r.error_kind);
+  const errors = rows.filter((r) => !unverified(r) && (r.error_kind || !(r.status >= 200 && r.status < 400))).length;
   return {
     period: options.period ?? "day",
     scope: options.scope ?? "normal",
     model: options.model ?? null,
     requests: rows.length,
-    successes: rows.filter((r) => r.status >= 200 && r.status < 400 && !r.error_kind).length,
+    successes: rows.filter((r) => r.status >= 200 && r.status < 400 && !r.error_kind && !unverified(r)).length,
+    unverified: rows.filter(unverified).length,
     errors,
     client_cancels: clientCancels,
     upstream_errors: errors - clientCancels,
@@ -612,6 +690,110 @@ export async function closeResponse(resp, reason) {
 // ---- adaptive semaphore (canceled waiters are removed eagerly) ----------------
 let active = 0;
 const waiters = [];
+const leases = new Set();
+let recoveryRequired = false;
+let admissionLoaded = false;
+
+function loadAdmissionBarrier() {
+  if (admissionLoaded) return;
+  admissionLoaded = true;
+  const path = admissionBarrierPath();
+  if (!existsSync(path)) return;
+  // Never guess that an old/corrupt marker is harmless. A wrapper can remove it
+  // only after stopping this shim and confirming the backend process exited.
+  recoveryRequired = true;
+  let count = 1;
+  try {
+    if (statSync(path).size > 65536) throw new Error("oversized admission marker");
+    const marker = JSON.parse(readFileSync(path, "utf8"));
+    if (marker.version !== 1 || !Array.isArray(marker.leases) || !marker.leases.length) throw new Error("invalid admission marker");
+    count = Math.min(marker.leases.length, HARD_MAX_CONCURRENCY);
+  } catch (error) { logNonFatal("unclean admission marker requires controlled recovery", error); }
+  for (let i = 0; i < count; i++) leases.add({ phase: "unknown", dispatched: true, id: `recovered-${i}` });
+  active += count;
+  log("unclean shim generation: inference blocked until backend and shim are stopped together and admission is recovered");
+}
+
+function persistAdmission() {
+  if (recoveryRequired) return; // never overwrite evidence from the old process
+  const path = admissionBarrierPath();
+  const outstanding = [...leases].filter((lease) => lease.dispatched || lease.phase === "unknown")
+    .map((lease) => ({ id: lease.id, phase: lease.phase === "unknown" ? "unknown" : "active" }));
+  if (!outstanding.length) {
+    try { unlinkSync(path); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    return;
+  }
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, JSON.stringify({ version: 1, upstream: UPSTREAM, leases: outstanding }), { mode: 0o600 });
+    renameSync(temporary, path);
+  } catch (error) {
+    recoveryRequired = true;
+    try { unlinkSync(temporary); } catch {}
+    throw new Error(`cannot persist admission safely: ${errorSummary(error)}`);
+  }
+}
+class AdmissionUnknownError extends Error {
+  constructor() {
+    super("shim admission is quarantined: backend execution is unknown; wait for tracked streams to settle, then restart the backend and shim together");
+    this.name = "AdmissionUnknownError";
+  }
+}
+function unknownCount() { return [...leases].filter((lease) => lease.phase === "unknown").length; }
+function admissionUnavailable() { return recoveryRequired || unknownCount() >= limiter.limit; }
+
+// A disconnected downstream does not imply that copilot-api stopped its work.
+// Unknown leases survive every limiter reset; only controlled process recovery
+// may clear them. Restarting just the shim cannot establish backend quiescence.
+function createLease(signal, tracker) {
+  const lease = {
+    id: crypto.randomUUID(),
+    phase: "queue", cancelled: Boolean(signal?.aborted), released: false,
+    onCancel: null, dispatched: false,
+    admitted() { lease.phase = "active"; leases.add(lease); },
+    dispatch() {
+      lease.dispatched = true;
+      if (lease.cancelled) lease.phase = "draining";
+      persistAdmission();
+    },
+    settled() {
+      lease.dispatched = false;
+      try { persistAdmission(); }
+      catch (error) {
+        recoveryRequired = true;
+        logNonFatal("completed work could not clear admission marker; controlled recovery required", error);
+      }
+    },
+    release() {
+      if (lease.released || lease.phase === "unknown") return;
+      lease.released = true;
+      leases.delete(lease);
+      signal?.removeEventListener("abort", cancel);
+      if (lease.phase !== "queue") release();
+      lease.phase = "done";
+    },
+    quarantine(owner) {
+      if (lease.released || lease.phase === "unknown") return;
+      lease.phase = "unknown";
+      try { persistAdmission(); } catch (error) { logNonFatal("admission persistence failed", error); }
+      tracker?.annotate({ timeout_owner: owner, drain_outcome: "unknown" });
+      log("backend execution unknown; admission retained until controlled backend and shim recovery", tracker?.traceId ?? "");
+      drainWaiters();
+    },
+    cancel: () => cancel(),
+  };
+  function cancel() {
+    lease.cancelled = true;
+    if (lease.dispatched && lease.phase !== "unknown" && !lease.released) {
+      lease.phase = "draining";
+      tracker?.annotate({ drain_outcome: "draining" });
+    }
+    lease.onCancel?.();
+  }
+  signal?.addEventListener("abort", cancel, { once: true });
+  return lease;
+}
 const limiter = createAdaptiveLimiter({
   onChange({ previous, limit, reason }) {
     log(`limiter ${previous} -> ${limit} (${reason}; active=${active}, queued=${waiters.length})`);
@@ -620,6 +802,13 @@ const limiter = createAdaptiveLimiter({
 });
 
 function drainWaiters() {
+  if (admissionUnavailable()) {
+    for (const waiter of waiters.splice(0)) {
+      waiter.signal?.removeEventListener("abort", waiter.onAbort);
+      waiter.reject(new AdmissionUnknownError());
+    }
+    return;
+  }
   while (active < limiter.limit && waiters.length) {
     const next = waiters.shift();
     next.signal?.removeEventListener("abort", next.onAbort);
@@ -631,6 +820,7 @@ function drainWaiters() {
 
 function acquire(signal) {
   if (signal?.aborted) return Promise.reject(abortError());
+  if (admissionUnavailable()) return Promise.reject(new AdmissionUnknownError());
   if (active < limiter.limit) { active++; return Promise.resolve(); }
   limiter.noteQueued();
   return new Promise((resolve, reject) => {
@@ -652,9 +842,9 @@ function release() {
 
 function backoffMs(attempt, retryAfter) {
   const seconds = Number(retryAfter);
-  if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
+  if (Number.isFinite(seconds) && seconds >= 0 && retryAfter != null && retryAfter !== "") return seconds * 1000;
   const date = retryAfter ? Date.parse(retryAfter) : NaN;
-  if (Number.isFinite(date)) return Math.min(Math.max(0, date - Date.now()), MAX_RETRY_AFTER_MS);
+  if (Number.isFinite(date)) return Math.max(0, date - Date.now());
   const jitter = BACKOFF_MS > 0 ? Math.floor(Math.random() * BACKOFF_MS) : 0;
   return Math.min(BACKOFF_MS * 2 ** attempt + jitter, MAX_BACKOFF_MS);
 }
@@ -808,8 +998,19 @@ function limiterStatus() {
   return {
     ...limiter.snapshot(),
     active,
+    draining: [...leases].filter((lease) => lease.phase === "draining").length,
+    unknown: unknownCount(),
+    admission_available: !admissionUnavailable(),
+    recovery_required: recoveryRequired || unknownCount() > 0,
+    recovery: recoveryRequired || unknownCount() ? "settle tracked streams, then restart backend and shim together" : null,
     queued: waiters.length,
     startup: { min: STARTUP_MIN, max: STARTUP_MAX },
+    versions: { backend: BACKEND_VERSION, shim: SHIM_VERSION },
+    timeouts: {
+      shim_fallback_ms: STALL_MS, backend_headers_ms: BACKEND_HEADERS_MS,
+      backend_inactivity_ms: BACKEND_INACTIVITY_MS,
+      compatible: STALL_MS > Math.max(BACKEND_HEADERS_MS, BACKEND_INACTIVITY_MS),
+    },
   };
 }
 
@@ -846,31 +1047,31 @@ async function updateLimiter(req) {
   }
 }
 
-// One upstream `fetch` attempt with a ceiling on the silent pre-header window.
-// A wedged upstream otherwise never settles this promise and the agent waits
-// forever; RETRIES then gets a chance to re-issue the request instead.
-function fetchAttempt(target, makeInit, clientSignal) {
+class UpstreamUnknownError extends Error {
+  constructor(message, owner) { super(message); this.name = "UpstreamUnknownError"; this.owner = owner; }
+}
+
+// After dispatch, downstream cancellation drains this physical request. Only
+// the later local watchdog aborts it, and that leaves execution quarantined.
+function fetchAttempt(target, makeInit, lease, attempt) {
   const ctl = new AbortController();
-  const onClientAbort = () => ctl.abort();
-  if (clientSignal?.aborted) ctl.abort();
-  else clientSignal?.addEventListener("abort", onClientAbort, { once: true });
   let stalled = false;
-  const timer = STALL_MS
-    ? setTimeout(() => { stalled = true; ctl.abort(); }, STALL_MS)
-    : null;
-  const done = () => {
-    if (timer) clearTimeout(timer);
-    clientSignal?.removeEventListener("abort", onClientAbort);
-  };
-  return fetch(target, makeInit(ctl.signal)).then(
+  const init = makeInit(ctl.signal);
+  init.headers.set("x-copilot-shim-attempt", String(attempt));
+  lease.dispatch();
+  const timer = setTimeout(() => { stalled = true; ctl.abort(); }, STALL_MS);
+  return fetch(target, init).then(
     (resp) => {
-      done();
+      clearTimeout(timer);
       responseAborters.set(resp, () => ctl.abort());
       return resp;
     },
     (err) => {
-      done();
-      throw stalled ? new Error(`upstream sent no response headers in ${STALL_MS}ms`) : err;
+      clearTimeout(timer);
+      throw new UpstreamUnknownError(stalled
+        ? `upstream sent no response headers in ${STALL_MS}ms; execution is unknown`
+        : `backend connection failed; execution is unknown (${errorSummary(err)})`,
+      stalled ? "shim_headers" : "shim_transport");
     },
   );
 }
@@ -884,32 +1085,105 @@ function fetchAttempt(target, makeInit, clientSignal) {
 // drop a chunk. Keeping the pull-driven shape (rather than a `start()` pump)
 // preserves backpressure toward the upstream.
 function observeResponsesTerminal(state, value) {
-  if (!state.responsesTerminal || state.responsesTerminal.seen) return;
-  const text = state.responsesTerminal.decoder.decode(value, { stream: true });
-  const combined = `${state.responsesTerminal.tail}${text}`.replaceAll("\r\n", "\n");
-  if (/(?:^|\n)event:\s*response\.(?:completed|failed|incomplete)\s*(?:\n|$)/.test(combined)) {
-    state.responsesTerminal.seen = true;
+  const observed = state.responsesTerminal;
+  if (observed && !observed.kind) {
+    const text = observed.decoder.decode(value, { stream: true });
+    // Keep only a bounded SSE field line, never a transcript. A terminal field
+    // is accepted when its event's blank line arrives, not on a truncated field.
+    for (const char of text) {
+      if (char !== "\n") {
+        if (observed.line.length < 512) observed.line += char;
+        else observed.overflow = true;
+        continue;
+      }
+      const line = observed.line.replace(/\r$/, "");
+      if (line === "" && !observed.overflow) {
+        if (observed.event && observed.data) observed.kind = observed.event;
+        observed.event = null; observed.data = false;
+      } else if (line.startsWith("event:") && !observed.overflow) {
+        const event = line.slice(6).trim();
+        observed.event = /^response\.(completed|failed|incomplete)$/.test(event) ? event : null;
+      } else if (line.startsWith("data:")) {
+        observed.data = true;
+        if (!observed.event && !observed.overflow) {
+          try {
+            const event = JSON.parse(line.slice(5)).type;
+            if (/^response\.(completed|failed|incomplete)$/.test(event)) observed.event = event;
+          } catch {}
+        }
+      }
+      observed.line = ""; observed.overflow = false;
+      if (observed.kind) break;
+    }
   }
-  // An SSE field name and value are tiny. Retain enough overlap for a field
-  // split across arbitrary transport chunks without buffering model output.
-  state.responsesTerminal.tail = combined.slice(-256);
+  if (state.jsonInspection && !state.jsonInspection.overflow) {
+    state.jsonInspection.bytes += value.byteLength;
+    if (state.jsonInspection.bytes > JSON_OBSERVE_MAX_BYTES) {
+      state.jsonInspection.overflow = true;
+      state.jsonInspection.text = "";
+    } else state.jsonInspection.text += state.jsonInspection.decoder.decode(value, { stream: true });
+  }
+}
+
+export function classifyResponsesJson(payload, pathname = "/responses") {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "unverified";
+  if (payload.error || payload.status === "failed") return "failed";
+  if (payload.status === "incomplete") return "incomplete";
+  if (payload.status === "completed") return "completed";
+  if (pathname.endsWith("/compact") && payload.object === "response.compaction"
+      && typeof payload.id === "string" && Number.isFinite(payload.created_at)
+      && Array.isArray(payload.output) && payload.output.some((item) => item?.type === "compaction"
+        && typeof item.encrypted_content === "string" && item.encrypted_content.length > 0)) return "completed";
+  return "unverified";
+}
+
+function streamState(resp, pathname, lease = null) {
+  const responses = /^\/(?:v1\/)?responses(?:\/compact)?$/.test(pathname);
+  const sse = isEventStream(resp?.headers.get("content-type"));
+  return {
+    reader: resp?.body?.getReader() ?? null, response: resp ?? null, pipeline: null,
+    pending: null, pulling: null, drainPromise: null, ended: false,
+    idleMs: 0, status: resp?.status ?? 200, pathname, lease,
+    cancelled: Boolean(lease?.cancelled), keepalive: PING_MS > 0 && sse,
+    responsesTerminal: responses && sse
+      ? { decoder: new TextDecoder(), line: "", overflow: false, event: null, data: false, kind: null } : null,
+    jsonInspection: responses && !sse && resp?.ok
+      ? { decoder: new TextDecoder(), bytes: 0, text: "", overflow: false } : null,
+  };
 }
 
 function finishStream(state, controller, releaseOnce, label, tracker) {
-  if (state.responsesTerminal && !state.responsesTerminal.seen) {
-    const tail = state.responsesTerminal.decoder.decode();
-    if (tail) observeResponsesTerminal(state, new TextEncoder().encode(tail));
+  if (state.ended) return;
+  state.ended = true;
+  let errorKind = null;
+  let terminal = state.responsesTerminal?.kind;
+  if (state.responsesTerminal) {
+    if (!terminal) errorKind = "upstream_protocol_eof";
+    else if (terminal !== "response.completed") errorKind = terminal.replace(".", "_");
   }
-  const missingTerminal = state.responsesTerminal && !state.responsesTerminal.seen;
-  if (missingTerminal) {
-    log(`${label} ended before a Responses terminal event`);
+  if (state.jsonInspection) {
+    let outcome = "unverified";
+    if (!state.jsonInspection.overflow) {
+      try { outcome = classifyResponsesJson(JSON.parse(state.jsonInspection.text + state.jsonInspection.decoder.decode()), state.pathname); }
+      catch {}
+    }
+    state.jsonInspection.text = "";
+    terminal = `json.${outcome}`;
+    if (outcome !== "completed") errorKind = `response_${outcome}`;
   }
-  controller.close();
+  tracker?.annotate({ terminal_event: terminal ?? null, terminal_error_category: errorKind,
+    drain_outcome: state.cancelled ? "completed" : null });
+  tracker?.attemptOutcome(state.status, errorKind ?? "completed");
+  if (state.lease && !state.cancelled && !errorKind) limiter.observeStatus(state.status, waiters.length > 0);
+  state.lease?.settled();
+  if (!state.cancelled) controller.close();
   releaseOnce();
-  tracker?.finalize(state.status, missingTerminal ? "upstream_protocol_eof" : null);
+  tracker?.finalize(state.cancelled ? 499 : state.status, state.cancelled ? "client_cancel" : errorKind);
+  if (errorKind === "upstream_protocol_eof") log(`${label} ended before a Responses terminal event`);
 }
 
 async function pumpStep(state, controller, releaseOnce, label, tracker) {
+  if (state.ended) return;
   if (!state.pending) state.pending = state.reader.read();
 
   const intervalMs = state.keepalive ? PING_MS : STALL_MS;
@@ -919,7 +1193,7 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
     if (done) { finishStream(state, controller, releaseOnce, label, tracker); return; }
     tracker?.firstByte();
     observeResponsesTerminal(state, value);
-    controller.enqueue(value);
+    if (!state.cancelled) controller.enqueue(value);
     return;
   }
 
@@ -933,7 +1207,7 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
     if (winner.read.done) { finishStream(state, controller, releaseOnce, label, tracker); return; }
     tracker?.firstByte();
     observeResponsesTerminal(state, winner.read.value);
-    controller.enqueue(winner.read.value);
+    if (!state.cancelled) controller.enqueue(winner.read.value);
     return;
   }
 
@@ -941,49 +1215,87 @@ async function pumpStep(state, controller, releaseOnce, label, tracker) {
   if (STALL_MS && state.idleMs >= STALL_MS) {
     const secs = Math.round(state.idleMs / 1000);
     log(`${label} stalled mid-stream: no upstream bytes for ${secs}s; failing the response`);
+    abortResponse(state.response);
     void settleCancellation(state.reader, new Error("stalled"), "stalled reader cancellation failed");
-    releaseOnce();
-    tracker?.finalize(state.status, "upstream_stall");
-    controller.error(new Error(`shim: upstream stalled for ${secs}s`));
-    return;
+    throw new UpstreamUnknownError(`shim: upstream stalled for ${secs}s; execution is unknown`, "shim_stream");
   }
-  controller.enqueue(PING_FRAME);
+  if (!state.cancelled) controller.enqueue(PING_FRAME);
+}
+
+function failStream(state, controller, releaseOnce, tracker, error) {
+  if (state.ended) return;
+  state.ended = true;
+  const owner = error instanceof UpstreamUnknownError ? error.owner : "shim_transport";
+  if (state.lease?.dispatched) state.lease.quarantine(owner);
+  else releaseOnce();
+  tracker?.annotate({ timeout_owner: owner, drain_outcome: state.cancelled ? "unknown" : null });
+  tracker?.attemptOutcome(state.status, "upstream_unknown", owner);
+  if (!state.cancelled && state.responsesTerminal && !state.responsesTerminal.kind) {
+    tracker?.annotate({ terminal_event: "response.failed", terminal_error_category: "upstream_unknown" });
+  }
+  tracker?.finalize(state.cancelled ? 499 : state.status, state.cancelled ? "client_cancel" : "upstream_unknown");
+  if (!state.cancelled) {
+    if (state.responsesTerminal && !state.responsesTerminal.kind) {
+      controller.enqueue(new TextEncoder().encode(`event: response.failed\ndata: ${JSON.stringify(responsesFailure(errorSummary(error), 502))}\n\n`));
+      controller.close();
+    } else if (isEventStream(state.response?.headers.get("content-type")) && !state.responsesTerminal) {
+      controller.enqueue(new TextEncoder().encode(`event: error\ndata: ${JSON.stringify({ type: "error", error: { type: "api_error", message: errorSummary(error) } })}\n\n`));
+      controller.close();
+    } else controller.error(error);
+  }
+}
+
+function enableDrain(state, releaseOnce, label, tracker) {
+  const drain = () => {
+    state.cancelled = true;
+    state.keepalive = false;
+    if (state.drainPromise || state.ended) return;
+    // Let an already-pending pull relinquish the reader before the background
+    // consumer takes over. This preserves exactly one read/cleanup owner.
+    state.drainPromise = (async () => {
+      await state.pulling?.catch(() => {});
+      if (state.ended) return;
+      if (!state.reader && state.pipeline) {
+        const resp = await state.pipeline;
+        const next = streamState(resp, state.pathname, state.lease);
+        Object.assign(state, next, { cancelled: true, keepalive: false, drainPromise: state.drainPromise });
+      }
+      const sink = { enqueue() {}, close() {}, error() {} };
+      if (!state.reader) { finishStream(state, sink, releaseOnce, label, tracker); return; }
+      while (!state.ended) await pumpStep(state, sink, releaseOnce, label, tracker);
+    })().catch((error) => failStream(state, { error() {} }, releaseOnce, tracker, error));
+  };
+  if (state.lease) state.lease.onCancel = drain;
+  if (state.cancelled) drain();
+  return drain;
 }
 
 // Stream an upstream response to the client, holding the semaphore permit until
 // the stream ends / errors / is cancelled (true in-flight accounting).
-function streamThrough(resp, releaseOnce, label = "stream", tracker = null, pathname = "") {
+function streamThrough(resp, releaseOnce, label = "stream", tracker = null, pathname = "", lease = null) {
   const headers = new Headers(resp.headers);
   headers.delete("content-encoding");  // Bun already decoded the upstream body
   headers.delete("content-length");
   headers.delete("transfer-encoding");
   if (tracker?.traceId) headers.set("x-trace-id", tracker.traceId);
   if (!resp.body) {
-    releaseOnce(); tracker?.finalize(resp.status);
+    const state = streamState(resp, pathname, lease);
+    finishStream(state, { close() {} }, releaseOnce, label, tracker);
     return new Response(null, { status: resp.status, headers });
   }
 
-  const state = {
-    reader: resp.body.getReader(),
-    pending: null,
-    idleMs: 0,
-    status: resp.status,
-    // Only an SSE body may carry comment frames; a JSON body must stay verbatim.
-    keepalive: PING_MS > 0 && isEventStream(headers.get("content-type")),
-    responsesTerminal: (pathname === "/responses" || pathname === "/v1/responses")
-      && isEventStream(headers.get("content-type"))
-      ? { decoder: new TextDecoder(), tail: "", seen: false }
-      : null,
-  };
+  const state = streamState(resp, pathname, lease);
+  const drain = enableDrain(state, releaseOnce, label, tracker);
   const stream = new ReadableStream({
     async pull(controller) {
-      try { await pumpStep(state, controller, releaseOnce, label, tracker); }
-      catch (err) { releaseOnce(); tracker?.finalize(resp.status, "stream_error"); controller.error(err); }
+      if (state.cancelled || state.ended) return;
+      state.pulling = pumpStep(state, controller, releaseOnce, label, tracker);
+      try { await state.pulling; }
+      catch (err) { failStream(state, controller, releaseOnce, tracker, err); }
     },
-    cancel(reason) {
-      abortResponse(resp);
-      releaseOnce(); tracker?.finalize(499, "client_cancel");
-      void settleCancellation(state.reader, reason, "downstream reader cancellation failed");
+    cancel() {
+      if (lease) lease.cancel();
+      else drain();
     },
   });
   return new Response(stream, { status: resp.status, headers });
@@ -1030,6 +1342,75 @@ async function boundedErrorDetail(resp, err, signal) {
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   const snippet = new TextDecoder().decode(bytes).replace(/\s+/g, " ").trim();
   return snippet ? `${prefix}: ${snippet.slice(0, 500)}` : prefix;
+}
+
+// Provider errors can contain JSON inside error.message. Bound both the bytes
+// and traversal depth; persist categories, never the inspected error body.
+export function classifyUpstreamError(status, text) {
+  const codes = new Set();
+  const messages = [];
+  let visited = 0;
+  function inspect(value, depth = 0) {
+    if (depth > 5 || ++visited > 32) return;
+    if (typeof value === "string") {
+      messages.push(value.slice(0, ERROR_BODY_MAX_BYTES));
+      try { inspect(JSON.parse(value), depth + 1); } catch {}
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      for (const key of ["code", "type"]) {
+        if (typeof value[key] === "string") codes.add(value[key].toLowerCase());
+      }
+      if (value.error != null) inspect(value.error, depth + 1);
+      if (value.message != null) inspect(value.message, depth + 1);
+    }
+  }
+  inspect(String(text ?? "").slice(0, ERROR_BODY_MAX_BYTES));
+  if (messages.some((message) => /^bad credentials\s*$/i.test(message))) return "bad_credentials";
+  if (messages.some((message) => /^IDE token expired(?::.*)?\s*$/i.test(message))) return "ide_token_expired";
+  if (codes.has("upstream_timeout")) return "backend_timeout";
+  if (status === 408 && codes.has("user_request_timeout")) return "request_body_timeout";
+  if (status === 401) return "authentication";
+  if (status === 402) return "quota";
+  if (status === 422 || codes.has("cyber_policy")) return "policy_or_validation";
+  if (status === 400) return "validation";
+  if (status === 429 || [...codes].some((code) => ["rate_limit_exceeded", "rate_limited", "too_many_requests", "throttled", "secondary_rate_limit"].includes(code))) return "throttle";
+  if (status === 403) return "permission";
+  return RETRY_STATUS.has(status) ? "transient_server" : "upstream_status";
+}
+
+async function inspectErrorResponse(resp, lease, tracker) {
+  const reader = resp.body?.getReader();
+  const deadline = timeoutToken(ERROR_BODY_TIMEOUT_MS);
+  const chunks = [];
+  let retained = 0;
+  try {
+    while (reader) {
+      const winner = await Promise.race([reader.read().then((read) => ({ read })), deadline.promise]);
+      if (winner.tick) throw new UpstreamUnknownError("backend error body did not finish; execution is unknown", "shim_error_body");
+      if (winner.read.done) break;
+      if (retained + winner.read.value.length > JSON_OBSERVE_MAX_BYTES) {
+        throw new UpstreamUnknownError("backend error body exceeded the bounded inspection limit; execution is unknown", "shim_error_body");
+      }
+      chunks.push(winner.read.value); retained += winner.read.value.length;
+    }
+    lease.settled();
+    const bytes = new Uint8Array(retained);
+    let offset = 0;
+    for (const part of chunks) { bytes.set(part, offset); offset += part.length; }
+    const category = classifyUpstreamError(resp.status, new TextDecoder().decode(bytes));
+    tracker.annotate({ terminal_error_category: category, timeout_owner: category === "backend_timeout" ? "backend" : null });
+    tracker.attemptOutcome(resp.status, category, category === "backend_timeout" ? "backend" : null);
+    const headers = new Headers(resp.headers);
+    headers.delete("content-length"); headers.delete("content-encoding"); headers.delete("transfer-encoding");
+    return { response: new Response(bytes, { status: resp.status, headers }), category };
+  } catch (error) {
+    abortResponse(resp);
+    void settleCancellation(reader, error);
+    throw error instanceof UpstreamUnknownError ? error
+      : new UpstreamUnknownError("backend error body disconnected; execution is unknown", "shim_transport");
+  } finally {
+    deadline.cancel();
+    try { reader?.releaseLock(); } catch {}
+  }
 }
 
 function responsesErrorCode(status) {
@@ -1085,22 +1466,14 @@ async function terminalErrorFrame(pathname, resp, err, signal) {
 }
 
 // Slow path body: ping through queueing, bounded attempts and bounded backoffs,
-// then splice in only a real SSE stream. Client cancellation aborts that pipeline.
-function keepaliveThenForward(pipeline, releaseOnce, label, tracker, pathname, signal) {
-  const state = {
-    reader: null,
-    response: null,
-    pending: null,
-    idleMs: 0,
-    keepalive: true,
-    status: 200,
-    responsesTerminal: pathname === "/responses" || pathname === "/v1/responses"
-      ? { decoder: new TextDecoder(), tail: "", seen: false }
-      : null,
-  };
+// then splice in only a real SSE stream. Cancellation drains dispatched work.
+function keepaliveThenForward(pipeline, releaseOnce, label, tracker, pathname, signal, lease) {
+  const state = streamState(null, pathname, lease);
+  state.pipeline = pipeline;
+  state.keepalive = true;
+  const drain = enableDrain(state, releaseOnce, label, tracker);
   let settled = false;
-  return new ReadableStream({
-    async pull(controller) {
+  const pull = async (controller) => {
       try {
         if (!settled) {
           const tick = timeoutToken(PING_MS);
@@ -1112,7 +1485,7 @@ function keepaliveThenForward(pipeline, releaseOnce, label, tracker, pathname, s
 
           if (winner.tick) {
             state.idleMs += PING_MS;
-            controller.enqueue(PING_FRAME);
+            if (!state.cancelled) controller.enqueue(PING_FRAME);
             return;
           }
 
@@ -1120,51 +1493,58 @@ function keepaliveThenForward(pipeline, releaseOnce, label, tracker, pathname, s
           state.idleMs = 0;
           const { resp, err } = winner;
           state.response = resp ?? null;
+          if (state.cancelled) return; // background drain owns the response now
           if (err || !resp.ok || !resp.body) {
             log(`${label} committed as SSE but upstream answered ${err ? `error (${err})` : resp.status}`);
             controller.enqueue(await terminalErrorFrame(pathname, err ? null : resp, err, signal));
             controller.close();
+            state.ended = true;
+            if (resp && !resp.body) lease.settled();
             releaseOnce();
-            tracker?.finalize(resp?.status ?? 502, err ? "upstream_error" : "upstream_status");
+            tracker?.annotate({ terminal_event: pathname.includes("responses") ? "response.failed" : "error" });
+            tracker?.finalize(resp?.status ?? 502, err ? "upstream_error" : resp.ok ? "upstream_protocol" : "upstream_status");
             return;
           }
           const contentType = resp.headers.get("content-type") ?? "";
           if (!isEventStream(contentType)) {
             log(`${label} committed as SSE but upstream returned non-SSE ${contentType || "content"}`);
-            await closeResponse(resp, new Error("non-SSE success body"));
+            // Still consume the unexpected body before releasing admission.
+            state.reader = resp.body.getReader();
+            state.lease.cancel();
             controller.enqueue(await terminalErrorFrame(pathname, null, new Error("upstream returned a non-SSE success body"), signal));
             controller.close();
-            releaseOnce();
             tracker?.finalize(resp.status, "upstream_protocol");
             return;
           }
-          state.status = resp.status;
-          state.reader = resp.body.getReader();
+          const next = streamState(resp, pathname, lease);
+          Object.assign(state, next, { pipeline, pulling: state.pulling, drainPromise: state.drainPromise });
         }
         await pumpStep(state, controller, releaseOnce, label, tracker);
       } catch (err) {
-        releaseOnce();
-        tracker?.finalize(state.status, signal?.aborted ? "client_cancel" : "stream_error");
-        controller.error(err);
+        failStream(state, controller, releaseOnce, tracker, err);
       }
+  };
+  return new ReadableStream({
+    async pull(controller) {
+      if (state.cancelled || state.ended) return;
+      state.pulling = pull(controller);
+      await state.pulling;
     },
-    cancel(reason) {
-      abortResponse(state.response);
-      releaseOnce();
-      tracker?.finalize(499, "client_cancel");
-      void settleCancellation(state.reader, reason, "delayed reader cancellation failed");
-      pipeline.then((resp) => closeResponse(resp, reason)).catch((error) => logNonFatal("pipeline cancellation failed", error));
+    cancel() {
+      if (lease) lease.cancel();
+      else drain();
     },
   });
 }
 
 export function startServer() {
+  loadAdmissionBarrier();
   const server = Bun.serve({
     port: PORT,
-    // Seconds; 255 is Bun's ceiling. With PING_MS keepalives the client socket
-    // no longer goes quiet for anywhere near this long, but leave the headroom:
-    // it is the last line of defence when pings are disabled.
-    idleTimeout: 255,
+    hostname: HOST,
+    // Bun's 255s ceiling would otherwise cancel non-streaming requests before
+    // the backend's 300s watchdog. The finite per-request watchdog owns this.
+    idleTimeout: 0,
     async fetch(req, bunServer) {
     const url = new URL(req.url);
     const method = req.method;
@@ -1224,16 +1604,27 @@ export function startServer() {
       }
     }
 
+    if (admissionUnavailable()) return jsonResponse({ error: new AdmissionUnknownError().message }, 503);
+
     // Mutating requests (POST /v1/messages …): buffer body so we can resend on
     // retry, then throttle + retry. A peer may disappear while Bun is still
     // assembling a large Codex tools payload; contain that handler rejection.
     let bodyBuf;
-    try { bodyBuf = await req.arrayBuffer(); }
+    const bodyDeadline = timeoutToken(STALL_MS);
+    try {
+      const received = await Promise.race([
+        req.arrayBuffer().then((body) => ({ body })), bodyDeadline.promise,
+      ]);
+      if (received.tick) {
+        return jsonResponse({ error: { type: "shim_request_body_timeout", message: "shim did not receive the complete request body before its deadline" } }, 408);
+      }
+      bodyBuf = received.body;
+    }
     catch (error) {
       const aborted = req.signal?.aborted;
       log(`${method} ${url.pathname} request body ${aborted ? "aborted" : "read failed"}: ${errorSummary(error)}`);
       return new Response(aborted ? "client aborted" : "shim: request body read failed", { status: aborted ? 499 : 400 });
-    }
+    } finally { bodyDeadline.cancel(); }
     let routingSnapshot = fastRoutingSnapshot();
     let normalized = normalizeRequestBody(
       url.pathname, bodyBuf, req.headers.get("content-encoding") ?? "", routingSnapshot.mappings,
@@ -1259,17 +1650,19 @@ export function startServer() {
         log(`fast requested for ${normalized.routing.model ?? "unknown model"} but no eligible sibling is available; using the standard model`);
       }
     }
-    const traceId = req.headers.get("x-trace-id") || crypto.randomUUID();
+    const incomingTrace = req.headers.get("x-trace-id") ?? "";
+    const traceId = /^[\w.:-]{1,128}$/.test(incomingTrace) ? incomingTrace : crypto.randomUUID();
     const meta = requestMetadata(url.pathname, normalized.inspectBody, req.headers);
-    const tracker = createMetricTracker({ ...meta, traceId });
+    const tracker = createMetricTracker({ ...meta, traceId, received_bytes: bodyBuf.byteLength,
+      forwarded_bytes: typeof normalized.body === "string" ? new TextEncoder().encode(normalized.body).byteLength : normalized.body.byteLength });
     const { target, makeInit } = buildUpstream(req, normalized.body, normalized.decoded, traceId);
 
     const label = `${method} ${url.pathname}`;
     // The permit is now taken INSIDE the pipeline: queue time is silent time on
     // the client socket too, so the keepalive below has to be able to cover it.
     let acquired = false;
-    let released = false;
-    const releaseOnce = () => { if (acquired && !released) { released = true; release(); } };
+    const lease = createLease(req.signal, tracker);
+    const releaseOnce = () => lease.release();
 
     // Queue for a permit, then talk to the upstream until a response is
     // committed. Resolves to a Response whose body has NOT been read yet, or to
@@ -1283,54 +1676,58 @@ export function startServer() {
       }
       try { await acquire(req.signal); }
       catch (err) {
+        releaseOnce();
+        if (err instanceof AdmissionUnknownError) {
+          tracker.finalize(503, "admission_unknown");
+          return jsonResponse({ error: err.message }, 503);
+        }
         tracker.finalize(499, "client_cancel");
         return new Response("client aborted", { status: 499 });
       }
       acquired = true;
+      lease.admitted();
       tracker.acquired();
       if (queuedAt !== null) {
         log(`admitted ${label} after ${Math.round(performance.now() - queuedAt)}ms (active=${active}/${limiter.limit}, queued=${waiters.length})`);
       }
 
       for (let attempt = 0; attempt <= RETRIES; attempt++) {
-        tracker.attempt();
+        if (lease.cancelled || req.signal.aborted) {
+          releaseOnce(); tracker.finalize(499, "client_cancel");
+          return new Response("client aborted", { status: 499 });
+        }
+        const attemptId = tracker.attempt();
         let resp;
+        let category = null;
         try {
-          resp = await fetchAttempt(target, makeInit, req.signal);
+          resp = await fetchAttempt(target, makeInit, lease, attemptId);
+          if (!resp.ok) {
+            const inspected = await inspectErrorResponse(resp, lease, tracker);
+            resp = inspected.response; category = inspected.category;
+          }
         } catch (err) {
-          if (req.signal?.aborted) {
-            releaseOnce();
-            tracker.finalize(499, "client_cancel");
-            return new Response("client aborted", { status: 499 });
-          }
-          if (attempt < RETRIES) {
-            const d = backoffMs(attempt);
-            log(`${label} network error (${err}); retry ${attempt + 1}/${RETRIES} in ${d}ms`);
-            try { await abortableSleep(d, req.signal); }
-            catch {
-              releaseOnce();
-              tracker.finalize(499, "client_cancel");
-              return new Response("client aborted", { status: 499 });
-            }
-            continue;
-          }
-          releaseOnce();
-          tracker.finalize(502, "upstream_error");
-          return new Response(`shim: upstream unreachable: ${err}`, { status: 502 });
+          const owner = err instanceof UpstreamUnknownError ? err.owner : "shim_transport";
+          lease.quarantine(owner);
+          tracker.attemptOutcome(502, "upstream_unknown", owner);
+          tracker.finalize(lease.cancelled ? 499 : 502, lease.cancelled ? "client_cancel" : "upstream_unknown");
+          return new Response(`shim: ${errorSummary(err)}; recover backend and shim after tracked streams settle`, { status: 502 });
         }
 
-        limiter.observeStatus(resp.status, willQueue || waiters.length > 0);
+        // A permission 403 is not evidence of throttling. Success pressure is
+        // observed at completion below, rather than at HTTP 200 headers.
+        if (category === "throttle") limiter.observeStatus(resp.status, willQueue || waiters.length > 0);
 
         // Retryable status and attempts left → back off and try again. A 408
         // user_request_timeout means the upstream did not finish reading the
         // already-buffered request body; replay it at most once so a transient
         // reader stall can recover without turning a persistent large-body
         // failure into four minute-long attempts.
-        const bodyTimeoutRetry = resp.status === REQUEST_BODY_TIMEOUT_STATUS
+        const bodyTimeoutRetry = resp.status === REQUEST_BODY_TIMEOUT_STATUS && category === "request_body_timeout"
           && requestBodyTimeoutRetries < REQUEST_BODY_TIMEOUT_RETRIES;
-        if ((RETRY_STATUS.has(resp.status) || bodyTimeoutRetry) && attempt < RETRIES) {
+        const d = backoffMs(attempt, resp.headers.get("retry-after"));
+        if ((category === "transient_server" || category === "throttle" || bodyTimeoutRetry)
+            && attempt < RETRIES && d <= MAX_RETRY_AFTER_MS && !lease.cancelled) {
           if (bodyTimeoutRetry) requestBodyTimeoutRetries++;
-          const d = backoffMs(attempt, resp.headers.get("retry-after"));
           log(`${label} -> ${resp.status}; retry ${attempt + 1}/${RETRIES} in ${d}ms`);
           await closeResponse(resp, new Error(`retrying upstream status ${resp.status}`));
           try { await abortableSleep(d, req.signal); }
@@ -1344,6 +1741,11 @@ export function startServer() {
 
         if (attempt > 0) log(`${label} -> ${resp.status} after ${attempt} retr${attempt === 1 ? "y" : "ies"}`);
         tracker.headers();
+        if (!resp.ok) {
+          lease.settled();
+          releaseOnce();
+          tracker.finalize(lease.cancelled ? 499 : resp.status, lease.cancelled ? "client_cancel" : "upstream_status");
+        }
         return resp;
       }
       releaseOnce(); // unreachable (last attempt always commits) — safety net
@@ -1355,7 +1757,7 @@ export function startServer() {
     // Non-streaming callers keep the original shape: one await, real status.
     const eligible = PING_MS > 0 && PING_AFTER_MS > 0 && wantsStream(normalized.inspectBody);
     if (!eligible) {
-      try { return streamThrough(await pipeline, releaseOnce, label, tracker, url.pathname); }
+      try { return streamThrough(await pipeline, releaseOnce, label, tracker, url.pathname, lease); }
       catch (err) { releaseOnce(); tracker.finalize(500, "pipeline_error"); return new Response(`shim: ${err}`, { status: 500 }); }
     }
 
@@ -1372,15 +1774,16 @@ export function startServer() {
       const contentType = early.resp.headers.get("content-type") ?? "";
       if (early.resp.ok && (!early.resp.body || !isEventStream(contentType))) {
         log(`${label} upstream returned non-SSE ${contentType || "content"} for a streaming request`);
-        await closeResponse(early.resp, new Error("non-SSE success body"));
-        releaseOnce();
+        const state = streamState(early.resp, url.pathname, lease);
+        const drain = enableDrain(state, releaseOnce, label, tracker);
         tracker.finalize(early.resp.status, "upstream_protocol");
+        lease.cancel(); drain();
         return new Response("shim: upstream returned a non-SSE success body", {
           status: 502,
           headers: { "content-type": "text/plain; charset=utf-8", "x-trace-id": traceId },
         });
       }
-      return streamThrough(early.resp, releaseOnce, label, tracker, url.pathname);
+      return streamThrough(early.resp, releaseOnce, label, tracker, url.pathname, lease);
     }
 
     // Slow path — still queued, or the model is still thinking. Commit the SSE
@@ -1388,7 +1791,7 @@ export function startServer() {
     // underneath once the pipeline settles.
     const phase = acquired ? "upstream" : "queue";
     log(`${label} silent for ${PING_AFTER_MS}ms; keepalive engaged (phase=${phase}, active=${active}/${limiter.limit}, queued=${waiters.length})`);
-    return new Response(keepaliveThenForward(pipeline, releaseOnce, label, tracker, url.pathname, req.signal), {
+    return new Response(keepaliveThenForward(pipeline, releaseOnce, label, tracker, url.pathname, req.signal, lease), {
       status: 200,
       headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive", "x-trace-id": traceId },
     });
@@ -1396,6 +1799,9 @@ export function startServer() {
   });
 
   void refreshFastRouting(true);
+  if (STALL_MS <= Math.max(BACKEND_HEADERS_MS, BACKEND_INACTIVITY_MS)) {
+    log("warning: shim fallback does not exceed the configured backend deadlines; check effective timeout overrides");
+  }
   log(`listening on :${server.port} -> ${UPSTREAM} (limit=${limiter.limit}, range=${STARTUP_MIN}..${STARTUP_MAX}, retries=${RETRIES}, backoff=${BACKOFF_MS}ms, ping=${PING_MS}ms after ${PING_AFTER_MS}ms, stall=${STALL_MS}ms)`);
   return server;
 }

@@ -46,8 +46,12 @@ write_fake_codex() {
 }
 
 write_update_fakes() {
-  mkdir -p "$TMP/bin"
-  printf '%s' 'copilot-api update fixture' > "$TMP/package.tgz"
+  mkdir -p "$TMP/bin" "$TMP/archive/package" "$TMP/runtime-tmp"
+  export TMPDIR="$TMP/runtime-tmp/"
+  printf '{"name":"@jeffreycao/copilot-api","version":"%s"}\n' "${1:-2.3.4}" >"$TMP/archive/package/package.json"
+  printf '%s\n' '#!/bin/sh' '[ "${FAKE_HELP_FAIL:-0}" = 0 ]' >"$TMP/archive/package/cli.sh"
+  chmod +x "$TMP/archive/package/cli.sh"
+  tar -czf "$TMP/package.tgz" -C "$TMP/archive" package
   cat > "$TMP/bin/curl" <<'SH'
 #!/bin/sh
 out=''
@@ -58,13 +62,20 @@ cp "$FAKE_TARBALL" "$out"
 SH
   cat > "$TMP/bin/bun" <<'SH'
 #!/bin/sh
-version="${2##*@}"
+if [ "$1" = -e ]; then exec "$REAL_BUN" "$@"; fi
+[ "${FAKE_INSTALL_FAIL:-0}" = 0 ] || exit 1
+# The updater must pass the verified local bytes, never a package spec.
+[ -f "$2" ] || exit 91
 mkdir -p node_modules/.bin node_modules/@jeffreycao/copilot-api
-printf '%s\n' '#!/bin/sh' 'exit 0' > node_modules/.bin/copilot-api
-chmod +x node_modules/.bin/copilot-api
-printf '{"version":"%s"}\n' "$version" > node_modules/@jeffreycao/copilot-api/package.json
+tar -xzf "$2" -C node_modules/@jeffreycao/copilot-api --strip-components=1
+ln -s ../@jeffreycao/copilot-api/cli.sh node_modules/.bin/copilot-api
+if [ -n "${FAKE_STAGED_VERSION:-}" ]; then
+  printf '{"version":"%s"}\n' "$FAKE_STAGED_VERSION" >node_modules/@jeffreycao/copilot-api/package.json
+fi
+printf '%s\n' "$2" > installed-from
 SH
-  chmod +x "$TMP/bin/curl" "$TMP/bin/bun"
+  printf '%s\n' '#!/bin/sh' 'exit 1' >"$TMP/bin/lsof"
+  chmod +x "$TMP/bin/curl" "$TMP/bin/bun" "$TMP/bin/lsof"
 }
 
 # --- _copilot_norm_models -------------------------------------------------------
@@ -248,10 +259,10 @@ JSON
   mkdir -p "$TMP/state/copilot-proxy"
   run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
   [ "$status" -eq 0 ]
-  [ "$output" = "@jeffreycao/copilot-api@2.3.4" ]
+  [ "$output" = "@jeffreycao/copilot-api@2.5.2" ]
   run bash -c "source '$SHELL_LIB'; _copilot_builtin_integrity"
   [ "$status" -eq 0 ]
-  [ "$output" = "sha512-yRMH3wQAH74a0K/3Gl0S3itSL7Dza/7qOGG32PXV3tKRd4feG3utpuIQf42HhnhIdcBwMz3qhmeWBPQrPxZQMQ==" ]
+  [ "$output" = "sha512-bMVpuniekbKKq0LMtmZZJKjDVpaOODAHs19akwkP/hyGfgcx+YK0X22jfB46lQb0p9EoywDrJMyTcAfLr18jEQ==" ]
   printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.2.0","integrity":"sha512-test"}' > "$TMP/state/copilot-proxy/package.json"
   run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
   [ "$status" -eq 0 ]
@@ -272,7 +283,7 @@ JSON
   command -v openssl >/dev/null 2>&1 || skip "openssl not installed"
   write_update_fakes
   run env FAKE_TARBALL="$TMP/package.tgz" bash -c "
-    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state';
+    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/config' COPILOT_API_HOME='$TMP/backend';
     source '$SHELL_LIB';
     _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"sha512-wrong\",\"tarball\":\"https://fake/package.tgz\"}}'; }
     _copilot_update_exact 2.3.4"
@@ -294,7 +305,7 @@ JSON
   printf '%s\n' '@jeffreycao/copilot-api@2.1.0' > "$TMP/data/copilot-api/pkg/.installed-spec"
   printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.1.0","integrity":"sha512-old"}' > "$TMP/state/copilot-proxy/package.json"
   run env FAKE_TARBALL="$TMP/package.tgz" META_INTEGRITY="sha512-$digest" bash -c "
-    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state';
+    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/config' COPILOT_API_HOME='$TMP/backend';
     source '$SHELL_LIB';
     _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
     _copilot_alive() { return 0; }
@@ -309,6 +320,166 @@ JSON
   [ -f "$TMP/data/copilot-api/pkg/old-marker" ]
   [ "$(jq -r '.spec' "$TMP/state/copilot-proxy/package.json")" = "@jeffreycao/copilot-api@2.1.0" ]
   [ "$(cat "$TMP/start-count")" = "2" ]
+}
+
+@test "exact update rejects wrong staged versions and failed binary smoke before touching live state" {
+  write_update_fakes
+  local digest mode
+  digest="$(openssl dgst -sha512 -binary "$TMP/package.tgz" | openssl base64 -A)"
+  mkdir -p "$TMP/data/copilot-api/pkg" "$TMP/state/copilot-proxy"
+  printf old >"$TMP/data/copilot-api/pkg/old-marker"
+  printf '%s\n' '{"spec":"old"}' >"$TMP/state/copilot-proxy/package.json"
+  for mode in version help; do
+    run env FAKE_TARBALL="$TMP/package.tgz" META_INTEGRITY="sha512-$digest" TEST_MODE="$mode" bash -c "
+      export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/config' COPILOT_API_HOME='$TMP/backend'
+      source '$SHELL_LIB'
+      if [ \"\$TEST_MODE\" = version ]; then export FAKE_STAGED_VERSION=9.9.9; else export FAKE_HELP_FAIL=1; fi
+      _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
+      _copilot_alive() { printf unexpected-live-probe; return 0; }
+      _copilot_update_exact 2.3.4"
+    [ "$status" -ne 0 ]
+    [[ "$output" != *unexpected-live-probe* ]]
+    [ -f "$TMP/data/copilot-api/pkg/old-marker" ]
+    [ "$(jq -r .spec "$TMP/state/copilot-proxy/package.json")" = old ]
+  done
+}
+
+@test "offline rollback restores custom transport fields and preserves newer credentials and usage" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  write_update_fakes
+  local digest real_bun
+  digest="$(openssl dgst -sha512 -binary "$TMP/package.tgz" | openssl base64 -A)"
+  real_bun="$(command -v bun)"
+  mkdir -p "$TMP/data/copilot-api/pkg" "$TMP/state/copilot-proxy" "$TMP/backend" "$TMP/config/shell"
+  printf old >"$TMP/data/copilot-api/pkg/old-marker"
+  printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.1.0","integrity":"sha512-old"}' >"$TMP/state/copilot-proxy/package.json"
+  printf '%s\n' '{"responsesTransport":{"headersTimeoutMsV2":123456,"streamInactivityTimeoutMs":234567},"unrelated":"before"}' >"$TMP/backend/config.json"
+  printf old-wrapper >"$TMP/config/shell/43_copilot_proxy.sh"
+  printf old-shim >"$TMP/config/shell/copilot-throttle-shim.js"
+  "$real_bun" -e 'import {Database} from "bun:sqlite"; const db = new Database(process.argv[1]); db.exec("PRAGMA journal_mode=WAL; CREATE TABLE usage(n INTEGER); INSERT INTO usage VALUES(1)"); db.close();' "$TMP/backend/copilot-api.sqlite"
+  run env FAKE_TARBALL="$TMP/package.tgz" META_INTEGRITY="sha512-$digest" REAL_BUN="$real_bun" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/config' COPILOT_API_HOME='$TMP/backend'
+    source '$SHELL_LIB'
+    _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
+    _copilot_alive() { return 1; }
+    _copilot_update_exact 2.3.4 || exit
+    printf '%s' new-token >'$TMP/backend/github_token'
+    printf '%s' '{\"upstreamTransport\":{\"headersTimeoutMs\":123456},\"unrelated\":\"after\"}' >'$TMP/backend/config.json'
+    command bun -e 'import {Database} from \"bun:sqlite\"; const db = new Database(process.argv[1]); db.exec(\"INSERT INTO usage VALUES(2)\"); db.close();' '$TMP/backend/copilot-api.sqlite'
+    _copilot_registry_metadata() { printf unexpected-network; return 1; }
+    copilot-proxy rollback"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *unexpected-network* ]]
+  [ -f "$TMP/data/copilot-api/pkg/old-marker" ]
+  [ "$(cat "$TMP/backend/github_token")" = new-token ]
+  jq -e '.responsesTransport.headersTimeoutMsV2 == 123456 and .responsesTransport.streamInactivityTimeoutMs == 234567 and .unrelated == "after" and (has("upstreamTransport") | not)' "$TMP/backend/config.json"
+  [ "$("$real_bun" -e 'import {Database} from "bun:sqlite"; const db = new Database(process.argv[1]); console.log(db.query("SELECT SUM(n) AS n FROM usage").get().n); db.close();' "$TMP/backend/copilot-api.sqlite")" = 3 ]
+  local snapshot
+  snapshot="$(find "$TMP/data/copilot-api" -path '*/deployed/copilot-throttle-shim.js' -print)"
+  [ "$(cat "$snapshot")" = old-shim ]
+  [ ! -e "$TMP/state/copilot-proxy/rollback" ]
+}
+
+@test "late selection write failure restores a pre-existing generation" {
+  write_update_fakes
+  local digest
+  digest="$(openssl dgst -sha512 -binary "$TMP/package.tgz" | openssl base64 -A)"
+  mkdir -p "$TMP/data/copilot-api/pkg" "$TMP/state/copilot-proxy"
+  printf old >"$TMP/data/copilot-api/pkg/old-marker"
+  printf '%s\n' '{"spec":"old"}' >"$TMP/state/copilot-proxy/package.json"
+  run env FAKE_TARBALL="$TMP/package.tgz" META_INTEGRITY="sha512-$digest" bash -c "
+    export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/config' COPILOT_API_HOME='$TMP/backend'
+    source '$SHELL_LIB'
+    _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
+    _copilot_alive() { return 1; }
+    _copilot_write_selection() { printf broken >'$TMP/state/copilot-proxy/package.json'; return 1; }
+    _copilot_update_exact 2.3.4"
+  [ "$status" -ne 0 ]
+  [ -f "$TMP/data/copilot-api/pkg/old-marker" ]
+  [ "$(jq -r .spec "$TMP/state/copilot-proxy/package.json")" = old ]
+}
+
+@test "rollback from absent initial config removes only migrated transport fields" {
+  mkdir -p "$TMP/data/copilot-api/pkg" "$TMP/bundle/pkg" "$TMP/backend" "$TMP/state"
+  printf '%s\n' '{}' >"$TMP/bundle/config.json"
+  printf '%s\n' '{"upstreamTransport":{"headersTimeoutMs":300000},"providers":{"custom":"keep"}}' >"$TMP/backend/config.json"
+  jq -n --arg prefix "$TMP/data/copilot-api/pkg" --arg config "$TMP/backend/config.json" --arg selection "$TMP/state/package.json" '{prefix:$prefix,config:$config,selection:$selection}' >"$TMP/bundle/paths.json"
+  run env XDG_DATA_HOME="$TMP/data" bash -c "source '$SHELL_LIB'; _copilot_restore_generation '$TMP/bundle'"
+  [ "$status" -eq 0 ]
+  jq -e '.providers.custom == "keep" and (has("upstreamTransport") | not) and (has("responsesTransport") | not)' "$TMP/backend/config.json"
+}
+
+@test "isolated dogfood runner enforces artifact, path and traffic bounds offline" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  run python3 "$SOURCE_DIR/tests/fixtures/copilot-dogfood-test.py"
+  [ "$status" -eq 0 ]
+}
+
+@test "shared shim lifecycle retains real workers, classifies results and quarantines unknown execution" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  run bun "$SOURCE_DIR/tests/fixtures/copilot-shim-lifecycle.mjs" "$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js" "$TMP/lifecycle-metrics"
+  if [ "$status" -ne 0 ]; then printf '%s\n' "$output" >&2; fi
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" | tail -n 1 | jq -e '.ok == true and (.scenarios | length == 5) and all(.scenarios[]; .ok == true)'
+}
+
+@test "rollback pins the previous installed default when no persisted selection existed" {
+  mkdir -p "$TMP/data/copilot-api/pkg" "$TMP/backend" "$TMP/config" "$TMP/bundle"
+  printf '%s\n' '@jeffreycao/copilot-api@2.3.4' >"$TMP/data/copilot-api/pkg/.installed-spec"
+  run env XDG_DATA_HOME="$TMP/data" XDG_CONFIG_HOME="$TMP/config" XDG_STATE_HOME="$TMP/state" COPILOT_API_HOME="$TMP/backend" bash -c '
+    . "$1"
+    _copilot_snapshot_runtime "$2" || exit
+    mv "$(_copilot_pkg_prefix)" "$2/pkg"
+    mkdir "$(_copilot_pkg_prefix)"
+    _copilot_restore_generation "$2" || exit
+    _copilot_pkg
+  ' _ "$SHELL_LIB" "$TMP/bundle"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'@jeffreycao/copilot-api@2.3.4' ]]
+  jq -e '.spec == "@jeffreycao/copilot-api@2.3.4" and .restored_from == "installed-spec"' "$TMP/state/copilot-proxy/package.json"
+}
+
+@test "admission marker survives shim-only and failed stops and clears after confirmed paired stop" {
+  local fail
+  for fail in 0 1; do
+    mkdir -p "$TMP/state/copilot-proxy"
+    printf '%s\n' '{"version":1,"entries":[{"id":"unknown"}]}' >"$TMP/state/copilot-proxy/metrics.sqlite.admission.json"
+    printf '%s\n' 4242 >"$TMP/backend.pid"
+    # Keep process operations mocked: this tests marker ownership, not signals.
+    run env XDG_STATE_HOME="$TMP/state" TEST_STOP_FAIL="$fail" TEST_TMP="$TMP" bash -c '
+      . "$1"
+      _copilot_pidfile() { printf "%s/backend.pid" "$TEST_TMP"; }
+      _copilot_port_pids() { return 1; }
+      _copilot_stop_listener() { printf "%s\n" "$1" >>"$TEST_TMP/stop-order"; [ "$1" != backend ] || [ "$TEST_STOP_FAIL" = 0 ]; }
+      _copilot_shim_stop || exit
+      [ -f "$(_copilot_admission_state)" ] || exit 91
+      copilot-proxy stop
+    ' _ "$SHELL_LIB"
+    if [ "$fail" = 0 ]; then
+      [ "$status" -eq 0 ]
+      [ ! -e "$TMP/state/copilot-proxy/metrics.sqlite.admission.json" ]
+    else
+      [ "$status" -ne 0 ]
+      [ -f "$TMP/state/copilot-proxy/metrics.sqlite.admission.json" ]
+    fi
+  done
+}
+
+@test "controlled stop refuses a reused PID rather than signaling an unrelated process" {
+  mkdir -p "$TMP/bin"
+  printf '%s\n' '#!/bin/sh' 'exit 1' >"$TMP/bin/lsof"
+  printf '%s\n' '#!/bin/sh' 'printf "sleep 100\n"' >"$TMP/bin/ps"
+  chmod +x "$TMP/bin/lsof" "$TMP/bin/ps"
+  printf '%s\n' 4242 >"$TMP/backend.pid"
+  run env PATH="$TMP/bin:$PATH" TEST_TMP="$TMP" bash -c '
+    . "$1"
+    kill() { printf unsafe >"$TEST_TMP/signaled"; }
+    _copilot_stop_listener backend 4141 "$TEST_TMP/backend.pid"
+  ' _ "$SHELL_LIB"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'refusing to stop unexpected process'* ]]
+  [ ! -e "$TMP/signaled" ]
+  [ -f "$TMP/backend.pid" ]
 }
 
 @test "pkg install: npm CA-stack fallback rescues two failed Bun attempts" {
@@ -326,60 +497,40 @@ printf '%s\n' npm > npm-fallback-used
 SH
   chmod +x "$TMP/bin/bun" "$TMP/bin/npm"
 
-  run bash -c "export PATH='$TMP/bin:/usr/bin:/bin' XDG_DATA_HOME='$TMP/data'
+  run bash -c "export PATH='$TMP/bin:/usr/bin:/bin' XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@2.5.2'
     source '$SHELL_LIB'; _copilot_ensure_pkg >/dev/null"
   [ "$status" -eq 0 ]
   [ -f "$TMP/data/copilot-api/pkg/npm-fallback-used" ]
-  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.4" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.5.2" ]
 }
 
-# --- integrity guard: the lock is evidence only about ITS OWN version ----------
-#
-# `bun add` writes bun.lock and never touches package-lock.json, so one npm
-# CA-stack fallback leaves a package-lock.json pinned to that version forever.
-# Reading it unconditionally compared 2.1.0's real hash to the 2.3.4 pin and
-# wedged every start. pitfalls/copilot-proxy-stale-package-lock-integrity.md
-
-# Installs the pinned version into the prefix and writes a package-lock.json
-# claiming $1 (version) / $2 (integrity) — the mixed-manager prefix shape.
-write_stale_lock_fixture() {
-  mkdir -p "$TMP/bin"
-  cat > "$TMP/bin/bun" <<SH
-#!/bin/sh
-mkdir -p node_modules/.bin node_modules/@jeffreycao/copilot-api
-printf '#!/bin/sh\n' > node_modules/.bin/copilot-api
-chmod +x node_modules/.bin/copilot-api
-printf '{"version":"2.3.4"}\n' > node_modules/@jeffreycao/copilot-api/package.json
-SH
-  chmod +x "$TMP/bin/bun"
-  mkdir -p "$TMP/data/copilot-api/pkg"
-  printf '{"packages":{"node_modules/@jeffreycao/copilot-api":{"version":"%s","integrity":"%s"}}}\n' \
-    "$1" "$2" > "$TMP/data/copilot-api/pkg/package-lock.json"
-}
-
-@test "integrity guard: a stale npm lock for ANOTHER version does not block install" {
+@test "trusted installation uses the verified archive and ignores a stale manager lock" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  # 2.1.0's genuine hash, left by a months-old npm fallback; pin is 2.3.4.
-  write_stale_lock_fixture 2.1.0 \
-    'sha512-9/Ro1UzrYT/erB7eR/rf61XHFyc5TOwQ94B6ij/Wu91TD1hnmbuqYu/PavKGUQ7YDBVCXFENRRvQSpTkS0X3eA=='
-  run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
+  write_update_fakes 2.5.2
+  local digest
+  digest="$(openssl dgst -sha512 -binary "$TMP/package.tgz" | openssl base64 -A)"
+  mkdir -p "$TMP/data/copilot-api/pkg"
+  printf '%s\n' '{"packages":{"node_modules/@jeffreycao/copilot-api":{"version":"2.1.0","integrity":"sha512-old"}}}' >"$TMP/data/copilot-api/pkg/package-lock.json"
+  run env FAKE_TARBALL="$TMP/package.tgz" META_INTEGRITY="sha512-$digest" bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/config' COPILOT_API_HOME='$TMP/backend'
     source '$SHELL_LIB'
-    _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"'\"\$(_copilot_builtin_integrity)\"'\"}}'; }
+    _copilot_builtin_integrity() { printf '%s' \"\$META_INTEGRITY\"; }
+    _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
     _copilot_ensure_pkg >/dev/null"
   [ "$status" -eq 0 ]
-  [[ "$output" != *"does not match the trusted pin"* ]]
-  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.3.4" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.5.2" ]
+  [[ "$(cat "$TMP/data/copilot-api/pkg/installed-from")" == *'/verified-package.tgz' ]]
+  cmp "$TMP/package.tgz" "$TMP/data/copilot-api/pkg/verified-package.tgz"
 }
 
-@test "integrity guard: a lock for the INSTALLED version with a bad hash still refuses" {
+@test "trusted installation refuses registry metadata that disagrees with the built-in pin" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  write_stale_lock_fixture 2.3.4 'sha512-tampered'
+  write_update_fakes 2.5.2
   run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
-    source '$SHELL_LIB'; _copilot_ensure_pkg"
+    source '$SHELL_LIB'
+    _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"sha512-tampered\",\"tarball\":\"https://fake/package.tgz\"}}'; }
+    _copilot_ensure_pkg"
   [ "$status" -ne 0 ]
   [[ "$output" == *"does not match the trusted pin"* ]]
-  # The message must name both sides, or the next occurrence needs a bisect.
-  [[ "$output" == *"@2.3.4"* ]]
   [ ! -e "$TMP/data/copilot-api/pkg/.installed-spec" ]
 }
 
@@ -1888,7 +2039,111 @@ tier_rank() {
   local catalog='{"data":[{"id":"tiny","capabilities":{"limits":{"max_prompt_tokens":64000}}}]}'
   run env CATALOG="$catalog" bash -c "source '$SHELL_LIB'; _copilot_claude_compact_window tiny \"\$CATALOG\""
   [ "$status" -eq 3 ]
-  [ -z "$output" ]
+  [[ "$output" == *"below the client's 100000-token minimum"* ]]
+}
+
+@test "Astra compact budget validates ratio, keeps non-Astra unchanged, and respects each client minimum" {
+  local catalog='{"data":[{"id":"gpt-6-astra","capabilities":{"limits":{"max_prompt_tokens":872000,"max_context_window_tokens":1000000}}},{"id":"gpt-6-astra-fast","capabilities":{"limits":{"max_prompt_tokens":872000}}},{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_prompt_tokens":922000}}}]}'
+  local shell ratio
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    run env COPILOT_ASTRA_COMPACT_RATIO=0.70 CATALOG="$catalog" "$shell" -c '. "$1"; printf "%s|%s|%s" "$(_copilot_claude_compact_window gpt-6-astra "$CATALOG")" "$(_copilot_claude_compact_window "gpt-6-astra-fast[1m]" "$CATALOG")" "$(_copilot_claude_compact_window gpt-5.6-sol "$CATALOG")"' _ "$SHELL_LIB"
+    [ "$status" -eq 0 ]
+    [ "$output" = '610400|610400|922000' ]
+    for ratio in 0 -0.1 1.1 bad '"0.7"'; do
+      run env COPILOT_ASTRA_COMPACT_RATIO="$ratio" CATALOG="$catalog" "$shell" -c '. "$1"; _copilot_compact_budget gpt-6-astra "$CATALOG" 1' _ "$SHELL_LIB"
+      [ "$status" -eq 4 ]
+    done
+    run env COPILOT_ASTRA_COMPACT_RATIO=0.01 CATALOG="$catalog" "$shell" -c '. "$1"; _copilot_claude_compact_window gpt-6-astra "$CATALOG"' _ "$SHELL_LIB"
+    [ "$status" -eq 3 ]
+    run env COPILOT_ASTRA_COMPACT_RATIO=0.01 CATALOG="$catalog" "$shell" -c '. "$1"; _copilot_compact_budget gpt-6-astra "$CATALOG" 1' _ "$SHELL_LIB"
+    [ "$status" -eq 0 ]
+    [ "$output" = 8720 ]
+  done
+}
+
+@test "Claude explicit compact capacity wins over ratio and existing safe pins remain valid" {
+  local catalog
+  catalog="$(auto_regression_catalog)"
+  mkdir -p "$TMP/proj/.claude"
+  printf '%s\n' '{"env":{"ANTHROPIC_BASE_URL":"http://localhost:4142","ANTHROPIC_MODEL":"gpt-6-astra[1m]","CLAUDE_CODE_AUTO_COMPACT_WINDOW":"872000"}}' >"$TMP/proj/.claude/settings.local.json"
+  run env CATALOG="$catalog" CLAUDE_CODE_AUTO_COMPACT_WINDOW=700000 COPILOT_ASTRA_COMPACT_RATIO=invalid bash -c '
+    cd "$2"; . "$1"
+    _copilot_model_catalog() { printf "%s" "$CATALOG"; }
+    _copilot_assert_pinned_compact_safe gpt-6-astra || exit
+    _copilot_env_json_for_model gpt-6-astra "$CATALOG" | jq -r .CLAUDE_CODE_AUTO_COMPACT_WINDOW
+  ' _ "$SHELL_LIB" "$TMP/proj"
+  [ "$status" -eq 0 ]
+  [ "$output" = 700000 ]
+}
+
+@test "Codex retry defaults are coordinated on both launcher paths and user overrides stay last" {
+  write_fake_codex
+  printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$4"' >"$TMP/bin/specstory"
+  chmod +x "$TMP/bin/specstory"
+  local shell shim mode catalog
+  catalog="$(auto_regression_catalog)"
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    for shim in on off; do
+      for mode in --no-specstory --specstory; do
+        run env CATALOG="$catalog" COPILOT_PROXY_SHIM="$shim" PATH="$TMP/bin:$PATH" "$shell" -c '
+          cd "$2"; . "$1"
+          _copilot_alive() { return 0; }
+          _copilot_require_shim() { return 0; }
+          _copilot_model_catalog() { printf "%s" "$CATALOG"; }
+          _copilot_codex_catalog_file() { printf /bundled.json; }
+          _copilot_specstory_codex_cmd() { printf codex; }
+          codex-copilot "$3" -m gpt-6-astra -c model_providers.copilot_api.request_max_retries=7 -c model_auto_compact_token_limit=700000
+        ' _ "$SHELL_LIB" "$TMP/proj" "$mode"
+        [ "$status" -eq 0 ]
+        if [ "$shim" = on ]; then
+          [[ "$output" == *'request_max_retries=0'*'request_max_retries=7'* ]]
+          [[ "$output" == *'stream_max_retries=0'* ]]
+        else
+          [[ "$output" == *'request_max_retries=3'*'request_max_retries=7'* ]]
+          [[ "$output" == *'stream_max_retries=1'* ]]
+        fi
+        [[ "$output" == *'model_context_window=1000000'* ]]
+        [[ "$output" == *'model_auto_compact_token_limit=700000'* ]]
+        [[ "$output" != *'model_auto_compact_token_limit=610400'* ]]
+      done
+    done
+  done
+}
+
+@test "Codex recognizes spaced config model and explicit compact overrides before applying the Astra policy" {
+  write_fake_codex
+  local catalog
+  catalog="$(auto_regression_catalog)"
+  run env CATALOG="$catalog" COPILOT_PROXY_SHIM=on COPILOT_ASTRA_COMPACT_RATIO=invalid PATH="$TMP/bin:$PATH" bash -c '
+    cd "$2"; . "$1"
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf "%s" "$CATALOG"; }
+    _copilot_codex_catalog_file() { printf /bundled.json; }
+    codex-copilot --no-specstory -c " model = \"gpt-6-astra\" " --config=" model_auto_compact_token_limit = 700000 "
+  ' _ "$SHELL_LIB" "$TMP/proj"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'--auto ->'* ]]
+  [[ "$output" == *'model_context_window=1000000'* ]]
+  [[ "$output" == *' model_auto_compact_token_limit = 700000 '* ]]
+}
+
+@test "Codex dedicated model flag wins over a later config model for derived metadata" {
+  write_fake_codex
+  local catalog='{"data":[{"id":"gpt-6-astra","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}},{"id":"gpt-5.6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000,"max_prompt_tokens":922000}}}]}'
+  run env CATALOG="$catalog" COPILOT_ASTRA_COMPACT_RATIO=invalid PATH="$TMP/bin:$PATH" bash -c '
+    cd "$2"; . "$1"
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf "%s" "$CATALOG"; }
+    _copilot_codex_catalog_file() { printf /bundled.json; }
+    codex-copilot --no-specstory -m gpt-5.6-sol -c="model=\"gpt-6-astra\""
+  ' _ "$SHELL_LIB" "$TMP/proj"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'model_context_window=1050000'* ]]
+  [[ "$output" == *'model_auto_compact_token_limit=922000'* ]]
 }
 
 @test "model profile: OpenAI maps quality balanced and fast roles" {
@@ -2032,7 +2287,7 @@ check_public_auto_recovery() {
         and $e.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-5.6-terra[1m]"
         and $e.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-5.6-luna[1m]"
         and $e.ANTHROPIC_SMALL_FAST_MODEL == "gpt-5.6-luna[1m]"
-        and $e.CLAUDE_CODE_AUTO_COMPACT_WINDOW == "872000"
+        and $e.CLAUDE_CODE_AUTO_COMPACT_WINDOW == "610400"
         and $e.UNRELATED == "keep" and .permissions.allow == ["Read"]' \
         "$AUTO_ROOT/proj/.claude/settings.local.json" >/dev/null
     else
@@ -2119,7 +2374,7 @@ check_public_auto_recovery() {
       [ "$status" -eq 0 ]
       [[ "$output" == *'=<gpt-6-astra>'* ]]
       [[ "$output" == *'=<model_context_window=1000000>'* ]]
-      [[ "$output" == *'=<model_auto_compact_token_limit=872000>'* ]]
+      [[ "$output" == *'=<model_auto_compact_token_limit=610400>'* ]]
       [[ "$output" == *'=<two words>'* ]]
       if [ "$scenario" = fresh ]; then
         [ ! -e "$AUTO_ROOT/state/copilot-proxy/model" ]

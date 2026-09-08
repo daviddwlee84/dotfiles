@@ -8,7 +8,7 @@ type copilot-proxy >/dev/null 2>&1 || return 0
 _copilot_proxy_completion() {
   local cur prev words cword
   _init_completion || return
-  local actions='start stop restart status doctor test logs auth reinstall shim limiter whoami usage quota stats events bench update help'
+  local actions='start stop restart status doctor test logs auth reinstall shim limiter whoami usage quota stats events bench update rollback help'
   if [ "$cword" -eq 1 ]; then COMPREPLY=( $(compgen -W "$actions" -- "$cur") ); return; fi
   case "${words[1]}" in
     stats|events)
