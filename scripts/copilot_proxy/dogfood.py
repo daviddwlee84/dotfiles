@@ -472,7 +472,7 @@ def run_slot(args: argparse.Namespace, root: Path, version: str, allowance: int,
         for process in reversed(processes):
             try:
                 terminate(process)
-            except OSError as error:
+            except (OSError, subprocess.TimeoutExpired) as error:
                 cleanup_errors.append(type(error).__name__)
         for log in logs:
             log.close()
