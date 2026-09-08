@@ -384,7 +384,7 @@ _ssh_setup_input() {
 }
 
 # Pick one of a list. $1 header, $2 default value, rest are the options.
-# Result in $_SSH_SETUP_REPLY.
+# Result in $_SSH_SETUP_REPLY; gum failure/cancellation returns nonzero.
 _ssh_setup_choose() {
   local header="$1" default="$2"
   shift 2
@@ -397,9 +397,15 @@ _ssh_setup_choose() {
 
   if _ssh_setup_use_gum; then
     local sel
-    sel="$(printf '%s\n' "$@" | gum choose --header "$header" --height 12 \
-             ${default:+--selected "$default"})" || sel=""
-    _SSH_SETUP_REPLY="${sel:-$default}"
+    local -a choose_args
+    choose_args=(--header "$header" --height 12)
+    # zsh keeps ${default:+--selected "$default"} as ONE argument.
+    # An array preserves the flag/value boundary and spaces inside key paths.
+    [ -z "$default" ] || choose_args+=(--selected "$default")
+    _SSH_SETUP_REPLY=""
+    sel="$(printf '%s\n' "$@" | gum choose "${choose_args[@]}")" || return 1
+    [ -n "$sel" ] || return 1
+    _SSH_SETUP_REPLY="$sel"
     return 0
   fi
 
@@ -903,7 +909,7 @@ EOF
     local opt_path="+ enter a path manually"
     menu+=("$opt_new" "$opt_path")
 
-    _ssh_setup_choose 'Which SSH key?' "$first" "${menu[@]}"
+    _ssh_setup_choose 'Which SSH key?' "$first" "${menu[@]}" || return 1
     local picked="$_SSH_SETUP_REPLY"
 
     case "$picked" in
@@ -934,7 +940,7 @@ EOF
     printf '\n--- Create new SSH key ---\n'
 
     local algo="ed25519"
-    _ssh_setup_choose 'Algorithm' 'ed25519' 'ed25519' 'ed25519-sk' 'rsa'
+    _ssh_setup_choose 'Algorithm' 'ed25519' 'ed25519' 'ed25519-sk' 'rsa' || return 1
     [ -n "$_SSH_SETUP_REPLY" ] && algo="$_SSH_SETUP_REPLY"
 
     local key_name="id_${algo}_${host_hint}"
@@ -1178,7 +1184,7 @@ EOF
     local action="insert"
     if [ "$has_idf" = "1" ]; then
       _ssh_setup_choose 'This host already has an IdentityFile.' \
-        'replace' 'replace' 'add another' 'skip'
+        'replace' 'replace' 'add another' 'skip' || return 1
       case "$_SSH_SETUP_REPLY" in
         add*)  action="add" ;;
         skip*) action="" ;;

@@ -213,6 +213,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 
 ### Config Files
 
+- `~/.config/shell/96_ssh_setup.sh` - Shared bash/zsh `ssh-setup-remote` wizard; gum key selection preserves paths with spaces and stops on picker errors or cancellation ([guide](docs/tutorials/setup_ssh_key_on_remote.md#automation-ssh-setup-remote))
 - `~/.gitconfig` - Git configuration; managed via `modify_` so `gh auth setup-git`'s `[credential "..."]` blocks (with the per-machine absolute path to `gh`) survive `chezmoi apply`; default pull behavior is rebase + autostash (`pull.rebase=true`, `rebase.autoStash=true`) so LazyGit's `p` pull keeps local dirty work across the rebase ([docs](docs/tools/gh-cli.md), [LazyGit notes](docs/tools/lazygit.md))
 - `~/.config/git/hooks/` - Global Git hooks (via a global `core.hooksPath`): managed `pre-commit` (gitleaks) + Git LFS hooks, all hardened to skip gracefully — PATH-robust and non-fatal so a stripped-PATH clone like `brew tap` can't break (see [pitfall](pitfalls/git-lfs-global-hook-breaks-brew-tap.md))
 - `~/.config/gh-dash/config.yml` - Global gh-dash config, with `diffnav` as the diff pager
