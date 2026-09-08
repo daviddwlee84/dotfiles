@@ -56,6 +56,8 @@ For a 422, rephrase a legitimate benign request to remove ambiguous cybersecurit
 
 ## Related
 
+- [Codex/Astra remote compact 408 followed by success](codex-astra-remote-compact-408-then-succeeds.md) — includes verified recovery and timeout ownership; extending the shim watchdog does not extend a remote request-body-read deadline.
+
 - `docs/tools/copilot-claude-proxy.md`
 - `tests/unit/copilot_proxy.bats`
 - `tests/fixtures/copilot-shim-hardening.mjs`

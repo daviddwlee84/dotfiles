@@ -424,6 +424,15 @@ launchers. They start the gateway/shim when necessary and pass a custom
 `~/.codex/config.toml` or `.codex/config.toml`, so plain `codex` remains on its
 normal provider.
 
+For GUI or plain-CLI resumes, chezmoi seeds a missing
+`[model_providers.copilot_api]` table in the user config. A saved thread retains
+the provider ID, but not the launcher's temporary provider definition. The
+fallback points to `http://localhost:4142` and uses the local gateway's literal
+`dummy` bearer, so a GUI need not inherit `GITHUB_COPILOT_API_KEY`. It does not
+select the provider globally. Existing provider definitions survive apply;
+set the saved `base_url` yourself when using a custom port. See
+[`codex-thread-resume-provider-not-found`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/codex-thread-resume-provider-not-found.md).
+
 Codex uses the shim on `localhost:4142` by default. Besides throttling and
 measurement, that boundary normalizes blank
 descriptions in Codex `mcp_list_tools` Responses items. GitHub Copilot rejects

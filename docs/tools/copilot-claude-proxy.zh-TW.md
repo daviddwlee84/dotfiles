@@ -351,6 +351,13 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 `copilot_api` Responses provider 傳給 Codex；不會編輯 `~/.codex/config.toml`
 或 `.codex/config.toml`，所以 plain `codex` 仍走原本 provider。
 
+為支援 GUI 或 plain CLI 恢復舊 thread，chezmoi 會在 user config 缺少時補上
+`[model_providers.copilot_api]`。Thread 會保存 provider ID，但不會保留 launcher
+臨時傳入的完整定義。預設指向 `http://localhost:4142`，並使用本機 gateway 接受的
+字面值 `dummy` bearer，因此 GUI 不必繼承 `GITHUB_COPILOT_API_KEY`。這只註冊
+provider，不改全域預設。既有 provider 定義會保留；使用自訂 port 時，須同步
+調整此表的 `base_url`。
+
 Codex 預設走 `localhost:4142` shim。這一層除了限流與 measurement，也會正規化
 Codex `mcp_list_tools` Responses item 裡的空白
 description。MCP server 與原生 Codex path 可以省略描述，但 GitHub Copilot 會以

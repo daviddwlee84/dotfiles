@@ -123,6 +123,28 @@ def prune_reserved_builtin_providers(live: dict) -> None:
         del live["model_providers"]
 
 
+def seed_copilot_resume_provider(live: dict) -> None:
+    """Let GUI/CLI resumes resolve the provider saved by codex-copilot.
+
+    Launcher -c definitions do not survive reopening a thread in another
+    process. Register a fallback without selecting it as the default or
+    overwriting an existing provider (which may use a different local port).
+    The localhost gateway ignores this literal dummy bearer; unlike env_key,
+    it also works in GUI processes that do not inherit the launcher env.
+    """
+    live.setdefault("model_providers", {}).setdefault("copilot_api", {
+        "name": "OpenAI",
+        "base_url": "http://localhost:4142",
+        "experimental_bearer_token": "dummy",
+        "requires_openai_auth": True,
+        "supports_websockets": False,
+        "wire_api": "responses",
+        "request_max_retries": 3,
+        "stream_max_retries": 1,
+        "stream_idle_timeout_ms": 300000,
+    })
+
+
 def prune_deprecated_features(live: dict) -> None:
     """Drop deprecated `[features]` keys from live so they don't survive merge.
 
@@ -274,6 +296,7 @@ def quote_key(k: str) -> str:
 live = parse(os.environ.get("CODEX_LIVE", ""))
 overlay = parse(os.environ.get("CODEX_OVERLAY", ""))
 prune_reserved_builtin_providers(live)
+seed_copilot_resume_provider(live)
 prune_deprecated_features(live)
 prune_legacy_peon_inline_hooks(live)
 prune_stale_managed_model(live)

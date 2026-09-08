@@ -167,6 +167,15 @@ The `.chezmoiignore.tmpl` presence-gates the entire `~/.cursor/`, `~/.codex/`, a
 
 The script falls through to passing the live file untouched if `python3` or `tomllib`/`tomli` are missing; chezmoi will skip the file for that apply.
 
+The merge also seeds a missing `[model_providers.copilot_api]` definition for
+threads created by `codex-copilot`. The GUI can then reopen those threads without
+the launcher's transient `-c` flags or `GITHUB_COPILOT_API_KEY` environment.
+This registers an available provider; it does not set the default
+`model_provider`. The fallback uses `http://localhost:4142` and a literal
+`dummy` bearer accepted by the unauthenticated local gateway. An existing table
+is preserved, including custom ports and authentication. If the gateway uses
+a different port, set this table's `base_url` to the client-facing endpoint.
+
 ### The writer must cover every construct a foreign writer can inject
 
 The emitter is hand-rolled, so it only knows the TOML constructs it was written for — and `~/.codex/config.toml` has *three* writers besides this repo: Codex itself, and any hook installer the user runs. When one of them introduces a construct the writer doesn't handle, the whole file fails to apply with a Python traceback rather than degrading:
