@@ -247,7 +247,62 @@ model_reasoning_effort = "low"
 
   run bash -c "printf '' | '$script'"
   [ "$status" -eq 0 ]
-  echo "$output" | yq -p toml -e '. | has("model_providers") | not' >/dev/null
+  echo "$output" | yq -p toml -e '.model_providers | has("openai") | not' >/dev/null
+}
+
+@test "codex modify_config.toml: seeds GUI resume provider without selecting it or requiring shell env" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+
+  local script="$RENDER_DIR/codex-resume.sh"
+  _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
+  run bash -c "printf '' | '$script'"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" > "$RENDER_DIR/seeded.toml"
+  python3 - "$RENDER_DIR/seeded.toml" <<'PY'
+import sys, tomllib
+with open(sys.argv[1], 'rb') as f:
+    config = tomllib.load(f)
+assert 'model_provider' not in config
+provider = config['model_providers']['copilot_api']
+assert provider['base_url'] == 'http://localhost:4142'
+assert provider['wire_api'] == 'responses'
+assert provider['experimental_bearer_token'] == 'dummy'
+assert 'env_key' not in provider
+PY
+  run bash -c "'$script' < '$RENDER_DIR/seeded.toml'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(cat "$RENDER_DIR/seeded.toml")" ]
+}
+
+@test "codex modify_config.toml: preserves an existing resume provider and default provider" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+
+  local script="$RENDER_DIR/codex-resume-custom.sh"
+  _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
+  cat > "$RENDER_DIR/custom.toml" <<'TOML'
+model_provider = "custom"
+[model_providers.copilot_api]
+name = "custom local gateway"
+base_url = "http://localhost:4242"
+env_key = "LOCAL_GATEWAY_KEY"
+[model_providers.custom]
+name = "another provider"
+base_url = "http://localhost:9000"
+TOML
+  run bash -c "'$script' < '$RENDER_DIR/custom.toml'"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" > "$RENDER_DIR/merged.toml"
+  python3 - "$RENDER_DIR/custom.toml" "$RENDER_DIR/merged.toml" <<'PY'
+import sys, tomllib
+with open(sys.argv[1], 'rb') as f:
+    original = tomllib.load(f)
+with open(sys.argv[2], 'rb') as f:
+    merged = tomllib.load(f)
+assert merged['model_provider'] == original['model_provider']
+assert merged['model_providers'] == original['model_providers']
+PY
 }
 
 @test "codex modify_config.toml: prunes invalid built-in OpenAI provider but preserves custom providers" {

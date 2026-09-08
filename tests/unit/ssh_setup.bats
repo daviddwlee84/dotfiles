@@ -487,6 +487,77 @@ _expanded_len() {
 
 # ── Prompt layer ──────────────────────────────────────────────────────────
 
+@test "prompt: gum gets separate flag/value arguments, including paths with spaces" {
+  cat > "$BATS_STUB_DIR/gum" <<'EOF'
+#!/usr/bin/env bash
+printf '<%s>\n' "$@" > "$CAPTURE_LOG"
+cat > "$SSH_TMP/options"
+printf '/tmp/chosen key\n'
+EOF
+  chmod +x "$BATS_STUB_DIR/gum"
+  local sh default
+  for sh in bash zsh; do
+    for default in '/tmp/default key' ''; do
+      run env SSH_SETUP_ASSUME_YES=0 SSH_SETUP_NO_GUM=0 PICK_DEFAULT="$default" \
+        "$sh" -c 'source "$1"
+          _ssh_setup_have_tty() { return 0; }
+          _ssh_setup_choose "Which SSH key?" "$PICK_DEFAULT" "/tmp/default key" "/tmp/chosen key"
+          printf "%s" "$_SSH_SETUP_REPLY"' _ "$SSH_FILE"
+      [ "$status" -eq 0 ]
+      [ "$output" = '/tmp/chosen key' ]
+      local expected=$'<choose>\n<--header>\n<Which SSH key?>\n<--height>\n<12>'
+      [ -z "$default" ] || expected+=$'\n<--selected>\n</tmp/default key>'
+      [ "$(cat "$CAPTURE_LOG")" = "$expected" ]
+      [ "$(cat "$SSH_TMP/options")" = $'/tmp/default key\n/tmp/chosen key' ]
+    done
+  done
+}
+
+@test "driver: failed, cancelled or empty gum selection stops before key setup" {
+  cat > "$BATS_STUB_DIR/gum" <<'EOF'
+#!/usr/bin/env bash
+cat >/dev/null
+exit "$GUM_TEST_RC"
+EOF
+  chmod +x "$BATS_STUB_DIR/gum"
+  local keys sh rc
+  # No keys exercises the algorithm picker; one key exercises the key picker.
+  for keys in none one; do
+    [ "$keys" = none ] || _mkkey k
+    for sh in bash zsh; do
+      for rc in 1 130 0; do
+        run env HOME="$FAKE_HOME" SSH_CFG_ROOT="$FAKE_HOME/.ssh/config" \
+          SSH_SETUP_ASSUME_YES=0 SSH_SETUP_NO_GUM=0 SSH_SETUP_NO_MUX=1 SSH_SETUP_KEY= \
+          GUM_TEST_RC="$rc" "$sh" -c 'source "$1"
+            _ssh_setup_have_tty() { return 0; }
+            ssh-setup-remote plain' _ "$SSH_FILE"
+        [ "$status" -eq 1 ]
+        [[ "$output" != *"Copy public key"* ]]
+        [ ! -e "$CAPTURE_LOG" ]
+        [ ! -e "$FAKE_HOME/.ssh/config" ]
+        [ ! -e "$FAKE_HOME/.ssh/id_ed25519_plain" ]
+      done
+    done
+  done
+}
+
+@test "config: cancelling gum preserves an existing IdentityFile" {
+  printf 'Host plain\n    IdentityFile ~/.ssh/original\n' > "$FAKE_HOME/.ssh/config"
+  cp "$FAKE_HOME/.ssh/config" "$SSH_TMP/config.before"
+  local sh
+  for sh in bash zsh; do
+    run env HOME="$FAKE_HOME" SSH_CFG_ROOT="$FAKE_HOME/.ssh/config" \
+      SSH_SETUP_ASSUME_YES=0 SSH_SETUP_NO_GUM=0 "$sh" -c 'source "$1"
+        _ssh_setup_have_tty() { return 0; }
+        gum() { cat >/dev/null; return 130; }
+        _ssh_setup_confirm() { [ "$1" = "Add/update host alias in local ~/.ssh/config?" ]; }
+        _ssh_setup_one plain "$HOME/.ssh/new" localonly' _ "$SSH_FILE"
+    [ "$status" -eq 1 ]
+    cmp "$FAKE_HOME/.ssh/config" "$SSH_TMP/config.before"
+    [ ! -e "$CAPTURE_LOG" ]
+  done
+}
+
 @test "prompt: defaults are honoured under SSH_SETUP_ASSUME_YES" {
   local sh
   for sh in bash zsh; do
