@@ -298,3 +298,22 @@ fallback 腳本的步驟 2 會偵測到並略過步驟 3。
 - [Bitwarden SSH Agent 教學](../tutorials/bitwarden_ssh_agent.md) —— 將 Bitwarden 設為 agent 的完整設定指南
 - `~/.config/zsh/tools/94_ssh_agent.zsh` —— SSH agent 自動偵測與 fallback
 - `~/.config/zsh/tools/95_bitwarden.zsh` —— Bitwarden CLI 的 zsh 補全
+
+## 群組 SSH 設定與 dev 整合
+
+新機採 create-only 的 SSH 入口，明列 `config.d/git/github.conf`、
+`config.d/git/gitlab.conf` 與 `config.d/common/defaults.conf`，選項縮排四格。
+優先順序由 Include 清單決定。種子不依賴 dev 已安裝；既有 flat／wildcard
+設定保留舊種子，不會自動遷移。新群組種子依入口標記 gating，避免更新時
+意外啟用新定義。搬移種子且移除原本精確 Include 後，apply 不會重建舊檔。
+
+使用包含 SSH 管理功能的 dev build 時，可執行 `dev ssh format` 預覽縮排，
+或明確選擇 `dev ssh organize` 搬移完整 Host 區塊及註解到群組。檢查計畫後
+加 `--apply` 才套用，`dev ssh restore <receipt>` 預覽復原；新的 dev 寫入
+使用 macOS／Linux 安全 backend。`dev ssh manage` 另外選擇 fleet／Herdr
+註冊及原生 profile 動作；安裝 dotfiles 本身不註冊主機或啟動遠端 server。
+
+Television SSH channel 優先使用 `dev ssh list --format tsv` 的 active aliases；
+dev 不可用或版本尚無 machine-management command 時，退回 flat／群組檔案的顯示型掃描。共用 SSH setup helper 追蹤
+巢狀 Include，為新選定檔案加入精確 Include，不會順便啟用相鄰的休眠檔案。
+原有以目錄為單位的 helper 子命令仍保留供既有呼叫者使用。

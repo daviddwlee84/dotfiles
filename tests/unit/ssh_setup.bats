@@ -629,3 +629,21 @@ EOF
   [[ "$output" == *"already accepts key-based login"* ]]
   [[ "$output" == *"Skipped."* ]]
 }
+
+@test "cfg_py finds a grouped Host and adds only the selected file Include" {
+  mkdir -p "$FAKE_HOME/.ssh/config.d/work"
+  printf 'Include ~/.ssh/config.d/work/box.conf\n' > "$FAKE_HOME/.ssh/config"
+  printf 'Host grouped alias-two\n    HostName 192.0.2.1\n' > "$FAKE_HOME/.ssh/config.d/work/box.conf"
+  run _ssh_run bash '_ssh_cfg_py find grouped ""'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"config.d/work/box.conf"* ]]
+  printf 'Host fresh\n    HostName 192.0.2.2\n' > "$FAKE_HOME/.ssh/config.d/new.conf"
+  printf 'Host dormant\n' > "$FAKE_HOME/.ssh/config.d/dormant.conf"
+  run _ssh_run bash '_ssh_cfg_py ensure-file "$HOME/.ssh/config.d/new.conf"'
+  [ "$status" -eq 1 ]
+  run _ssh_run bash '_ssh_cfg_py add-file-include "$HOME/.ssh/config.d/new.conf"'
+  [ "$status" -eq 0 ]
+  grep -F 'Include "~/.ssh/config.d/new.conf"' "$FAKE_HOME/.ssh/config"
+  ! grep -F 'config.d/*' "$FAKE_HOME/.ssh/config"
+  ! grep -F 'dormant.conf' "$FAKE_HOME/.ssh/config"
+}

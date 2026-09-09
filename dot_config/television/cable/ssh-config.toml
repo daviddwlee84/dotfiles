@@ -1,5 +1,5 @@
 # Custom SSH config channel for television (tv)
-# Parses Host entries from ~/.ssh/config AND ~/.ssh/config.d/* (Include support).
+# Prefers dev ssh static active-alias discovery; legacy fallback scans flat and grouped files.
 # The community ssh-hosts channel only reads ~/.ssh/config directly.
 #
 # Each entry shows which file the host is defined in, so duplicates across
@@ -16,18 +16,24 @@
 #   Ctrl+/     Toggle preview panel
 #
 # Preview shows resolved config via `ssh -G` plus a local-key existence check
-# (no network — just stat the IdentityFile paths).
+# (configured Match exec / resolver behavior may run; there is no login probe).
 
 [metadata]
 name = "ssh-config"
-description = "SSH hosts (with Include config.d/* support)"
+description = "SSH hosts with source files and grouped config.d support"
 requirements = ["ssh", "awk", "sort"]
 
 [source]
 # Emit "<source-file>\t<hostname>" so the picker shows the origin file but
 # actions still receive a clean hostname via {split:\t:1}.
 command = """
-for f in $HOME/.ssh/config $HOME/.ssh/config.d/*; do
+if command -v dev >/dev/null 2>&1 && management_help=$(dev ssh manage --help 2>/dev/null) &&
+  printf '%s\\n' "$management_help" | awk '/--herdr-profile[[:space:]]/ {found=1} END {exit !found}' &&
+  rows=$(dev ssh list --format tsv 2>/dev/null); then
+  printf '%s\\n' "$rows" | awk -F '\\t' '$2 == "active" {printf "%s\\t%s\\n", $4, $1}'
+else
+sh <<'DEV_SSH_LIST'
+for f in "$HOME"/.ssh/config "$HOME"/.ssh/config.d/* "$HOME"/.ssh/config.d/*/*.conf; do
   [ -f "$f" ] || continue
   rel=${f#$HOME/}
   awk -v src="$rel" '
@@ -36,7 +42,9 @@ for f in $HOME/.ssh/config $HOME/.ssh/config.d/*; do
         if ($i !~ /[*?]/) printf "%s\\t%s\\n", src, $i
       }
     }' "$f"
-done | sort -u -t '\t' -k2,2
+done
+DEV_SSH_LIST
+fi | sort -u -t '\t' -k2,2
 """
 display = "{split:\\t:1}  ({split:\\t:0})"
 output = "{split:\\t:1}"
@@ -112,7 +120,13 @@ echo "# Scanning all hosts (offline — no network) ..."
 echo "# Legend: [OK] = at least one IdentityFile present locally"
 echo "#         [--] = no key file on disk (password / agent / unconfigured)"
 echo
-for f in $HOME/.ssh/config $HOME/.ssh/config.d/*; do
+if command -v dev >/dev/null 2>&1 && management_help=$(dev ssh manage --help 2>/dev/null) &&
+  printf '%s\\n' "$management_help" | awk '/--herdr-profile[[:space:]]/ {found=1} END {exit !found}' &&
+  rows=$(dev ssh list --format tsv 2>/dev/null); then
+  printf '%s\\n' "$rows" | awk -F '\\t' '$2 == "active" {printf "%s\\t%s\\n", $4, $1}'
+else
+sh <<'DEV_SSH_LIST'
+for f in "$HOME"/.ssh/config "$HOME"/.ssh/config.d/* "$HOME"/.ssh/config.d/*/*.conf; do
   [ -f "$f" ] || continue
   rel=${f#$HOME/}
   awk -v src="$rel" '
@@ -121,7 +135,9 @@ for f in $HOME/.ssh/config $HOME/.ssh/config.d/*; do
         if ($i !~ /[*?]/) printf "%s\\t%s\\n", src, $i
       }
     }' "$f"
-done | sort -u -t '\t' -k2,2 | while IFS=$'\\t' read -r src host; do
+done
+DEV_SSH_LIST
+fi | sort -u -t '\t' -k2,2 | while IFS=$'\\t' read -r src host; do
   keyline=""
   found=0
   while IFS= read -r kf; do

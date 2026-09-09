@@ -189,3 +189,13 @@ Full breakdown / themes / keybindings / troubleshooting: [](docs/tools/tmux/).
 ### Zellij `default_mode "locked"`
 
 `dot_config/zellij/config.kdl` sets `default_mode "locked"` on purpose — all keys pass through to inner apps, `Ctrl+G` unlocks Zellij's own. Do **not** change it. Fresh box → pick the "Unlock-First (non-colliding)" preset. [keyboard-shortcuts.md](docs/keyboard-shortcuts.md)
+
+### SSH grouped seeds remain create-only
+
+New SSH dispatchers explicitly include grouped files; existing flat/wildcard
+configs must never acquire new active definitions during apply. Keep the grouped
+seed marker gating in `.chezmoiignore.tmpl` aligned with `dot_ssh/` and test fresh
+and existing destinations. Four spaces is the seed convention; Include order is
+semantic authority. The shared setup helper uses exact-file Include insertion,
+and the Television channel prefers dev's active static inventory with a grouped
+fallback. Config migration is an explicit `dev ssh organize` action, not apply.

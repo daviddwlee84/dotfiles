@@ -42,7 +42,7 @@
 _ssh_cfg_py() {
   command -v python3 >/dev/null 2>&1 || return 127
   python3 - "$@" <<'PY'
-import os, re, sys, glob, pathlib, tempfile
+import os, re, sys, glob, pathlib, tempfile, shlex
 
 ROOT = pathlib.Path(os.environ.get("SSH_CFG_ROOT") or os.path.expanduser("~/.ssh/config"))
 SSH_DIR = ROOT.parent
@@ -81,7 +81,7 @@ def resolve_includes(start):
             m = INC_RE.match(line)
             if not m:
                 continue
-            for pat in m.group(1).split():
+            for pat in shlex.split(m.group(1), comments=True):
                 for f in sorted(glob.glob(expand(pat))):
                     walk(f)
 
@@ -152,7 +152,7 @@ def configd_reachable():
             m = INC_RE.match(line)
             if not m:
                 continue
-            for pat in m.group(1).split():
+            for pat in shlex.split(m.group(1), comments=True):
                 if os.path.realpath(os.path.dirname(expand(pat))) == target:
                     return True
     return False
@@ -229,6 +229,26 @@ def cmd_add_include():
     return 0
 
 
+
+def cmd_file_include(path, apply=False):
+    target = pathlib.Path(expand(path))
+    if not target.is_file() or "\n" in str(target) or "\r" in str(target):
+        raise ValueError("select an existing SSH config file")
+    if target.resolve() in [p.resolve() for p in resolve_includes(ROOT)]:
+        return 0
+    if not apply:
+        return 1
+    # An exact Include never activates unrelated dormant drop-ins.
+    value = tildify(str(target)).replace("\\", "\\\\").replace('"', '\\"')
+    lines = ROOT.read_text(errors="replace").splitlines() if ROOT.is_file() else []
+    k = 0
+    while k < len(lines) and (not lines[k].strip() or lines[k].lstrip().startswith("#")):
+        k += 1
+    ROOT.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(ROOT, lines[:k] + ['Include "%s"' % value] + lines[k:])
+    return 0
+
+
 def main(argv):
     if not argv:
         return 2
@@ -237,6 +257,8 @@ def main(argv):
         return cmd_find(rest[0], rest[1] if len(rest) > 1 else "")
     if cmd == "insert":
         return cmd_insert(rest[0], rest[1], rest[2], rest[3], "--identities-only" in rest[4:])
+    if cmd in ("ensure-file", "add-file-include"):
+        return cmd_file_include(rest[0], cmd == "add-file-include")
     if cmd == "ensure-include":
         return 0 if configd_reachable() else 1
     if cmd == "add-include":
@@ -1264,10 +1286,10 @@ Host $host_alias
   # If we wrote into config.d/ but the entry-point config never Includes it,
   # the drop-in silently won't load. Offer to wire it up.
   if [ "$wrote_configd" = "1" ] && command -v python3 >/dev/null 2>&1; then
-    if ! _ssh_cfg_py ensure-include; then
-      printf '\nNote: ~/.ssh/config has no `Include` for config.d/* — this entry will not load.\n'
-      if _ssh_setup_confirm 'Add `Include ~/.ssh/config.d/*` to ~/.ssh/config now?' yes; then
-        _ssh_cfg_py add-include && printf 'Include directive added.\n'
+    if ! _ssh_cfg_py ensure-file "$config_file"; then
+      printf '\nNote: this exact file is not included by ~/.ssh/config.\n'
+      if _ssh_setup_confirm "Add an exact Include for $config_file now?" yes; then
+        _ssh_cfg_py add-file-include "$config_file" && printf 'Include directive added.\n'
       fi
     fi
   fi

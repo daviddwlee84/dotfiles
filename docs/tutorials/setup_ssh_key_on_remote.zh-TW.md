@@ -341,3 +341,22 @@ ssh user@<host>   # 出現提示時接受新的 key
 ```
 
 錯誤訊息會告訴你是哪一行（例如 `Offending ECDSA key in ~/.ssh/known_hosts:89`），但 `ssh-keygen -R` 會根據 hostname/IP 自動處理移除。
+
+## 群組 SSH 設定與 dev 整合
+
+新機採 create-only 的 SSH 入口，明列 `config.d/git/github.conf`、
+`config.d/git/gitlab.conf` 與 `config.d/common/defaults.conf`，選項縮排四格。
+優先順序由 Include 清單決定。種子不依賴 dev 已安裝；既有 flat／wildcard
+設定保留舊種子，不會自動遷移。新群組種子依入口標記 gating，避免更新時
+意外啟用新定義。搬移種子且移除原本精確 Include 後，apply 不會重建舊檔。
+
+使用包含 SSH 管理功能的 dev build 時，可執行 `dev ssh format` 預覽縮排，
+或明確選擇 `dev ssh organize` 搬移完整 Host 區塊及註解到群組。檢查計畫後
+加 `--apply` 才套用，`dev ssh restore <receipt>` 預覽復原；新的 dev 寫入
+使用 macOS／Linux 安全 backend。`dev ssh manage` 另外選擇 fleet／Herdr
+註冊及原生 profile 動作；安裝 dotfiles 本身不註冊主機或啟動遠端 server。
+
+Television SSH channel 優先使用 `dev ssh list --format tsv` 的 active aliases；
+dev 不可用或版本尚無 machine-management command 時，退回 flat／群組檔案的顯示型掃描。共用 SSH setup helper 追蹤
+巢狀 Include，為新選定檔案加入精確 Include，不會順便啟用相鄰的休眠檔案。
+原有以目錄為單位的 helper 子命令仍保留供既有呼叫者使用。

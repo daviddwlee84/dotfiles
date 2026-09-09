@@ -209,23 +209,27 @@ plugins:
       markdown_description: >
         Cross-platform dotfiles (chezmoi + ansible) tuned for coding-agent workflows on macOS / Ubuntu. Covers tmux, zsh, OSC 133 shell integration, aicapture (aifix / aiexplain / aiblock), sesh, fleet-apply.
 
+      # Match base and localized sources after the i18n plugin filters Files.
       sections:
         Landing:
-          - index.md
+          - index.*md
         Tools:
-          - tools/aicapture.md
-          - tools/ai-agents-benchmark.md
-          - tools/zsh-inline-ai.md
-          - tools/tmux/README.md
-          - tools/sesh.md
-          - tools/clipboard.md
-          - tools/agent-overlays.md
+          - tools/aicapture.*md
+          - tools/herdr.*md
+          - tools/ssh-agent.*md
+          - tutorials/setup_ssh_key_on_remote.*md
+          - tools/ai-agents-benchmark.*md
+          - tools/zsh-inline-ai.*md
+          - tools/tmux/README.*md
+          - tools/sesh.*md
+          - tools/clipboard.*md
+          - tools/agent-overlays.*md
         Playbooks:
-          - playbooks/workflow.md
+          - playbooks/workflow.*md
         Repo internals:
-          - this_repo/architecture.md
-          - this_repo/fleet-apply.md
-          - this_repo/instant-llm-fix-prior-art.md
+          - this_repo/architecture.*md
+          - this_repo/fleet-apply.*md
+          - this_repo/instant-llm-fix-prior-art.*md
   - copy-to-llm:
       repo_url: "https://daviddwlee84.github.io/dotfiles/"
       button_hover_color: "var(--md-primary-fg-color)"
@@ -465,3 +469,7 @@ extra:
 # rendered as their own page. `not_in_nav` suppresses the INFO warning.
 not_in_nav: |
   /_snippets/
+
+# Align llmstxt aliases with the source counterpart rendered for each language.
+hooks:
+  - scripts/docs_i18n_llms.py

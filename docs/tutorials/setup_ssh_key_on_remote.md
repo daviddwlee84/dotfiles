@@ -341,3 +341,29 @@ ssh user@<host>   # accept the new key when prompted
 ```
 
 The error message tells you the offending line number (e.g. `Offending ECDSA key in ~/.ssh/known_hosts:89`), but `ssh-keygen -R` handles removal by hostname/IP automatically.
+
+## Grouped SSH configuration and dev integration
+
+New machines receive a create-only SSH dispatcher with explicit Includes for
+`config.d/git/github.conf`, `config.d/git/gitlab.conf` and
+`config.d/common/defaults.conf`. Four spaces indent options. Include order,
+not directory names or an implicit wildcard sort, defines precedence. The seed
+works without dev installed. Existing flat/wildcard configurations retain their
+legacy seeds and are never automatically migrated; moved seed files are not
+recreated after their exact Include is removed. Grouped seed files are gated
+by the dispatcher marker to avoid activating new definitions during an update.
+
+With a dev build containing SSH management, run `dev ssh format` for the default
+indentation preview or explicitly choose `dev ssh organize` to move complete Host
+blocks and their comments into groups. Use `--apply` after reviewing the plan;
+`dev ssh restore <receipt>` previews recovery. The new dev writes use its
+macOS/Linux security backend. `dev ssh manage` separately selects fleet/Herdr
+registrations and native Herdr profile actions; installing dotfiles does not
+register hosts or start remote Herdr servers.
+
+The Television SSH channel prefers `dev ssh list --format tsv` for active aliases
+and falls back to a display-only flat/grouped file scan when the machine-management
+command is unavailable (including older dev versions).
+The shared SSH setup helper follows nested Includes and adds an exact Include for
+a newly selected file, so wiring one file does not activate dormant neighbors.
+Legacy directory-level helper subcommands remain available for existing callers.

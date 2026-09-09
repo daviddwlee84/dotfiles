@@ -308,3 +308,33 @@ Library/Application Support/{{ . }}/**
 .copilot/hooks/**
 .gemini/settings.json
 .antigravity/settings.json
+
+# BEGIN SSH grouped seed gating
+# Existing flat/wildcard layouts keep their legacy create-only seeds. New group
+# files must not become active merely because an existing machine runs apply.
+{{- $sshRoot := joinPath .chezmoi.homeDir ".ssh" "config" }}
+{{- $sshGrouped := true }}
+{{- $sshExists := false }}
+{{- $sshContents := "" }}
+{{- if stat $sshRoot }}
+{{- $sshExists = true }}
+{{- $sshContents = include $sshRoot }}
+{{- $sshGrouped = contains "# dotfiles-ssh-layout: grouped-v1" $sshContents }}
+{{- end }}
+{{- if $sshGrouped }}
+.ssh/config.d/00-defaults
+.ssh/config.d/01_git
+# Do not recreate a seed after the user moves it with dev ssh organize.
+{{- range $seed := list "git/github.conf" "git/gitlab.conf" "common/defaults.conf" }}
+{{- $included := regexMatch (printf "(?mi)^[ \\t]*Include[ \\t]+\"?~/\\.ssh/config\\.d/%s\"?[ \\t\\r]*(#.*)?$" (regexQuoteMeta $seed)) $sshContents }}
+{{- if and $sshExists (not $included) }}
+.ssh/config.d/{{ $seed }}
+{{- end }}
+{{- end }}
+{{- else }}
+.ssh/config.d/git
+.ssh/config.d/git/**
+.ssh/config.d/common
+.ssh/config.d/common/**
+{{- end }}
+# END SSH grouped seed gating

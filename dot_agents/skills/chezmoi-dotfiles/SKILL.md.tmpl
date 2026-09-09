@@ -207,3 +207,13 @@ Categories: `chezmoi-*`, `ansible-*`, `upgrade-*` (brew/mise/uv/npm/cargo/…),
 Before changing anything under the repo, read `CLAUDE.md` Hard invariants and the
 "Cross-file maintenance rules" table — many surfaces have mandatory mirror updates
 in the same commit (docs, completions, tool-managers index, this very skill, …).
+
+## SSH layout and machine management
+
+New SSH seeds use grouped directories and explicit Include order with four-space
+indentation; existing flat/wildcard layouts stay create-only. Use `dev ssh format`
+for indentation preview and opt into `dev ssh organize` for complete Host-block
+and comment moves with private recovery. `dev ssh manage` handles explicit
+SSH/fleet/Herdr registrations; dotfiles apply never registers machines. The SSH
+Television channel prefers dev's static active-alias listing and has a grouped-file
+fallback. See `docs/tutorials/setup_ssh_key_on_remote.md` in the source repository.
