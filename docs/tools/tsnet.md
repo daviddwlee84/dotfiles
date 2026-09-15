@@ -70,7 +70,7 @@ which region is ours.
 
 **1. `~/.ssh/config` has no `Include`.** Writing a `config.d/` drop-in is then a
 no-op ssh never reads. This is not hypothetical: it is the state of a stock
-`~/.ssh/config` that predates this repo's `dot_ssh/create_private_config`, and
+`~/.ssh/config` that predates this repo's `private_dot_ssh/create_private_config`, and
 `tsnet` refuses with **exit 4** plus the evidence:
 
 ```

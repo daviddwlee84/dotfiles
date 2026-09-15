@@ -49,7 +49,8 @@ OpenSSH 位於 `~/.ssh/`，並要求嚴格的 0700 權限。Bash 堅持使用 `$
 （較新版本也接受 `~/.config/tmux/tmux.conf`）。我們順從各工具實際的查找
 順序，而非與之對抗。
 
-在本 repo 中：`dot_ssh/`、`dot_bashrc.tmpl`、`dot_zshrc.tmpl`、
+在本 repo 中：`private_dot_ssh/`（`private_` 前綴讓 `~/.ssh` 維持 0700，如上所述——
+若用裸 `dot_ssh` 會套成 0755 而永久 drift）、`dot_bashrc.tmpl`、`dot_zshrc.tmpl`、
 `dot_gitconfig.tmpl`（同樣放在 `$HOME`——git 2.13+ 也讀取
 `~/.config/git/config`，但 `~/.gitconfig` 是經典的標準位置）。
 
@@ -95,7 +96,7 @@ OpenSSH 位於 `~/.ssh/`，並要求嚴格的 0700 權限。Bash 堅持使用 `$
 缺點：順序受 glob 排序左右、易脆 (fragile)（多數採用 `NN_` 前綴）。
 原生不支援 `.d/` 的工具需要手寫 loader。
 
-在本 repo 中：`dot_ssh/private_config.d/` → `~/.ssh/config.d/*`，
+在本 repo 中：`private_dot_ssh/private_config.d/` → `~/.ssh/config.d/*`，
 由 `~/.ssh/config` include 進來。此外 `~/.bashrc.d/*` 在
 `dot_bashrc.tmpl` 第 11 步以使用者向後相容層 (user backward-compat layer)
 被 source（**並非**我們放置 chezmoi 管理之 bash 設定的位置——見 B3）。
@@ -151,7 +152,7 @@ direnvrc）時，套件存在框架管理的專屬目錄中：
   `[safe]`、`[credential]`、`[http.proxy]`）。列在
   `.chezmoiignore.tmpl` 中，所以 chezmoi 不會追蹤它。檔案不存在時
   會無聲略過（git 的 `[include] path = ~/.gitconfig.local` 是寬容的）。
-- `dot_ssh/dot_config` 以類似方式 include `~/.ssh/config.local`。
+- `private_dot_ssh/dot_config` 以類似方式 include `~/.ssh/config.local`。
 
 何時使用：當工具具備原生 include 指令，且標準設定有穩定的結構、
 不會因部分覆寫而壞掉時。

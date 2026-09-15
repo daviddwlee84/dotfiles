@@ -37,7 +37,7 @@
 
 - **效果**：來源中的 `dot_foo` 變成目標的 `.foo`。純粹是名稱對映，讓 dotfile 在 `git ls-files` 中保持可見。
 - **`chezmoi add`**：綠燈通行。
-- **典型用途**：`dot_zshrc`、`dot_gitconfig`、`dot_config/…`、`dot_ssh/…`。
+- **典型用途**：`dot_zshrc`、`dot_gitconfig`、`dot_config/…`、`dot_bashrc`（注意：本 repo 的 `~/.ssh` 用 `private_dot_ssh` 而非裸 `dot_`，以套成 0700——見下方 `private_` 前綴）。
 
 ### `private_` — 收緊檔案模式為 0600（目錄為 0700）
 

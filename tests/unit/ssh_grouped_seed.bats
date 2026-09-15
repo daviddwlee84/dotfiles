@@ -6,16 +6,24 @@ setup() {
   SSH_SEED_TMP=$(mktemp -d)
   export SSH_SEED_HOME="$SSH_SEED_TMP/home"
   mkdir -p "$SSH_SEED_HOME" "$SSH_SEED_TMP/source"
-  cp -R "$REPO_ROOT/dot_ssh" "$SSH_SEED_TMP/source/"
+  cp -R "$REPO_ROOT/private_dot_ssh" "$SSH_SEED_TMP/source/"
   sed -n '/# BEGIN SSH grouped seed gating/,/# END SSH grouped seed gating/p' "$REPO_ROOT/.chezmoiignore.tmpl" > "$SSH_SEED_TMP/source/.chezmoiignore.tmpl"
 }
 teardown() { [ -n "${SSH_SEED_TMP:-}" ] && rm -rf "$SSH_SEED_TMP"; }
+# Own persistent state per run: never touch the user's real chezmoistate.boltdb
+# (which a live `chezmoi update --apply` can be holding a lock on — see
+# pitfalls/chezmoi-ssh-dir-mode-drift-prompt.md).
 seed_apply() {
-  HOME="$SSH_SEED_HOME" XDG_CONFIG_HOME="$SSH_SEED_HOME/.config" chezmoi --source "$SSH_SEED_TMP/source" --destination "$SSH_SEED_HOME" --no-tty apply --exclude=scripts "$@"
+  HOME="$SSH_SEED_HOME" XDG_CONFIG_HOME="$SSH_SEED_HOME/.config" chezmoi --source "$SSH_SEED_TMP/source" --destination "$SSH_SEED_HOME" --persistent-state "$SSH_SEED_TMP/state.db" --no-tty apply --exclude=scripts "$@"
 }
+# Portable octal mode of a path (GNU stat, then BSD/macOS stat).
+mode_of() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 @test "fresh SSH seed uses exact grouped Includes and stays create-only" {
   run seed_apply
   [ "$status" -eq 0 ]
+  # .ssh must be 0700 so ssh/dev never fight chezmoi over the dir mode
+  # (private_dot_ssh). A bare dot_ssh would apply 0755 and drift forever.
+  [ "$(mode_of "$SSH_SEED_HOME/.ssh")" = 700 ]
   grep -F '# dotfiles-ssh-layout: grouped-v1' "$SSH_SEED_HOME/.ssh/config"
   [ -f "$SSH_SEED_HOME/.ssh/config.d/git/github.conf" ]
   [ ! -e "$SSH_SEED_HOME/.ssh/config.d/01_git" ]

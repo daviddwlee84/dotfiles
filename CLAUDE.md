@@ -194,8 +194,12 @@ Full breakdown / themes / keybindings / troubleshooting: [](docs/tools/tmux/).
 
 New SSH dispatchers explicitly include grouped files; existing flat/wildcard
 configs must never acquire new active definitions during apply. Keep the grouped
-seed marker gating in `.chezmoiignore.tmpl` aligned with `dot_ssh/` and test fresh
-and existing destinations. Four spaces is the seed convention; Include order is
-semantic authority. The shared setup helper uses exact-file Include insertion,
+seed marker gating in `.chezmoiignore.tmpl` aligned with `private_dot_ssh/` and
+test fresh and existing destinations. The source dir is `private_dot_ssh` (not
+`dot_ssh`) so chezmoi owns `~/.ssh` at mode 0700 — matching ssh/`dev ssh` — instead
+of applying 0755 and drifting forever (see
+`pitfalls/chezmoi-ssh-dir-mode-drift-prompt.md`). Four spaces is the seed
+convention; Include order is semantic authority. The shared setup helper uses
+exact-file Include insertion,
 and the Television channel prefers dev's active static inventory with a grouped
 fallback. Config migration is an explicit `dev ssh organize` action, not apply.

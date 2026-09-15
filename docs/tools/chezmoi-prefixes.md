@@ -32,7 +32,7 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
 
 - **Effect**: `dot_foo` in source becomes `.foo` in target. Purely a name mapping so dotfiles stay visible in `git ls-files`.
 - **`chezmoi add`**: green-light.
-- **Typical use**: `dot_zshrc`, `dot_gitconfig`, `dot_config/…`, `dot_ssh/…`.
+- **Typical use**: `dot_zshrc`, `dot_gitconfig`, `dot_config/…`, `dot_bashrc` (note: this repo's `~/.ssh` is `private_dot_ssh`, not a bare `dot_`, so it lands 0700 — see the `private_` prefix below).
 
 ### `private_` — tighten file mode to 0600 (dir: 0700)
 

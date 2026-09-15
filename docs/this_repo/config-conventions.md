@@ -62,7 +62,8 @@ OpenSSH lives in `~/.ssh/` with strict 0700 perms. Bash insists on
 `~/.tmux.conf` (newer versions also accept `~/.config/tmux/tmux.conf`).
 We follow each tool's actual lookup order rather than fighting it.
 
-In this repo: `dot_ssh/`, `dot_bashrc.tmpl`, `dot_zshrc.tmpl`,
+In this repo: `private_dot_ssh/` (the `private_` prefix keeps `~/.ssh` at 0700 as
+above — a bare `dot_ssh` would apply 0755 and drift forever), `dot_bashrc.tmpl`, `dot_zshrc.tmpl`,
 `dot_gitconfig.tmpl` (also at `$HOME` — git 2.13+ also reads
 `~/.config/git/config`, but `~/.gitconfig` is the classic canonical).
 
@@ -112,7 +113,7 @@ can ship one without modifying the canonical config.
 Cons: order is glob-sort fragile (most use `NN_` prefixes). Tools
 that don't natively support `.d/` need a manual loader.
 
-In this repo: `dot_ssh/private_config.d/` → `~/.ssh/config.d/*`,
+In this repo: `private_dot_ssh/private_config.d/` → `~/.ssh/config.d/*`,
 included by `~/.ssh/config`. Plus `~/.bashrc.d/*` is sourced as a
 user backward-compat layer in `dot_bashrc.tmpl` step 11 (NOT where
 we place chezmoi-managed bash configs — see B3).
@@ -173,7 +174,7 @@ Examples in this repo:
   `.chezmoiignore.tmpl` so chezmoi never tracks it. Silently
   no-ops when absent (git's `[include] path = ~/.gitconfig.local`
   is forgiving).
-- `dot_ssh/dot_config` includes `~/.ssh/config.local` similarly.
+- `private_dot_ssh/dot_config` includes `~/.ssh/config.local` similarly.
 
 When to use: tool has native include directive AND the canonical
 config has stable structure that won't break on partial overrides.

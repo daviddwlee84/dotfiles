@@ -93,7 +93,7 @@ EOF
 }
 
 # `Include` must come before any Host block, otherwise ssh scopes it to that
-# block -- see tsnet's reachability() and dot_ssh/create_private_config.
+# block -- see tsnet's reachability() and private_dot_ssh/create_private_config.
 _reachable_root() {
     printf 'Include %s/config.d/*\n\nHost manual\n    HostName manual.invalid\n' \
         "$TS_TMP" > "$TS_TMP/config"
