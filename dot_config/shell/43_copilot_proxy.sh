@@ -1270,12 +1270,16 @@ copilot-proxy() {
       ;;
     status)
       if _copilot_alive; then
-        local status_json status_count status_claude _shim_health _shim_detail _fast_state _fast_count
+        local status_json status_count status_claude _shim_health _shim_detail _fast_state _fast_count _ver
         status_json="$(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null || true)"
         status_count="$(printf '%s' "$status_json" | jq -r '.data | length' 2>/dev/null || printf '?')"
         status_claude="$(printf '%s' "$status_json" | jq -r '[.data[]?.id | select(startswith("claude-"))] | join(" ")' 2>/dev/null)"
         [ -n "$status_claude" ] || status_claude='none'
+        # Installed backend version (on disk; a warm start runs exactly this). If
+        # it differs from the pinned spec, the spec tail makes that visible.
+        _ver="$(_copilot_pkg_actual_version 2>/dev/null || true)"
         printf '%s\n' "copilot-proxy: RUNNING on $(_copilot_base)"
+        printf '%s\n' "  version: ${_ver:-unknown}  (spec: $pkg)"
         printf '%s\n' "  models: $status_count served; Claude: $status_claude"
         if _copilot_shim_enabled; then
           if _copilot_shim_alive; then
