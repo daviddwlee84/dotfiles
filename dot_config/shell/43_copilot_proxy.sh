@@ -479,13 +479,16 @@ _copilot_snapshot_runtime() {
       [ -f "$f" ] || continue
       local label=backend
       [ "$f" != "$mf" ] || label=metrics
-      command bun -e '
-        import { Database } from "bun:sqlite";
-        const db = new Database(process.argv[1], {readonly:true});
-        db.exec("BEGIN");
-        await Bun.write(process.argv[2], db.serialize());
-        db.close();
-      ' "$f" "$bundle/$label.sqlite" || exit 1
+      # Consistent forensic copy of the (quiescent) SQLite DB. Every snapshot
+      # call site has already stopped writers — start() snapshots before the
+      # backend spawns, update() runs `copilot-proxy stop` first — so copying the
+      # main file together with any -wal/-shm sidecars replays cleanly on reopen.
+      # Do NOT reintroduce bun:sqlite's Database.serialize(): it throws "Out of
+      # memory" on Bun 1.3.x even for tens-of-MB DBs and blocked every start and
+      # update. See pitfalls/copilot-bun-sqlite-serialize-oom.md.
+      for ext in '' '-wal' '-shm'; do
+        [ ! -f "$f$ext" ] || command cp -p "$f$ext" "$bundle/$label.sqlite$ext" || exit 1
+      done
     done
   )
 }
