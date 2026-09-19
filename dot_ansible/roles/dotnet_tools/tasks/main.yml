@@ -1,107 +1,142 @@
 ---
-# .NET global tools installation
-# .NET SDK is installed via mise (`mise use -g dotnet@<version>`), which puts
-# a dotnet shim under ~/.local/share/mise/shims/dotnet and lets `dotnet tool
-# install --global` drop binaries into ~/.dotnet/tools (hardcoded by dotnet).
-# ~/.dotnet/tools is prepended to PATH by dot_config/zsh/00_exports.zsh when it
-# exists.
+# The managed mise config owns the version and isolated layout. Never `mise use`
+# here: it rewrites that config. Global tool apphosts need mise's DOTNET_ROOT,
+# not merely a dotnet executable somewhere on PATH.
 
-# =============================================================================
-# Ensure dotnet SDK is installed via mise
-# =============================================================================
-
-- name: Check for user-installed mise (dotnet_tools)
-  ansible.builtin.stat:
-    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
-  register: dotnet_mise_user_install
-
-- name: Set mise binary path (dotnet_tools)
-  ansible.builtin.set_fact:
-    dotnet_mise_bin: >-
-      {{
-        (ansible_facts['env']['HOME'] + '/.local/bin/mise')
-        if dotnet_mise_user_install.stat.exists
-        else ('/opt/homebrew/bin/mise' if ansible_facts['os_family'] == 'Darwin' else '/usr/local/bin/mise')
-      }}
-
-- name: Verify mise binary is reachable (dotnet_tools)
-  ansible.builtin.stat:
-    path: "{{ dotnet_mise_bin }}"
-  register: dotnet_mise_bin_stat
-
-- name: Skip dotnet_tools when mise is unavailable
-  when: not dotnet_mise_bin_stat.stat.exists
+- name: Skip .NET on the unsupported CentOS/RHEL 7 baseline
+  when: oldEL | default(false)
   ansible.builtin.debug:
-    msg: >-
-      dotnet_tools: mise not found at {{ dotnet_mise_bin }} — skipping install
-      of {{ dotnet_tools | map(attribute='name') | list | join(', ') }}.
-      Install mise first (bootstrap script / curl https://mise.run | sh) and
-      re-run `chezmoi apply` or `ansible-playbook ... --tags dotnet_tools`.
+    msg: ".NET tools require a newer runtime baseline than CentOS/RHEL 7."
 
-- name: Install and pin dotnet via mise
-  when: dotnet_mise_bin_stat.stat.exists
-  ansible.builtin.command: "{{ dotnet_mise_bin }} use -g dotnet@{{ dotnet_version }}"
-  args:
-    creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/installs/dotnet"
-  register: dotnet_mise_use
+# mise uses dotnet-install.sh, which does not install native dependencies.
+# Debian's -dev packages select the matching ICU/OpenSSL runtime ABI on each
+# distro release (e.g. libicu70/74 and libssl3/libssl3t64). Do not hardcode it.
+# noRoot skips sudo tasks; the offline tool check then diagnoses missing libs.
+- name: Install .NET native dependencies (Debian/Ubuntu)
+  when: ansible_facts['os_family'] == 'Debian'
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: [ca-certificates, libc6, libgcc-s1, libstdc++6, libicu-dev, libssl-dev, zlib1g, libgssapi-krb5-2, tzdata]
+    state: present
+
+- name: Install .NET native dependencies (modern RedHat)
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - not (oldEL | default(false))
+  become: true
+  tags: [sudo]
+  ansible.builtin.dnf:
+    name: [ca-certificates, glibc, libgcc, libstdc++, libicu, openssl-libs, zlib, krb5-libs, tzdata]
+    state: present
+
+- name: Install and verify .NET tools
+  when: not (oldEL | default(false))
   environment:
-    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+    # Also makes a standalone --tags dotnet_tools run use the managed layout.
+    MISE_DOTNET_ISOLATED: "true"
+    MISE_AUTO_INSTALL: "false"
+    DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.dotnet/tools:{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:{{ ansible_facts['env']['PATH'] }}"
+  block:
+    - name: Locate installed mise binaries (dotnet_tools)
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+        - "{{ '/opt/homebrew/bin/mise' if ansible_facts['os_family'] == 'Darwin' and (target_architecture | default(ansible_facts['architecture'])) in ['arm64', 'aarch64'] else '/usr/local/bin/mise' }}"
+        - /usr/bin/mise
+      register: dotnet_mise_candidates
 
-# =============================================================================
-# Install .NET global tools (loop over dotnet_tools)
-# =============================================================================
+    - name: Select the first executable mise (dotnet_tools)
+      ansible.builtin.set_fact:
+        dotnet_mise_bin: >-
+          {{ dotnet_mise_candidates.results
+             | selectattr('stat.exists')
+             | selectattr('stat.executable')
+             | map(attribute='item') | first | default('') }}
 
-# `dotnet tool install --global` is NOT idempotent (exits 1 when already
-# installed), so we probe each binary first and skip when present. To catch
-# upstream updates, users can re-run with the explicit `update` command:
-#   dotnet tool update --global <name>
+    - name: Require mise before installing .NET tools
+      ansible.builtin.assert:
+        that: dotnet_mise_bin | length > 0
+        fail_msg: "dotnet_tools: mise is missing. Complete bootstrap, then re-run chezmoi apply."
 
-- name: Check whether each dotnet_tool binary is present
-  when:
-    - dotnet_mise_bin_stat.stat.exists
-    - dotnet_tools | length > 0
-  ansible.builtin.shell: |
-    export PATH="$HOME/.dotnet/tools:$HOME/.local/share/mise/shims:$PATH"
-    command -v {{ item.binary }}
-  args:
-    executable: /bin/bash
-  register: dotnet_tool_presence
-  changed_when: false
-  failed_when: false
-  loop: "{{ dotnet_tools }}"
-  loop_control:
-    label: "{{ item.binary }}"
+    - name: Check whether the requested SDK is installed
+      ansible.builtin.command:
+        argv: ["{{ dotnet_mise_bin }}", where, "dotnet@{{ dotnet_version }}"]
+      register: dotnet_sdk_before
+      changed_when: false
+      failed_when: false
+      check_mode: false
 
-- name: Build list of dotnet_tools still missing
-  when:
-    - dotnet_mise_bin_stat.stat.exists
-    - dotnet_tools | length > 0
-  ansible.builtin.set_fact:
-    dotnet_tools_to_install: >-
-      {{
-        dotnet_tool_presence.results
-        | selectattr('rc', 'ne', 0)
-        | map(attribute='item')
-        | list
-      }}
+    - name: Install the missing .NET SDK without changing managed config
+      when: dotnet_sdk_before.rc != 0
+      ansible.builtin.command:
+        argv: ["{{ dotnet_mise_bin }}", install, --yes, "dotnet@{{ dotnet_version }}"]
+      register: dotnet_sdk_install
+      changed_when: dotnet_sdk_install.rc == 0
 
-- name: Install missing dotnet_tools via `dotnet tool install --global`
-  when:
-    - dotnet_mise_bin_stat.stat.exists
-    - dotnet_tools_to_install is defined
-    - dotnet_tools_to_install | length > 0
-  ansible.builtin.shell: |
-    export PATH="$HOME/.dotnet/tools:$HOME/.local/share/mise/shims:$PATH"
-    {{ dotnet_mise_bin }} exec dotnet@{{ dotnet_version }} -- dotnet tool install --global {{ item.name }}
-  args:
-    executable: /bin/bash
-  register: dotnet_tool_install
-  until: dotnet_tool_install is succeeded
-  retries: 3
-  delay: 10
-  changed_when: >-
-    'was successfully installed' in dotnet_tool_install.stdout
-    or 'Installed' in dotnet_tool_install.stdout
-  loop: "{{ dotnet_tools_to_install }}"
-  loop_control:
-    label: "{{ item.name }}"
+    - name: Resolve the installed .NET SDK directory
+      when: not ansible_check_mode or dotnet_sdk_before.rc == 0
+      ansible.builtin.command:
+        argv: ["{{ dotnet_mise_bin }}", where, "dotnet@{{ dotnet_version }}"]
+      register: dotnet_sdk_root
+      changed_when: false
+      check_mode: false
+
+    # Invoke the resolved executable directly so a Homebrew/system dotnet cannot
+    # mask an incomplete mise install. Do not silently upgrade a damaged SDK.
+    - name: Verify the selected .NET SDK can run
+      when: not ansible_check_mode or dotnet_sdk_before.rc == 0
+      ansible.builtin.command:
+        argv: ["{{ dotnet_sdk_root.stdout | trim }}/dotnet", --list-sdks]
+      register: dotnet_sdk_health
+      changed_when: false
+      check_mode: false
+      failed_when: >-
+        dotnet_sdk_health.rc != 0 or
+        not (dotnet_sdk_health.stdout is search('(?m)^' ~ (dotnet_version | regex_escape) ~ '[.]'))
+
+    - name: Check global tool executables in the actual install directory
+      ansible.builtin.stat:
+        path: "{{ ansible_facts['env']['HOME'] }}/.dotnet/tools/{{ item.binary }}"
+      loop: "{{ dotnet_tools }}"
+      loop_control:
+        label: "{{ item.binary }}"
+      register: dotnet_tool_presence
+
+    - name: Install missing .NET global tools
+      when: not item.stat.exists
+      ansible.builtin.command:
+        argv:
+          - "{{ dotnet_mise_bin }}"
+          - exec
+          - "dotnet@{{ dotnet_version }}"
+          - --
+          - dotnet
+          - tool
+          - install
+          - --global
+          - "{{ item.item.name }}"
+      loop: "{{ dotnet_tool_presence.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      register: dotnet_tool_install
+      until: dotnet_tool_install is succeeded
+      retries: 3
+      delay: 10
+      changed_when: dotnet_tool_install.rc == 0
+
+    - name: Verify .NET global tools start with the selected runtime
+      when:
+        - not ansible_check_mode
+        - item.smoke_args is defined
+      ansible.builtin.command:
+        argv: >-
+          {{ [dotnet_mise_bin, 'exec', 'dotnet@' ~ dotnet_version, '--',
+              ansible_facts['env']['HOME'] ~ '/.dotnet/tools/' ~ item.binary]
+             + item.smoke_args }}
+      loop: "{{ dotnet_tools }}"
+      loop_control:
+        label: "{{ item.binary }}"
+      changed_when: false

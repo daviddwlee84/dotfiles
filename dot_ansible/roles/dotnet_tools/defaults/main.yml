@@ -8,11 +8,12 @@
 # Each entry:
 #   - name:   NuGet package id (e.g. azure-cost-cli)
 #   - binary: executable name to check for idempotency (e.g. azure-cost)
+#   - smoke_args: optional argv list for an offline startup check (e.g. [--help])
 
-# mise channel/version for dotnet. "latest" tracks the newest stable SDK.
-# Pin to e.g. "8" or "8.0" if a specific LTS is required.
-dotnet_version: latest
+# Must match dot_config/mise/config.toml.tmpl. Apply installs; upgrades are explicit.
+dotnet_version: "10"
 
 dotnet_tools:
   - name: azure-cost-cli
     binary: azure-cost
+    smoke_args: [--help]

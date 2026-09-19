@@ -99,6 +99,12 @@ flowchart LR
     yazi_plugins["yazi-plugins<br/>(ya pkg upgrade)"] --> summary((Summary))
 ```
 
+.NET SDK installs use the managed `dotnet = "10"` and `dotnet.isolated = true`
+settings. `mise upgrade dotnet` explicitly upgrades within that major;
+`just upgrade-dotnet` upgrades global tools separately. After either, check
+`mise exec -- azure-cost --help` before testing Azure authentication. Avoid
+`mise use -g dotnet@latest`, which rewrites the chezmoi-managed version pin.
+
 Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`go`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.
 
 `claude-hud` stays out of [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl): it uses a versioned cache path and rewrites `~/.claude/plugins/installed_plugins.json`, so it fits the explicit `plugins` upgrade path better than chezmoi externals. Upstream `v0.0.12+` also switched usage rendering to Claude Code's official stdin `rate_limits`, which means the old credential-derived `Max` badge may disappear after upgrade.

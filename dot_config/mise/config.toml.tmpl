@@ -34,6 +34,12 @@
 # Use precompiled ruby binaries instead of compiling from source.
 # ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
 ruby.compile = false
+{{ if and $dotnet (not $oldEL) -}}
+# Keep SDKs in their version directories, including installs made before mise's
+# shared dotnet-root default. mise exports DOTNET_ROOT for global tool apphosts.
+# See pitfalls/azure-cost-you-must-install-dotnet.md.
+dotnet.isolated = true
+{{ end -}}
 
 [env]
 # mise's Go backend force-sets GOBIN=<mise install>/bin with NO off-switch
@@ -85,9 +91,8 @@ go = "latest"
 {{ end -}}
 {{ if $dotnet -}}
 # .NET SDK (installDotnetTools=true). Pin the major to the current LTS (10):
-# .NET majors are not drop-in (TFM bumps, SDK behavior changes) and 8/9 are at
-# or near EOL by mid-2026, so "latest" risks both breakage and an unsupported
-# train. Bump this deliberately when the next LTS (12) ships.
+# .NET majors are not drop-in (TFM bumps, SDK behavior changes). Keep the same
+# spec in dotnet_tools/defaults/main.yml; bump both deliberately for a new LTS.
 dotnet = "10"
 {{ else -}}
 # .NET SDK skipped: installDotnetTools=false

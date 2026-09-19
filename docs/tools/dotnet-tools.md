@@ -2,8 +2,9 @@
 
 Opt-in via `installDotnetTools = true` during `chezmoi init`. This role:
 
-1. Installs the .NET SDK via [mise](https://mise.jdx.dev/) (`mise use -g dotnet@latest`) — same mechanism as `rust_cargo_tools` uses for Rust, so no `brew install dotnet` / Microsoft apt repo / `dotnet-install.sh` dance.
-2. Loops over the [`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) list and runs `dotnet tool install --global <pkg>` for each entry. Binaries land in `~/.dotnet/tools`, which is auto-added to `PATH` via [`00_exports.zsh`](../../dot_config/zsh/00_exports.zsh.tmpl) when present.
+1. Installs the .NET 10 SDK via [mise](https://mise.jdx.dev/lang/dotnet.html) with `mise install --yes dotnet@10`. The managed config explicitly uses `dotnet.isolated = true`, retaining version-specific SDK directories and matching `DOTNET_ROOT`.
+2. Verifies the resolved SDK can run, then installs missing global tools through `mise exec dotnet@10 -- dotnet tool install --global <pkg>`. Executables live in `~/.dotnet/tools`; the shared [shell exports](../../dot_config/shell/00_exports.sh.tmpl) add it to PATH for both Bash and Zsh.
+3. Runs each configured offline startup check, including `azure-cost --help`, even for already-installed tools. A failed runtime or tool check fails the role. Apply installs missing tools; upgrades remain explicit.
 
 Shipped tools (default):
 
@@ -17,6 +18,7 @@ Add more tools by editing `dot_ansible/roles/dotnet_tools/defaults/main.yml`:
 dotnet_tools:
   - name: azure-cost-cli
     binary: azure-cost
+    smoke_args: [--help]       # optional argv list; must not require credentials
   - name: dotnet-ef          # EF Core CLI
     binary: dotnet-ef
   - name: PowerShell         # cross-platform PowerShell
@@ -26,9 +28,9 @@ dotnet_tools:
 ## Why mise?
 
 - **One SDK manager across the stack.** mise already owns Node.js / Rust / (optionally) Python for this repo. Adding `dotnet` keeps every language runtime in one place under `~/.local/share/mise/installs/`.
-- **No sudo / no system package manager.** `mise use -g dotnet@latest` works identically on macOS, Ubuntu with sudo, and Ubuntu `noRoot`. Compare to the previous setup which needed `brew install dotnet`, `packages-microsoft-prod.deb`, or `dotnet-install.sh` depending on platform.
-- **Global pin lives in `~/.config/mise/config.toml`.** `mise upgrade dotnet` promotes cleanly and other mise tools keep working on their pinned versions.
-- **Shims on PATH.** `~/.local/share/mise/shims/dotnet` resolves `dotnet` automatically once mise is activated in zsh.
+- **User-local SDK.** `mise install --yes dotnet@10` installs the SDK without sudo or a Microsoft package repository. On Linux the role installs native ICU/OpenSSL/C++/Kerberos/zlib dependencies through apt/dnf (`state: present`, tagged `sudo`). Debian uses `libicu-dev` and `libssl-dev` to select the distro’s runtime ABI without hardcoding versioned package names. `noRoot` skips these system packages and requires them to be preinstalled; the startup check reports missing libraries.
+- **Global pin lives in `~/.config/mise/config.toml`.** `mise upgrade dotnet` explicitly upgrades within the configured major. Ansible never uses `mise use`, which would rewrite this chezmoi-owned config.
+- **Runtime discovery.** mise activation in both Bash and Zsh exports `DOTNET_ROOT` as well as adding the SDK to PATH. Non-interactive scripts should use `mise exec -- azure-cost …`; a dotnet shim alone does not tell a global tool apphost where its runtime lives.
 
 ## Quick start
 
@@ -36,12 +38,13 @@ dotnet_tools:
 # During chezmoi init
 chezmoi init --force   # re-prompt; answer y to installDotnetTools
 
-# Or ad-hoc
+# After the managed mise config has been deployed, re-run just this role
 ansible-playbook ~/.ansible/playbooks/macos.yml --tags dotnet_tools
 
-# Verify
-dotnet --version
-azure-cost --help
+# Verify without Azure credentials
+mise exec -- dotnet --list-sdks
+mise exec -- azure-cost --help
+# Open a new Bash/Zsh shell, then also check bare azure-cost --help
 ```
 
 ## azure-cost-cli usage
@@ -85,58 +88,84 @@ Authentication notes:
 ```bash
 # Upgrade .NET SDK (mise-managed)
 mise upgrade dotnet
-# or pin a specific channel
-mise use -g dotnet@8
+# Change major only by updating both managed config and role defaults.
 
 # Upgrade a specific global tool
-dotnet tool update --global azure-cost-cli
+mise exec -- dotnet tool update --global azure-cost-cli
 
 # List installed dotnet global tools
-dotnet tool list --global
+mise exec -- dotnet tool list --global
 ```
 
 ## Troubleshooting
 
-### `dotnet: command not found` after install
+### `You must install .NET to run this application.`
 
-The dotnet binary comes in via a mise shim. Ensure `mise activate` ran in your shell:
-
-```bash
-# Check shims
-ls ~/.local/share/mise/shims/dotnet
-
-# Re-activate mise (should be sourced from your shell config already)
-eval "$(mise activate zsh)"
-```
-
-### `azure-cost: command not found`
-
-`dotnet tool install --global` puts binaries in `~/.dotnet/tools`. That directory is prepended to `PATH` by [`~/.config/zsh/00_exports.zsh`](../../dot_config/zsh/00_exports.zsh.tmpl) only when it exists, so open a fresh shell after the first install:
+An installed SDK and a working `dotnet --version` are not enough: standalone
+global tool apphosts need to discover the compatible runtime. A Homebrew dotnet
+on PATH can mask a broken mise SDK environment.
 
 ```bash
-ls ~/.dotnet/tools/          # should show azure-cost
-echo $PATH | tr ':' '\n' | rg dotnet
-exec zsh                     # pick up the PATH update
+mise where dotnet
+mise env --shell bash | rg DOTNET
+mise exec -- dotnet --list-runtimes
+mise exec -- azure-cost --help
 ```
 
-For bash, add manually:
+The managed `dotnet.isolated = true` setting keeps new installations and older
+version-directory installs consistent. A missing `~/.local/share/mise/dotnet-root`
+with an SDK still under `installs/dotnet/<version>` indicates the shared/isolated
+layout mismatch. Apply the updated config, then open a new shell. For a temporary
+check of an intact version-directory installation:
 
 ```bash
-echo 'export PATH="$HOME/.dotnet/tools:$PATH"' >> ~/.bashrc
+DOTNET_ROOT="$(mise where dotnet)" azure-cost --help
 ```
+
+See the [symptom and recovery record](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/azure-cost-you-must-install-dotnet.md).
+If the SDK itself cannot run, the role fails rather than silently upgrading it;
+inspect the resolved installation and explicitly reinstall the affected SDK.
+
+### `dotnet` or `azure-cost`: command not found
+
+Complete the opted-in installation, then open a fresh Bash or Zsh shell so mise
+activation and the shared PATH module see the newly installed directories.
+Both shells are configured automatically; do not append duplicate PATH edits
+to managed rc files. For non-interactive commands use `mise exec -- …`.
 
 ### `mise` not found during role run
 
-The role refuses to continue and prints a skip warning when mise isn't installed. mise is part of the bootstrap phase (see [`run_once_before_00_bootstrap.sh.tmpl`](../../run_once_before_00_bootstrap.sh.tmpl)), so the common cause is a partial bootstrap. Re-run:
+The role fails with a bootstrap hint when mise isn't installed. mise is part of the bootstrap phase (see [`run_once_before_00_bootstrap.sh.tmpl`](../../run_once_before_00_bootstrap.sh.tmpl)), so the common cause is a partial bootstrap. Re-run:
 
 ```bash
 curl https://mise.run | sh
 chezmoi apply
 ```
 
+## Recipe validation
+
+Offline regression tests execute the real role with a fake SDK and check
+opt-in/opt-out template rendering:
+
+```sh
+python3 -m unittest discover -s tests/unit -p test_dotnet_tools.py -v
+```
+
+For a real fresh-install smoke, use a disposable Ubuntu 24.04 container with
+mise, chezmoi, ansible-core, Bash/Zsh, CA certificates, and root/sudo access:
+
+```sh
+python3 tests/smoke/dotnet_install.py
+```
+
+The smoke creates its own HOME, applies the managed templates with chezmoi,
+installs through the actual role, repeats the role to check idempotency, and
+starts azure-cost from both shells. It downloads the SDK and NuGet package;
+it does not need or copy Azure credentials.
+
 ## Related
 
-- [mise dotnet plugin (asdf-dotnet)](https://github.com/mise-plugins/mise-dotnet)
+- [mise .NET core backend](https://mise.jdx.dev/lang/dotnet.html)
 - [dotnet tool install docs](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-tool-install)
 - [NuGet search for global tools](https://www.nuget.org/packages?packagetype=dotnettool)
 - [docs/tools/infrastructure-as-code.md](./infrastructure-as-code.md) — Azure CLI / Terraform / OpenTofu (separate `installIacTools` opt-in; `az login` here is the auth source for `azure-cost`)

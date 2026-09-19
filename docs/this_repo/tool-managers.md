@@ -399,7 +399,7 @@ Wrappers around language-specific package managers. All consume a
 | `summarize` | brew (macOS) / `mise exec -- npm install -g` (Linux) | 1 (`summarize`) | `installSummarize` |
 | `rust_cargo_tools` | `cargo install` (after `mise install rust@stable`) | `[]` in defaults + 2 hardcoded (`recon`, `pueue`) | (no gate; rust runtime always installed via mise) |
 | `ruby_gem_tools` | `gem install` (after `mise install ruby@3`) | 2 (`try-cli`, `tmuxinator`) | (no gate; gated by `mise install ruby` skip on noRoot Linux) |
-| `dotnet_tools` | `dotnet tool install --global` (after `mise use -g dotnet@latest`) | 1 (`azure-cost-cli`) | `installDotnetTools` |
+| `dotnet_tools` | `dotnet tool install --global` (after `mise install --yes dotnet@10`) | 1 (`azure-cost-cli`) | `installDotnetTools` |
 
 **Key invariant** (`with_executables_from:` entries MUST also declare
 `extra_binaries:`): see AGENTS.md "Install vs upgrade is split on
@@ -447,7 +447,8 @@ dependencies should pin their own version for CI consistency.
 
 **Config**: `dot_config/mise/config.toml.tmpl`
 
-`[settings]`: `ruby.compile = false`.
+`[settings]`: `ruby.compile = false`; opted-in modern hosts also set
+`dotnet.isolated = true` so mise exports the runtime root matching the SDK layout.
 
 **Modern hosts** (default):
 
@@ -466,7 +467,7 @@ moving channels because each promises backward compatibility (Go's
 rust's `stable`). `bun=1` and `dotnet=10` pin the **major** instead —
 neither guarantees no-break across majors (bun ships behavior changes on
 minors; .NET majors bump TFMs / SDK behavior), and `dotnet=10` is also the
-current LTS (8/9 are at/near EOL by mid-2026). Bump `dotnet` deliberately
+selected LTS. Bump `dotnet` deliberately
 when the next LTS (12) lands. `ruby=3` tracks the 3.x line.
 
 `go` replaces the old macOS-only brew install from the `security_tools`
@@ -670,8 +671,12 @@ the `creates:` guard).
 
 **Config**: `dot_ansible/roles/dotnet_tools/defaults/main.yml`
 
-**.NET SDK** ships via `mise use -g dotnet@<version>` (default `latest`).
-Once SDK is installed, the role loops `dotnet tool install --global`
+**.NET SDK** ships via `mise install --yes dotnet@10`, matching the managed
+mise config and its explicit `dotnet.isolated = true` setting. The role checks
+the resolved SDK executable, not just its parent directory, and never rewrites
+the config with `mise use`. Linux native libraries are install-only apt/dnf
+dependencies tagged `sudo`; noRoot hosts must already provide them.
+Once SDK is installed, the role uses `mise exec dotnet@10 -- dotnet tool install --global`
 for each entry — drops binaries into `~/.dotnet/tools/` (already on PATH
 via `dot_config/shell/00_exports.sh.tmpl`).
 
@@ -685,7 +690,9 @@ via `dot_config/shell/00_exports.sh.tmpl`).
 per tool.
 
 **Adding a dotnet tool**: append to `dotnet_tools/defaults/main.yml`
-with `name` (NuGet package id) and `binary` (the actual command name).
+with `name` (NuGet package id), `binary` (the actual command name), and optional
+`smoke_args` (an argv list for an offline startup check). `azure-cost` uses
+`smoke_args: [--help]`; it is checked even when already installed.
 
 ### 10. gem (Ruby gems)
 
@@ -1101,7 +1108,7 @@ list.
 | **docker** | brew cask `orbstack` | `curl get.docker.com` rootless | docker |
 | **doggo** | brew | GitHub release | networking_tools |
 | **dotenv** (python-dotenv[cli]) | uv tool | uv tool | python_uv_tools |
-| **dotnet** | mise | mise | mise |
+| **dotnet** | mise (`10`, isolated) | mise (`10`, isolated) | mise |
 | **doxx** | brew (homebrew-core) | GitHub release `.tar.xz` | devtools |
 | **duckdb** | brew | GitHub release | devtools |
 | **duckdb.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
