@@ -347,6 +347,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **System audio & media control** (cross-platform): `sys*` shell helpers — `sysvol` / `sysmute` (built-in, always available) and `sysplay` / `sysnow` (with `installMediaControl=true`, which adds `nowplaying-cli`/`switchaudio-osx` on macOS and `playerctl` on Linux). Enables remote one-key mute via `fleet exec --login -- sysmute on`. See [docs/tools/media-control.md](docs/tools/media-control.md).
 - **.NET tools** (optional): .NET 10 SDK via mise (isolated layout) + `azure-cost-cli` (Azure cost analysis), with Linux native dependencies and an offline startup check on apply (noRoot requires preinstalled libraries); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
+- **Mihomo controller**: [lazyclash](https://github.com/daviddwlee84/lazyclash), a CLI/TUI for existing local or SSH-accessible cores. macOS/Linux source installs use the Go toolchain under `installExtraRuntimes`, land in `~/.local/bin`, and include generated zsh/bash completions. This does not install a core or register controller credentials.
 - **Cargo tools**: pueue (process queue manager), [`recon`](https://github.com/gavraz/recon) (Claude Code tmux dashboard — see [agent pane discovery](docs/tools/agent-panes-discovery.md))
 - **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt` with integrated Codex on Intel and Apple Silicon, `opencode-desktop`, `antigravity`, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Steam via Brewfile when `installGamingApps=true`; Tailscale (desktop app **and** `tailscale` CLI) via Homebrew Cask `tailscale-app` — the cask's pkg also installs a `/usr/local/bin/tailscale` wrapper into the app, so there is no separate `tailscale` formula on macOS.
 
@@ -410,7 +411,7 @@ just upgrade-mise         # mise self-update + `mise upgrade`
 just upgrade-uv           # uv itself (auto-dispatches: brew vs self update) + `uv tool upgrade --all` (apprise, mlflow, sqlit-tui, ...)
 just upgrade-npm          # global npm packages (Bitwarden CLI, readability-cli, ...)
 just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
-just upgrade-go           # go install <pkg>@latest per go_tools entry (Linux only; macOS translate/dev → brew)
+just upgrade-go           # platform-selected Go tools; lazyclash on macOS/Linux, translate/dev/gopls stay brew-owned on macOS
 just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
 just upgrade-gem          # Ruby gems (try-cli, tmuxinator, ...)
 just upgrade-agents       # self-update/installers for Claude Code / OpenCode / Pi / OMP / Cursor / Ollama / llmfit / RTK

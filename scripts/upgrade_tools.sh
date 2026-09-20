@@ -39,6 +39,8 @@ _REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$_REPO_ROOT/scripts/lib/log_shared.sh"
 # shellcheck source=lib/herdr_skill.sh
 source "$_REPO_ROOT/scripts/lib/herdr_skill.sh"
+# shellcheck source=lib/go_tools.sh
+source "$_REPO_ROOT/scripts/lib/go_tools.sh"
 
 # ----------------------------------------------------------------------------
 # Source shared sudo helper (same file used by run_*.sh.tmpl via `include`)
@@ -560,15 +562,6 @@ cat_cargo() {
 # dot_ansible/roles/go_tools/defaults/main.yml
 # ============================================================================
 cat_go() {
-  # macOS installs go_tools binaries via Homebrew (translate + dev →
-  # daviddwlee84/tap), so `go install` is Linux-only — skip on macOS to avoid
-  # re-creating ~/.local/bin copies that shadow brew. Mirrors the go_tools role
-  # gate; on macOS upgrade via `brew upgrade` (just upgrade-brew).
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    warn "go tools are Homebrew-managed on macOS — skipping (use \`brew upgrade\`)"
-    return $SKIP_RC
-  fi
-
   # Resolve go via mise shim first, then system PATH.
   local go_cmd=""
   if [[ -x "$HOME/.local/share/mise/shims/go" ]]; then
@@ -580,23 +573,18 @@ cat_go() {
     return $SKIP_RC
   fi
 
-  # Parse the tools list from defaults YAML — lines `  - name: <pkg>@<ver>`.
-  # Same hand-rolled awk parser as cat_dotnet.
+  # Use the same per-tool platform declaration as installation. In particular,
+  # macOS includes lazyclash without recreating Homebrew translate/dev/gopls.
   local defaults_file="$_REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml"
+  local selected_tools
   local tools=()
-  if [[ -f "$defaults_file" ]]; then
-    while IFS= read -r line; do
-      tools+=("$line")
-    done < <(awk '
-            /^go_tools:/ { in_list=1; next }
-            in_list && /^[^ ]/ { in_list=0 }
-            in_list && /^[[:space:]]*-[[:space:]]*name:/ {
-                sub(/^[[:space:]]*-[[:space:]]*name:[[:space:]]*/, "")
-                gsub(/["'"'"']/, "")
-                print
-            }
-        ' "$defaults_file")
+  if ! selected_tools="$(go_tool_packages "$defaults_file" "$(uname -s)")"; then
+    error "cannot select Go tools from the platform manifest"
+    return 1
   fi
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && tools+=("$line")
+  done <<<"$selected_tools"
 
   if [[ ${#tools[@]} -eq 0 ]]; then
     warn "no go tools to upgrade — skipping"

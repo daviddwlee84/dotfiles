@@ -54,8 +54,25 @@ compinit runs once (inside oh-my-zsh.sh)
 | `pia` | `pia completion zsh` |
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
+| `lazyclash` | `lazyclash completion zsh` |
 | `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
+
+lazyclash 在 macOS/Linux 由 `go_tools` 安裝，completion 同樣由每次 apply 的
+`run_after_50` 產生；檔案放在未納入版本控制的 `~/.zfunc/_lazyclash` 與 bash
+使用者 completion 目錄。若只要刷新它，執行：
+
+```sh
+scripts/generate_completions.sh --tool lazyclash --force
+```
+
+`--tool` 不會改動其他工具；未知名稱會在建立 output 目錄之前失敗。
+目前 `.zshrc` 已在 Oh My Zsh 的 `compinit` 之前加入 `~/.zfunc`，不需再加
+startup 設定。第一次安裝後開新 shell 即可，不要清掉所有 compdump。
+原生 Cobra zsh bridge 每次 Tab 都向目前 binary 取得候選，所以新命令、flags
+與本機動態候選不需要另一層 startup cache。Bridge 本身則在 apply 或手動刷新
+時更新；legacy Bash 靜態 script 不具備相同保證，仍需維持生成檔的新鮮度。
+`just upgrade-go` 本身不執行 completion 生成。
 
 Fresh apply 若尚未重載 PATH，bulk generator 也會探測
 `~/.local/bin/<tool>`；因此剛安裝的 OMP 不需要第二次開 shell／apply 就能

@@ -10,7 +10,8 @@
 #
 # Tools handled (the "self-generating" set from docs/zsh/zsh-completions.md
 # Section A): chezmoi, mise, uv, just, starship, gh, docker, rg, fd, bat,
-# delta, zellij, pueue, opencode, omp, pia, translate, dev.
+# delta, zellij, pueue, opencode, omp, pia, translate, dev, lazyclash, summarize;
+# mole is present on macOS only.
 #
 # Tools handled elsewhere (don't double-up):
 #   sesh, tv, worktrunk        → shell-startup mtime check
@@ -21,6 +22,7 @@
 # Manual rerun (--force regenerates all even if cache fresh):
 #   just completions-refresh
 #   bash {{ .chezmoi.sourceDir }}/scripts/generate_completions.sh --force
+#   bash {{ .chezmoi.sourceDir }}/scripts/generate_completions.sh --tool lazyclash --force
 #
 # Skip this hook (cache files stay as they are):
 #   export CHEZMOI_SKIP_COMPLETION_GEN=1

@@ -39,7 +39,7 @@ Micro 隨 devtools 安裝：macOS 用 brew，Linux 用 apt／驗證 checksum 的
 | **uv** | Python CLI 工具（`python_uv_tools` ~13 個 + `llm_tools` 1 個 + `litellm`） | `dot_ansible/roles/python_uv_tools/defaults/main.yml`、`dot_ansible/roles/llm_tools/defaults/main.yml`、`coding_agents` 中的 ad-hoc `uv tool install`（specify-cli）+ `security_tools`（pre-commit） | `uv` (`uv tool upgrade --all`) |
 | **npm** (全域) | JS CLI（Pi、copilot-cli、codex、gemini-cli、openchamber、bitwarden、readability-cli）+ `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`、散布的 `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) / Pi 另由 `agents` 處理穩定 prefix |
 | **cargo** | Rust crates：`recon`、`pueue`（Linux）、`tree-sitter-cli`（fallback）、`alacritty`（Linux 編譯）、`modelsdev`（Linux fallback） | `rust_cargo_tools/defaults/main.yml`（目前為 `[]`）+ 在 task 中硬寫 | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | 個人 Go CLI：`translate`、`dev`（僅 Linux；macOS 由 `daviddwlee84/tap` 的 Homebrew formula 安裝） | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest`) |
+| **go** (`go install`) | lazyclash 用於 macOS/Linux；translate、dev、gopls 僅 Linux（macOS 副本由 Homebrew 管理） | `go_tools/defaults/main.yml`，逐項 `platforms` | `go`（依平台執行 `go install <pkg>@latest`） |
 | **dotnet** (全域工具) | `azure-cost-cli`（binary `azure-cost`） | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli`（binary `try`）、`tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、omp、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
@@ -604,6 +604,29 @@ Pi 使用固定的 `~/.local` prefix，因此由 `just upgrade-agents` 先跑
 (由 `cargo install-update -a` 涵蓋);只在安裝需要額外編譯依賴或非
 crates.io 來源時才 hard-code 到 `tasks/main.yml`(見 `recon`、`pueue`)。
 
+### Go CLI（平台別原始碼安裝）
+
+設定來源是 `dot_ansible/roles/go_tools/defaults/main.yml`，每筆包含固定版本的
+`name`、輸出的 `binary`，以及單行 `platforms: [Linux, Darwin]`。Ansible
+安裝與 `just upgrade-go` 都依此選擇平台；升級用的免依賴 parser 會先驗證所有
+record，不接受不完整或未支援的格式。
+
+| 套件 | 平台／管理方式 |
+|---|---|
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.3` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
+| `github.com/daviddwlee84/translate@v0.5.2` | Linux 用 Go；macOS 用 Homebrew |
+| `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | Linux 用 Go；macOS 用 Homebrew |
+| `golang.org/x/tools/gopls@v0.23.0` | Linux 用 Go；macOS 用 Homebrew |
+
+Go 由 mise 提供，仍受 `installExtraRuntimes` 控制；關閉時略過 role，缺少 Go
+也不會改走另一種 installer。Binary 經 `GOBIN` 安裝到已在 PATH 的
+`~/.local/bin`，module cache 經 `GOPATH` 使用 `~/.local/share/go`。
+`creates:` 保持 apply 僅補裝缺少的 binary；明確執行 `just upgrade-go` 才用
+`@latest` 升級。lazyclash 操作現有 core API，不會安裝 Mihomo 或預填控制器密鑰。
+
+會自行產生 completion 的工具也要加入 `scripts/generate_completions.sh`。
+只刷新一個工具可用 `scripts/generate_completions.sh --tool lazyclash --force`。
+
 ### 8. dotnet (全域 .NET 工具)
 
 **設定檔**:`dot_ansible/roles/dotnet_tools/defaults/main.yml`
@@ -1049,6 +1072,7 @@ agent-specific 升級路徑。
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab**(`jupyter-lab`) | uv tool(配 notebook、ipykernel 等) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh`(永遠) | 同 | base |
+| **lazyclash** | `go install`（`go_tools`） | `go install`（`go_tools`） | 現有 core 的 CLI/TUI；依平台選原始碼通道，apply 產生 zsh/bash completion |
 | **lazygit** | brew → 官方 release fallback（最低 0.64.0） | 移除舊 PPA → brew 偵測 → 官方 system/user release（最低 0.64.0） | lazyvim_deps |
 | **libnotify-bin** | n/a | apt(Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |

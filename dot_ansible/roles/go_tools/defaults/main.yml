@@ -14,11 +14,13 @@
 # — same install-vs-upgrade split as cargo. Example:
 #   - name: github.com/owner/tool@v1.2.3
 #     binary: tool
+#     platforms: [Linux, Darwin]
+# Keep platforms on one line: the dependency-free upgrade manifest reader
+# validates this small schema before selecting packages.
 
-# NOTE: on macOS these tools install via Homebrew (the personal tap for
-# translate/dev-cli, homebrew-core for gopls — see Brewfile.tmpl); this
-# go-install path is Linux-only (tasks + cat_go gate off Darwin). Entries stay
-# here as the source of truth for Linux installs and for `just upgrade-go`.
+# Platform ownership is per tool: translate/dev/gopls stay Linux-only here
+# because Homebrew owns their macOS copies. lazyclash uses source installation
+# on both platforms until it has a package-manager release channel.
 #
 # The translate pin was raised v0.1.0 → v0.5.2 on 2026-08-27. That is a FLOOR
 # bump, not an upgrade (the split above still holds): v0.1.0 predates almost the
@@ -32,7 +34,13 @@
 go_tools:
   - name: github.com/daviddwlee84/translate@v0.5.2
     binary: translate
+    platforms: [Linux]
   - name: github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0
     binary: dev
+    platforms: [Linux]
   - name: golang.org/x/tools/gopls@v0.23.0
     binary: gopls
+    platforms: [Linux]
+  - name: github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.3
+    binary: lazyclash
+    platforms: [Darwin, Linux]

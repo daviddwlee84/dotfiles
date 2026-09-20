@@ -2,7 +2,7 @@
 # Regenerate shell completion files for upstream CLIs.
 #
 # Usage:
-#   scripts/generate_completions.sh [--force] [--quiet] [--help]
+#   scripts/generate_completions.sh [--force] [--quiet] [--tool NAME] [--help]
 #
 # Modes:
 #   default   Skip tools whose completion file is already newer than its
@@ -10,6 +10,7 @@
 #             revision stamp such as .git/index).
 #   --force   Regenerate every tool's completion regardless of mtime.
 #   --quiet   Suppress per-tool progress; still print final summary.
+#   --tool    Select one registered tool, leaving all other files untouched.
 #
 # Output paths (lazy-autoload conventions):
 #   zsh:  ~/.zfunc/_<tool>                                              (in fpath via dot_zshrc.tmpl:68)
@@ -34,31 +35,45 @@ set -euo pipefail
 
 force=0
 quiet=0
-for a in "$@"; do
-  case "$a" in
+selected_tool=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --force) force=1 ;;
     --quiet) quiet=1 ;;
+    --tool)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        echo "generate_completions: --tool requires a tool name" >&2
+        exit 2
+      fi
+      selected_tool="$2"
+      shift
+      ;;
+    --tool=*)
+      selected_tool="${1#--tool=}"
+      [ -n "$selected_tool" ] || exit 2
+      ;;
     -h | --help)
       sed -n '2,30p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "generate_completions: unknown arg: $a" >&2
+      echo "generate_completions: unknown arg: $1" >&2
       exit 2
       ;;
   esac
+  shift
 done
 
 ZFUNC="${HOME}/.zfunc"
 BASHDIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions"
-
-mkdir -p "$ZFUNC" "$BASHDIR"
 
 n_z_regen=0
 n_b_regen=0
 n_z_skip=0
 n_b_skip=0
 n_missing=0
+n_matched=0
+n_failed=0
 
 # regen <tool> <zsh-args> <bash-args> [runner-path] [freshness-path]
 # Uses word-splitting on $zargs / $bargs deliberately (the upstream completion
@@ -67,6 +82,10 @@ n_missing=0
 # launchers whose wrapper mtime does not change when their source revision does.
 regen() {
   local tool="$1" zargs="$2" bargs="$3"
+  if [ -n "$selected_tool" ] && [ "$selected_tool" != "$tool" ]; then
+    return 0
+  fi
+  n_matched=$((n_matched + 1))
   local runner_path="${4:-}" freshness_path="${5:-}"
   local bin runner freshness
   if [ -n "$runner_path" ]; then
@@ -95,6 +114,7 @@ regen() {
   [ -e "$freshness" ] || freshness="$bin"
   local zfile="${ZFUNC}/_${tool}"
   local bfile="${BASHDIR}/${tool}"
+  mkdir -p "$ZFUNC" "$BASHDIR"
 
   # zsh
   if [ "$force" = 1 ] || [ ! -f "$zfile" ] || [ "$freshness" -nt "$zfile" ]; then
@@ -105,6 +125,7 @@ regen() {
       [ "$quiet" = 0 ] && printf '  zsh   %-10s → %s\n' "$tool" "$zfile"
     else
       rm -f "$zfile.tmp"
+      n_failed=$((n_failed + 1))
     fi
   else
     n_z_skip=$((n_z_skip + 1))
@@ -119,6 +140,7 @@ regen() {
       [ "$quiet" = 0 ] && printf '  bash  %-10s → %s\n' "$tool" "$bfile"
     else
       rm -f "$bfile.tmp"
+      n_failed=$((n_failed + 1))
     fi
   else
     n_b_skip=$((n_b_skip + 1))
@@ -158,7 +180,18 @@ regen translate "completion zsh" "completion bash"
 # covers the short `mo` entrypoint too.
 regen mole "completion zsh" "completion bash"
 regen dev "completion zsh" "completion bash"
+regen lazyclash "completion zsh" "completion bash"
 regen summarize "completion zsh" "completion bash"
+
+if [ "$n_matched" -eq 0 ]; then
+  echo "generate_completions: unknown tool: $selected_tool" >&2
+  exit 2
+fi
+
+if [ -n "$selected_tool" ] && { [ "$n_missing" -gt 0 ] || [ "$n_failed" -gt 0 ]; }; then
+  echo "generate_completions: $selected_tool is unavailable or completion generation failed; existing files were retained" >&2
+  exit 1
+fi
 
 if [ "$n_z_regen" -gt 0 ] || [ "$n_b_regen" -gt 0 ] || [ "$quiet" = 0 ]; then
   printf 'completions: regenerated %d zsh + %d bash | skipped %d zsh + %d bash | %d not installed\n' \

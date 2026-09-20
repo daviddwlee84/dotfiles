@@ -36,7 +36,7 @@ If you want to know:
 | **npm** (global) | JS CLIs (Pi, copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli, summarize on Linux) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`); Pi's stable prefix is handled by `agents` |
 | **Mason** (Neovim tools) | Editor-local language servers, linters, formatters; shared Prettier fallback | LazyVim defaults/extras + `dot_config/nvim/lua/exact_plugins/mason.lua` | Manual `:MasonUpdate`, then `:MasonInstall prettier`; not `upgrade-plugins` |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | Go CLIs: `translate`, `dev`, `gopls` (**Linux only** — macOS installs them via Homebrew) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
+| **go** (`go install`) | `lazyclash` on macOS/Linux; `translate`, `dev`, `gopls` on Linux (Homebrew owns their macOS copies) | `go_tools/defaults/main.yml`, per-tool `platforms` | `go` (`go install <pkg>@latest` per selected entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, omp, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
@@ -658,14 +658,24 @@ idempotent.
 | `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
 | `golang.org/x/tools/gopls@v0.23.0` | `gopls` (Linux only; macOS → Homebrew `gopls`) |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.3` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
 boxes; upgrades move it forward — the same install-vs-upgrade split as cargo.
 
+Installation and upgrades select each entry's `platforms` from the same manifest.
+Existing Homebrew tools stay Linux-only here; lazyclash is selected on both
+Darwin and Linux. `installExtraRuntimes=false` still skips this role, and missing
+Go does not trigger another installer. lazyclash manages existing core APIs; its
+installation does not install Mihomo or seed target credentials.
+
 **Adding a go tool**: append to `go_tools/defaults/main.yml` with `name`
-(`<module-path>@<version>`) and `binary` (the resulting command name, used for
-the `creates:` guard).
+(`<module-path>@<version>`), `binary` (the executable used for the `creates:`
+guard), and an inline `platforms: [Linux, Darwin]` list. The dependency-free
+upgrade reader rejects malformed/unsupported records before selecting packages.
+Add self-generated completions to `scripts/generate_completions.sh`; for one
+tool use `scripts/generate_completions.sh --tool lazyclash --force`.
 
 ### 9. dotnet (global .NET tools)
 
@@ -1163,6 +1173,7 @@ list.
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh` (always) | same | base |
+| **lazyclash** | `go install` (`go_tools`) | `go install` (`go_tools`) | Existing-core CLI/TUI; platform-selected source channel, zsh/bash generated on apply |
 | **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
@@ -1338,7 +1349,7 @@ Is it a .NET global tool?
 └── No → continue
 
 Is it a Go CLI tool (installable via `go install`)?
-├── Yes → go (append to go_tools/defaults/main.yml: name=<module>@<ver>, binary=<cmd>)
+├── Yes → go (go_tools/defaults/main.yml: name=<module>@<ver>, binary=<cmd>, platforms=[Linux,Darwin])
 │         · Installs to ~/.local/bin via GOBIN; gated on installExtraRuntimes
 │         · Upgrade handled by cat_go in scripts/upgrade_tools.sh (just upgrade-go)
 └── No → continue

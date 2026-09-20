@@ -145,6 +145,7 @@ project's own Playwright Test for committed CI tests.
 
 - **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation, generated completion, agent-safe prepare/finalize/done/retire lifecycle, and receipt-backed `dev git` transactions. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the `go_tools` role. Source: `github.com/daviddwlee84/dev-cli`.
 - **`translate`** — terminal translator (CLI + TUI). macOS installs `daviddwlee84/tap/translate`; Linux uses the `go_tools` role.
+- **`lazyclash`** — CLI/TUI for existing local or SSH-accessible Mihomo cores. macOS/Linux use the platform-selected `go_tools` source manifest (requires `installExtraRuntimes`/Go), install into `~/.local/bin`, and upgrade via `just upgrade-go` or its explicit `upgrade` command. The apply-time completion generator owns zsh/bash files; narrow refresh: `scripts/generate_completions.sh --tool lazyclash --force`. It does not install a core or seed credentials. Source: `github.com/daviddwlee84/lazyclash`.
 
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 

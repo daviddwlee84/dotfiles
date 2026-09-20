@@ -87,6 +87,7 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `pia` | `pia completion zsh` |
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
+| `lazyclash` | `lazyclash completion zsh` |
 | `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
@@ -222,7 +223,25 @@ shell's file completion. Both are deployed shell CLIs (strategy B).
 
 ## Generating Completions After Fresh Install
 
-**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 19 bulk-generated tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`, `omp`, `pia`, `translate`, `dev`, `summarize`).
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` for its registered tools, including lazyclash. Missing tools are skipped; generated files stay outside chezmoi source control.
+
+For a narrow refresh after installation or an external upgrade:
+
+```sh
+scripts/generate_completions.sh --tool lazyclash --force
+```
+
+The filter touches only lazyclash's zsh/bash completion files. An unknown tool
+fails without creating output directories. `~/.zfunc` is already on `fpath`
+before Oh My Zsh calls `compinit`, so no additional `.zshrc` entry is needed.
+Open a new shell after the initial installation; do not delete every compdump.
+
+Native Cobra zsh completion asks the current binary for candidates on each Tab.
+New commands/flags and local dynamic candidates therefore follow that binary
+without another startup cache. The generated shell bridge itself is refreshed
+on apply or by the explicit command above when its generator changes or it needs
+repair. The same claim does not apply to legacy static Bash scripts; keep their
+generated files current too. `just upgrade-go` does not run completion generation.
 
 The hook is **idempotent** — it stat-checks each tool's freshness source against the existing completion file and skips if the cache is fresh. That source is normally the binary; `pia` uses the external checkout's `.git/index`. Cost when nothing changed: **~50ms** total (presence checks + 36 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime, or a `pia` checkout refresh that updates its Git index, only the affected completion is regenerated.
 On a fresh apply, it also probes `~/.local/bin/<tool>` when the parent process
