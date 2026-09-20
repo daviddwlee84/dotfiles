@@ -41,6 +41,6 @@ go_tools:
   - name: golang.org/x/tools/gopls@v0.23.0
     binary: gopls
     platforms: [Linux]
-  - name: github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.4
+  - name: github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5
     binary: lazyclash
     platforms: [Darwin, Linux]

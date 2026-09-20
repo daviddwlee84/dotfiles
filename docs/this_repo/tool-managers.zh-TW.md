@@ -613,7 +613,7 @@ record，不接受不完整或未支援的格式。
 
 | 套件 | 平台／管理方式 |
 |---|---|
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.4` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
 | `github.com/daviddwlee84/translate@v0.5.2` | Linux 用 Go；macOS 用 Homebrew |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | Linux 用 Go；macOS 用 Homebrew |
 | `golang.org/x/tools/gopls@v0.23.0` | Linux 用 Go；macOS 用 Homebrew |

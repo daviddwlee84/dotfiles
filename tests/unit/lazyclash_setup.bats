@@ -10,7 +10,7 @@ setup() {
 @test "Go source manifest selects only lazyclash on Darwin and all four Linux tools" {
   run bash -c 'source "$REPO_ROOT/scripts/lib/go_tools.sh"; go_tool_packages "$REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml" Darwin'
   [ "$status" -eq 0 ]
-  [ "$output" = "github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.4" ]
+  [ "$output" = "github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5" ]
 
   run bash -c 'source "$REPO_ROOT/scripts/lib/go_tools.sh"; go_tool_packages "$REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml" Linux'
   [ "$status" -eq 0 ]
@@ -18,7 +18,7 @@ setup() {
   [[ "$output" == *"github.com/daviddwlee84/translate@v0.5.2"* ]]
   [[ "$output" == *"github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0"* ]]
   [[ "$output" == *"golang.org/x/tools/gopls@v0.23.0"* ]]
-  [[ "$output" == *"github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.4"* ]]
+  [[ "$output" == *"github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5"* ]]
 }
 
 @test "Go manifest rejects an invalid later entry without emitting an earlier package" {

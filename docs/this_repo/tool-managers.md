@@ -658,7 +658,7 @@ idempotent.
 | `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
 | `golang.org/x/tools/gopls@v0.23.0` | `gopls` (Linux only; macOS → Homebrew `gopls`) |
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.4` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
