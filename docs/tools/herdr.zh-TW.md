@@ -169,7 +169,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + Alt + e` | 只編輯 active runtime config、驗證並 reload（永不呼叫 chezmoi） | command pane |
 | `prefix + shift + b` | 新 git worktree（從 `prefix + shift + g` 移過來） | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
-| `prefix + G` | lazygit 暫時 pane（近全螢幕 popup 會阻止切 tab/workspace，因此試用後移除） | command pane |
+| `prefix + G` / `Alt + g` | lazygit 暫時 pane（近全螢幕 popup 會阻止切 tab/workspace，因此試用後移除） | command pane |
 | `prefix + Y` | 在聚焦 pane cwd 開啟 [Yazi](yazi.md) 檔案管理員；按 `q` 回到不變的 layout | 90% × 85% popup |
 | `prefix + M` | btop 系統監控器 | command pane |
 | `prefix + N` | nvtop GPU 監控器 | command pane |
@@ -190,6 +190,8 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > 大寫字母會解析成 `prefix+shift+<letter>`；其中許多已是內建（`shift+g` worktree、`shift+t` rename-tab、`shift+h/j/k/l` swap-pane）。`prefix+G`/`prefix+T` 由上面的重綁釋放，`prefix+Y` 則是 upstream 未使用的空位；`herdr server reload-config` 會在 `diagnostics` 回報任何殘餘衝突。
+
+lazygit 的直接快捷鍵使用小寫 `alt+g`（不需 prefix）；`alt+G` 會要求 `Alt+Shift+g`。Ghostty/cmux 的 Meta 鍵設定使用**左 Option**（`macos-option-as-alt = left`）。
 
 `prefix+Y` 刻意採用 session-modal popup，適合在閱讀 agent pane 時做快速檔案操作。
 它從聚焦 pane 的 cwd 啟動，但子行程最後所在的目錄無法改變已在執行的來源 shell；

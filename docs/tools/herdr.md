@@ -165,7 +165,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + Alt + e` | edit only the active runtime config, validate it, and reload (never invokes chezmoi) | command pane |
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
-| `prefix + G` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
+| `prefix + G` / `Alt + g` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
 | `prefix + Y` | [Yazi](yazi.md) file manager rooted at the focused pane cwd; `q` returns to the unchanged layout | 90% × 85% popup |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
@@ -186,6 +186,8 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > Uppercase letters resolve to `prefix+shift+<letter>`; many are built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above, while `prefix+Y` is unused upstream; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
+
+The direct lazygit shortcut uses lowercase `alt+g` (no prefix); `alt+G` would require `Alt+Shift+g`. Ghostty/cmux sends the configured Meta key from **Left Option** (`macos-option-as-alt = left`).
 
 `prefix+Y` is deliberately session-modal because it is for quick filesystem
 operations while reading an agent pane. It starts in the focused pane's cwd,

@@ -9,9 +9,9 @@ This repo manages `~/.config/ghostty/config` (via `dot_config/ghostty/config`). 
 Key settings:
 
 - **`macos-option-as-alt = left`** — Left Option sends Meta/Esc+ so tmux `M-` keybindings work (theme switching `M-c`/`M-t`, layouts `M-1`..`M-5`, fine resize `M-h/j/k/l`). Right Option retains macOS compose behavior for accents and special characters.
-- **`font-features = -calt, -liga, -dlig`** — Disables ligatures for code readability.
+- **`font-feature = -calt, -liga, -dlig`** — Disables ligatures for code readability. The key is singular; `font-features` fails Ghostty validation with `unknown field`.
 
-> **Note**: Restart Ghostty/cmux after changing the config — it is read on launch, not hot-reloaded.
+Validate the managed source with `ghostty +validate-config --config-file=dot_config/ghostty/config`, and the installed config with `ghostty +validate-config`. Ghostty can reload configuration with `Cmd+Shift+,` on macOS; restart cmux to pick up changes to the shared file.
 
 Without `macos-option-as-alt`, macOS Option produces Unicode compose characters (e.g. `Option+c` → `ç`) instead of `Esc+c`, silently breaking all tmux Meta bindings. Alacritty and iTerm2 have their own equivalent settings (`window.option_as_alt` and Profiles > Keys > Left Option Key > Esc+ respectively).
 

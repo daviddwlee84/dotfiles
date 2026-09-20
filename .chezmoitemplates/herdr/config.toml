@@ -137,6 +137,13 @@ type = "pane"
 command = "lazygit"
 description = "lazygit (temporary pane)"
 
+[[keys.command]]
+# Lowercase g: alt+G would require Alt+Shift+g.
+key = "alt+g"
+type = "pane"
+command = "lazygit"
+description = "lazygit (temporary pane)"
+
 # Yazi is intentionally a popup: this is a quick, modal filesystem operation
 # from an agent pane. It starts in the focused pane's cwd; quitting returns to
 # the unchanged layout and does not attempt to change the source shell's cwd.
@@ -189,8 +196,8 @@ description = "scratch shell (popup)"
 #
 # type = "popup" (herdr >= 0.7.4) is the tmux `display-popup -E` analog: it floats
 # ABOVE the tiled layout instead of splitting it, so nothing reflows and you land
-# back exactly where you were. The same popup primitive powers scratch and the
-# Alt+g lazygit trial; prefix+G/btop/nvtop retain their temporary-pane forms.
+# back exactly where you were. The same popup primitive powers scratch;
+# prefix+G/Alt+g/btop/nvtop retain their temporary-pane forms.
 #
 # Deliberately not a herdr-plus Quick Action (prefix+y): Quick Actions run through
 # `sh -c` with no PTY/stdin (the same reason btop/nvtop are command panes) and

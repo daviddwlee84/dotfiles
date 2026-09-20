@@ -7,7 +7,7 @@
 macos-option-as-alt = left
 
 # Disable ligatures (code readability)
-font-features = -calt, -liga, -dlig
+font-feature = -calt, -liga, -dlig
 
 # OSC 52 clipboard policy (pairs with tmux set-clipboard + Neovim SSH clipboard
 # override in dot_config/nvim/lua/config/options.lua).

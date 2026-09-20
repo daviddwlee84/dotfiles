@@ -14,9 +14,9 @@
 關鍵設定：
 
 - **`macos-option-as-alt = left`** — 左 Option 送出 Meta/Esc+，讓 tmux 的 `M-` 鍵位 (keybinding) 能運作（主題切換 `M-c`/`M-t`、layout `M-1`..`M-5`、細部調整大小 `M-h/j/k/l`）。右 Option 保留 macOS 的 compose 行為，用於重音與特殊字元。
-- **`font-features = -calt, -liga, -dlig`** — 停用連字 (ligatures) 以提高程式碼可讀性。
+- **`font-feature = -calt, -liga, -dlig`** — 停用連字 (ligatures) 以提高程式碼可讀性。欄位名稱是單數；`font-features` 會讓 Ghostty 驗證回報 `unknown field`。
 
-> **注意**：修改設定後請重新啟動 Ghostty/cmux——它在啟動時讀取設定，並非熱重載 (hot-reload)。
+用 `ghostty +validate-config --config-file=dot_config/ghostty/config` 驗證 repo 來源，並以 `ghostty +validate-config` 驗證已部署設定。Ghostty 在 macOS 可按 `Cmd+Shift+,` 重新載入設定；cmux 可重新啟動以讀取共用檔案的變更。
 
 若沒有 `macos-option-as-alt`，macOS 的 Option 會產生 Unicode compose 字元（例如 `Option+c` → `ç`）而非 `Esc+c`，會無聲地讓所有 tmux Meta 綁定失效。`Alacritty` 與 `iTerm2` 各有等同的設定（分別為 `window.option_as_alt` 與 Profiles > Keys > Left Option Key > Esc+）。
 
