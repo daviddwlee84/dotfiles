@@ -1,0 +1,140 @@
+---
+# Independent of installGuiApps/installJsCliTools. Node is provisioned by
+# lazyvim_deps before devtools. All system changes honor --skip-tags sudo.
+- name: Determine browser release support
+  ansible.builtin.set_fact:
+    browser_tools_terminal_enabled: "{{ browser_tools_install_terminal | default(true) | bool }}"
+    browser_tools_playwright_enabled: "{{ browser_tools_install_playwright | default(true) | bool }}"
+    browser_tools_preload_enabled: "{{ (browser_tools_install_playwright | default(true) | bool) and (browser_tools_preload_chromium | default(false) | bool) }}"
+    browser_tools_arch_supported: "{{ target_architecture | default(ansible_facts['architecture']) in ['x86_64', 'amd64', 'aarch64', 'arm64'] }}"
+    browser_tools_linux_supported: >-
+      {{ (ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_version'] is version('22.04', '>='))
+         or (ansible_facts['distribution'] == 'Debian' and ansible_facts['distribution_major_version'] | int >= 12) }}
+    browser_tools_t64: >-
+      {{ (ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_version'] is version('24.04', '>='))
+         or (ansible_facts['distribution'] == 'Debian' and ansible_facts['distribution_major_version'] | int >= 13) }}
+
+- name: Report unsupported browser host
+  when: >-
+    not browser_tools_arch_supported or
+    (ansible_facts['os_family'] != 'Darwin' and not browser_tools_linux_supported)
+  ansible.builtin.debug:
+    msg: >-
+      Browser tools skipped: automatic provisioning supports macOS and modern
+      Debian/Ubuntu on x64/arm64. Older Linux, EL and 32-bit hosts can still be
+      previewed from a supported client using terminal-browser open --ssh HOST URL.
+
+- name: Provision supported browser hosts
+  when:
+    - browser_tools_arch_supported
+    - ansible_facts['os_family'] == 'Darwin' or browser_tools_linux_supported
+  block:
+    - name: Install Chromium and Electron runtime libraries (Debian/Ubuntu)
+      when:
+        - browser_tools_linux_supported
+        - browser_tools_terminal_enabled or browser_tools_preload_enabled
+      become: true
+      tags: [sudo]
+      ansible.builtin.apt:
+        state: present
+        name:
+          - libnss3
+          - libnspr4
+          - "libatk1.0-0{{ 't64' if browser_tools_t64 else '' }}"
+          - "libatk-bridge2.0-0{{ 't64' if browser_tools_t64 else '' }}"
+          - "libatspi2.0-0{{ 't64' if browser_tools_t64 else '' }}"
+          - "libcups2{{ 't64' if browser_tools_t64 else '' }}"
+          - "libasound2{{ 't64' if browser_tools_t64 else '' }}"
+          - "libgtk-3-0{{ 't64' if browser_tools_t64 else '' }}"
+          - libdbus-1-3
+          - libdrm2
+          - libxkbcommon0
+          - libxcomposite1
+          - libxdamage1
+          - libxfixes3
+          - libxrandr2
+          - libgbm1
+          - libpango-1.0-0
+          - libcairo2
+          - fonts-liberation
+          - fonts-noto-color-emoji
+
+    - name: Check for an existing terminal-browser
+      when: browser_tools_terminal_enabled
+      ansible.builtin.shell: command -v terminal-browser
+      environment:
+        PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+      register: browser_tools_terminal_check
+      check_mode: false
+      changed_when: false
+      failed_when: false
+
+    - name: Install terminal-browser cask (macOS, missing only)
+      when:
+        - browser_tools_terminal_enabled
+        - ansible_facts['os_family'] == 'Darwin'
+        - browser_tools_terminal_check.rc != 0
+      community.general.homebrew_cask:
+        name: terminal-browser
+        state: present
+
+    - name: Install verified terminal-browser release (Linux, missing only)
+      when:
+        - browser_tools_terminal_enabled
+        - browser_tools_linux_supported
+        - browser_tools_terminal_check.rc != 0
+      ansible.builtin.script: browser_tools.py install-terminal-browser
+      args:
+        executable: python3
+      register: browser_tools_terminal_install
+      changed_when: "'CHANGED:' in browser_tools_terminal_install.stdout"
+
+    - name: Install Playwright CLI through the selected Node runtime
+      when: browser_tools_playwright_enabled
+      ansible.builtin.script: browser_tools.py install-playwright
+      args:
+        executable: python3
+      register: browser_tools_playwright_install
+      changed_when: "'CHANGED:' in browser_tools_playwright_install.stdout"
+
+    # This invokes only the package's Linux sandbox helper, not its full setup
+    # (which also writes editor settings). It uses Ansible's shared become flow.
+    - name: Resolve terminal-browser AppArmor helper and executable
+      when: browser_tools_linux_supported and browser_tools_terminal_enabled
+      ansible.builtin.script: browser_tools.py sandbox-paths
+      args:
+        executable: python3
+      register: browser_tools_sandbox_paths
+      changed_when: false
+
+    - name: Install upstream executable-specific AppArmor profile when required
+      when:
+        - browser_tools_linux_supported
+        - browser_tools_terminal_enabled
+        - not ansible_check_mode
+        - browser_tools_sandbox_paths.stdout | default('') | trim != ''
+      become: true
+      tags: [sudo]
+      ansible.builtin.command:
+        argv: "{{ ['bash'] + (browser_tools_sandbox_paths.stdout | trim | from_json) }}"
+      register: browser_tools_apparmor
+      changed_when: "'AppArmor profile installed' in browser_tools_apparmor.stdout"
+
+    - name: Synchronize browser skills (Chromium preloading is opt-in)
+      ansible.builtin.script: >-
+        browser_tools.py refresh
+        {{ '' if browser_tools_terminal_enabled else '--skip-terminal' }}
+        {{ '' if browser_tools_playwright_enabled else '--skip-playwright' }}
+        {{ '--preload-chromium' if browser_tools_preload_enabled else '' }}
+      args:
+        executable: python3
+      register: browser_tools_refresh
+      changed_when: "'CHANGED:' in browser_tools_refresh.stdout"
+
+  rescue:
+    - name: Report incomplete browser provisioning
+      ansible.builtin.debug:
+        msg: >-
+          Browser tools are not ready: {{ ansible_failed_result.msg | default('see failed task above') }}.
+          Re-run with --tags browser_tools after resolving downloads, runtime
+          libraries or sandbox permissions. A CLI version alone is not a browser health check.

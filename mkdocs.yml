@@ -286,6 +286,7 @@ nav:
           - Themes: tools/tmux/themes.md
           - Vim integration: tools/tmux/vim.md
       - herdr (tmux alternative, trial): tools/herdr.md
+      - Browser tools for agents: tools/browser-tools.md
       - Shell & terminal:
           - Ghostty: tools/ghostty.md
           - Warp: tools/warp.md

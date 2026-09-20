@@ -35,6 +35,14 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
 
 ---
 
+## Browser tools
+
+For visible browser work beside an agent, use
+[terminal-browser](browser-tools.md) inside a graphics-capable outer terminal
+such as Ghostty. Its own CLI handles pane splitting; no Herdr browser plugin is
+required. Browser skills come from the installed browser package, separately
+from `herdr --skill`. Playwright CLI handles independent headless testing.
+
 ## Model differences vs tmux
 
 herdr's hierarchy is **Session → Workspace → Tab → Pane** — one level deeper than tmux (Session → Window → Pane). A "Workspace" is a project-level container; a "Tab" groups panes. The CLI (`herdr session|workspace|tab|pane|agent …`, most with `--json`) is the scripting surface that replaces `tmux switch-client` / `list-sessions` etc.

@@ -1,0 +1,113 @@
+---
+# Invoked only through the GUI role (ubuntu_desktop tag selection). Keep this
+# out of devtools: a headless server can use a local Ghostty client over SSH.
+- name: Check for an existing Ghostty installation
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64', 'arm64']
+  ansible.builtin.command: ghostty +version
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/snap/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: ghostty_available
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Explain Ghostty noRoot and architecture limits
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_no_root | bool or target_architecture not in ['x86_64', 'aarch64', 'arm64']
+  ansible.builtin.debug:
+    msg: >-
+      Ghostty automatic GUI installation requires sudo and x64/arm64 userland.
+      Existing installations and the shared Ghostty config are preserved.
+      Use a supported preinstalled client for terminal-browser and SSH.
+
+- name: Install missing Ghostty (native apt, Ubuntu PPA, then classic Snap)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64', 'arm64']
+    - not (gui_apps_linux_no_root | bool)
+    - ghostty_available.rc | default(1) != 0
+  tags: [sudo]
+  become: true
+  block:
+    - name: Refresh apt metadata before choosing a Ghostty package
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Check distribution Ghostty candidate
+      ansible.builtin.command: apt-cache policy ghostty
+      environment:
+        LC_ALL: C
+      register: ghostty_apt_policy
+      changed_when: false
+      check_mode: false
+
+    - name: Select the native Ghostty apt channel when available
+      ansible.builtin.set_fact:
+        ghostty_native_apt: "{{ ghostty_apt_policy.stdout is regex('(?m)^\\s*Candidate: (?!\\(none\\))\\S+') }}"
+        ghostty_ubuntu_ppa: >-
+          {{ ansible_facts['distribution'] == 'Ubuntu'
+             and ansible_facts['distribution_version'] == '24.04' }}
+
+    # Ghostty upstream lists mkasberg's packages, but they remain community
+    # builds. Noble's GTK baseline is supported up to Ghostty 1.3.1. Never add
+    # an Ubuntu PPA to Debian or substitute another distro's suite.
+    - name: Install PPA management dependencies (Ubuntu 24.04 only)
+      when: not ghostty_native_apt and ghostty_ubuntu_ppa
+      ansible.builtin.apt:
+        name: [software-properties-common, python3-apt]
+        state: present
+
+    - name: Add the documented Ghostty Ubuntu PPA
+      when: not ghostty_native_apt and ghostty_ubuntu_ppa
+      ansible.builtin.apt_repository:
+        repo: ppa:mkasberg/ghostty-ubuntu
+        state: present
+        update_cache: true
+
+    - name: Install Ghostty apt package without upgrading existing packages
+      when: ghostty_native_apt or ghostty_ubuntu_ppa
+      ansible.builtin.apt:
+        name: ghostty
+        state: present
+
+    # Older GTK releases (e.g. Ubuntu 22.04 / Debian 12) cannot use Noble's
+    # .deb. The upstream-listed classic snap brings its runtime and lets the
+    # terminal launch host tools; it is a fallback, not the preferred hot path.
+    - name: Install snapd when no compatible Ghostty apt channel exists
+      when: not ghostty_native_apt and not ghostty_ubuntu_ppa
+      ansible.builtin.apt:
+        name: snapd
+        state: present
+
+    - name: Enable the Snap socket for the fallback installation
+      when: not ghostty_native_apt and not ghostty_ubuntu_ppa
+      ansible.builtin.systemd_service:
+        name: snapd.socket
+        enabled: true
+        state: started
+
+    - name: Install Ghostty classic Snap
+      when: not ghostty_native_apt and not ghostty_ubuntu_ppa
+      community.general.snap:
+        name: ghostty
+        classic: true
+        state: present
+
+    - name: Verify the installed Ghostty executable
+      when: not ansible_check_mode
+      ansible.builtin.command: ghostty +version
+      environment:
+        PATH: "/snap/bin:{{ ansible_facts['env']['PATH'] }}"
+      changed_when: false
+
+  rescue:
+    - name: Report incomplete Ghostty GUI installation
+      ansible.builtin.debug:
+        msg: >-
+          Ghostty installation failed: {{ ansible_failed_result.msg | default('see task output') }}.
+          See docs/tools/ghostty.md for the supported native/PPA/Snap channels.
+          No existing terminal or default-terminal selection was replaced.

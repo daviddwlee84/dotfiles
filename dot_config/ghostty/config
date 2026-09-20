@@ -2,6 +2,13 @@
 # Also read by cmux (Ghostty-based terminal)
 # Docs: https://ghostty.org/docs/config
 
+# Match Alacritty's font and spacing; keep Ghostty's opaque background.
+# Bold/italic faces are selected automatically from the same Nerd Font family.
+font-family = Hack Nerd Font Mono
+font-size = 14
+window-padding-x = 10
+window-padding-y = 10
+
 # Left Option sends Meta/Esc+ for tmux M-key bindings (M-c, M-1..5, M-h/j/k/l, etc.)
 # Right Option retains macOS compose behavior (accents, special characters)
 macos-option-as-alt = left
@@ -16,3 +23,8 @@ font-feature = -calt, -liga, -dlig
 #                   (safer default; flip to "allow" if prompts get annoying)
 clipboard-write = allow
 clipboard-read = ask
+
+# Install terminfo for interactive SSH and fall back gracefully when unavailable.
+# Keep the native xterm-ghostty TERM and negotiated keyboard protocol; Alacritty's
+# forced CSI-u / Ctrl+/ mappings and xterm-256color override aren't needed here.
+shell-integration-features = ssh-env,ssh-terminfo

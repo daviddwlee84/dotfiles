@@ -419,7 +419,7 @@ info:
 completions-refresh:
     ./scripts/generate_completions.sh --force
 
-# Upgrade everything: externals, brew, mise, uv, npm, cargo, go, dotnet, gem, flatpak, warp, atuin, herdr, agents, plugins
+# Upgrade everything: package managers, runtimes, browser tools, agents and plugins
 upgrade-all:
     ./scripts/upgrade_tools.sh all
 
@@ -435,7 +435,7 @@ upgrade-mise:
 upgrade-uv:
     ./scripts/upgrade_tools.sh uv
 
-# Global npm packages (falls back to `mise exec -- npm` when npm not on PATH)
+# Global npm packages (prefers mise Node) + Playwright skills; Chromium preload is opt-in
 upgrade-npm:
     ./scripts/upgrade_tools.sh npm
 
@@ -477,6 +477,11 @@ upgrade-atuin:
 # owns your pane, so herdr refuses from inside one. See docs/tools/herdr.md.
 upgrade-herdr:
     ./scripts/upgrade_tools.sh herdr
+
+# Linux terminal-browser release + packaged skills; skips live browsers.
+# macOS uses upgrade-brew. Playwright CLI/Chromium use upgrade-npm.
+upgrade-terminal-browser:
+    ./scripts/upgrade_tools.sh terminal-browser
 
 # Self-managed agents: Claude Code, OpenCode, Pi, OMP, Cursor CLI, Ollama, llmfit, RTK
 upgrade-agents:

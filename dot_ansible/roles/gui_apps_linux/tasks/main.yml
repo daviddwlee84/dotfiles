@@ -3,7 +3,7 @@
 # gui_apps_linux — Ubuntu/Debian desktop GUI app installer
 #
 # Handles the "desktop-only" category of apps that aren't in the apt default
-# repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
+# repos: Ghostty (native apt / PPA / classic Snap), Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
 # (Microsoft apt repo), Cursor (.deb with graceful fallback), Google Chrome
 # (.deb, x86_64-only), Discord (.deb,
 # x86_64-only), Steam (Valve apt repo, optional), Zen Browser (AppImage +
@@ -49,6 +49,14 @@
       Skipping gui_apps_linux on armhf — no practical GUI stack,
       cargo builds of alacritty are very slow, and upstream AppImages
       do not target armv7.
+
+# =============================================================================
+# Ghostty (graphics-capable terminal for terminal-browser / Herdr)
+# =============================================================================
+
+- name: Install Ghostty on GUI hosts
+  ansible.builtin.import_tasks: ghostty.yml
+  tags: [ghostty]
 
 # =============================================================================
 # Alacritty (moved verbatim from the former alacritty role)

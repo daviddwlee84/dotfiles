@@ -1,0 +1,17 @@
+#!/bin/bash
+# Package-owned skills can disappear without source changes. Chromium download
+# and cache repair require an explicit preloadPlaywrightChromium opt-in.
+set -u
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+LOG_STREAM=stdout
+{{ include "scripts/lib/log_shared.sh" }}
+
+if command -v python3 >/dev/null 2>&1; then
+  if ! python3 - refresh {{ if not (dig "installTerminalBrowser" true .) }}--skip-terminal{{ end }} {{ if not (dig "installPlaywrightCli" true .) }}--skip-playwright{{ end }} {{ if and (dig "installPlaywrightCli" true .) (dig "preloadPlaywrightChromium" false .) }}--preload-chromium{{ end }} 2>&1 <<'BROWSER_TOOLS_PY'
+{{ include "dot_ansible/roles/devtools/files/browser_tools.py" }}
+BROWSER_TOOLS_PY
+  then
+    warn "Browser tools refresh incomplete; check libraries/runtime/downloads and re-run chezmoi apply"
+  fi
+fi
+exit 0

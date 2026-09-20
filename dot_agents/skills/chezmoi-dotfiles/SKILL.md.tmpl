@@ -124,6 +124,23 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 - **Vim mode** — shell modal editing + tmux vim nav (NOT Neovim/editors — those are always vim).
 {{- end }}
 
+## Agent browser tools
+
+**Ghostty** is GUI-managed: macOS `installBrewApps` cask; Linux desktop native
+apt/PPA with classic Snap fallback (sudo, x64/arm64). Config is shared with
+cmux, uses Hack Nerd Font Mono 14, padding 10, native keyboard protocols and SSH
+terminfo helpers. Server hosts use a local GUI client over SSH. Details:
+`docs/tools/ghostty.md`.
+
+**Agent browser tools** have independent `installTerminalBrowser` (this host: {{ dig "installTerminalBrowser" true . }}) and `installPlaywrightCli` ({{ dig "installPlaywrightCli" true . }}) switches on supported macOS/Linux hosts, including servers. Use `terminal-browser open URL --split right` for a visible
+shared page (Ghostty/Kitty graphics required), and
+`playwright-cli -s=TASK open URL --browser=chromium` for independent headless testing. Both have package-matched
+skills. Chromium preload/cache repair is opt-in (`preloadPlaywrightChromium`, this host: {{ dig "preloadPlaywrightChromium" false . }}). Otherwise first run `playwright-cli install-browser chromium` (Linux missing libraries: add `--with-deps`). Remote preview:
+run `terminal-browser open --ssh HOST http://localhost:PORT` **locally**; a remote
+agent does not automatically control that local browser. See
+`docs/tools/browser-tools.md` for platform/noRoot limits and upgrades. Use the
+project's own Playwright Test for committed CI tests.
+
 ## Package-managed personal CLIs
 
 - **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation, generated completion, agent-safe prepare/finalize/done/retire lifecycle, and receipt-backed `dev git` transactions. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the `go_tools` role. Source: `github.com/daviddwlee84/dev-cli`.

@@ -1,8 +1,8 @@
 # Agent skills
 
 This repo manages ordinary Git-backed skills through
-[`vercel-labs/skills`](https://github.com/vercel-labs/skills), plus two
-direct-managed skills whose content must come from local state.
+[`vercel-labs/skills`](https://github.com/vercel-labs/skills), plus skills whose
+content comes from local configuration or installed tool packages.
 
 ## TL;DR
 
@@ -12,6 +12,7 @@ direct-managed skills whose content must come from local state.
 | **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `.chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl` on every `chezmoi apply` (when source dir == repo); manual fallback: `just bootstrap-skills` |
 | **First-party templated** (`chezmoi-dotfiles`) | none — chezmoi-managed | `~/.agents/skills/chezmoi-dotfiles/` (+ symlink in `~/.claude/skills/`) | `chezmoi apply` (re-renders per host from `.chezmoi.toml`) — see [§ First-party templated skill](#first-party-templated-skill-chezmoi-dotfiles) |
 | **Binary-matched** (`herdr`) | none — deliberately excluded from the npx lock | `~/.agents/skills/herdr/` (+ symlink in `~/.claude/skills/`) | `herdr --skill` after every `chezmoi apply` and successful `just upgrade-herdr` |
+| **Package-matched browsers** (`terminal-browser`, `playwright-cli`) | none | Links to complete installed-package skills in shared/existing agent directories | `run_after_43_refresh_browser_tools.sh.tmpl` and package upgrade hooks |
 
 The two scopes happen to overlap today (both install
 `project-knowledge-harness`), but they serve different purposes — see "Why two
@@ -173,6 +174,15 @@ and self-discovering** (it points at `docs/`, `tv list-channels`, `just --list`,
 version: freshness is automatic; only edit the `.tmpl` when a section must be gated
 on a **new prompt key** or a stable new CLI is worth naming.
 
+## Package-matched browser skills
+
+Browser tools have a similar **package-matched** path: the every-apply
+`run_after_43_refresh_browser_tools.sh.tmpl` links terminal-browser's complete
+bundled skill (including the Codex variant) and Playwright CLI's bundled skill
+from its resolved `playwright-core` dependency. No floating npx skill install is
+used. Existing custom skill directories/links are preserved; package-owned
+links are repaired after upgrades. CLI installation is independently switchable; Chromium downloads/cache repair require `preloadPlaywrightChromium=true`. See [browser-tools](browser-tools.md).
+
 ## Binary-matched skill (`herdr`)
 
 Herdr publishes an official skill, but the runtime copy does not come from a
@@ -277,7 +287,8 @@ new location; chezmoi's lock-file management still uses
   templates, etc.) in chezmoi source.** They're owned by the npx skills CLI;
   chezmoi managing them creates a constant fight with the CLI's
   `skillFolderHash`. Only the **lock file** is chezmoi-managed. The explicit
-  exceptions are `chezmoi-dotfiles` (templated) and `herdr` (binary-emitted).
+  exceptions are `chezmoi-dotfiles` (templated), `herdr` (binary-emitted), and
+  `terminal-browser` / `playwright-cli` (links to installed package skills).
 - **Don't run `chezmoi re-add ~/.agents/.skill-lock.json`** to capture local
   changes. Edit the merger's `$managed` block instead — that's the
   source-of-truth list. `re-add` would freeze a snapshot of one machine's

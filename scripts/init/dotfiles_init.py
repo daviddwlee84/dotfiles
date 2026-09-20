@@ -268,6 +268,24 @@ PROMPTS: tuple[Prompt, ...] = (
            default=False,
            prompt_text="Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)",
            comment="是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)"),
+    Prompt("installTerminalBrowser", "bool", "Dev tooling",
+           "terminal-browser",
+           "Visible browser inside Ghostty/Kitty/Herdr; bundles Electron/Chromium (~300MB installed).",
+           default=True,
+           prompt_text="Install terminal-browser (includes Electron/Chromium)",
+           comment="是否安裝 terminal-browser（內含 Electron/Chromium，約 300MB）"),
+    Prompt("installPlaywrightCli", "bool", "Dev tooling",
+           "Playwright CLI",
+           "Agent browser automation CLI and skills (~20MB); browser engines are downloaded on demand by default.",
+           default=True,
+           prompt_text="Install Playwright CLI (browser engines downloaded separately)",
+           comment="是否安裝 Playwright CLI（瀏覽器引擎預設按需下載）"),
+    Prompt("preloadPlaywrightChromium", "bool", "Dev tooling",
+           "Preload Playwright Chromium",
+           "Download and verify the matching Chromium during apply (~550MB); effective only when Playwright CLI is enabled.",
+           default=False,
+           prompt_text="Preload Chromium for Playwright CLI during chezmoi apply",
+           comment="是否在 apply 預載 Playwright Chromium（約 550MB；須啟用 Playwright CLI）"),
     Prompt("installExtraRuntimes", "bool", "Dev tooling",
            "Extra mise runtimes (rust, bun, ruby)",
            "Rust toolchain + cargo tools, bun, ruby + gem tools via mise (~1.8GB). Node is always installed regardless (nvim LSP / npm agents need it).",
@@ -586,6 +604,8 @@ BUNDLES: dict[str, dict[str, object]] = {
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
     },
     "cloud-vm": {
+        "installTerminalBrowser": False,
+        "installPlaywrightCli": False,
         # Lean throwaway / cloud dev VM: ergonomic shell + tmux + nvim +
         # coding agents, nothing heavier. Pairs with `just az-dev-vm`
         # (scripts/azure/dev_vm.py) which passes --bundle cloud-vm during the
@@ -610,6 +630,8 @@ BUNDLES: dict[str, dict[str, object]] = {
         "backupMode": "off",  # fresh VM — nothing worth backing up
     },
     "minimal": {
+        "installTerminalBrowser": False,
+        "installPlaywrightCli": False,
         # Dotfiles only — every installX forced off so `chezmoi apply` in CI /
         # Docker does the minimum work possible. Note this overrides the
         # prompt-level defaults (which have coding-agents / python-uv /
@@ -1138,6 +1160,8 @@ README_END = "<!-- /dotfiles-init:prompts -->"
 # so the CI image builds fast (skip the heavy coding-agent / uv / js installs,
 # no backup). Anything not listed uses the prompt's own default.
 DOCKER_ARG_DEFAULTS: dict[str, object] = {
+    "installTerminalBrowser": False,
+    "installPlaywrightCli": False,
     "installCodingAgents": False,
     "installPythonUvTools": False,
     "installJsCliTools": False,

@@ -70,9 +70,11 @@ pitfalls/** # ignore past-pitfalls knowledge base (repo metadata, not user confi
 #   (merger script, see docs/tools/agent-skills.md).  The skills/ folder under
 #   it is owned by the npx skills CLI and re-populated by
 #   run_onchange_after_install_global_skills.sh.tmpl whenever the lock changes,
-#   so we do NOT want chezmoi to manage skills/ contents directly. Herdr is the
-#   one direct-managed exception: run_after_42_sync_herdr_skill.sh.tmpl writes
+#   so we do NOT want chezmoi to manage skills/ contents directly. Herdr is
+#   a direct-managed exception: run_after_42_sync_herdr_skill.sh.tmpl writes
 #   its binary-matched SKILL.md, while chezmoi only owns Claude's symlink to it.
+#   Browser skills are package-owned symlinks repaired by run_after_43; their
+#   contents likewise stay outside the managed tree and the npx skill lock.
 #
 # Patterns use single-`*` (direct child) + `*/**` (its contents) form instead of a
 # bare `**`. This is load-bearing: a recursive `**` (or a bare `.agents/skills`

@@ -194,7 +194,7 @@ nothing, and kills `community.general.homebrew` on empty JSON with
 
 | Cask | Gating |
 |---|---|
-| `alacritty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | `installBrewApps` |
+| `alacritty`, `ghostty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | `installBrewApps` |
 | `claude`, `chatgpt`, `opencode-desktop`, `antigravity` | `installAiDesktopApps` |
 | `codeisland` (tap `wxtsky/tap`) | `installAiDesktopApps` |
 | `ollama-app` | `installAiDesktopApps` + `installLlmTools` |
@@ -1132,6 +1132,7 @@ list.
 | **gh-dash** | `gh extension install dlvhdr/gh-dash` | same | devtools |
 | **gh-notify** | `gh extension install meiji163/gh-notify` | same | devtools |
 | **gh-select** | `gh extension install remcostoeten/gh-select` | same | devtools |
+| **ghostty** | brew cask (`installBrewApps`) | native apt → Ubuntu 24.04 community PPA → classic Snap | GUI profile only; sudo + x64/arm64 on Linux. See [Ghostty](../tools/ghostty.md) |
 | **git** | brew | apt/yum | base |
 | **git-delta** | brew | `.deb` (x86_64) → brew aarch64 → GitHub musl user | devtools |
 | **git-filter-repo** | uv tool | uv tool | python_uv_tools |
@@ -1203,6 +1204,7 @@ list.
 | **pia** | chezmoi external `~/.local/share/pi-agents/bin/pia` | same | `.chezmoiexternal.toml.tmpl` (`installCodingAgents`) |
 | **piper.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
+| **playwright-cli** (`@playwright/cli`) | mise npm | mise npm (supported Debian/Ubuntu x64/arm64) | devtools, `installPlaywrightCli`; package skills refreshed on apply / upgrade-npm, Chromium preloading opt-in. See [browser-tools](../tools/browser-tools.md) |
 | **poppler** (`pdftoppm`) | brew | apt (`poppler-utils`) | devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **pre-commit** | `uv tool install --python 3.13` | same | security_tools |
 | **prettier** | Mason (Neovim-local) | Mason (Neovim-local) | LazyVim `ensure_installed`; Conform prefers project-local `node_modules/.bin/prettier` |
@@ -1247,6 +1249,7 @@ list.
 | **taplo** | brew | apt+release | devtools |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
 | **television** (`tv`) | brew | apt+release | devtools |
+| **terminal-browser** | brew cask | checksum-verified upstream stable release (supported Debian/Ubuntu x64/arm64) | devtools, `installTerminalBrowser`; package skills, upgrade-brew / upgrade-terminal-browser. See [browser-tools](../tools/browser-tools.md) |
 | **terminal-notifier** | brew | n/a | coding_agents (macOS) |
 | **terraform** | brew (`hashicorp/tap`) | HashiCorp apt repo → user zip | iac_tools |
 | **the-unarchiver** | brew cask | n/a | Brewfile.darwin |

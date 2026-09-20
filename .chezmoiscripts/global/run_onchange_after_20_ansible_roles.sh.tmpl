@@ -16,6 +16,8 @@
 # lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
 # lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
 # devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+# browser tools tasks: {{ include "dot_ansible/roles/devtools/tasks/browser-tools.yml" | sha256sum }}
+# browser tools helper: {{ include "dot_ansible/roles/devtools/files/browser_tools.py" | sha256sum }}
 # docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
 # nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
 # coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
@@ -48,6 +50,7 @@
 # dotnet_tools tasks: {{ include "dot_ansible/roles/dotnet_tools/tasks/main.yml" | sha256sum }}
 # dotnet_tools defaults: {{ include "dot_ansible/roles/dotnet_tools/defaults/main.yml" | sha256sum }}
 # gui_apps_linux tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/main.yml" | sha256sum }}
+# Ghostty GUI tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/ghostty.yml" | sha256sum }}
 # gui_apps_linux defaults: {{ include "dot_ansible/roles/gui_apps_linux/defaults/main.yml" | sha256sum }}
 # homelab_tools tasks: {{ include "dot_ansible/roles/homelab_tools/tasks/main.yml" | sha256sum }}
 # homelab_tools defaults: {{ include "dot_ansible/roles/homelab_tools/defaults/main.yml" | sha256sum }}
@@ -334,6 +337,7 @@ TAGS="${TAGS},niri"
 # from before this prompt existed) keep zsh as login shell.
 {{ $primaryShell := "zsh" }}{{ if hasKey . "primaryShell" }}{{ $primaryShell = .primaryShell }}{{ end -}}
 EXTRA_VARS="primary_shell={{ $primaryShell }}"
+EXTRA_VARS="$EXTRA_VARS browser_tools_install_terminal={{ dig "installTerminalBrowser" true . }} browser_tools_install_playwright={{ dig "installPlaywrightCli" true . }} browser_tools_preload_chromium={{ dig "preloadPlaywrightChromium" false . }}"
 {{ if and $installBitwarden (or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")) -}}
 # Install Bitwarden Desktop app (for SSH agent) on desktop profiles
 EXTRA_VARS="$EXTRA_VARS bitwarden_install_desktop=true"

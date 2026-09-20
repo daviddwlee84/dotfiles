@@ -145,6 +145,9 @@ Full diagnosis: [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](pitfalls/bo
 
 ### After install
 
+- Browser tools have independent `installTerminalBrowser` / `installPlaywrightCli` switches (normally on; off in minimal/cloud-vm). Chromium is downloaded on demand unless `preloadPlaywrightChromium=true`. Use Ghostty/Kitty with `terminal-browser open URL --split right`, or install the test engine with `playwright-cli install-browser chromium` before `playwright-cli open URL --browser=chromium` for headless testing. See [browser-tools](docs/tools/browser-tools.md) for skills, SSH and noRoot requirements.
+- Ghostty is installed with the GUI bundle: `installBrewApps` on macOS and `ubuntu_desktop` on Linux (native apt/PPA, classic Snap fallback; sudo and x64/arm64 required). Its managed font/spacing match Alacritty, with native graphics/keyboard support and SSH terminfo helpers. See [Ghostty](docs/tools/ghostty.md).
+
 - `~/.local/bin` and the rest of the shared layer are seeded by `~/.config/shell/00_exports.sh`; after mise/Bun initialise, `08_pi_agents.sh` reasserts the canonical `~/.local/bin/{pi,omp}` and external `pia` paths so stale package-manager copies cannot shadow them. Both fragments are sourced by the chezmoi-managed `~/.bashrc` and `~/.zshrc`.
 - With `installCodingAgents=true`, `pi` and `omp` are installed alongside the Git-managed `pia` combo manager. Start with `pia doctor`, `pia list --tree`, then `pia use pi/base`; authentication remains owned by each agent and is never committed to dotfiles.
 - On sudo-enabled machines, the ansible role for your `primaryShell` choice switches your login shell automatically (`zsh` role for `primaryShell=zsh`, `bash` role for `primaryShell=bash`). Log out / back in to pick it up, or run `exec zsh` / `exec bash` now.
@@ -166,6 +169,9 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
 | `installJsCliTools` | true | Standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.) |
+| `installTerminalBrowser` | true | terminal-browser with bundled Electron/Chromium (~300 MB installed); independent of GUI profile. Off in minimal/cloud-vm bundles. |
+| `installPlaywrightCli` | true | Playwright CLI and package skills (~20 MB); browser engines downloaded separately. Off in minimal/cloud-vm bundles. |
+| `preloadPlaywrightChromium` | false | Download/repair matching Chromium during apply and npm upgrades (~550 MB); effective only with Playwright CLI enabled. Default is on-demand installation. |
 | `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |
 | `installSummarize` | false | [`summarize`](docs/tools/summarize.md) CLI: YouTube / podcast / web / PDF → LLM summary, defaulting to 繁體中文 output |
 | `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT with Codex on Intel and Apple Silicon, OpenCode Desktop, Antigravity; `ollama-app` also requires `installLlmTools=true`). macOS only. |
@@ -234,7 +240,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 - `~/.config/docker/daemon.json` - Rootless Docker `registry-mirrors` (DaoCloud only — the other four CN mirrors were measured dead in 2026-07; Linux + `useChineseMirror` only). The `proxies` key in the same file is owned by `docker-net`, not chezmoi ([docs](docs/tools/containers.md#strategy-a-registry-mirrors-in-daemonjson), [docker-net](docs/tools/docker-net.md))
 - `~/.config/alacritty/` - Alacritty terminal config (CSI-u keybindings for `Ctrl+Number` tmux window switching, `option_as_alt` for Meta keys)
 - `~/Library/Application Support/{Code,Cursor,Antigravity}/User/` (macOS) + `~/.config/{Code,Cursor,Antigravity}/User/` (Linux) - Editor settings overlay: `modify_settings.json` deep-merges a 6-key baseline (Hack Nerd Font Mono, relative line numbers, format on save, smart-accept suggestion, terminal font) into each editor's live `settings.json` without overwriting other keys; `create_keybindings.json` seeds 5 universal keybindings on a fresh machine and never overwrites editor-added entries. Canonical templates live under [`.chezmoitemplates/editor/`](.chezmoitemplates/editor/); `.chezmoiignore.tmpl` gates each editor dir with a `stat` presence check so uninstalled editors never produce phantom directories.
-- `~/.config/ghostty/config` - Ghostty/cmux terminal config (`macos-option-as-alt` for tmux Meta keybindings, disabled ligatures via `font-feature`, explicit `clipboard-write = allow` / `clipboard-read = ask` for OSC 52) ([docs](docs/tools/ghostty.md))
+- `~/.config/ghostty/config` - Ghostty/cmux terminal config (Hack Nerd Font Mono 14, padding 10, native keyboard protocol, SSH terminfo helpers, left Option as Alt, disabled ligatures, and OSC 52 clipboard policy) ([docs](docs/tools/ghostty.md))
 - `~/.config/starship.toml` - Starship cross-shell prompt config
 - `~/.xonshrc` + `~/.config/xonsh/rc.xsh` - Optional [Xonsh](https://xon.sh/) (Python-superset shell) startup + extension sandbox. Installed via `python_uv_tools` with a curated set of xontribs (`jedi`/`zoxide`/`pipeliner`/`fzf-widgets`); **not** a login shell — drop in with `xonsh` for ad-hoc Python-in-shell work ([docs](docs/shells/xonsh.md))
 - `~/.config/direnv/direnvrc` - direnv helper functions, including `.venv`-aware Python activation
@@ -310,6 +316,8 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 
 ### Tools (via ansible)
 
+- **Agent browser tools**: terminal-browser (shared visible pages in a graphics-capable terminal) and Playwright CLI (independent headless automation), with version-matched skills, independent install switches and opt-in Chromium preloading/cache repair. Independent of GUI/JS-tool toggles; see [browser-tools](docs/tools/browser-tools.md).
+
 - **Base**: git, git-lfs, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies; macOS keeps a healthy install untouched, uses Homebrew on Apple Silicon, and falls back to the checksum-verified official release on Intel or when Homebrew cannot satisfy the minimum
 - **LazyVim deps**: fzf, LazyGit >= 0.64.0, tree-sitter-cli, Node.js; stale Homebrew LazyGit installs receive a targeted formula upgrade, with a checksum-verified official release fallback when the active binary still cannot satisfy the renderer schema
@@ -362,6 +370,8 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **Infrastructure & virtualization**: [docs/infra/](docs/infra/) — Proxmox / ESXi / OrbStack / UTM / VirtualBox / libvirt comparison; CephFS / BeeGFS / NFS / Lustre shared storage; SLURM / Kubernetes / Nomad compute scheduling; FreeIPA + shared-home patterns. Documentation only; nothing is installed by chezmoi for these.
 
 ## Supported Platforms
+
+Browser automation has a narrower runtime baseline: macOS x64/arm64 (Playwright Chromium: macOS 14+), Ubuntu 22.04+ or Debian 12+ x64/arm64. Older Linux/EL and 32-bit hosts skip browser provisioning; noRoot requires preinstalled system libraries/sandbox support. See [browser-tools](docs/tools/browser-tools.md).
 
 | Platform | Package Manager | Notes |
 |----------|-----------------|-------|

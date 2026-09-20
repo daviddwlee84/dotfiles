@@ -1,12 +1,71 @@
 # Ghostty & cmux
 
+Ghostty's Kitty graphics support also makes it suitable for
+[terminal-browser](browser-tools.md), including inside Herdr. Playwright CLI's
+headless mode works independently of terminal graphics.
+
 [Ghostty](https://ghostty.org/) is a fast, native terminal emulator. [cmux](https://cmux.dev/) is a lightweight macOS terminal built on Ghostty for managing AI coding agents. Both read the same config file.
+
+## Installation and profiles
+
+- **macOS:** `cask "ghostty"` is in the GUI Brewfile under `installBrewApps`.
+- **Linux desktop:** `gui_apps_linux` installs missing Ghostty on x64/arm64.
+  It prefers an existing apt candidate (Ubuntu 26.04+ ships one), uses the
+  upstream-listed `mkasberg/ghostty-ubuntu` PPA on Ubuntu 24.04, and otherwise
+  falls back to the upstream-listed classic Snap. The PPA is a community build;
+  Noble's GTK baseline is supported up to Ghostty 1.3.1. No Ubuntu PPA is added
+  to Debian. Snap is the compatibility fallback for older GTK, not the first
+  choice for a daily-use terminal.
+- **Server:** GUI tag selection does not install Ghostty. Run it on the client
+  and connect over SSH.
+- **noRoot / 32-bit:** automatic Linux installation is skipped with a hint;
+  existing manually installed binaries are preserved. No default terminal is
+  changed, and Alacritty continues to be available.
+
+Apply is install-only. macOS upgrades use `just upgrade-brew`; apt installations
+follow explicit system package maintenance, and Snap follows its normal refresh
+schedule. There is no extra Ghostty updater. Package sources:
+[Ghostty installation guide](https://ghostty.org/docs/install/binary),
+[Ubuntu PPA](https://github.com/mkasberg/ghostty-ubuntu),
+[classic Snap](https://snapcraft.io/ghostty).
+
+## Alacritty comparison
+
+| Setting | Ghostty decision |
+| --- | --- |
+| Hack Nerd Font Mono, 14pt | Shared; bold/italic variants selected from the family automatically |
+| 10px window padding | Shared numeric X/Y value of 10; actual scaling follows each terminal |
+| 0.7 opacity + blur | Keep Ghostty's opaque default for readability; optional recipe below |
+| Shift/Ctrl+Enter, Ctrl+digits | Use native negotiated Kitty/xterm extended keys; do not force Alacritty's byte strings |
+| Ctrl+/ | Native legacy encoding already supplies `0x1f`; modern apps can negotiate an unambiguous key |
+| `TERM=xterm-256color` | Keep native `xterm-ghostty`, with SSH terminfo support |
+| Option as Alt | Keep Ghostty's existing left-only policy; Right Option remains available for compose |
+| Linux Ctrl+Shift+T / N | Keep Ghostty's native tab / window actions; Alacritty maps both to windows because it has no tabs |
+
+Ghostty's legacy modified-Enter encoding can be xterm `CSI 27;…~`, while Kitty
+mode uses CSI-u. Applications/multiplexers negotiate and decode these protocols;
+the bytes need not be identical to Alacritty's explicit overrides. Existing tmux
+root bindings still consume Ctrl+digits for window selection.
+
+For the Alacritty transparency look, the equivalent optional settings are:
+
+```ini
+background-opacity = 0.7
+background-blur = true
+```
+
+Blur depends on the compositor (macOS / supported Linux compositors such as
+KWin); it is not guaranteed under GNOME. This file also affects cmux. See the
+[Ghostty option reference](https://ghostty.org/docs/config/reference).
 
 ## Managed config
 
 This repo manages `~/.config/ghostty/config` (via `dot_config/ghostty/config`). cmux reads this file first (before `~/Library/Application Support/com.mitchellh.ghostty/config`).
 
 Key settings:
+
+- **`font-family = Hack Nerd Font Mono`, `font-size = 14`, `window-padding-x/y = 10`** — aligns typography and spacing with Alacritty.
+- **`shell-integration-features = ssh-env,ssh-terminfo`** — enables the interactive SSH helpers described below while retaining the other default features.
 
 - **`macos-option-as-alt = left`** — Left Option sends Meta/Esc+ so tmux `M-` keybindings work (theme switching `M-c`/`M-t`, layouts `M-1`..`M-5`, fine resize `M-h/j/k/l`). Right Option retains macOS compose behavior for accents and special characters.
 - **`font-feature = -calt, -liga, -dlig`** — Disables ligatures for code readability. The key is singular; `font-features` fails Ghostty validation with `unknown field`.
@@ -23,7 +82,7 @@ When you SSH into a fresh remote, `$TERM=xterm-ghostty` but the remote has no ma
 
 > - [Shell Integration - Features](https://ghostty.org/docs/features/shell-integration#ssh-integration)
 
-Add to `~/.config/ghostty/config`:
+Already enabled in the managed `~/.config/ghostty/config`:
 
 ```ini
 shell-integration-features = ssh-env,ssh-terminfo

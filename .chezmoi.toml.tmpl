@@ -57,6 +57,12 @@ installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Pytho
 installJsCliTools = {{ promptBoolOnce . "installJsCliTools" "Install standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.)" true }}
 # 是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)
 installDotnetTools = {{ promptBoolOnce . "installDotnetTools" "Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)" false }}
+# 是否安裝 terminal-browser（內含 Electron/Chromium，約 300MB）
+installTerminalBrowser = {{ promptBoolOnce . "installTerminalBrowser" "Install terminal-browser (includes Electron/Chromium)" true }}
+# 是否安裝 Playwright CLI（瀏覽器引擎預設按需下載）
+installPlaywrightCli = {{ promptBoolOnce . "installPlaywrightCli" "Install Playwright CLI (browser engines downloaded separately)" true }}
+# 是否在 apply 預載 Playwright Chromium（約 550MB；須啟用 Playwright CLI）
+preloadPlaywrightChromium = {{ promptBoolOnce . "preloadPlaywrightChromium" "Preload Chromium for Playwright CLI during chezmoi apply" false }}
 # 是否安裝額外的 mise runtimes (rust, bun, ruby) 與對應的 cargo/gem 工具（~1.8GB）。
 # Node 永遠會裝（nvim LSP / npm-based coding agents 硬依賴），不受此 flag 影響。
 # false 時 mise [tools] 只留 node，且 ansible TAGS 會剔除 rust_cargo_tools /

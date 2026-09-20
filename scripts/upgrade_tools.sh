@@ -89,7 +89,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin herdr micro agents plugins yazi-plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin herdr micro terminal-browser agents plugins yazi-plugins)
 
 usage() {
   cat <<EOF
@@ -342,6 +342,9 @@ cat_brew() {
 
   _run brew cleanup || any_fail=1
 
+  # Cask upgrades replace versioned skill targets; repair links immediately.
+  _run python3 "$_REPO_ROOT/dot_ansible/roles/devtools/files/browser_tools.py" sync || any_fail=1
+
   return "$any_fail"
 }
 
@@ -444,26 +447,68 @@ cat_uv() {
 # ============================================================================
 cat_npm() {
   local npm_cmd=""
-  if command -v npm >/dev/null 2>&1; then
+  local mise_bin="" mise_node=""
+  mise_bin="$(command -v mise 2>/dev/null || true)"
+  [[ -n "$mise_bin" ]] || mise_bin="$HOME/.local/bin/mise"
+  if [[ -x "$mise_bin" ]]; then
+    mise_node="$("$mise_bin" which node 2>/dev/null || true)"
+  fi
+  # Match install-time runtime selection, even when system npm shadows mise.
+  if [[ -n "$mise_node" && -x "$mise_node" ]]; then
+    # `mise exec -- npm` can still select a shadowing npm in the inherited
+    # environment. Pin both npm and its shebang's node to the selected runtime.
+    npm_cmd="${mise_node%/*}/npm"
+    local PATH="${mise_node%/*}:$PATH"
+  elif command -v npm >/dev/null 2>&1; then
     npm_cmd="npm"
   else
-    local mise_bin=""
-    if command -v mise >/dev/null 2>&1; then
-      mise_bin="mise"
-    elif [[ -x "$HOME/.local/bin/mise" ]]; then
-      mise_bin="$HOME/.local/bin/mise"
-    fi
-    if [[ -n "$mise_bin" ]]; then
-      npm_cmd="$mise_bin exec -- npm"
-    else
-      warn "neither npm nor mise found — skipping"
-      return $SKIP_RC
-    fi
+    warn "neither usable mise Node nor npm found — skipping"
+    return $SKIP_RC
   fi
 
   local any_fail=0
   info "Upgrading global npm packages via: $npm_cmd"
-  _run_sh "$npm_cmd -g update" || any_fail=1
+  _run "$npm_cmd" -g update || any_fail=1
+  local -a browser_refresh_args=(refresh-playwright)
+  # Absent settings preserve lazy browser downloads, including older hosts.
+  if [[ "$(chezmoi execute-template '{{ and (dig "installPlaywrightCli" true .) (dig "preloadPlaywrightChromium" false .) }}' 2>/dev/null)" == true ]]; then
+    browser_refresh_args+=(--preload-chromium)
+  fi
+  _run python3 "$_REPO_ROOT/dot_ansible/roles/devtools/files/browser_tools.py" "${browser_refresh_args[@]}" || any_fail=1
+  return "$any_fail"
+}
+
+# Linux release installs only. Browser processes are checked before replacing
+# the launcher; unlike upstream's installer, this never kills a live browser.
+cat_terminal_browser() {
+  if [[ "$(uname -s)" != Linux ]]; then
+    info "terminal-browser is upgraded by Homebrew on macOS — skipping"
+    return $SKIP_RC
+  fi
+  local result rc sandbox_paths sandbox_script sandbox_binary any_fail=0
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    _run python3 "$_REPO_ROOT/dot_ansible/roles/devtools/files/browser_tools.py" install-terminal-browser --upgrade
+    return 0
+  fi
+  result=$(python3 "$_REPO_ROOT/dot_ansible/roles/devtools/files/browser_tools.py" install-terminal-browser --upgrade 2>&1)
+  rc=$?
+  [[ -z "$result" ]] || printf '%s\n' "$result"
+  [[ "$rc" -eq 0 ]] || return "$rc"
+  [[ "$result" != *"SKIP:"* ]] || return $SKIP_RC
+  # Versioned release paths need a new per-executable profile on restricted
+  # Ubuntu hosts. Reuse the shared sudo session; never disable userns policy.
+  if [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" == 1 ]]; then
+    sandbox_paths=$(python3 "$_REPO_ROOT/dot_ansible/roles/devtools/files/browser_tools.py" sandbox-paths) || return 1
+    sandbox_script=$(printf '%s' "$sandbox_paths" | jq -er '.[0]') || return 1
+    sandbox_binary=$(printf '%s' "$sandbox_paths" | jq -er '.[1]') || return 1
+    if sudo_session_init "upgrade-terminal-browser"; then
+      sudo_run bash "$sandbox_script" "$sandbox_binary" || any_fail=1
+    else
+      warn "terminal-browser updated, but its AppArmor profile needs admin setup; re-run Ansible --tags browser_tools"
+      any_fail=1
+    fi
+  fi
+  _run python3 "$_REPO_ROOT/dot_ansible/roles/devtools/files/browser_tools.py" sync || any_fail=1
   return "$any_fail"
 }
 
@@ -1202,6 +1247,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         atuin) run_category atuin cat_atuin ;;
         herdr) run_category herdr cat_herdr ;;
         micro) run_category micro cat_micro ;;
+        terminal-browser) run_category terminal-browser cat_terminal_browser ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
         yazi-plugins) run_category yazi-plugins cat_yazi_plugins ;;

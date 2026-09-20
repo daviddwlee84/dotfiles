@@ -5,6 +5,11 @@
 - name: Install Micro non-modal editor
   ansible.builtin.import_tasks: micro.yml
 
+- name: Install browser tools for desktop and server agents
+  ansible.builtin.import_tasks: browser-tools.yml
+  tags: [browser_tools]
+  when: (browser_tools_install_terminal | default(true) | bool) or (browser_tools_install_playwright | default(true) | bool)
+
 # =============================================================================
 # macOS - all via Homebrew
 # =============================================================================

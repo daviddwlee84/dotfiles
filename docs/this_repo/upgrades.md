@@ -24,6 +24,11 @@ Three side-effects worth knowing about:
 
 ## Entry points
 
+Ghostty follows its GUI package channel: macOS `just upgrade-brew`; Linux native
+apt/PPA via explicit system apt maintenance, or normal Snap refresh for the
+classic-Snap fallback. `chezmoi apply` does not upgrade an existing Ghostty.
+See [Ghostty installation](../tools/ghostty.md#installation-and-profiles).
+
 Micro: Homebrew uses `just upgrade-brew`, apt uses a targeted OS package upgrade,
 and the verified Linux user-level fallback uses `just upgrade-micro` (category
 `micro`, included in `all`). The latter requires an installer receipt and an
@@ -50,14 +55,21 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 
 ## Category matrix
 
+Browser tools are maintained with their packages: macOS terminal-browser uses
+`brew`, while Playwright CLI uses `npm` (preferring the same mise Node used during
+installation). Both repair their package skill links afterward; `npm` also
+prepares and launch-checks matching Chromium only when `preloadPlaywrightChromium=true` and Playwright CLI is enabled. Otherwise browser downloads remain on demand.
+See [browser-tools](../tools/browser-tools.md).
+
 | Category | What actually happens |
 | --- | --- |
 | `micro` | Upgrades only the active, receipt-backed Linux release in `~/.local/bin` using the official archive checksum; otherwise skips. Brew/apt installs stay with their package manager. Runs after `herdr` and before `agents`. |
+| `terminal-browser` | `just upgrade-terminal-browser`: verified Linux release only, after `micro`; skips live browsers and foreign installs, refreshes package skills and the per-executable AppArmor profile where needed. macOS uses `brew`. |
 | `externals` | `chezmoi upgrade` (the chezmoi binary itself) + `chezmoi apply --refresh-externals` (force-refresh the 168h externals: oh-my-zsh, TPM, pi-agents, toolkami.rb, fzf). First because a chezmoi version bump may change how later steps behave. |
 | `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile` *without* `--no-upgrade` → `Brewfile.{darwin,linux}` → `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) so cask pkg installers that shell out to `sudo /usr/sbin/installer` find a live ticket. |
 | `mise` | `mise self-update --yes` + `mise upgrade` (honours the version constraints in `~/.config/mise/config.toml`). `self-update` warns, rather than fails, when mise was installed via brew/apt. |
 | `uv` | Detects install style by binary path (Homebrew vs curl-installer) and dispatches to the right channel: `brew upgrade uv` for Homebrew/Linuxbrew installs, `uv self update` for the standalone curl installer. Then `uv tool upgrade --all`. Covers every tool listed in [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) and [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml). The `python_uv_tools` ansible role does the same dispatch automatically when uv is below `min_uv_version` — see [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md). |
-| `npm` | `npm -g update`, falling back to `mise exec -- npm -g update` when `npm` is not directly on PATH (same detection as [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml)). Pi is the exception: its stable `~/.local` prefix is upgraded by `agents`, not this active-prefix bulk command. |
+| `npm` | Uses the npm executable beside mise's selected Node, with that runtime first on PATH; otherwise uses system `npm -g update`. This matches browser-tool installation even when system npm shadows mise. Then repairs Playwright's package skills; Chromium download/repair requires `preloadPlaywrightChromium=true`. Pi's stable `~/.local` prefix is upgraded by `agents`, not this runtime-prefix bulk command. |
 | `cargo` | If absent, bootstraps the `cargo-update` crate, then `cargo install-update -a`. Covers pueue (Linux) plus any future entries in [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml). |
 | `go` | Parses tool names from [`go_tools/defaults/main.yml`](../../dot_ansible/roles/go_tools/defaults/main.yml) and runs `go install <pkg>@latest` per entry (strips the pinned version), installing into `~/.local/bin` via `GOBIN`. Resolves go via the mise shim; `SKIPPED` when Go is absent (`installExtraRuntimes=false`). **macOS is skipped entirely** — `translate`, `dev`, and `gopls` are Homebrew-managed there, so upgrade them with `brew upgrade` (`just upgrade-brew`). |
 | `dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool (via the mise dotnet shim). Falls back to `dotnet tool list --global` if parsing finds nothing. |
@@ -93,7 +105,8 @@ flowchart LR
     warp["warp<br/>(Linux apt-only)"] --> atuin
     atuin["atuin<br/>(brew or setup.atuin.sh)"] --> herdr
     herdr["herdr<br/>(update --handoff, self-managed)"] --> micro
-    micro["micro<br/>(verified user-level Linux release)"] --> agents
+    micro["micro<br/>(verified user-level Linux release)"] --> terminal_browser
+    terminal_browser["terminal-browser<br/>(verified Linux release, idle only)"] --> agents
     agents["agents<br/>(self-update + installer fallbacks)"] --> plugins
     plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> yazi_plugins
     yazi_plugins["yazi-plugins<br/>(ya pkg upgrade)"] --> summary((Summary))
