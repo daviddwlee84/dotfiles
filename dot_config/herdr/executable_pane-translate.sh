@@ -34,8 +34,8 @@
 # A `visible` capture is never trimmed at the top: it is exactly what you are
 # looking at, so it only ever gets a marker.
 #
-# Entry points (all four land here):
-#   prefix+t                 type = "popup" -> --inline, has a PTY, pages in place
+# Entry points (prefix+t separately launches the translate TUI):
+#   direct helper invocation               -> --inline, has a PTY, pages in place
 #   prefix+y "Translate pane: …"            -> Quick Action, `sh -c`, NO PTY/stdin:
 #                                              captures, splits a pane, and re-execs
 #                                              itself as `__view` inside it
@@ -56,9 +56,9 @@
 # Env: HERDR_TRANSLATE_MAX_CHARS (12000), HERDR_TRANSLATE_TO, HERDR_RUN_HOLD
 #      (fail|always|never, as in run-command.sh), PAGER.
 #
-# Consumers: the prefix+t keybind and the translate-pane* Quick Actions
+# Consumers: direct helper invocations and the translate-pane* Quick Actions
 # (dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/).
-# See docs/tools/herdr.md § "Translate a pane".
+# See docs/tools/herdr.md § "Translation: interactive TUI and pane capture".
 set -eu
 
 usage() {

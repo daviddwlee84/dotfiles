@@ -128,7 +128,7 @@ description = "new tab at the workspace (space) root dir"
 | `tv` channel popups (`prefix+T/U/a`) | **Custom command panes** (`[[keys.command]] type="pane"`) | Key bindings + 2 herdr-aware channels |
 | dev / lazygit / scratch launchers | **Custom command panes + popups** | Full-screen TUIs such as lazygit stay temporary panes; short-lived modal tasks use popups |
 | URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` scans scrollback |
-| Translate the pane you are reading | **No tmux analog** | `prefix+t` → `pane-translate.sh` → `translate -2` bilingual popup; scope variants on `prefix+y` |
+| Translation | **No tmux analog** | `prefix+t` opens the interactive `translate` TUI; `prefix+y` Quick Actions capture a pane for bilingual translation |
 | File-path picker (`prefix+p`; extrakto `prefix+Tab` on tmux) | **Custom command pane + helper** | `prefix+p` → `path-pick.sh` — two-tier (exists-under-cwd first) → `x copy` |
 | Neovim clipboard across local/remote attaches | OSC 52 **write only**; clipboard queries unsupported | yanks reach the attached client; normal `p` uses Neovim's register; inbound external text uses terminal paste |
 | Search all pane content + jump | **CLI pipeline + fzf + exact-focus helper** | `prefix+Alt+F` → `herdr-grep --pick --visible`; Alt+S searches unwrapped scrollback |
@@ -182,7 +182,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `` prefix + ` `` | scratch shell | command popup |
 | `prefix + E` | **run any command** in the pane's cwd — fzf-pick from history or type it; the popup closes itself when the command exits ([details](#run-any-command)) | command **popup** |
 | `prefix + O` | herdr-plus **Projects** (layout launcher) | plugin action |
-| `` prefix + t `` | **translate this pane** — bilingual view of the on-screen page in a popup ([details](#translate-pane)) | popup |
+| `` prefix + t `` | **interactive translator** — enter or paste text into the `translate` TUI ([details](#translate-pane)) | 80% × 80% popup |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > Uppercase letters resolve to `prefix+shift+<letter>`; many are built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above, while `prefix+Y` is unused upstream; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
@@ -496,15 +496,17 @@ Helper: `~/.config/herdr/path-pick.sh` = [`dot_config/herdr/executable_path-pick
 
 `path:line:col` suffixes (grep `-n` / stack traces / compiler output) are stripped before the existence test, so `pkg.py:42:5` validates as `pkg.py`. Scope is the visible screen by default (`--source recent` for scrollback); multi-select copies newline-joined; an empty result prints `no file paths found` and pauses ~1.5 s.
 
-## Translate a pane (`prefix+t`) {#translate-pane}
+## Translation: interactive TUI and pane capture {#translate-pane}
 
-Pipes the focused pane's content through the [`translate`](https://github.com/daviddwlee84/translate) CLI in **bilingual** mode and shows the result in a popup: the original lines stay verbatim, each block's translation interleaved beneath as `  ↳ …`. There is no tmux analog — this is herdr-only, built on `herdr pane read`.
+`prefix+t` opens the [`translate`](https://github.com/daviddwlee84/translate) interactive TUI in an 80% × 80% popup. Enter or paste the text to translate; this shortcut does not capture the focused pane.
+
+For pane translation, use `prefix+y` → *Translate pane*. The helper pipes the focused pane's content through `translate` in **bilingual** mode and shows the result in a new pane: the original lines stay verbatim, each block's translation interleaved beneath as `  ↳ …`. There is no tmux analog — this is herdr-only, built on `herdr pane read`.
 
 Helper: `~/.config/herdr/pane-translate.sh` = [`dot_config/herdr/executable_pane-translate.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-translate.sh), a sibling of `pane-copy.sh` / `url-pick.sh` / `path-pick.sh` (same pane resolution, same `herdr pane read` plumbing).
 
 | Entry point | Scope | Where the result lands |
 |---|---|---|
-| `prefix + t` | the on-screen page | a popup, paged with `less -R` |
+| `prefix + t` | text you enter or paste | interactive TUI in a popup |
 | `prefix + y` → *Translate pane* | select list: current page / last 200 / 500 / 1000 lines | a pane split to the right, focused |
 | `prefix + y` → *Translate pane into…* | current page | same, with a target language you type |
 | `prefix + y` → *Translate pane: copy* | current page | the clipboard (`x copy`) + a notification |
@@ -513,7 +515,7 @@ Helper: `~/.config/herdr/pane-translate.sh` = [`dot_config/herdr/executable_pane
 
 The obvious worry is that a fixed window cuts mid-sentence, and that a coding-agent plan can run past one screen. Three facts decide it:
 
-- **An agent pane on the alternate screen has no scrollback at all.** A Claude Code pane reports `scroll.max_offset_from_bottom: 0`, and `herdr pane read --source recent --lines 1000` returns exactly `viewport_rows` — byte-identical to `--source visible`. Rows that leave the alternate screen never enter herdr's host scrollback, so no `--lines` value recovers them. (A shell or a `codex` pane in the next tab happily reports thousands of rows: this is per-application, not global.) So for the case that motivates the feature, one page is all there is — and because `--source visible` renders whatever you scrolled to *inside* the app, "the current page" is exact rather than a guess. Scroll in the agent, press the key again.
+- **An agent pane on the alternate screen has no scrollback at all.** A Claude Code pane reports `scroll.max_offset_from_bottom: 0`, and `herdr pane read --source recent --lines 1000` returns exactly `viewport_rows` — byte-identical to `--source visible`. Rows that leave the alternate screen never enter herdr's host scrollback, so no `--lines` value recovers them. (A shell or a `codex` pane in the next tab happily reports thousands of rows: this is per-application, not global.) So for the case that motivates the feature, one page is all there is — and because `--source visible` renders whatever you scrolled to *inside* the app, "the current page" is exact rather than a guess. Scroll in the agent, then invoke the pane-translation Quick Action again.
 - **`herdr pane read` caps at 1000 lines** and has no offset or pagination flag, so `recent:1000` is a hard ceiling — the same limit [`pane-copy.sh` documents](#copy-to-clipboard).
 - **A 1000-line read is ~62 KB.** `translate` costs roughly 10 KB ≈ 60 s and 20 KB ≈ 95 s, and providers reject well before 62 KB. The real cap is therefore a **character budget** (`HERDR_TRANSLATE_MAX_CHARS`, default `12000` ≈ 75 s), not a line count. `recent:N` only picks a coarse window that the budget then trims — and every trim is reported in the pane header, never silent.
 
@@ -544,13 +546,13 @@ Check any of this without spending an LLM call:
 
 It prints the cleaned, repaired capture on stdout and `raw_lines=… out_chars=… trimmed=…` on stderr.
 
-### Why `prefix+t` is a popup and the scope variants are Quick Actions
+### Interactive popup and pane-translation Quick Actions
 
-Same split as [`prefix + E`](#run-any-command): Quick Actions run through `sh -c` with **no PTY/stdin**, so they cannot host the pager themselves — they capture first, then `herdr pane split` a real pane and re-exec the helper inside it (`pane split` has no `--focus` flag, so the new pane is focused via the shared `focus-pane.py`). The direct key does not need that hop, and a popup floats above the layout, which matters more here than elsewhere: a `type = "pane"` split would narrow the source pane and re-wrap the very page just read. The capture is therefore always taken **before** the split.
+Same split as [`prefix + E`](#run-any-command): Quick Actions run through `sh -c` with **no PTY/stdin**, so they cannot host the pager themselves — they capture first, then `herdr pane split` a real pane and re-exec the helper inside it (`pane split` has no `--focus` flag, so the new pane is focused via the shared `focus-pane.py`). The direct `prefix+t` popup supplies a PTY for the interactive translator. For pane-translation Quick Actions, the capture is always taken **before** the split so that resizing cannot re-wrap the page being captured.
 
 Lowercase `t`, because `prefix + T` is already the `herdr-sesh` session picker.
 
-Env: `HERDR_TRANSLATE_MAX_CHARS` (12000), `HERDR_TRANSLATE_TO` (default target language; otherwise `translate`'s own `[general]` config decides), `HERDR_RUN_HOLD` (`fail`|`always`|`never`, as in `prefix+E`), `PAGER`.
+Pane-translation helper env (not the direct `prefix+t` TUI): `HERDR_TRANSLATE_MAX_CHARS` (12000), `HERDR_TRANSLATE_TO` (default target language; otherwise `translate`'s own `[general]` config decides), `HERDR_RUN_HOLD` (`fail`|`always`|`never`, as in `prefix+E`), `PAGER`.
 
 ## AI usage / quota status
 

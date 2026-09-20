@@ -26,8 +26,8 @@
 # only rebind a couple of keys and add command panes for the tv/dev/lazygit TUIs.
 
 [theme]
-name = "catppuccin"          # mocha (dark)
-auto_switch = true            # follow OS light/dark
+name = "catppuccin"             # mocha (dark)
+auto_switch = true              # follow OS light/dark
 light_name = "catppuccin-latte"
 dark_name = "catppuccin"
 
@@ -60,13 +60,10 @@ agent_panel_sort = "priority"
 # NOTE this pins the layout: upstream changes to the default rows will NOT reach
 # us, so re-check this block against `herdr --default-config` on herdr upgrades.
 [ui.sidebar.agents]
-rows = [
-  ["state_icon", "workspace", "tab", "$review"],
-  ["agent"],
-]
+rows = [["state_icon", "workspace", "tab", "$review"], ["agent"]]
 
 [terminal]
-shell_mode = "auto"           # login/non-login auto-detect; follows $SHELL
+shell_mode = "auto" # login/non-login auto-detect; follows $SHELL
 # CWD policy for new panes/tabs/workspaces (no explicit --cwd). Values:
 #   "follow"  = inherit the SOURCE pane/workspace (default)
 #   "home"    = $HOME · "current" = herdr's own process dir · or a fixed path
@@ -83,11 +80,17 @@ new_cwd = "follow"
 # not listed here. An action accepts an ARRAY of bindings (herdr docs), so a
 # single action can carry both the intuitive key and the tmux-default key.
 [keys]
-split_vertical = ["prefix+|", "prefix+%"]         # side-by-side (left/right) = tmux prefix+| and prefix+% (-h)
-split_horizontal = ["prefix+minus", "prefix+\""]  # stacked (top/bottom)      = tmux prefix+- and prefix+" (-v)
-reload_config = "prefix+shift+r"   # tmux: prefix+R
-rename_tab = "prefix+,"            # tmux: prefix+, (rename window) — frees prefix+shift+t for the sesh popup below
-new_worktree = "prefix+shift+b"    # moved off prefix+shift+g so prefix+G can be lazygit (worktrees handled by wt/wm + herdr-plus auto-layout)
+split_vertical = [
+  "prefix+|",
+  "prefix+%",
+] # side-by-side (left/right) = tmux prefix+| and prefix+% (-h)
+split_horizontal = [
+  "prefix+minus",
+  "prefix+\"",
+] # stacked (top/bottom)      = tmux prefix+- and prefix+" (-v)
+reload_config = "prefix+shift+r" # tmux: prefix+R
+rename_tab = "prefix+," # tmux: prefix+, (rename window) — frees prefix+shift+t for the sesh popup below
+new_worktree = "prefix+shift+b" # moved off prefix+shift+g so prefix+G can be lazygit (worktrees handled by wt/wm + herdr-plus auto-layout)
 
 # --- Indexed quick-switch (native herdr actions) ---
 # switch_tab (prefix+1..9) is a herdr built-in; add the workspace + agent analogs
@@ -97,8 +100,8 @@ new_worktree = "prefix+shift+b"    # moved off prefix+shift+g so prefix+G can be
 # keyboard protocol (which herdr uses) shift+1 still carries the printable "!", so
 # herdr matches the symbol, not "shift+1". ctrl+digit and alt+digit have no
 # printable form, so they disambiguate cleanly. Hence ctrl (workspace) / alt (agent).
-switch_workspace = "prefix+ctrl+1..9"    # prefix+ctrl+N → workspace N (shift+N would emit !@#… — unusable)
-focus_agent = "prefix+alt+1..9"          # prefix+alt+N  → jump to agent N's pane (herdr tracks agents per pane natively)
+switch_workspace = "prefix+ctrl+1..9" # prefix+ctrl+N → workspace N (shift+N would emit !@#… — unusable)
+focus_agent = "prefix+alt+1..9"       # prefix+alt+N  → jump to agent N's pane (herdr tracks agents per pane natively)
 
 # --- Workspace navigate-mode: vim j/k (entered via prefix+w) ---
 # prefix+w opens the workspace navigator; navigate_workspace_* are the
@@ -317,32 +320,18 @@ type = "pane"
 command = "~/.config/herdr/path-pick.sh \"$HERDR_ACTIVE_PANE_ID\" --cwd \"$HERDR_ACTIVE_PANE_CWD\""
 description = "copy a file path from the pane (fzf, two-tier)"
 
-# --- Translate the pane you are reading (prefix+t) ---
-# Pipes the focused pane's content through the `translate` CLI in bilingual mode
-# (-2 --bilingual-mode doc): the original lines stay verbatim and each block's
-# translation is interleaved beneath as `  ↳ …`.
-#
-# Scope is the on-screen page. That is not a shortcut — an agent pane on the
-# ALTERNATE SCREEN has no scrollback at all (a Claude Code pane reports
-# scroll.max_offset_from_bottom = 0, and `pane read --source recent --lines 1000`
-# returns exactly viewport_rows), so one page is all that exists there, and
-# --source visible tracks whatever you scrolled to INSIDE the app. The scrollback
-# variants live on the prefix+y Quick Actions, where a select list can offer them
-# without spending a direct key: they only pay off on shell/log/codex panes.
-#
-# A popup rather than a Quick Action for the usual reason (see prefix+E): Quick
-# Actions run through `sh -c` with no PTY/stdin and so cannot host the pager. The
-# Quick Action variants work around it by splitting a real pane; this key does
-# not have to. Popup also means the source pane never reflows — which matters
-# more here than elsewhere, because a reflow would re-wrap the very page we read.
-# lowercase t: prefix+T is already `tv herdr-sesh`.
+# --- Interactive translator (prefix+t) ---
+# Bare `translate` opens its TUI for text entered or pasted by the user.
+# Pane capture and bilingual translation remain on prefix+y Quick Actions.
+# A popup supplies the PTY/stdin the interactive TUI needs; Quick Actions run
+# through `sh -c` without either. Lowercase t: prefix+T is `tv herdr-sesh`.
 [[keys.command]]
 key = "prefix+t"
 type = "popup"
-command = "~/.config/herdr/pane-translate.sh visible \"$HERDR_ACTIVE_PANE_ID\" --inline"
+command = "translate"
 width = "80%"
 height = "80%"
-description = "translate this pane (bilingual, popup)"
+description = "translate (interactive TUI, popup)"
 
 # --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
 # Requires: herdr plugin install cloudmanic/herdr-plus

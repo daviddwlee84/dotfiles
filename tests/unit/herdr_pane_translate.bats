@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Unit tests for dot_config/herdr/executable_pane-translate.sh — the text pipeline
-# behind prefix+t and the "Translate pane" Quick Actions.
+# behind the "Translate pane" Quick Actions and direct helper invocations.
 #
 # Why this file earns its keep: the helper spends money. Every regression in the
 # capture filter either sends terminal chrome to an LLM (waste) or silently sends

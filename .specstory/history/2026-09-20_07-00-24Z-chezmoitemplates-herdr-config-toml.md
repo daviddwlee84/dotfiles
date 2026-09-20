@@ -374,3 +374,159 @@ text(await tools.exec_command({cmd:"git add -- .specstory/history/2026-09-20_07-
 
 ```
 </details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:32:00Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.write_stdin({session_id:70875,chars:"",yield_time_ms:1000,max_output_tokens:2000}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:32:05Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"git log -1 --format='%h %s'; git diff --cached --name-only; git status --short; git show --format= --stat HEAD",max_output_tokens:1500}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:32:10Z)**_
+
+已提交：`56c9f6b` — `fix: correct Herdr lazygit shortcut and Ghostty font setting`
+
+包含本次修正、文件與對話紀錄，pre-commit 全部通過。其他既有修改保留在工作區。
+
+---
+
+_**User (2026-09-20 07:33:08Z)**_
+
+.chezmoitemplates/herdr 這個不用管嗎？
+
+---
+
+_**Agent (gpt-6-astra 2026-09-20 07:33:23Z)**_
+
+我再核對這個目錄剩下的 diff，確認哪些已提交、哪些仍留在工作區。
+
+_**Agent (gpt-6-astra 2026-09-20 07:33:24Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"git status --short -- .chezmoitemplates/herdr; git diff -- .chezmoitemplates/herdr; git show --format= HEAD -- .chezmoitemplates/herdr/config.toml",max_output_tokens:3500}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:33:36Z)**_
+
+有處理，`Alt+g` 的修正已包含在 `56c9f6b`。
+
+這個檔案仍顯示 `M`，剩下的是開始前就存在的修改：
+
+- 排版調整。
+- `prefix+t` 從「翻譯目前 pane」改成直接開 `translate`。
+
+我把這些保留在工作區。第二項會改變功能，若要一起提交，也需要同步目前仍寫「翻譯 pane」的說明文件。
+
+---
+
+_**User (2026-09-20 07:43:13Z)**_
+
+一起git commit吧
+
+---
+
+_**Agent (gpt-6-astra 2026-09-20 07:43:17Z)**_
+
+我會把 Herdr 剩下的修改一起提交，並將 `prefix+t` 的說明同步為直接開啟 `translate`。
+
+_**Agent (gpt-6-astra 2026-09-20 07:43:20Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+const results=await Promise.allSettled([
+tools.exec_command({cmd:"git status --short; rg -n 'prefix\\s*\\+\\s*t|translate this pane|翻譯這個 pane|translate the focused pane|pane-translate.sh visible' .chezmoitemplates/herdr/config.toml README.md docs/tools/herdr.md docs/tools/herdr.zh-TW.md dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl tests/unit dot_config/herdr | head -100; sed -n '480,600p' docs/tools/herdr.md; sed -n '470,595p' docs/tools/herdr.zh-TW.md",max_output_tokens:6500}),
+tools.exec_command({cmd:"translate --help | head -80; git diff -- .chezmoitemplates/herdr/config.toml; sed -n '330,365p' .chezmoitemplates/herdr/config.toml; bash .agents/skills/agent-history-hygiene/scripts/find-session.sh --json",max_output_tokens:2800})
+]);results.forEach((r,i)=>text({i,...r}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:43:25Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Minimizing document edits**
+
+I need to focus on minimizing the scope of my edits, specifically in the documentation, helper comments, and tests. I want to prioritize updating comments that align with the behavior rather than the tests themselves. To do this effectively, I'll read the paragraph and the first header, along with the README, to guide my modifications. This way, I can ensure everything stays coherent and relevant. It feels like a good plan!
+</details></think>
+
+_**Agent (gpt-6-astra 2026-09-20 07:43:26Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"sed -n '318,353p' .chezmoitemplates/herdr/config.toml; sed -n '1,70p' dot_config/herdr/executable_pane-translate.sh; sed -n '545,560p' docs/tools/herdr.md; head -8 tests/unit/herdr_pane_translate.bats; rg -n 'prefix.?t|Translate a pane|翻譯 pane' docs -g '*.md' | head -45",max_output_tokens:2300}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:44:04Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"python3 - <<'PY'\nfrom pathlib import Path\n\ndef replace(path, old, new):\n    p = Path(path)\n    text = p.read_text()\n    assert text.count(old) == 1, (path, old[:80], text.count(old))\n    p.write_text(text.replace(old, new))\n\np = Path('.chezmoitemplates/herdr/config.toml')\ntext = p.read_text()\nstart = text.index('# --- Translate the pane you are reading (prefix+t) ---')\nend = text.index('# --- herdr-plus plugin', start)\ntext = text[:start] + '''# --- Interactive translator (prefix+t) ---\n# Bare `translate` opens its TUI for text entered or pasted by the user.\n# Pane capture and bilingual translation remain on prefix+y Quick Actions.\n# A popup supplies the PTY/stdin the interactive TUI needs; Quick Actions run\n# through `sh -c` without either. Lowercase t: prefix+T is `tv herdr-sesh`.\n[[keys.command]]\nkey = \"prefix+t\"\ntype = \"popup\"\ncommand = \"translate\"\nwidth = \"80%\"\nheight = \"80%\"\ndescription = \"translate (interactive TUI, popup)\"\n\n''' + text[end:]\np.write_text(text)\n\nreplace('README.md', '`prefix+Y` Yazi popup in the focused pane cwd,', '`prefix+Y` Yazi popup in the focused pane cwd, `prefix+t` interactive translator popup,')\nreplace('dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl', '`prefix+t` to translate the focused pane (bilingual `translate -2` popup; scope variants — current page / last 200-1000 lines — are `prefix+y` Quick Actions, because an alternate-screen agent pane has NO scrollback and `pane read` caps at 1000 lines)', '`prefix+t` for the interactive `translate` TUI popup, and `prefix+y` Quick Actions for bilingual pane translation (current page / last 200-1000 lines; an alternate-screen agent pane has NO scrollback and `pane read` caps at 1000 lines)')\nreplace('docs/tools/herdr.md', '| Translate the pane you are reading | **No tmux analog** | `prefix+t` → `pane-translate.sh` → `translate -2` bilingual popup; scope variants on `prefix+y` |', '| Translation | **No tmux analog** | `prefix+t` opens the interactive `translate` TUI; `prefix+y` Quick Actions capture a pane for bilingual translation |')\nreplace('docs/tools/herdr.md', '| `` prefix + t `` | **translate this pane** — bilingual view of the on-screen page in a popup ([details](#translate-pane)) | popup |', '| `` prefix + t `` | **interactive translator** — enter or paste text into the `translate` TUI ([details](#translate-pane)) | 80% × 80% popup |')\nreplace('docs/tools/herdr.md', '## Translate a pane (`prefix+t`) {#translate-pane}\\n\\nPipes the focused pane\\'s content through the [`translate`](https://github.com/daviddwlee84/translate) CLI in **bilingual** mode and shows the result in a popup:', '## Translation: interactive TUI and pane capture {#translate-pane}\\n\\n`prefix+t` opens the [`translate`](https://github.com/daviddwlee84/translate) interactive TUI in an 80% × 80% popup. Enter or paste the text to translate; this shortcut does not capture the focused pane.\\n\\nFor pane translation, use `prefix+y` → *Translate pane*. The helper pipes the focused pane\\'s content through `translate` in **bilingual** mode and shows the result in a new pane:')\nreplace('docs/tools/herdr.md', '| `prefix + t` | the on-screen page | a popup, paged with `less -R` |', '| `prefix + t` | text you enter or paste | interactive TUI in a popup |')\nreplace('docs/tools/herdr.md', 'Scroll in the agent, press the key again.', 'Scroll in the agent, then invoke the pane-translation Quick Action again.')\nreplace('docs/tools/herdr.md', '### Why `prefix+t` is a popup and the scope variants are Quick Actions', '### Interactive popup and pane-translation Quick Actions')\nreplace('docs/tools/herdr.md', 'The direct key does not need that hop, and a popup floats above the layout, which matters more here than elsewhere: a `type = \"pane\"` split would narrow the source pane and re-wrap the very page just read. The capture is therefore always taken **before** the split.', 'The direct `prefix+t` popup supplies a PTY for the interactive translator. For pane-translation Quick Actions, the capture is always taken **before** the split so that resizing cannot re-wrap the page being captured.')\nreplace('docs/tools/herdr.md', 'Env: `HERDR_TRANSLATE_MAX_CHARS` (12000)', 'Pane-translation helper env (not the direct `prefix+t` TUI): `HERDR_TRANSLATE_MAX_CHARS` (12000)')\n\nreplace('docs/tools/herdr.zh-TW.md', '| 翻譯正在讀的 pane | **tmux 沒有對應物** | `prefix+t` → `pane-translate.sh` → `translate -2` 雙語 popup；範圍變體放在 `prefix+y` |', '| 翻譯 | **tmux 沒有對應物** | `prefix+t` 開啟互動式 `translate` TUI；`prefix+y` Quick Actions 擷取 pane 並進行雙語翻譯 |')\nreplace('docs/tools/herdr.zh-TW.md', '| `` prefix + t `` | **翻譯這個 pane** ——在 popup 裡以雙語對照顯示當前畫面（[詳細](#translate-pane)） | popup |', '| `` prefix + t `` | **互動式翻譯器** ——在 `translate` TUI 輸入或貼上文字（[詳細](#translate-pane)） | 80% × 80% popup |')\nreplace('docs/tools/herdr.zh-TW.md', '## 翻譯 pane（`prefix+t`） {#translate-pane}\\n\\n把焦點 pane 的內容送進 [`translate`](https://github.com/daviddwlee84/translate) CLI 的**雙語模式**，結果顯示在 popup 裡：', '## 翻譯：互動式 TUI 與 pane 擷取 {#translate-pane}\\n\\n`prefix+t` 在 80% × 80% popup 中直接開啟 [`translate`](https://github.com/daviddwlee84/translate) 互動式 TUI，供你輸入或貼上待翻譯文字；這個快捷鍵不會擷取焦點 pane。\\n\\n要翻譯 pane，請用 `prefix+y` → *Translate pane*。Helper 把焦點 pane 的內容送進 `translate` CLI 的**雙語模式**，結果顯示在新 pane 裡：')\nreplace('docs/tools/herdr.zh-TW.md', '| `prefix + t` | 畫面上這一頁 | popup，用 `less -R` 分頁 |', '| `prefix + t` | 你輸入或貼上的文字 | popup 裡的互動式 TUI |')\nreplace('docs/tools/herdr.zh-TW.md', '在 agent 裡捲動，再按一次即可。', '在 agent 裡捲動，再執行一次 pane 翻譯的 Quick Action 即可。')\nreplace('docs/tools/herdr.zh-TW.md', '### 為什麼 `prefix+t` 是 popup、而範圍變體是 Quick Action', '### 互動式 popup 與 pane 翻譯 Quick Actions')\nreplace('docs/tools/herdr.zh-TW.md', '直接鍵不需要繞這一圈，而 popup 浮在版面之上，這一點在這裡比其他功能更重要：`type = \"pane\"` 的分割會壓窄來源 pane、讓它重新換行，正好毀掉剛剛讀到的那一頁。因此擷取**一律在分割之前**完成。', '`prefix+t` 的 popup 直接提供互動式翻譯器需要的 PTY。Pane 翻譯 Quick Actions 則**一律在分割之前**完成擷取，避免縮小來源 pane 時重新換行而改變擷取內容。')\nreplace('docs/tools/herdr.zh-TW.md', '環境變數：`HERDR_TRANSLATE_MAX_CHARS`（12000）', 'Pane 翻譯 helper 的環境變數（不適用於直接開啟的 `prefix+t` TUI）：`HERDR_TRANSLATE_MAX_CHARS`（12000）')\n\nreplace('dot_config/herdr/executable_pane-translate.sh', '# Entry points (all four land here):\\n#   prefix+t                 type = \"popup\" -> --inline, has a PTY, pages in place', '# Entry points (prefix+t separately launches the translate TUI):\\n#   direct helper invocation               -> --inline, has a PTY, pages in place')\nreplace('dot_config/herdr/executable_pane-translate.sh', '# Consumers: the prefix+t keybind and the translate-pane* Quick Actions', '# Consumers: direct helper invocations and the translate-pane* Quick Actions')\nreplace('dot_config/herdr/executable_pane-translate.sh', '# See docs/tools/herdr.md § \"Translate a pane\".', '# See docs/tools/herdr.md § \"Translation: interactive TUI and pane capture\".')\nreplace('tests/unit/herdr_pane_translate.bats', '# behind prefix+t and the \"Translate pane\" Quick Actions.', '# behind the \"Translate pane\" Quick Actions and direct helper invocations.')\nPY",max_output_tokens:500}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:44:10Z)**_
+
+已同步設定中的快捷鍵描述和中英文文件：`prefix+t` 開互動式翻譯器，pane 內容翻譯仍由 `prefix+y` 的 Quick Actions 提供。現在驗證設定與文件，再建立 commit。
+
+_**Agent (gpt-6-astra 2026-09-20 07:44:13Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+const results=await Promise.allSettled([
+tools.exec_command({cmd:"HERDR_CONFIG_PATH=\"$PWD/.chezmoitemplates/herdr/config.toml\" herdr config check; git diff --check -- .chezmoitemplates/herdr README.md docs/tools/herdr.md docs/tools/herdr.zh-TW.md dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl dot_config/herdr/executable_pane-translate.sh tests/unit/herdr_pane_translate.bats; git diff --stat -- .chezmoitemplates/herdr README.md docs/tools/herdr.md docs/tools/herdr.zh-TW.md dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl dot_config/herdr/executable_pane-translate.sh tests/unit/herdr_pane_translate.bats; git diff -- docs/tools/herdr.md dot_config/herdr/executable_pane-translate.sh",max_output_tokens:4000}),
+tools.exec_command({cmd:"just docs-build > /tmp/chezmoi-herdr-translate-docs-build.log 2>&1",yield_time_ms:1000,max_output_tokens:500})
+]);results.forEach((r,i)=>text({i,...r}));
+
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-20 07:44:21Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Addressing documentation updates**
+
+I need to revise the documentation regarding the new "not" allowed inherited requirement—okay! I want to commit this in about 20 seconds once the docs are ready. Stage 8 should include the current transcript, and I can precommit and append the race as I did before. I’ll scan hook handles and use Git commands to add the scoped sections. Ensuring the documentation build is completed in parallel while checking for no mutations is essential to avoid tool script issues.
+</details></think>
+
+_**Agent (gpt-6-astra 2026-09-20 07:44:23Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.write_stdin({session_id:48510,chars:"",yield_time_ms:1000,max_output_tokens:500}));
+text(await tools.exec_command({cmd:"git add -- .chezmoitemplates/herdr/config.toml README.md docs/tools/herdr.md docs/tools/herdr.zh-TW.md dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl dot_config/herdr/executable_pane-translate.sh tests/unit/herdr_pane_translate.bats .specstory/history/2026-09-20_07-00-24Z-chezmoitemplates-herdr-config-toml.md && python3 scripts/redact_secrets.py && bash .agents/skills/agent-history-hygiene/scripts/scan-staged.sh --redact && git diff --cached --check -- . ':!.specstory/history/*' && git commit -m \"feat(herdr): open interactive translator with prefix+t\"",yield_time_ms:1000,max_output_tokens:2500}));
+
+```
+</details></tool-use>
