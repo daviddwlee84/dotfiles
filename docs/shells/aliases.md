@@ -575,6 +575,14 @@ direct `v` remains Neovim. See [editor selection](../tools/editor.md).
 
 ### Proxy helpers
 
+When lazyclash supports `proxy shell-init` (v0.1.6+), this module delegates `proxy-on/off/status/test/refresh` and `withproxy` to that standalone integration. `proxy-on [TARGET]` prefers a local registered target unless one is explicitly selected; an SSH target starts a private shell-owned tunnel with native SSH authentication. `proxy-off` restores the prior proxy environment and releases only that shell's session. Bash/zsh exit hooks preserve existing handlers. Crashed-shell sessions are reclaimed with `lazyclash proxy tunnel cleanup`. `withproxy` preserves shell functions and builtins and fails when resolution fails; `lazyclash proxy exec -- CMD...` preserves an external command's exit code without retrying it. Set `LAZYCLASH_PROXY_SHELL=0` before this module loads to keep the legacy helpers. A missing or older binary also retains legacy behavior.
+
+The `LOCAL_PROXY_URL` / `LOCAL_PROXY_SOCKS_URL` manual override remains supported when no target was chosen. Existing `docker-net` / Copilot cache consumers use the same resolver but refuse authenticated proxy URLs and custom CA settings, because they print or persist those caches; use native `proxy-on` / `proxy exec` for authenticated proxies. Persistent HTTPS-over-SSH env export is unsupported because replacing the proxy hostname with localhost would change TLS verification; use an HTTP/SOCKS data endpoint or direct HTTPS endpoint.
+
+Docker exports are separate: `lazyclash proxy docker render --endpoint URL` produces an env file, Compose overlay, build arguments or JSON snippet; it does not edit `~/.docker/config.json`. That file's `proxies.default` remains owned by the chezmoi template and its apply-time `LOCAL_PROXY_URL`. The consumer endpoint must be reachable from the container/builder; localhost is never rewritten automatically. `proxy docker test --container NAME` or `--image LOCAL_IMAGE` tests inside a container without pulling an image. Daemon changes remain explicit `docker-net`/native owner operations, not a side effect of proxy-on.
+
+Legacy fallback behavior:
+
 > Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL` (+ optional `$LOCAL_PROXY_SOCKS_URL` for split Clash `socks-port:` configs). Detection order: env → **macOS System Proxy** (when HTTPEnable and a loopback port is listening — what Clash Verge / CFW "System Proxy" writes) → Clash Verge / mihomo / CFW config files whose declared port is actually open → probe ports `7897/7890/7891/17890/1087/8118/8080`. Preferring System Proxy avoids a stale `~/.config/clash` winning over a live Verge instance on `7897`. Detection is cached per shell; `proxy-off` and `proxy-refresh` clear that cache. Set `$LOCAL_PROXY_AUTO_ACTIVATE=1` to auto-export env vars on shell startup. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md). See also: [docs/tools/containers.md](../tools/containers.md) for how `$LOCAL_PROXY_URL` feeds the chezmoi-managed `~/.docker/config.json` `proxies.default` block. Copilot Node clients need `HTTPS_PROXY` / `--proxy-env` separately — see [docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md).
 
 | Command | Type | Source File | Description |
@@ -586,6 +594,7 @@ direct `v` remains Neovim. See [editor selection](../tools/editor.md).
 | `proxy-status` | function | `dot_config/shell/50_networking.sh` | Report state: **active** (exported), **available** (detected), or **unavailable** |
 | `proxy-test` | function | `dot_config/shell/50_networking.sh` | Test detected proxy egress with `curl https://www.google.com/generate_204` (HTTP, not ICMP ping) |
 | `proxy-refresh` | function | `dot_config/shell/50_networking.sh` | Clear cached detection, re-probe, print status (use after toggling your proxy) |
+| `lazyclash-proxy-on/off/status/test/refresh`, `lazyclash-withproxy` | upstream functions | `lazyclash proxy shell-init` via `dot_config/shell/50_networking.sh` | Namespaced standalone equivalents; preserve existing generic function names unless `--replace` is requested |
 
 ### Docker registry egress (`docker-net`)
 

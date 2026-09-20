@@ -10,6 +10,9 @@ load "../test_helper.bash"
 
 PROXY_FILE="$REPO_ROOT/dot_config/shell/50_networking.sh"
 
+# These cases cover the legacy fallback independently of the installed CLI.
+setup() { export LAZYCLASH_PROXY_SHELL=0; }
+
 # Helper: write a fake `nc` that exits 0 only when port matches $EXPECT_PORT
 # (set by the calling test via env). All other ncs fail -> simulates closed.
 _make_nc_stub() {
@@ -74,7 +77,7 @@ EOF
   ")"
   [[ "$result" == *"http=http://127.0.0.1:7891"* ]]
   [[ "$result" == *"all=socks5://127.0.0.1:7891"* ]]
-  [[ "$result" == *"source=clash config"* ]]
+  [[ "$result" == *"source=clash/mihomo config"* ]]
 }
 
 @test "detect_proxy: uses Clash split HTTP and SOCKS ports" {

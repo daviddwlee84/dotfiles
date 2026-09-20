@@ -613,7 +613,7 @@ record，不接受不完整或未支援的格式。
 
 | 套件 | 平台／管理方式 |
 |---|---|
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.6` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
 | `github.com/daviddwlee84/translate@v0.5.2` | Linux 用 Go；macOS 用 Homebrew |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | Linux 用 Go；macOS 用 Homebrew |
 | `golang.org/x/tools/gopls@v0.23.0` | Linux 用 Go；macOS 用 Homebrew |
@@ -622,7 +622,9 @@ Go 由 mise 提供，仍受 `installExtraRuntimes` 控制；關閉時略過 role
 也不會改走另一種 installer。Binary 經 `GOBIN` 安裝到已在 PATH 的
 `~/.local/bin`，module cache 經 `GOPATH` 使用 `~/.local/share/go`。
 `creates:` 保持 apply 僅補裝缺少的 binary；明確執行 `just upgrade-go` 才用
-`@latest` 升級。lazyclash 操作現有 core API，不會安裝 Mihomo 或預填控制器密鑰。
+`@latest` 升級。這個 role 只安裝 lazyclash CLI；另外明確執行 `lazyclash setup`
+才會進入受管理 native／Docker client 的預覽與安裝。Dotfiles apply 不安裝 core 或
+預填控制器密鑰。v0.1.6 也提供共用 shell proxy adapter，見 [proxy helpers](../shells/aliases.md)。
 
 會自行產生 completion 的工具也要加入 `scripts/generate_completions.sh`。
 只刷新一個工具可用 `scripts/generate_completions.sh --tool lazyclash --force`。
@@ -1072,7 +1074,7 @@ agent-specific 升級路徑。
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab**(`jupyter-lab`) | uv tool(配 notebook、ipykernel 等) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh`(永遠) | 同 | base |
-| **lazyclash** | `go install`（`go_tools`） | `go install`（`go_tools`） | 現有 core 的 CLI/TUI；依平台選原始碼通道，apply 產生 zsh/bash completion |
+| **lazyclash** | `go install`（`go_tools`） | `go install`（`go_tools`） | Core CLI/TUI、明確 client setup 與共用 proxy shell adapter；apply 產生 zsh/bash completion |
 | **lazygit** | brew → 官方 release fallback（最低 0.64.0） | 移除舊 PPA → brew 偵測 → 官方 system/user release（最低 0.64.0） | lazyvim_deps |
 | **libnotify-bin** | n/a | apt(Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |

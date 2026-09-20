@@ -419,6 +419,32 @@ proxy-refresh() {
   proxy-status
 }
 
+# Delegate to lazyclash's standalone shell integration when the installed
+# version supports it. Older/missing binaries retain the functions above.
+# Do not edit a managed rc from the CLI, and do not silently fall back to port
+# guesses after the native resolver reports ambiguity or an unavailable session.
+if [ "${LAZYCLASH_PROXY_SHELL:-1}" != 0 ] && command -v lazyclash >/dev/null 2>&1; then
+  _net_proxy_shell=bash
+  [ -z "${ZSH_VERSION:-}" ] || _net_proxy_shell=zsh
+  if _net_proxy_init="$(command lazyclash proxy shell-init --shell "$_net_proxy_shell" --replace 2>/dev/null)"; then
+    eval "$_net_proxy_init"
+    __net_detect_proxy() {
+      local _net_proxy_assignments
+      if _net_proxy_assignments="$(command lazyclash proxy _resolve-shell)"; then
+        # The native protocol emits only three fixed, shell-quoted assignments.
+        # It refuses credentials because these legacy caches are printed by
+        # docker-net/copilot helpers. Native proxy-on/exec supports auth itself.
+        eval "$_net_proxy_assignments"
+      else
+        __net_set_proxy_cache none '' 'lazyclash unavailable'
+        return 1
+      fi
+    }
+    __net_all_proxy_url() { printf '%s\n' "${_NET_PROXY_SOCKS_CACHE:-$_NET_PROXY_CACHE}"; }
+  fi
+  unset _net_proxy_init _net_proxy_shell
+fi
+
 # Optional auto-activation: when $LOCAL_PROXY_AUTO_ACTIVATE=1 is set before
 # this file is sourced, silently call `proxy-on` if a proxy is detected.
 # Set the env var in a machine-local shell file (or ~/.zshenv / ~/.profile) on

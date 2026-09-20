@@ -658,7 +658,7 @@ idempotent.
 | `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
 | `golang.org/x/tools/gopls@v0.23.0` | `gopls` (Linux only; macOS → Homebrew `gopls`) |
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.5` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.6` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
@@ -667,8 +667,10 @@ boxes; upgrades move it forward — the same install-vs-upgrade split as cargo.
 Installation and upgrades select each entry's `platforms` from the same manifest.
 Existing Homebrew tools stay Linux-only here; lazyclash is selected on both
 Darwin and Linux. `installExtraRuntimes=false` still skips this role, and missing
-Go does not trigger another installer. lazyclash manages existing core APIs; its
-installation does not install Mihomo or seed target credentials.
+Go does not trigger another installer. This role installs only the lazyclash CLI;
+its separate `setup` command can explicitly install/register an owned native or
+Docker Mihomo client. Dotfiles apply does not install a core or seed credentials.
+v0.1.6 also supplies the shared shell proxy adapter; see [proxy helpers](../shells/aliases.md).
 
 **Adding a go tool**: append to `go_tools/defaults/main.yml` with `name`
 (`<module-path>@<version>`), `binary` (the executable used for the `creates:`
@@ -1173,7 +1175,7 @@ list.
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh` (always) | same | base |
-| **lazyclash** | `go install` (`go_tools`) | `go install` (`go_tools`) | Existing-core CLI/TUI; platform-selected source channel, zsh/bash generated on apply |
+| **lazyclash** | `go install` (`go_tools`) | `go install` (`go_tools`) | Core CLI/TUI and explicit client setup; shared proxy shell adapter, zsh/bash completions on apply |
 | **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
