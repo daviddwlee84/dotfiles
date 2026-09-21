@@ -3,6 +3,9 @@
 # every time it starts.
 gui:
   nerdFontsVersion: "3"
+  showNumstatInFilesView: true
+  filterMode: fuzzy
+  expandFocusedSidePanel: true
   showDivergenceFromBaseBranch: arrowAndNumber
   branchColorPatterns:
     '^feat/': '#89b4fa'
@@ -33,6 +36,13 @@ os:
   copyToClipboardCmd: "printf '%s' {{text}} | x copy"
 
 customCommands:
+  - key: '<alt+s>'
+    context: files
+    description: Change statistics (staged / unstaged / overall)
+    command: '"$HOME/.config/lazygit/change-statistics.sh"'
+    loadingText: Counting changes...
+    output: popup
+    outputTitle: Change statistics
   - key: I
     context: localBranches
     description: Branch insights (local/remote main containment)

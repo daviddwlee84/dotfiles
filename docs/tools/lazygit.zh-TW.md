@@ -7,7 +7,7 @@
 
 [lazygit](https://github.com/jesseduffield/lazygit) 是這裡使用的 git TUI（透過 `lazyvim_deps` role 安裝；綁定為 `lg`）。日常操作（stage、commit、branch）很直覺——這頁專收**難記的 rebase／amend「手術」**，把 **lazygit 按鍵與等價的 CLI 並排**列出，讓你兩種方式都能做。
 
-> **黃金守則：只改寫尚未 push 的 commit。** 以下所有配方都會改寫歷史（產生新的 SHA）。若某個 commit 已在共享 remote 上，別動——否則你得用 `git push --force-with-lease` 並和他人協調。
+> **黃金守則：只改寫尚未 push 的 commit。** 以下歷史手術配方會改寫歷史（產生新的 SHA）；統計與洞察介面則是唯讀。若某個 commit 已在共享 remote 上，別改寫——否則你得用 `git push --force-with-lease` 並和他人協調。
 
 ## 受管理的 pull 行為
 
@@ -21,6 +21,50 @@
 ```
 
 所以 LazyGit 一般的 **`p`** pull 會以 rebase 方式執行，且工作區 (working-tree) 的髒變更會在 rebase 前被 stash、rebase 後再套用回來。若重新套用的 stash 發生衝突，Git 會保留該 autostash 而非丟棄；請檢查 `git status` 與 `git stash list`，解決工作區衝突、確認你的變更已回來之後，再丟掉 autostash。
+
+## 變更統計與導覽
+
+受管理的設定啟用以下顯示選項：
+
+| 設定 | 效果 |
+|---|---|
+| `gui.showNumstatInFilesView: true` | 在每個變更檔案旁顯示新增／刪除行數 |
+| `gui.filterMode: fuzzy` | `/` 使用模糊比對 (fuzzy matching)，字元按順序出現即可，不必連續 |
+| `gui.expandFocusedSidePanel: true` | 目前操作的側邊面板自動增高（預設權重為 `2`） |
+
+短字串的模糊搜尋可能出現較多結果；切換焦點時，面板高度會跟著改變。
+Diff 分割沿用上游預設 `auto`，搭配既有 delta renderer。
+檔案樹、commit graph、自動 fetch、commit 訊息長度提示都已由上游預設啟用。
+
+檔案旁的行數是工作區相對 **HEAD** 的差異，涵蓋已暫存 (staged) 與未暫存
+(unstaged) 的變更，但不分成兩組數字。選取 commit 時，主 diff 面板本來
+就會顯示該 commit 的 `--stat` 統計。
+
+在 **Files** 按 **`Alt+s`**（小寫 `s`，不加 multiplexer prefix），開啟唯讀的
+**Change statistics** popup：
+
+| 區塊 | 等價指令 |
+|---|---|
+| Staged | `git diff --cached --shortstat` |
+| Unstaged | `git diff --shortstat` |
+| Overall vs HEAD | `git diff HEAD --shortstat` |
+
+Popup 統計整個 repository，不受目前選取檔案或所在子目錄影響。
+沒有變更的區塊會明確顯示零檔案、零行數。
+**Overall 是重新比較，不是前兩組相加**：staged 與 unstaged 的編輯可能互相抵消。
+
+不包含尚未追蹤 (untracked) 的檔案。二進位檔案的變更會計入檔案數，
+但不計入文字增刪行數。尚無第一個 commit 時，popup 使用 empty tree，
+並明確標示比較基準；原生檔案行數需要 HEAD。
+Git 失敗時會呈現錯誤，不會替換成零。Helper 停用 external diff／textconv，
+不執行 fetch、stage 或 commit。
+
+Helper 原始檔是 `dot_config/lazygit/executable_change-statistics.sh`，部署到
+`~/.config/lazygit/change-statistics.sh`。在 Files 按 `?` 也能找到這個快捷鍵。
+macOS 的 Ghostty／cmux 請使用左側 Option 作為 Alt。
+
+上游參考：[設定文件](https://github.com/jesseduffield/lazygit/blob/v0.64.1/docs/Config.md)
+與[自訂命令](https://github.com/jesseduffield/lazygit/blob/v0.64.1/docs/Custom_Command_Keybindings.md)。
 
 ## Branch 面板與 `I` Branch insights
 

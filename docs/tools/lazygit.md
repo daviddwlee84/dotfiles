@@ -2,7 +2,7 @@
 
 [lazygit](https://github.com/jesseduffield/lazygit) is the git TUI used here (installed via the `lazyvim_deps` role; bound to `lg`). The everyday stuff (stage, commit, branch) is obvious — this page is the **rebase/amend "surgery" that's hard to remember**, with the **lazygit keys and the equivalent CLI side by side** so you can do it either way.
 
-> **Golden rule: only rewrite commits that have NOT been pushed.** All recipes below rewrite history (new SHAs). If a commit is already on a shared remote, don't — or you'll need `git push --force-with-lease` and coordination.
+> **Golden rule: only rewrite commits that have NOT been pushed.** The history-surgery recipes below rewrite history (new SHAs); the statistics and insight views are read-only. If a commit is already on a shared remote, don't rewrite it — or you'll need `git push --force-with-lease` and coordination.
 
 ## Managed pull behavior
 
@@ -16,6 +16,52 @@ This dotfiles repo sets Git's global baseline to:
 ```
 
 So LazyGit's normal **`p`** pull runs as a rebase pull, and dirty working-tree changes are stashed before the rebase and re-applied afterwards. If the re-applied stash conflicts, Git keeps the autostash instead of dropping it; inspect `git status` and `git stash list`, resolve any worktree conflicts, then drop the autostash only after confirming your changes are back.
+
+## Change statistics and navigation
+
+The managed config enables these display options:
+
+| Setting | Effect |
+|---|---|
+| `gui.showNumstatInFilesView: true` | Shows added/deleted line counts beside each changed file |
+| `gui.filterMode: fuzzy` | `/` matches characters in order without requiring a contiguous substring |
+| `gui.expandFocusedSidePanel: true` | Gives the focused side panel more height (default weight: `2`) |
+
+Fuzzy filtering can return extra matches for short queries; panel heights change
+as focus moves. Diff splitting keeps the upstream `auto` default alongside the
+existing delta renderer. File trees, commit graphs, automatic fetching, and the
+commit-message length indicator are already enabled by upstream defaults.
+
+The per-file counts compare the worktree against **HEAD**. They combine staged
+and unstaged changes into one comparison, rather than displaying two counters.
+Selecting a commit already shows its `--stat` summary in the main diff view.
+
+In **Files**, press **`Alt+s`** (lowercase `s`, no multiplexer prefix) for a
+read-only **Change statistics** popup:
+
+| Section | Equivalent command |
+|---|---|
+| Staged | `git diff --cached --shortstat` |
+| Unstaged | `git diff --shortstat` |
+| Overall vs HEAD | `git diff HEAD --shortstat` |
+
+The popup covers the entire repository, regardless of the selected file or
+current subdirectory. An unchanged section explicitly shows zero files and
+lines. **Overall is a fresh comparison, not the sum of the other sections**:
+staged and unstaged edits can cancel each other out.
+
+Untracked files are excluded. Binary changes count toward files changed, but
+not text lines added/deleted. Before the first commit, the popup uses the empty
+tree and labels that baseline explicitly; the native file counters require
+HEAD. Git errors are reported rather than replaced with zero counts. The helper
+disables external diff/textconv commands and does not fetch, stage, or commit.
+
+The source helper is `dot_config/lazygit/executable_change-statistics.sh`, deployed
+to `~/.config/lazygit/change-statistics.sh`. The shortcut is also discoverable in
+the Files `?` keybinding menu. In Ghostty/cmux on macOS, use left Option for Alt.
+
+Upstream references: [configuration](https://github.com/jesseduffield/lazygit/blob/v0.64.1/docs/Config.md)
+and [custom commands](https://github.com/jesseduffield/lazygit/blob/v0.64.1/docs/Custom_Command_Keybindings.md).
 
 ## Branch view and `I` Branch insights
 
