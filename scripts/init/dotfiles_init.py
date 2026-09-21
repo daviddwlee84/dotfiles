@@ -249,6 +249,15 @@ PROMPTS: tuple[Prompt, ...] = (
                     "peon 的音量/音效包/通知樣式由 `peon` CLI 自己管，chezmoi 不碰，\n"
                     "所以隨便調都不會產生 chezmoi diff。見 docs/tools/agent-sounds.md")),
 
+    # --- Personal tools --------------------------------------------------
+    Prompt("installPersonalTools", "bool", "Personal tools",
+           "Personal CLI suite",
+           "dev, translate, exp, lazychezmoi, lazyclash, lazymlflow and lazypueue. Installs CLIs only; no first-use downloads or backend services.",
+           default=True,
+           prompt_text="Install personal CLI suite (dev, translate, exp and lazy tools)",
+           comment=("是否安裝七件個人 CLI 套件；macOS 走 Homebrew，Linux 走驗證 checksum 的 release。\n"
+                    "只裝 CLI，不啟動後端、不建立 credentials，也不在首次呼叫時下載。")),
+
     # --- Dev tooling -----------------------------------------------------
     Prompt("installPythonUvTools", "bool", "Dev tooling",
            "Python CLI tools (via uv)",
@@ -564,6 +573,7 @@ PROMPTS: tuple[Prompt, ...] = (
 
 BUNDLES: dict[str, dict[str, object]] = {
     "personal-mac": {
+        "installPersonalTools": True,
         "installCodingAgents": True,
         "installMole": True,
         "installLlmTools": True,
@@ -579,6 +589,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "backupMode": "smart",
     },
     "work-mac": {
+        "installPersonalTools": True,
         "installCodingAgents": True,
         "installMole": True,
         "installSummarize": True,
@@ -591,6 +602,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden, installGamingApps
     },
     "server-linux": {
+        "installPersonalTools": True,
         "installCodingAgents": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
@@ -604,6 +616,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
     },
     "cloud-vm": {
+        "installPersonalTools": False,
         "installTerminalBrowser": False,
         "installPlaywrightCli": False,
         # Lean throwaway / cloud dev VM: ergonomic shell + tmux + nvim +
@@ -630,6 +643,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "backupMode": "off",  # fresh VM — nothing worth backing up
     },
     "minimal": {
+        "installPersonalTools": False,
         "installTerminalBrowser": False,
         "installPlaywrightCli": False,
         # Dotfiles only — every installX forced off so `chezmoi apply` in CI /
@@ -1160,6 +1174,7 @@ README_END = "<!-- /dotfiles-init:prompts -->"
 # so the CI image builds fast (skip the heavy coding-agent / uv / js installs,
 # no backup). Anything not listed uses the prompt's own default.
 DOCKER_ARG_DEFAULTS: dict[str, object] = {
+    "installPersonalTools": False,
     "installTerminalBrowser": False,
     "installPlaywrightCli": False,
     "installCodingAgents": False,
@@ -1480,6 +1495,10 @@ def run_init(cmd: InitCmd) -> int:
     # to bundle/prompt defaults. Explicit --bundle still layers on top.
     if pf.source_exists:
         current = read_current_config()
+        if cmd.yes and "installPersonalTools" not in current and cmd.bundle is None:
+            console.print("[red]Choose an explicit bundle or use dotcfg --set "
+                          "installPersonalTools=true (or false) before headless re-init.[/red]")
+            return 2
         if current:
             overrides = {**current, **overrides}
             console.print("[dim]Seeded answers from current chezmoi.toml (re-init).[/dim]\n")
@@ -1627,6 +1646,10 @@ def run_reconfigure(cmd: ReconfigureCmd) -> int:
         overrides.pop("profile")
 
     non_interactive = cmd.yes or not pf.is_tty
+    if non_interactive and "installPersonalTools" not in current and "installPersonalTools" not in set_overrides:
+        console.print("[red]Choose the new personal suite explicitly once: "
+                      "--set installPersonalTools=true (or false). Existing hosts retain legacy selection until then.[/red]")
+        return 2
     if non_interactive and not cmd.yes:
         console.print("[yellow]No TTY detected — running non-interactively from current + --set values.[/yellow]")
 

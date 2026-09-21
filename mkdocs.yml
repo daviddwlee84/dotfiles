@@ -72,6 +72,7 @@ plugins:
             Home: 首頁
             Playbooks: 工作流程
             Tools: 工具
+            Personal CLI suite: 個人 CLI 套件
             "System admin": 系統管理
             Repo Internals: 本 Repo 內部
             Infrastructure: 基礎建設
@@ -277,6 +278,7 @@ nav:
       - Wi-Fi latency spikes: playbooks/wifi-latency-spikes.md
       - Random hard power-offs: playbooks/random-hard-poweroff.md
   - Tools:
+      - Personal CLI suite: tools/personal-tools.md
       - tools/aicapture.md
       - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
       - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md

@@ -7,18 +7,14 @@ setup() {
   mkdir -p "$TEST_SANDBOX/bin" "$TEST_SANDBOX/home"
 }
 
-@test "Go source manifest selects only lazyclash on Darwin and all four Linux tools" {
+@test "generic Go manifest keeps personal tools out of both platform selections" {
   run bash -c 'source "$REPO_ROOT/scripts/lib/go_tools.sh"; go_tool_packages "$REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml" Darwin'
   [ "$status" -eq 0 ]
-  [ "$output" = "github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7" ]
-
+  [ -z "$output" ]
   run bash -c 'source "$REPO_ROOT/scripts/lib/go_tools.sh"; go_tool_packages "$REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml" Linux'
   [ "$status" -eq 0 ]
-  [ "${#lines[@]}" -eq 4 ]
-  [[ "$output" == *"github.com/daviddwlee84/translate@v0.5.2"* ]]
-  [[ "$output" == *"github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0"* ]]
-  [[ "$output" == *"golang.org/x/tools/gopls@v0.23.0"* ]]
-  [[ "$output" == *"github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7"* ]]
+  [ "${#lines[@]}" -eq 1 ]
+  [[ "$output" == *"golang.org/x/tools/gopls@"* ]]
 }
 
 @test "Go manifest rejects an invalid later entry without emitting an earlier package" {
@@ -41,7 +37,7 @@ YAML
   chmod +x "$TEST_SANDBOX/bin/go"
   sed -n '/^cat_go() {$/,/^}$/p' "$REPO_ROOT/scripts/upgrade_tools.sh" >"$TEST_SANDBOX/cat-go.sh"
   run env HOME="$TEST_SANDBOX/home" PATH="$TEST_SANDBOX/bin:$PATH" \
-    TEST_PLATFORM=Darwin CALLS="$TEST_SANDBOX/calls" bash -c '
+    TEST_PLATFORM=Linux CALLS="$TEST_SANDBOX/calls" bash -c '
       source "$REPO_ROOT/scripts/lib/go_tools.sh"
       source "$1"
       _REPO_ROOT="$REPO_ROOT"
@@ -52,7 +48,7 @@ YAML
       cat_go
     ' bash "$TEST_SANDBOX/cat-go.sh"
   [ "$status" -eq 0 ]
-  [ "$(cat "$TEST_SANDBOX/calls")" = "go install github.com/daviddwlee84/lazyclash/cmd/lazyclash@latest" ]
+  [ "$(cat "$TEST_SANDBOX/calls")" = "go install golang.org/x/tools/gopls@latest" ]
 }
 
 @test "actual Ansible install task selects platform and keeps creates idempotency with a fake Go" {
@@ -93,10 +89,13 @@ YAML
     run env ANSIBLE_CONFIG="$TEST_SANDBOX/ansible.cfg" ANSIBLE_LOCAL_TEMP="$TEST_SANDBOX/ansible-tmp" \
       ansible-playbook -i localhost, -c local "$TEST_SANDBOX/install.yml"
     [ "$status" -eq 0 ]
-    [ -f "$fixture_home/.local/bin/lazyclash" ]
-    local expected=1
-    if [ "$platform" = Linux ]; then expected=4; fi
-    [ "$(wc -l <"$fixture_home/.local/bin/calls" | tr -d ' ')" -eq "$expected" ]
+    local expected=0
+    if [ "$platform" = Linux ]; then
+      expected=1
+      [ -f "$fixture_home/.local/bin/gopls" ]
+    else
+      [ ! -e "$fixture_home/.local/bin/calls" ]
+    fi
     if [ "$platform" = Darwin ]; then
       [ ! -e "$fixture_home/.local/bin/dev" ]
       [ ! -e "$fixture_home/.local/bin/translate" ]
@@ -105,7 +104,11 @@ YAML
     run env ANSIBLE_CONFIG="$TEST_SANDBOX/ansible.cfg" ANSIBLE_LOCAL_TEMP="$TEST_SANDBOX/ansible-tmp" \
       ansible-playbook -i localhost, -c local "$TEST_SANDBOX/install.yml"
     [ "$status" -eq 0 ]
-    [ "$(wc -l <"$fixture_home/.local/bin/calls" | tr -d ' ')" -eq "$expected" ]
+    if [ "$expected" -gt 0 ]; then
+      [ "$(wc -l <"$fixture_home/.local/bin/calls" | tr -d ' ')" -eq "$expected" ]
+    else
+      [ ! -e "$fixture_home/.local/bin/calls" ]
+    fi
   done
 }
 

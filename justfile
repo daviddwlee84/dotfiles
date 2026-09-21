@@ -447,6 +447,11 @@ upgrade-cargo:
 upgrade-go:
     ./scripts/upgrade_tools.sh go
 
+# Upgrade selected, already-installed personal CLIs through their current owner.
+upgrade-personal:
+    ./scripts/upgrade_tools.sh personal
+
+
 # `dotnet tool update --global <name>` per tool in dotnet_tools defaults
 upgrade-dotnet:
     ./scripts/upgrade_tools.sh dotnet

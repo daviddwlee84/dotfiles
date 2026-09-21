@@ -1,0 +1,39 @@
+---
+- name: Install selected personal CLIs through their platform owner
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_facts['python']['executable'] | default('python3') }}"
+      - "{{ role_path }}/files/personal_tools.py"
+      - install
+      - --mode
+      - "{{ personal_tools_mode }}"
+      - --extra-runtimes
+      - "{{ personal_tools_extra_runtimes | bool | ternary('true', 'false') }}"
+      - --platform
+      - "{{ ansible_facts['system'] }}"
+      - --arch
+      - "{{ target_architecture | default(ansible_facts['architecture']) }}"
+      - --completion-script
+      - "{{ personal_tools_completion_script }}"
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: personal_tools_install
+  changed_when: (personal_tools_install.stdout | from_json).changed | bool
+  when: not ansible_check_mode
+
+- name: Show personal CLI selection in check mode without installing
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_facts['python']['executable'] | default('python3') }}"
+      - "{{ role_path }}/files/personal_tools.py"
+      - plan
+      - --mode
+      - "{{ personal_tools_mode }}"
+      - --extra-runtimes
+      - "{{ personal_tools_extra_runtimes | bool | ternary('true', 'false') }}"
+      - --platform
+      - "{{ ansible_facts['system'] }}"
+  check_mode: false
+  changed_when: false
+  when: ansible_check_mode

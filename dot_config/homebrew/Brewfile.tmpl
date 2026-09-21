@@ -20,17 +20,9 @@ tap "daviddwlee84/tap"  # personal CLIs — auto-trusted by the brew-bundle run-
 # Note: Most CLI tools are managed by ansible for better cross-platform support
 # Only add formulas here that you want to manage via Brewfile
 
-# translate — terminal translator (CLI+TUI). macOS via the public tap; Linux uses
-# `go install` (go_tools role). NOT installBrewApps-gated: it's a CLI wanted on every mac.
-{{ if eq .chezmoi.os "darwin" -}}
-brew "daviddwlee84/tap/translate"
-{{ end -}}
-
-# dev-cli — repository, task and worktree command center. macOS via the public
-# tap; Linux uses `go install` (go_tools role). Installs as the `dev` command.
-{{ if eq .chezmoi.os "darwin" -}}
-brew "daviddwlee84/tap/dev-cli"
-{{ end -}}
+# Personal CLIs are ensured by the personal_tools role, using the same tap.
+# Keep them out of Brewfile: upgrade-brew also runs brew bundle, which must not
+# resurrect a missing or disabled personal CLI.
 
 # gopls — Go language server used by Claude Code's official gopls-lsp plugin.
 # Linux installs the same binary via the go_tools role.

@@ -181,6 +181,10 @@ regen translate "completion zsh" "completion bash"
 regen mole "completion zsh" "completion bash"
 regen dev "completion zsh" "completion bash"
 regen lazyclash "completion zsh" "completion bash"
+regen lazychezmoi "completion zsh" "completion bash"
+regen lazymlflow "completion zsh" "completion bash"
+regen lazypueue "completion zsh" "completion bash"
+regen exp "completion zsh" "completion bash"
 regen summarize "completion zsh" "completion bash"
 
 if [ "$n_matched" -eq 0 ]; then

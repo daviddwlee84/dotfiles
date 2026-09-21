@@ -88,6 +88,10 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
 | `lazyclash` | `lazyclash completion zsh` |
+| `lazychezmoi` | `lazychezmoi completion zsh` |
+| `lazymlflow` | `lazymlflow completion zsh` |
+| `lazypueue` | `lazypueue completion zsh` |
+| `exp` | `exp completion zsh` |
 | `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
@@ -210,8 +214,8 @@ shell's file completion. Both are deployed shell CLIs (strategy B).
     `$(brew --prefix)/share/zsh/site-functions/_translate` exists on macOS. The
     `regen translate` row here still writes `~/.zfunc/_translate`, which wins
     (`~/.zfunc` comes first in `fpath`). That is harmless — both are generated
-    from the same binary — and the row must stay, because **Linux installs
-    `translate` with `go install`, which ships no completions at all**. Point 4
+    from the same binary — and the row must stay, because **Linux release installs and retained Go source installs use this
+    common generator to keep completions aligned with the active binary**. Point 4
     above applies to tools that are brew-only.
 
 ### What we DO track
@@ -223,7 +227,7 @@ shell's file completion. Both are deployed shell CLIs (strategy B).
 
 ## Generating Completions After Fresh Install
 
-**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` for its registered tools, including lazyclash. Missing tools are skipped; generated files stay outside chezmoi source control.
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` for its registered tools, including all seven personal CLIs. Missing tools are skipped; generated files stay outside chezmoi source control.
 
 For a narrow refresh after installation or an external upgrade:
 

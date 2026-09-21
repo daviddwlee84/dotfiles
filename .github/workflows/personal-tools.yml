@@ -1,0 +1,63 @@
+name: Personal tools
+
+on:
+  push:
+    branches: [main, feat/personal-tools]
+    paths:
+      - 'dot_ansible/roles/personal_tools/**'
+      - 'scripts/init/dotfiles_init.py'
+      - 'scripts/generate_completions.sh'
+      - 'tests/unit/test_personal_tools*.py'
+      - 'tests/integration/personal_tools_live.py'
+      - '.github/workflows/personal-tools.yml'
+  pull_request:
+    paths:
+      - 'dot_ansible/roles/personal_tools/**'
+      - 'scripts/init/dotfiles_init.py'
+      - 'scripts/generate_completions.sh'
+      - 'tests/unit/test_personal_tools*.py'
+      - 'tests/integration/personal_tools_live.py'
+      - '.github/workflows/personal-tools.yml'
+  workflow_dispatch:
+    inputs:
+      live_install:
+        description: Install all seven public releases on disposable runners
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Ownership, rollback, Ansible and prompt fixtures
+        run: >-
+          uv run --no-project --python 3.12 --with ansible-core
+          --with rich --with questionary --with tyro
+          python -m unittest discover -s tests/unit -p 'test_personal_tools*.py' -v
+      - name: Generated prompts stay in sync
+        run: uv run --script scripts/init/dotfiles_init.py gen --source . --check
+
+  live-install:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_install
+    needs: fixtures
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Native Ansible install, receipts, completions and second apply
+        env:
+          PERSONAL_TOOLS_LIVE: '1'
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: >-
+          uv run --no-project --python 3.12 --with ansible-core
+          python tests/integration/personal_tools_live.py

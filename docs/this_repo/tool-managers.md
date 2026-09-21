@@ -36,7 +36,7 @@ If you want to know:
 | **npm** (global) | JS CLIs (Pi, copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli, summarize on Linux) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`); Pi's stable prefix is handled by `agents` |
 | **Mason** (Neovim tools) | Editor-local language servers, linters, formatters; shared Prettier fallback | LazyVim defaults/extras + `dot_config/nvim/lua/exact_plugins/mason.lua` | Manual `:MasonUpdate`, then `:MasonInstall prettier`; not `upgrade-plugins` |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | `lazyclash` on macOS/Linux; `translate`, `dev`, `gopls` on Linux (Homebrew owns their macOS copies) | `go_tools/defaults/main.yml`, per-tool `platforms` | `go` (`go install <pkg>@latest` per selected entry) |
+| **go** (`go install`) | Linux `gopls`; personal legacy source installs have their own owner | `go_tools/defaults/main.yml` | `go`; personal CLIs use `personal` |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, omp, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
@@ -44,6 +44,7 @@ If you want to know:
 | **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), pi-agents, toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
 | **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
+| **personal tools** | dev, translate, exp and four lazy CLIs; macOS Homebrew, Linux verified releases | `personal_tools/files/tools.json` | `personal` (`just upgrade-personal`) |
 
 ---
 
@@ -186,7 +187,7 @@ nothing, and kills `community.general.homebrew` on empty JSON with
 
 | File | Owns |
 |---|---|
-| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas`. Plus (macOS, **always** — not `installBrewApps`-gated): tap `daviddwlee84/tap` + formulas `translate` (prebuilt terminal translator with generated completions) and `dev-cli` (source-built `dev` repository/task/worktree command center with generated completions). Linux uses `go install` via `go_tools` |
+| `Brewfile.tmpl` (shared) | General macOS GUI support under `installBrewApps`, plus the personal tap and gopls. Personal CLI formulas are ensured by `personal_tools`, outside Brewfile, so `upgrade-brew` cannot reinstall missing personal tools through `brew bundle`. |
 | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
 | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
 
@@ -285,9 +286,9 @@ profile presets (`minimal`, `cloud-vm` planned, default-developer, …).
 
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
-| `base` | `git`, `git-lfs`, `curl`, `wget`, `ripgrep`, `fd`, `jq`, `tree`, `just`, `gcc`/`build-essential`/`make` | macOS: brew formulae · Debian: apt (`fd-find` + `/usr/bin/fd` symlink) · RedHat: yum · `just` always via `curl https://just.systems/install.sh` · Linux user-level GitHub-release fallback to `~/.local/bin` for ripgrep/fd/jq/git-lfs |
-| `homebrew` | (no installs — refresh + cleanup only, 24h-throttled) | n/a |
 | `atuin` | `atuin` shell history sync | macOS: brew formula · Linux: `curl https://setup.atuin.sh \| sh -s -- --non-interactive` → `~/.atuin/bin/` |
+| `homebrew` | (no installs — refresh + cleanup only, 24h-throttled) | n/a |
+| `base` | `git`, `git-lfs`, `curl`, `wget`, `ripgrep`, `fd`, `jq`, `tree`, `just`, `gcc`/`build-essential`/`make` | macOS: brew formulae · Debian: apt (`fd-find` + `/usr/bin/fd` symlink) · RedHat: yum · `just` always via `curl https://just.systems/install.sh` · Linux user-level GitHub-release fallback to `~/.local/bin` for ripgrep/fd/jq/git-lfs |
 | `nerdfonts` | `font-hack-nerd-font` | macOS: brew cask · Linux: download `Hack.zip` from `nerd-fonts/releases/latest` → `~/.local/share/fonts` + `fc-cache -fv` |
 
 #### 3.2 Shells (`bash`, `zsh`, `starship`)
@@ -641,45 +642,34 @@ only when the install needs extra build deps or a non-crates.io source
 
 ### 8. go (Go CLI tools)
 
-**Config**: `dot_ansible/roles/go_tools/defaults/main.yml`
+`dot_ansible/roles/go_tools/defaults/main.yml` now contains Linux `gopls` only;
+Homebrew owns macOS gopls. This role remains gated by `installExtraRuntimes`,
+uses mise Go, installs into `~/.local/bin` with `GOPATH=~/.local/share/go`, and
+preserves its `creates:` install-only guard. `just upgrade-go` explicitly runs
+`go install <package>@latest` for this non-personal manifest.
 
-**Go install**: the Go toolchain ships via mise (`go = "latest"`, gated on
-`installExtraRuntimes`). The role resolves the mise Go bin dir via
-`mise which go` and no-ops cleanly when Go is absent (so lean/CI hosts skip
-it). Binaries install into `~/.local/bin` via `GOBIN` (already on PATH via
-`dot_config/shell/00_exports.sh.tmpl`) — not `~/go/bin` (`GOPATH/bin`) or the
-version-pinned mise toolchain dir. A `creates:` guard makes the install
-idempotent.
+### Personal tools (Homebrew / verified releases / legacy Go)
 
-**Inventory**:
+`installPersonalTools` selects seven package-managed CLIs. The single registry is
+`dot_ansible/roles/personal_tools/files/tools.json`; the `personal_tools` role and
+`just upgrade-personal` share its selection and owner-aware installer.
 
-| Package | Binary |
-|---|---|
-| `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
-| `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
-| `golang.org/x/tools/gopls@v0.23.0` | `gopls` (Linux only; macOS → Homebrew `gopls`) |
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
+Explicit enablement uses Homebrew formulas on macOS and checksummed release
+archives on Linux amd64/arm64. Fresh install pins are recorded per tool; apply
+never upgrades an existing binary. Unknown binaries are preserved. Linux user
+installs need no sudo or Go SDK. Download/checksum/version failures preserve the
+previous installation and never silently fall back to compilation.
 
-**Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
-the pinned version). Install pins a known-good version for reproducible fresh
-boxes; upgrades move it forward — the same install-vs-upgrade split as cargo.
+A missing key retains the old selection and channels: macOS dev/translate via
+Brew; Linux dev/translate and macOS/Linux lazyclash via Go only when extra
+runtimes are enabled. Those Go installs still use the old fresh-install pins and
+XDG output/cache paths, and skip when no Go exists. `gopls` stays outside this
+suite. Backend daemons and credentials are never installed by the suite.
 
-Installation and upgrades select each entry's `platforms` from the same manifest.
-Existing Homebrew tools stay Linux-only here; lazyclash is selected on both
-Darwin and Linux. `installExtraRuntimes=false` still skips this role, and missing
-Go does not trigger another installer. This role installs only the lazyclash CLI;
-its separate `setup` command can explicitly install/register an owned native or
-Docker Mihomo client. Dotfiles apply does not install a core or seed credentials.
-v0.1.7 includes the shared shell adapter, foreground reverse SSH sharing, and a
-service consumer guard that rejects temporary SSH endpoints before Copilot startup
-or Docker daemon configuration; see [proxy helpers](../shells/aliases.md).
-
-**Adding a go tool**: append to `go_tools/defaults/main.yml` with `name`
-(`<module-path>@<version>`), `binary` (the executable used for the `creates:`
-guard), and an inline `platforms: [Linux, Darwin]` list. The dependency-free
-upgrade reader rejects malformed/unsupported records before selecting packages.
-Add self-generated completions to `scripts/generate_completions.sh`; for one
-tool use `scripts/generate_completions.sh --tool lazyclash --force`.
+See [Personal tools](../tools/personal-tools.md) for migration, ownership receipts,
+source-to-Brew backups, explicit upgrade, and platform limits. Register completion
+commands in `scripts/generate_completions.sh`; installer upgrades refresh only the
+changed tool's Bash/Zsh output.
 
 ### 9. dotnet (global .NET tools)
 
@@ -1114,7 +1104,7 @@ list.
 | **cursor** (IDE) | brew cask | `.deb` from `cursor.com/api/download` | Brewfile.darwin / gui_apps_linux |
 | **cursor-agent** (CLI) | curl `cursor.com/install` | same | coding_agents |
 | **dasel** | brew | release | devtools |
-| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | `go install` (`go_tools`) | Brewfile + go_tools — repository/task/worktree command center |
+| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Repository/task/worktree dashboard; binary `dev`. |
 | **dbeaver-community** | brew cask | n/a | Brewfile.darwin |
 | **diffnav** | brew | GitHub release | devtools |
 | **direnv** | brew | apt or curl-installer | devtools |
@@ -1128,6 +1118,7 @@ list.
 | **duckdb.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **ethtool** | n/a | apt / yum (`ethtool`) | wake_on_lan |
 | **exiftool** | brew | apt (`libimage-exiftool-perl`) | media_tools |
+| **exp-cli** (`exp`) | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Research workflow CLI and overview; binary `exp`. |
 | **eza** | brew | gierens.de apt repo → GitHub musl → brew aarch64 | devtools |
 | **fastfetch** | brew | (Linux release if added) | devtools |
 | **fd** | brew | apt (`fd-find` + symlink) → GitHub release | base |
@@ -1177,8 +1168,11 @@ list.
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh` (always) | same | base |
-| **lazyclash** | `go install` (`go_tools`) | `go install` (`go_tools`) | Core CLI/TUI and explicit client setup; shared proxy shell adapter, zsh/bash completions on apply |
+| **lazychezmoi** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Chezmoi state, diff, edit and apply TUI. |
+| **lazyclash** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Mihomo CLI/TUI and guarded proxy shell integration. |
 | **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
+| **lazymlflow** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — MLflow experiments, runs and artifact inspection. |
+| **lazypueue** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Pueue task/queue dashboard. |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **libreoffice** (`soffice`) | brew cask | apt (`libreoffice-writer/calc/impress`, no-recommends) | devtools |
@@ -1275,7 +1269,7 @@ list.
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
-| **translate** | brew (`daviddwlee84/tap`, prebuilt + completions) | go install (`go_tools`) | Brewfile + go_tools |
+| **translate** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Terminal translation CLI/TUI. |
 | **tree** | brew | apt/yum | base |
 | **tree-sitter** / **tree-sitter-cli** | brew | mise-npm → cargo fallback | lazyvim_deps |
 | **trippy** (`trip`) | brew | apt/release | networking_tools |
@@ -1353,7 +1347,8 @@ Is it a .NET global tool?
 └── No → continue
 
 Is it a Go CLI tool (installable via `go install`)?
-├── Yes → go (go_tools/defaults/main.yml: name=<module>@<ver>, binary=<cmd>, platforms=[Linux,Darwin])
+├── Personal CLI suite → personal_tools registry (Homebrew / verified release / legacy source)
+├── Other Go tool → go_tools/defaults/main.yml: name=<module>@<ver>, binary=<cmd>, platforms=[Linux,Darwin]
 │         · Installs to ~/.local/bin via GOBIN; gated on installExtraRuntimes
 │         · Upgrade handled by cat_go in scripts/upgrade_tools.sh (just upgrade-go)
 └── No → continue

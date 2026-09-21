@@ -13,6 +13,7 @@ _dotcfg_completion() {
     local flags="--set --yes --dry-run --no-apply --help"
     local keys="profile email name \
 installCodingAgents installLlmTools installAiDesktopApps \
+installPersonalTools \
 installPythonUvTools installJsCliTools installDotnetTools installAuditd \
 installIacTools installMediaTools installBitwarden installBrewApps \
 installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools \

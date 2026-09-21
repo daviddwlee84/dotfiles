@@ -129,7 +129,7 @@ description = "edit runtime config, validate, and reload"
 [[keys.command]]
 key = "prefix+d"
 type = "pane"
-command = "dev"
+command = "~/.config/herdr/personal-dev.sh"
 description = "dev repository/task dashboard (popup pane)"
 
 # Keep lazygit as a temporary pane rather than a near-full popup: popups are

@@ -12,6 +12,7 @@
 _dotcfg_keys=(
     profile email name
     installCodingAgents installLlmTools installAiDesktopApps
+    installPersonalTools
     installPythonUvTools installJsCliTools installDotnetTools installAuditd
     installIacTools installMediaTools installBitwarden installBrewApps
     installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools

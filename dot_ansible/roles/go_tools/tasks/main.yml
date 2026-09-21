@@ -62,8 +62,8 @@
 # `creates:` guard makes this install-only + idempotent — version bumps go
 # through `just upgrade-go` (scripts/upgrade_tools.sh cat_go), never a re-apply.
 #
-# Per-tool platforms keep macOS translate/dev/gopls on Homebrew while allowing
-# source-only lazyclash on Darwin and Linux. cat_go reads the same manifest.
+# gopls remains Linux-only here; personal CLIs use the personal_tools role.
+# cat_go reads this same non-personal manifest.
 - name: Validate Go CLI platform declarations
   ansible.builtin.assert:
     that:

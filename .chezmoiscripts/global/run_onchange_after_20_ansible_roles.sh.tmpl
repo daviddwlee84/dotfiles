@@ -38,6 +38,10 @@
 # rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
 # go_tools tasks: {{ include "dot_ansible/roles/go_tools/tasks/main.yml" | sha256sum }}
 # go_tools defaults: {{ include "dot_ansible/roles/go_tools/defaults/main.yml" | sha256sum }}
+# personal_tools tasks: {{ include "dot_ansible/roles/personal_tools/tasks/main.yml" | sha256sum }}
+# personal_tools defaults: {{ include "dot_ansible/roles/personal_tools/defaults/main.yml" | sha256sum }}
+# personal_tools installer: {{ include "dot_ansible/roles/personal_tools/files/personal_tools.py" | sha256sum }}
+# personal_tools registry: {{ include "dot_ansible/roles/personal_tools/files/tools.json" | sha256sum }}
 # ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
 # ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
 # starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
@@ -147,6 +151,7 @@ LOG_STREAM=stdout
 {{ include "scripts/lib/log_shared.sh" }}
 # --- end logging helper
 
+export CHEZMOI_SOURCE_DIR={{ .chezmoi.sourceDir | quote }}
 ANSIBLE_DIR="$HOME/.ansible"
 export ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg"
 INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
@@ -218,18 +223,18 @@ fi
 {{ if eq .chezmoi.os "darwin" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
-TAGS="homebrew,base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
+TAGS="homebrew,base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,personal_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
 {{ else if eq .profile "ubuntu_desktop" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Desktop: full desktop experience (no homebrew).
 # gui_apps bundles alacritty + AppImageLauncher + VSCode + Cursor (see
 # dot_ansible/roles/gui_apps_linux/tasks/main.yml); libfuse2 comes with it
 # so AppImage-based editors work out of the box on Ubuntu 22.04+.
-TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools,gui_apps"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,personal_tools,rust_cargo_tools,go_tools,ruby_gem_tools,gui_apps"
 {{ else if eq .profile "ubuntu_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Server: no GUI stuff (no nerdfonts)
-TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,personal_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
 {{ else if eq .profile "centos_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # CentOS Server: same playbook + tag set as Ubuntu Server. Ansible roles
@@ -238,7 +243,7 @@ PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # actually runs are the user-level GitHub-release / cargo / mise
 # fallbacks — see pitfalls/centos7-noroot.md for the gate-broadening
 # fix that lets those fire on RedHat too.
-TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,personal_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
 {{ else -}}
 warn "Unknown profile: {{ .profile }}"
 exit 0
@@ -336,7 +341,9 @@ TAGS="${TAGS},niri"
 # and chsh-to-bash). Default "zsh" so existing bashes (apply on a host
 # from before this prompt existed) keep zsh as login shell.
 {{ $primaryShell := "zsh" }}{{ if hasKey . "primaryShell" }}{{ $primaryShell = .primaryShell }}{{ end -}}
+{{ $personalToolsMode := "legacy" }}{{ if hasKey . "installPersonalTools" }}{{ if .installPersonalTools }}{{ $personalToolsMode = "enabled" }}{{ else }}{{ $personalToolsMode = "disabled" }}{{ end }}{{ end -}}
 EXTRA_VARS="primary_shell={{ $primaryShell }}"
+EXTRA_VARS="$EXTRA_VARS personal_tools_mode={{ $personalToolsMode }} personal_tools_extra_runtimes={{ $installExtraRuntimes }}"
 EXTRA_VARS="$EXTRA_VARS browser_tools_install_terminal={{ dig "installTerminalBrowser" true . }} browser_tools_install_playwright={{ dig "installPlaywrightCli" true . }} browser_tools_preload_chromium={{ dig "preloadPlaywrightChromium" false . }}"
 {{ if and $installBitwarden (or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")) -}}
 # Install Bitwarden Desktop app (for SSH agent) on desktop profiles

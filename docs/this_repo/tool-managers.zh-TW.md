@@ -39,7 +39,7 @@ Micro 隨 devtools 安裝：macOS 用 brew，Linux 用 apt／驗證 checksum 的
 | **uv** | Python CLI 工具（`python_uv_tools` ~13 個 + `llm_tools` 1 個 + `litellm`） | `dot_ansible/roles/python_uv_tools/defaults/main.yml`、`dot_ansible/roles/llm_tools/defaults/main.yml`、`coding_agents` 中的 ad-hoc `uv tool install`（specify-cli）+ `security_tools`（pre-commit） | `uv` (`uv tool upgrade --all`) |
 | **npm** (全域) | JS CLI（Pi、copilot-cli、codex、gemini-cli、openchamber、bitwarden、readability-cli）+ `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`、散布的 `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) / Pi 另由 `agents` 處理穩定 prefix |
 | **cargo** | Rust crates：`recon`、`pueue`（Linux）、`tree-sitter-cli`（fallback）、`alacritty`（Linux 編譯）、`modelsdev`（Linux fallback） | `rust_cargo_tools/defaults/main.yml`（目前為 `[]`）+ 在 task 中硬寫 | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | lazyclash 用於 macOS/Linux；translate、dev、gopls 僅 Linux（macOS 副本由 Homebrew 管理） | `go_tools/defaults/main.yml`，逐項 `platforms` | `go`（依平台執行 `go install <pkg>@latest`） |
+| **go** (`go install`) | Linux gopls；個人工具來源另由 personal role 管理 | `go_tools/defaults/main.yml` | `go` |
 | **dotnet** (全域工具) | `azure-cost-cli`（binary `azure-cost`） | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli`（binary `try`）、`tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (廠商 `install.sh`) | 自管 coding agents + 少數系統工具：claude、opencode、omp、cursor-agent、agy、rtk、ollama、atuin、docker、zoxide、direnv、just、llmfit、starship | `dot_ansible/roles/coding_agents/`、`llm_tools/`、`devtools/`、`starship/`、`atuin/`、`docker/`、bootstrap | `agents`（其中具自我更新 (self-update) 子命令的子集） |
@@ -47,6 +47,7 @@ Micro 隨 devtools 安裝：macOS 用 brew，Linux 用 apt／驗證 checksum 的
 | **chezmoi externals** | 每週刷新的 git checkout：oh-my-zsh + 插件、oh-my-bash、ble.sh、TPM、fzf（Linux）、pi-agents、toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | 發行版套件（編譯依賴、ffmpeg、audit、fontconfig、libnotify-bin、系統 git/zsh/bash 等） | role 中散布的 `ansible.builtin.apt:` / `ansible.builtin.yum:` | **無**（依賴 repo 流程外的 `apt upgrade`） |
 | **flatpak** | Discord（Linux 上的預設頻道） | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
+| **personal tools** | dev、translate、exp 與四個 lazy CLI | `personal_tools/files/tools.json` | `personal` |
 
 ---
 
@@ -181,7 +182,7 @@ ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew
 
 | 檔案 | 擁有什麼 |
 |---|---|
-| `Brewfile.tmpl`(共用) | 一般 macOS GUI 支援（`installBrewApps=true`）加上永遠安裝的 `daviddwlee84/tap` 個人 CLI：`translate` 與 `dev-cli`（binary `dev`）；Linux 由 `go_tools` 透過 `go install` 安裝 |
+| `Brewfile.tmpl`(共用) | macOS GUI 選項、personal tap 與 gopls；七個 personal formula 由 personal_tools 在 apply 管理，不放 Brewfile，避免 brew bundle 在 upgrade 補裝。 |
 | `Brewfile.darwin.tmpl` | 全部 GUI casks — 見下表 |
 | `Brewfile.linux.tmpl` | 空白(只有被註解掉的佔位) |
 
@@ -271,9 +272,9 @@ bundle 腳本 `scripts/init/dotfiles_init.py` 定義 profile 預設
 
 | Role | 擁有什麼 | OS 機制 |
 |---|---|---|
-| `base` | `git`、`git-lfs`、`curl`、`wget`、`ripgrep`、`fd`、`jq`、`tree`、`just`、`gcc`/`build-essential`/`make` | macOS:brew formulae · Debian:apt(`fd-find` + `/usr/bin/fd` symlink) · RedHat:yum · `just` 永遠走 `curl https://just.systems/install.sh` · Linux 使用者層級 GitHub-release fallback 到 `~/.local/bin`:ripgrep/fd/jq/git-lfs |
-| `homebrew` | (無安裝 — 只做刷新 + 清理,24h 節流) | n/a |
 | `atuin` | `atuin` shell history 同步 | macOS:brew formula · Linux:`curl https://setup.atuin.sh \| sh -s -- --non-interactive` → `~/.atuin/bin/` |
+| `homebrew` | (無安裝 — 只做刷新 + 清理,24h 節流) | n/a |
+| `base` | `git`、`git-lfs`、`curl`、`wget`、`ripgrep`、`fd`、`jq`、`tree`、`just`、`gcc`/`build-essential`/`make` | macOS:brew formulae · Debian:apt(`fd-find` + `/usr/bin/fd` symlink) · RedHat:yum · `just` 永遠走 `curl https://just.systems/install.sh` · Linux 使用者層級 GitHub-release fallback 到 `~/.local/bin`:ripgrep/fd/jq/git-lfs |
 | `nerdfonts` | `font-hack-nerd-font` | macOS:brew cask · Linux:從 `nerd-fonts/releases/latest` 下載 `Hack.zip` → `~/.local/share/fonts` + `fc-cache -fv` |
 
 #### 3.2 Shells (`bash`、`zsh`、`starship`)
@@ -604,31 +605,25 @@ Pi 使用固定的 `~/.local` prefix，因此由 `just upgrade-agents` 先跑
 (由 `cargo install-update -a` 涵蓋);只在安裝需要額外編譯依賴或非
 crates.io 來源時才 hard-code 到 `tasks/main.yml`(見 `recon`、`pueue`)。
 
-### Go CLI（平台別原始碼安裝）
+### Go CLI 與個人工具套件
 
-設定來源是 `dot_ansible/roles/go_tools/defaults/main.yml`，每筆包含固定版本的
-`name`、輸出的 `binary`，以及單行 `platforms: [Linux, Darwin]`。Ansible
-安裝與 `just upgrade-go` 都依此選擇平台；升級用的免依賴 parser 會先驗證所有
-record，不接受不完整或未支援的格式。
+`go_tools/defaults/main.yml` 現只管理 Linux 的 `gopls`；macOS gopls 仍由
+Homebrew 管理。它維持 `installExtraRuntimes`、mise Go、`creates:` 與
+`just upgrade-go` 的既有 install-only／明確升級分工。
 
-| 套件 | 平台／管理方式 |
-|---|---|
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
-| `github.com/daviddwlee84/translate@v0.5.2` | Linux 用 Go；macOS 用 Homebrew |
-| `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | Linux 用 Go；macOS 用 Homebrew |
-| `golang.org/x/tools/gopls@v0.23.0` | Linux 用 Go；macOS 用 Homebrew |
+七個個人工具改由 `personal_tools` role 管理，單一來源是
+`dot_ansible/roles/personal_tools/files/tools.json`。`installPersonalTools=true`
+時 macOS 走 Homebrew formula，Linux amd64/arm64 走驗證 checksum 的 GitHub
+release；一般安裝不需 Go 或 sudo。`just upgrade-personal` 只升級已安裝且能辨識
+owner 的選定工具，不補裝缺失工具，也不覆蓋未知同名程式。
 
-Go 由 mise 提供，仍受 `installExtraRuntimes` 控制；關閉時略過 role，缺少 Go
-也不會改走另一種 installer。Binary 經 `GOBIN` 安裝到已在 PATH 的
-`~/.local/bin`，module cache 經 `GOPATH` 使用 `~/.local/share/go`。
-`creates:` 保持 apply 僅補裝缺少的 binary；明確執行 `just upgrade-go` 才用
-`@latest` 升級。這個 role 只安裝 lazyclash CLI；另外明確執行 `lazyclash setup`
-才會進入受管理 native／Docker client 的預覽與安裝。Dotfiles apply 不安裝 core 或
-預填控制器密鑰。v0.1.7 包含共用 shell adapter、前景反向 SSH 分享，以及在 Copilot
-啟動或 Docker daemon 設定前拒絕臨時 SSH endpoint 的 service 檢查，見 [proxy helpers](../shells/aliases.md)。
+舊機缺少新 key 時保留舊選擇：macOS 的 dev／translate 維持 Brew；Linux 的
+這兩者與兩平台 lazyclash 仍受 extra runtimes 控制，使用既有 Go 安裝基線。
+Go output/cache 維持 `~/.local/bin`／`~/.local/share/go`；沒有 Go 就略過，
+不默默安裝 SDK。其他四個不會自動加入。套件只安裝 CLI，不啟動後端或建立密鑰。
 
-會自行產生 completion 的工具也要加入 `scripts/generate_completions.sh`。
-只刷新一個工具可用 `scripts/generate_completions.sh --tool lazyclash --force`。
+詳見 [個人工具](../tools/personal-tools.md) 的遷移、receipt、可回復 Brew
+轉換與平台限制。安裝／升級成功後沿用 completion generator 更新對應的兩個 shell。
 
 ### 8. dotnet (全域 .NET 工具)
 
@@ -1022,7 +1017,7 @@ agent-specific 升級路徑。
 | **cursor**(IDE) | brew cask | `.deb` 來自 `cursor.com/api/download` | Brewfile.darwin / gui_apps_linux |
 | **cursor-agent**(CLI) | curl `cursor.com/install` | 同 | coding_agents |
 | **dasel** | brew | release | devtools |
-| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | `go install` (`go_tools`) | Brewfile + go_tools — repository/task/worktree command center |
+| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
 | **dbeaver-community** | brew cask | n/a | Brewfile.darwin |
 | **diffnav** | brew | GitHub release | devtools |
 | **direnv** | brew | apt 或 curl-installer | devtools |
@@ -1033,6 +1028,7 @@ agent-specific 升級路徑。
 | **dotnet** | mise | mise | mise |
 | **duckdb** | brew | GitHub release | devtools |
 | **exiftool** | brew | apt(`libimage-exiftool-perl`) | media_tools |
+| **exp-cli** (`exp`) | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
 | **eza** | brew | gierens.de apt repo → GitHub musl → brew aarch64 | devtools |
 | **fastfetch** | brew | (Linux release 視情況) | devtools |
 | **fd** | brew | apt(`fd-find` + symlink)→ GitHub release | base |
@@ -1075,8 +1071,11 @@ agent-specific 升級路徑。
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab**(`jupyter-lab`) | uv tool(配 notebook、ipykernel 等) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh`(永遠) | 同 | base |
-| **lazyclash** | `go install`（`go_tools`） | `go install`（`go_tools`） | Core CLI/TUI、明確 client setup 與共用 proxy shell adapter；apply 產生 zsh/bash completion |
+| **lazychezmoi** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
+| **lazyclash** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
 | **lazygit** | brew → 官方 release fallback（最低 0.64.0） | 移除舊 PPA → brew 偵測 → 官方 system/user release（最低 0.64.0） | lazyvim_deps |
+| **lazymlflow** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
+| **lazypueue** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
 | **libnotify-bin** | n/a | apt(Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **litellm[proxy]**(`litellm`) | uv tool(python 3.13) | uv tool | llm_tools |
@@ -1151,6 +1150,7 @@ agent-specific 升級路徑。
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
+| **translate** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
 | **tree** | brew | apt/yum | base |
 | **tree-sitter** / **tree-sitter-cli** | brew | mise-npm → cargo fallback | lazyvim_deps |
 | **trippy**(`trip`) | brew | apt/release | networking_tools |

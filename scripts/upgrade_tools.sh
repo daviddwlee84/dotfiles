@@ -91,7 +91,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin herdr micro terminal-browser agents plugins yazi-plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go personal dotnet gem flatpak warp atuin herdr micro terminal-browser agents plugins yazi-plugins)
 
 usage() {
   cat <<EOF
@@ -574,7 +574,7 @@ cat_go() {
   fi
 
   # Use the same per-tool platform declaration as installation. In particular,
-  # macOS includes lazyclash without recreating Homebrew translate/dev/gopls.
+  # personal CLIs are handled by cat_personal; macOS gopls stays on Homebrew.
   local defaults_file="$_REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml"
   local selected_tools
   local tools=()
@@ -1203,6 +1203,12 @@ cat_micro() {
   _run sh "$_REPO_ROOT/dot_ansible/roles/devtools/files/install-micro.sh" --upgrade
 }
 
+# Personal upgrades only touch selected, installed tools and preserve their owner.
+cat_personal() {
+  _run python3 "$_REPO_ROOT/dot_ansible/roles/personal_tools/files/personal_tools.py" upgrade \
+    --completion-script "$_REPO_ROOT/scripts/generate_completions.sh"
+}
+
 # ============================================================================
 # Main: dispatch selected categories in defined order
 # ============================================================================
@@ -1228,6 +1234,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         npm) run_category npm cat_npm ;;
         cargo) run_category cargo cat_cargo ;;
         go) run_category go cat_go ;;
+        personal) run_category personal cat_personal ;;
         dotnet) run_category dotnet cat_dotnet ;;
         gem) run_category gem cat_gem ;;
         flatpak) run_category flatpak cat_flatpak ;;

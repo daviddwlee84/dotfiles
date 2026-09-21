@@ -97,6 +97,9 @@
     - role: go_tools
       tags: [go_tools]
 
+    - role: personal_tools
+      tags: [personal_tools]
+
     - role: llm_tools
       tags: [llm_tools]
 

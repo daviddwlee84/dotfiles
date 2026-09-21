@@ -1,0 +1,5 @@
+---
+# Missing chezmoi key is deliberately a legacy selection, not the new default.
+personal_tools_mode: legacy
+personal_tools_extra_runtimes: true
+personal_tools_completion_script: "{{ (lookup('env', 'CHEZMOI_SOURCE_DIR') ~ '/scripts/generate_completions.sh') if lookup('env', 'CHEZMOI_SOURCE_DIR') else '' }}"

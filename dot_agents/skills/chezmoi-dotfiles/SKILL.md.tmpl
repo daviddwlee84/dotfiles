@@ -143,9 +143,23 @@ project's own Playwright Test for committed CI tests.
 
 ## Package-managed personal CLIs
 
-- **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation, generated completion, agent-safe prepare/finalize/done/retire lifecycle, and receipt-backed `dev git` transactions. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the `go_tools` role. Source: `github.com/daviddwlee84/dev-cli`.
-- **`translate`** — terminal translator (CLI + TUI). macOS installs `daviddwlee84/tap/translate`; Linux uses the `go_tools` role.
-- **`lazyclash`** — CLI/TUI for local or SSH-accessible Mihomo cores, source-backed node/group editing and explicit native/Docker client setup. macOS/Linux use the platform-selected `go_tools` source manifest (requires `installExtraRuntimes`/Go), install into `~/.local/bin`, and upgrade via `just upgrade-go` or its explicit `upgrade` command. The apply-time completion generator owns zsh/bash files; narrow refresh: `scripts/generate_completions.sh --tool lazyclash --force`. v0.1.6+ supplies standalone `proxy shell-init` used by `50_networking.sh`: proxy-on/off own per-shell SSH sessions and restore previous env; set `LAZYCLASH_PROXY_SHELL=0` for legacy helpers. v0.1.7 adds `proxy ssh HOST [-- COMMAND...]` and foreground `proxy tunnel share HOST` for the opposite direction; printed exports belong on the remote host. Copilot startup and `docker-net on` check service lifetime and refuse known temporary SSH endpoints before side effects. Docker render/test generates consumer settings without writing the chezmoi-owned client `proxies.default`; legacy cache consumers reject private proxy credentials. Dotfiles apply installs only the CLI; `lazyclash setup` separately previews and installs a core with its own owner/rollback record. Source: `github.com/daviddwlee84/lazyclash`.
+`installPersonalTools` groups dev, translate, exp and the four lazy CLIs. Full
+bundles default on; cloud-vm/minimal off. Missing keys preserve legacy selection;
+choose explicitly with `dotcfg --set installPersonalTools=true --yes --no-apply`.
+Apply installs CLIs only (no daemons/credentials or first-use shims). New macOS
+installs use the personal tap; Linux amd64/arm64 uses verified releases without
+Go. `just upgrade-personal` preserves the active owner and skips missing/unknown
+binaries; generated Bash/Zsh completions follow successful changes. See
+`docs/tools/personal-tools.md`. `gopls` stays in generic `go_tools`.
+
+- **`dev`** — repository/task/worktree command center with a TUI, parent-shell navigation, generated completion, agent-safe prepare/finalize/done/retire lifecycle, and receipt-backed `dev git` transactions. macOS installs `daviddwlee84/tap/dev-cli`; Linux uses the personal release installer (legacy Go remains supported). Source: `github.com/daviddwlee84/dev-cli`.
+- **`translate`** — terminal translator (CLI + TUI). macOS installs `daviddwlee84/tap/translate`; Linux uses the personal release installer (legacy Go remains supported).
+- **`lazyclash`** — CLI/TUI for local or SSH-accessible Mihomo cores, source-backed node/group editing and explicit native/Docker client setup. macOS uses the personal tap; Linux new installs use verified releases in `~/.local/bin`, while legacy hosts retain source ownership. Upgrade through `just upgrade-personal` or the owning package manager. The apply-time completion generator owns zsh/bash files; narrow refresh: `scripts/generate_completions.sh --tool lazyclash --force`. v0.1.6+ supplies standalone `proxy shell-init` used by `50_networking.sh`: proxy-on/off own per-shell SSH sessions and restore previous env; set `LAZYCLASH_PROXY_SHELL=0` for legacy helpers. v0.1.7 adds `proxy ssh HOST [-- COMMAND...]` and foreground `proxy tunnel share HOST` for the opposite direction; printed exports belong on the remote host. Copilot startup and `docker-net on` check service lifetime and refuse known temporary SSH endpoints before side effects. Docker render/test generates consumer settings without writing the chezmoi-owned client `proxies.default`; legacy cache consumers reject private proxy credentials. Dotfiles apply installs only the CLI; `lazyclash setup` separately previews and installs a core with its own owner/rollback record. Source: `github.com/daviddwlee84/lazyclash`.
+
+- **`exp`** — Git-based research records, execution and a read-only overview.
+- **`lazychezmoi`** — inspect/edit/apply dotfile state through chezmoi.
+- **`lazymlflow`** — experiment/run/artifact exploration; local stores may need MLflow separately.
+- **`lazypueue`** — task and queue dashboard; Pueue daemons are configured separately.
 
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 

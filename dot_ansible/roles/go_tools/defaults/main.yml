@@ -7,7 +7,8 @@
 # is already on PATH (dot_config/shell/00_exports.sh.tmpl), matching where
 # cargo/uv/npm/dotnet tools land.
 #
-# Add tools here. Pin the version so a fresh box installs a known-good build;
+# Personal CLIs live in roles/personal_tools, including legacy source installs.
+# Add non-personal tools here. Pin the version so a fresh box installs a known-good build;
 # `binary` is the resulting executable name, used for the `creates:`
 # idempotency guard. Version bumps are handled by the upgrade path
 # (`just upgrade-go` → scripts/upgrade_tools.sh cat_go), NOT by editing the pin
@@ -18,29 +19,9 @@
 # Keep platforms on one line: the dependency-free upgrade manifest reader
 # validates this small schema before selecting packages.
 
-# Platform ownership is per tool: translate/dev/gopls stay Linux-only here
-# because Homebrew owns their macOS copies. lazyclash uses source installation
-# on both platforms until it has a package-manager release channel.
+# gopls stays Linux-only here; Homebrew owns its macOS copy.
 #
-# The translate pin was raised v0.1.0 → v0.5.2 on 2026-08-27. That is a FLOOR
-# bump, not an upgrade (the split above still holds): v0.1.0 predates almost the
-# whole tool — no dictionary, no TUI engine cycle, no `serve`/`mcp` — so a fresh
-# Linux box got something barely recognisable until someone ran `just upgrade-go`.
-#
-# Linux is now the only platform that builds translate from source. macOS gets a
-# prebuilt bottle-style binary from the tap and Windows a prebuilt scoop package;
-# both also install shell completions, which `go install` cannot — which is why
-# the `regen translate` row in scripts/generate_completions.sh has to stay.
 go_tools:
-  - name: github.com/daviddwlee84/translate@v0.5.2
-    binary: translate
-    platforms: [Linux]
-  - name: github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0
-    binary: dev
-    platforms: [Linux]
   - name: golang.org/x/tools/gopls@v0.23.0
     binary: gopls
     platforms: [Linux]
-  - name: github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7
-    binary: lazyclash
-    platforms: [Darwin, Linux]
