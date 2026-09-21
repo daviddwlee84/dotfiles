@@ -50,8 +50,10 @@ than silently compiling or installing a new SDK.
 pins, archive names and checksum filenames. Its Python helper is shared by the
 Ansible role and upgrades. Apply is install-only; an existing executable is not
 silently upgraded. A known legacy source binary on Linux stays source-owned.
-Legacy source installs retain their original Go pins, XDG module cache and
-missing-Go skip behavior.
+Legacy source installs use the registry’s explicit `legacy_pin`, retaining the
+XDG module cache and missing-Go skip behavior. The source-packaging baseline
+raises both release and existing legacy pins; it does not upgrade installed
+binaries during apply.
 
 Receipts live under `${XDG_DATA_HOME:-~/.local/share}/dotfiles/personal-tools/`.
 They record install origin; probe the actual binary for its current version,
@@ -92,6 +94,11 @@ releases on a schedule or manual dispatch, verifies the complete archive set and
 checksums, and updates only changed formulas. It retains the previous formula
 when a release is incomplete or inconsistent. Formula publication does not
 require distributing a tap-write token to every application repository.
+
+Binary packages contain runtime files only. The source-packaging releases also
+provide checksummed source archives and exclude development transcripts/plans
+from Go module downloads while preserving build inputs. These exclusions do not
+reduce a full Git clone or remove published history.
 
 After publishing a release, update a fresh-install pin only when deliberately
 raising the baseline; normal upgrades use the latest stable release for the

@@ -33,7 +33,9 @@ completion、picker、背景服務檢查只使用已安裝的程式。
 單一 registry 是 `dot_ansible/roles/personal_tools/files/tools.json`，記錄 package、
 binary、版本與 archive/checksum 名稱；Ansible role 與 upgrade 共用同一個 helper。
 Apply 只補裝缺少工具，不自動升級已有 binary。Linux 已有的 source-owned 程式
-保留原管理方式；legacy Go 安裝維持舊基線、XDG cache 與缺少 Go 時略過的行為。
+保留原管理方式；legacy Go 安裝使用 registry 的明確 `legacy_pin`，保留 XDG cache
+與缺少 Go 時略過的行為。這次 source packaging 基線同步提高 release 與既有
+legacy pin，但 apply 不會升級已安裝的 binary。
 
 Receipt 位於 `${XDG_DATA_HOME:-~/.local/share}/dotfiles/personal-tools/`，用來記錄
 安裝來源；目前版本仍以實際 binary 為準，因為原生 updater 可能已更新它。
@@ -66,6 +68,10 @@ scripts/generate_completions.sh --tool lazymlflow --force
 各應用 repo 發佈自己的 binary；tap 定時或手動讀取 stable public release，驗證
 完整產物與 checksum 後更新有變動的 formula。不完整或不一致的 release 保留舊
 formula。這樣不必替每個應用 repo 都配置 tap-write token。
+
+Binary 套件只包含執行所需檔案。Source packaging 版本另提供有 checksum 的
+source archive，並從 Go module 下載排除開發對話／計畫、保留編譯所需檔案。
+這些排除不會縮小完整 Git clone，也不會刪除已公開的歷史。
 
 工具新增／移除時，同步 registry、兩語言 tool inventory、upgrade 文件、completion
 與 chezmoi agent skill。只有刻意提高新機基線時才改 pin；一般升級跟隨現有 owner

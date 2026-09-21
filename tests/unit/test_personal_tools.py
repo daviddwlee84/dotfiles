@@ -48,6 +48,16 @@ class ReleaseTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {"HOME": str(self.home), "XDG_DATA_HOME": str(self.home / "data"), "PATH": str(self.home / ".local/bin") + ":/usr/bin:/bin"})
         self.env.start()
         self.addCleanup(self.env.stop)
+        # Fixture releases deliberately remain stable as production baselines advance.
+        tools = m.load_tools()
+        for tool in tools:
+            if tool["id"] == "lazypueue":
+                tool["pin"] = "v0.1.0"
+            elif tool["id"] == "lazyclash":
+                tool["legacy_pin"] = "v0.1.7"
+        registry = patch.object(m, "load_tools", return_value=tools)
+        registry.start()
+        self.addCleanup(registry.stop)
         self.tool = next(t for t in m.selection(m.load_tools(), "enabled", "Linux", False) if t["id"] == "lazypueue")
         self.installer = m.Installer(self.home, "Linux", "x86_64")
         self.target = self.installer.target(self.tool)
