@@ -398,7 +398,13 @@ class Installer:
         operation = {"brew": self.brew, "go": self.source, "release": self.release}[method]
         changed = operation(tool, upgrade=action == "upgrade")
         if changed:
-            self.refresh(tool)
+            try:
+                self.refresh(tool)
+            except (OSError, InstallError, subprocess.TimeoutExpired) as exc:
+                # Installation is already committed. Report that fact even
+                # when the independently regenerable completion step fails.
+                return dict(changed=True, status="failed", owner=method,
+                            error=f"Installed successfully, but completion refresh failed: {exc}")
         return dict(changed=bool(changed), status="missing-go" if changed is None else "ok", owner=method)
 
 
@@ -437,7 +443,7 @@ def main(argv=None):
                 result = installer.execute(tool, args.action, args.dry_run)
             except (OSError, ValueError, InstallError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
                 result = dict(changed=False, status="failed", error=str(exc))
-                failed = True
+            failed = failed or result["status"] == "failed"
             results.append(dict(tool=tool["id"], **result))
         print(json.dumps(dict(changed=any(row["changed"] for row in results), results=results)))
         return int(failed)

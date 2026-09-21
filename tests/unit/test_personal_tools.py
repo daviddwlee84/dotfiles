@@ -92,6 +92,17 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(self.installer.execute(self.tool, "upgrade")["status"], "not-installed")
         self.assertFalse(self.installer.state.exists())
 
+    def test_completion_failure_reports_committed_install_and_nonzero_exit(self):
+        with self.downloads(), patch.object(m.Installer, "refresh", side_effect=m.InstallError("fixture completion failure")), patch("sys.stdout", new_callable=io.StringIO) as output:
+            rc = m.main(["install", "--mode", "enabled", "--extra-runtimes", "false",
+                         "--platform", "Linux", "--arch", "amd64", "--tool", "lazypueue"])
+        self.assertEqual(rc, 1)
+        result = json.loads(output.getvalue())
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["results"][0]["status"], "failed")
+        self.assertEqual(m.check_version(self.target), "v0.1.0")
+        self.assertEqual(self.installer.receipt(self.tool)["version"], "v0.1.0")
+
     def test_bad_checksum_or_candidate_version_preserves_previous_install(self):
         self.install()
         before = self.target.read_bytes()
