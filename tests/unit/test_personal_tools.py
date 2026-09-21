@@ -165,6 +165,23 @@ class ReleaseTests(unittest.TestCase):
                     self.installer.execute(self.tool, "upgrade")
         self.assertEqual(self.target.read_text(), "concurrent user build")
 
+    def test_upgrade_never_downgrades_a_newer_native_update(self):
+        self.install()
+        self.target.write_text("#!/bin/sh\nprintf 'lazypueue v0.1.2\\n'\n")
+        with patch.object(m, "latest", return_value="v0.1.0"), patch.object(m, "fetch", side_effect=AssertionError("no downgrade download")):
+            result = self.installer.execute(self.tool, "upgrade")
+        self.assertFalse(result["changed"])
+        self.assertEqual(m.check_version(self.target), "v0.1.2")
+
+    def test_development_version_suffix_is_not_a_stable_release(self):
+        self.target.parent.mkdir(parents=True)
+        for version in ("v0.1.0-SNAPSHOT", "v0.1.0+dirty", "v0.1.0-rc.1"):
+            with self.subTest(version=version):
+                self.target.write_text(f"#!/bin/sh\nprintf 'lazypueue {version}\\n'\n")
+                self.target.chmod(0o755)
+                with self.assertRaises(m.InstallError):
+                    m.check_version(self.target, "v0.1.0")
+
     def test_upgrade_preserves_actual_source_owner(self):
         self.target.parent.mkdir(parents=True)
         self.target.write_text("source fixture")

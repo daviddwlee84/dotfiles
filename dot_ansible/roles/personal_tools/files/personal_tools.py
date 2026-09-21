@@ -116,8 +116,8 @@ def latest(tool):
 
 def check_version(binary, tag=None):
     output = run([str(binary), "--version"], timeout=20)
-    versions = re.findall(r"(?<![\w.])v?(\d+\.\d+\.\d+)(?![\w.])", output)
-    if not versions or (tag is not None and tag.removeprefix("v") not in versions):
+    versions = re.findall(r"(?<![\w.])v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*)(?![\w.+-])", output)
+    if not versions or not TAG.fullmatch("v" + versions[0]) or (tag is not None and tag != "v" + versions[0]):
         raise InstallError(f"Candidate version does not match {tag or 'a stable release'}")
     return "v" + versions[0]
 
@@ -282,8 +282,10 @@ class Installer:
         if target.is_symlink():
             raise InstallError("Refusing to replace a symlinked executable")
         tag = latest(tool) if upgrade else tool["pin"]
-        if upgrade and check_version(target) == tag:
-            return False
+        if upgrade:
+            installed = check_version(target)
+            if tuple(map(int, tag[1:].split("."))) <= tuple(map(int, installed[1:].split("."))):
+                return False  # A native updater may already be ahead of latest.
         asset = tool["archive"].format(repo=tool["id"], tag=tag, version=tag[1:], os="linux", arch=self.arch)
         base = f"https://github.com/{tool['repo']}/releases/download/{tag}/"
         with tempfile.TemporaryDirectory(prefix="personal-tool-") as tmp:
