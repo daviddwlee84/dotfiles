@@ -134,10 +134,19 @@ model even when no local pin file exists.
 
 Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 
+With lazyclash v0.1.7+, startup and restart check the selected endpoint for service
+use before installing a package, rotating logs or touching a running backend.
+Temporary shell/foreground SSH endpoints are refused, including copied URLs. Use a
+stable local proxy or explicit stable endpoint. Resolver ambiguity, authentication
+and unavailable-session errors stop startup; only a genuinely unconfigured proxy
+allows `auto` to go direct. Stable overrides replace all six proxy variables and
+remove inherited SSH lifetime markers from the backend. Older lazyclash versions
+retain the compatibility resolver until explicitly upgraded.
+
 | Env var | Default | Meaning |
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
-| `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
+| `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` uses a detected proxy, or direct only when none is configured; `always` requires a proxy; `never` clears inherited proxy variables for direct access; or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
 | `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.5.2` pin. While set, update/rollback refuse to change persisted state. |
 | `COPILOT_ASTRA_COMPACT_RATIO` | `0.70` | New Astra sessions/pins compact against this fraction of the live prompt ceiling; numeric `0 < ratio <= 1`. Explicit client compact settings take precedence. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |

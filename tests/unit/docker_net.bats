@@ -217,7 +217,7 @@ exit 0
 STUB
   chmod +x "$BATS_STUB_DIR/docker"
 
-  run bash --norc -c "source '$DNET_FILE'; _dnet_pull ghcr.io/foo/bar:v1"
+  run bash --norc -c "source '$DNET_FILE'; _dnet_have() { [ \"\$1\" != skopeo ] && command -v \"\$1\" >/dev/null 2>&1; }; _dnet_pull ghcr.io/foo/bar:v1"
   [ "$status" -ne 0 ]
   [[ "$output" == *"rung 1"* ]]
   [[ "$output" == *"registry-mirrors only covers Docker Hub, not ghcr.io"* ]]
@@ -234,7 +234,7 @@ exit 0
 STUB
   chmod +x "$BATS_STUB_DIR/docker"
 
-  run bash --norc -c "source '$DNET_FILE'; _dnet_pull nginx:1.2"
+  run bash --norc -c "source '$DNET_FILE'; _dnet_have() { [ \"\$1\" != skopeo ] && command -v \"\$1\" >/dev/null 2>&1; }; _dnet_pull nginx:1.2"
   [ "$status" -ne 0 ]
   [[ "$output" == *"rung 2: docker pull docker.m.daocloud.io/library/nginx:1.2"* ]]
 }

@@ -579,6 +579,21 @@ When lazyclash supports `proxy shell-init` (v0.1.6+), this module delegates `pro
 
 The `LOCAL_PROXY_URL` / `LOCAL_PROXY_SOCKS_URL` manual override remains supported when no target was chosen. Existing `docker-net` / Copilot cache consumers use the same resolver but refuse authenticated proxy URLs and custom CA settings, because they print or persist those caches; use native `proxy-on` / `proxy exec` for authenticated proxies. Persistent HTTPS-over-SSH env export is unsupported because replacing the proxy hostname with localhost would change TLS verification; use an HTTP/SOCKS data endpoint or direct HTTPS endpoint.
 
+With v0.1.7+, `copilot-proxy start/restart` and `docker-net on` request a service-safe
+endpoint before changing runtime state. A known shell/foreground SSH listener is
+rejected even when its URL was copied explicitly. Use a stable local proxy or an
+explicit stable endpoint for background services. Copilot `auto` goes direct only
+when no proxy is configured; ambiguity, authentication and lifetime errors stop the
+operation. `always` requires a proxy; `never` clears inherited proxy variables for
+the backend. Older CLIs keep the compatibility path until explicitly upgraded.
+
+The opposite SSH direction is explicit: `lazyclash proxy ssh HOST` shares a selected
+proxy reachable from this machine with one remote shell; append `-- COMMAND...` for
+one remote command. `lazyclash proxy tunnel share HOST` stays in the foreground and
+prints exports to run **on that remote host**. Its remote listener is loopback-only,
+and Ctrl+C closes the share. These commands do not configure Docker or a persistent
+remote service; `proxy-on --target ID` continues to consume a remote proxy locally.
+
 Docker exports are separate: `lazyclash proxy docker render --endpoint URL` produces an env file, Compose overlay, build arguments or JSON snippet; it does not edit `~/.docker/config.json`. That file's `proxies.default` remains owned by the chezmoi template and its apply-time `LOCAL_PROXY_URL`. The consumer endpoint must be reachable from the container/builder; localhost is never rewritten automatically. `proxy docker test --container NAME` or `--image LOCAL_IMAGE` tests inside a container without pulling an image. Daemon changes remain explicit `docker-net`/native owner operations, not a side effect of proxy-on.
 
 Legacy fallback behavior:

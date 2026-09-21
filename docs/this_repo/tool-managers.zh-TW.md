@@ -613,7 +613,7 @@ record，不接受不完整或未支援的格式。
 
 | 套件 | 平台／管理方式 |
 |---|---|
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.6` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7` | Darwin、Linux 都用 Go 原始碼安裝，目前沒有 Homebrew formula |
 | `github.com/daviddwlee84/translate@v0.5.2` | Linux 用 Go；macOS 用 Homebrew |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | Linux 用 Go；macOS 用 Homebrew |
 | `golang.org/x/tools/gopls@v0.23.0` | Linux 用 Go；macOS 用 Homebrew |
@@ -624,7 +624,8 @@ Go 由 mise 提供，仍受 `installExtraRuntimes` 控制；關閉時略過 role
 `creates:` 保持 apply 僅補裝缺少的 binary；明確執行 `just upgrade-go` 才用
 `@latest` 升級。這個 role 只安裝 lazyclash CLI；另外明確執行 `lazyclash setup`
 才會進入受管理 native／Docker client 的預覽與安裝。Dotfiles apply 不安裝 core 或
-預填控制器密鑰。v0.1.6 也提供共用 shell proxy adapter，見 [proxy helpers](../shells/aliases.md)。
+預填控制器密鑰。v0.1.7 包含共用 shell adapter、前景反向 SSH 分享，以及在 Copilot
+啟動或 Docker daemon 設定前拒絕臨時 SSH endpoint 的 service 檢查，見 [proxy helpers](../shells/aliases.md)。
 
 會自行產生 completion 的工具也要加入 `scripts/generate_completions.sh`。
 只刷新一個工具可用 `scripts/generate_completions.sh --tool lazyclash --force`。

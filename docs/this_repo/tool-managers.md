@@ -658,7 +658,7 @@ idempotent.
 | `github.com/daviddwlee84/translate@v0.5.2` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`, Windows → scoop `daviddwlee84/translate`) |
 | `github.com/daviddwlee84/dev-cli/cmd/dev@v0.1.0` | `dev` (Linux only; macOS → Homebrew `daviddwlee84/tap/dev-cli`) |
 | `golang.org/x/tools/gopls@v0.23.0` | `gopls` (Linux only; macOS → Homebrew `gopls`) |
-| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.6` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
+| `github.com/daviddwlee84/lazyclash/cmd/lazyclash@v0.1.7` | `lazyclash` (Darwin and Linux; source channel, no Homebrew formula) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
@@ -670,7 +670,9 @@ Darwin and Linux. `installExtraRuntimes=false` still skips this role, and missin
 Go does not trigger another installer. This role installs only the lazyclash CLI;
 its separate `setup` command can explicitly install/register an owned native or
 Docker Mihomo client. Dotfiles apply does not install a core or seed credentials.
-v0.1.6 also supplies the shared shell proxy adapter; see [proxy helpers](../shells/aliases.md).
+v0.1.7 includes the shared shell adapter, foreground reverse SSH sharing, and a
+service consumer guard that rejects temporary SSH endpoints before Copilot startup
+or Docker daemon configuration; see [proxy helpers](../shells/aliases.md).
 
 **Adding a go tool**: append to `go_tools/defaults/main.yml` with `name`
 (`<module-path>@<version>`), `binary` (the executable used for the `creates:`

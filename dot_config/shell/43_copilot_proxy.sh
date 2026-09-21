@@ -67,7 +67,7 @@
 #                                   macOS System Proxy), start with --proxy-env
 #                                   + HTTPS_PROXY. Node ignores System Proxy;
 #                                   TUN/Mixin used to hide this on GFW hosts.
-#                          always = same, but warn when no local proxy is found
+#                          always = require a configured, service-safe proxy
 #                          never  = never pass --proxy-env (non-GFW machines)
 #                          http://127.0.0.1:PORT = force that URL
 #   COPILOT_API_PKG      default: unset       - temporary highest-priority
@@ -1048,19 +1048,51 @@ _copilot_upstream_models() {
 # COPILOT_HTTP_PROXY:
 #   auto|always|never|<url>
 _copilot_resolve_http_proxy() {
-  local mode="${COPILOT_HTTP_PROXY:-auto}"
+  local mode="${COPILOT_HTTP_PROXY:-auto}" consumer="${1:-process}" explicit='' resolved rc
   case "$mode" in
     never|off|0|false|no) return 0 ;;
     http://*|https://*|socks5://*|socks5h://*)
-      printf '%s' "$mode"
-      return 0
+      explicit="$mode"
       ;;
     always|auto|on|1|true|yes|"") ;;
     *)
       printf '%s\n' "copilot-proxy: unknown COPILOT_HTTP_PROXY='$mode' (use auto|always|never|http://...)" >&2
-      return 0
+      return 2
       ;;
   esac
+
+  if [ "$consumer" = service ] && command -v __net_service_proxy >/dev/null 2>&1; then
+    if resolved="$(__net_service_proxy "$explicit")"; then
+      printf '%s' "$resolved"
+      return 0
+    else
+      rc=$?
+      if [ "$rc" -eq 4 ] && [ "$mode" = auto ]; then return 0; fi
+      [ "$rc" -ne 4 ] || printf '%s\n' 'copilot-proxy: a proxy is required but none is configured.' >&2
+      return "$rc"
+    fi
+  fi
+  # This file is also sourced standalone; a copied URL still needs the native
+  # registry guard even when 50_networking.sh has not installed its adapter.
+  if [ "$consumer" = service ] && command -v lazyclash >/dev/null 2>&1 \
+     && command lazyclash proxy _resolve-shell --help 2>/dev/null | command grep -q -- '--consumer'; then
+    local _NET_PROXY_CACHE _NET_PROXY_SOCKS_CACHE _NET_PROXY_SOURCE_CACHE
+    if [ -n "$explicit" ]; then
+      resolved="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$explicit")"
+    else
+      resolved="$(command lazyclash proxy _resolve-shell --consumer service)"
+    fi
+    rc=$?
+    if [ "$rc" -eq 0 ]; then eval "$resolved"; printf '%s' "$_NET_PROXY_CACHE"; return 0; fi
+    [ "$rc" -eq 4 ] && [ "$mode" = auto ] && return 0
+    [ "$rc" -ne 4 ] || printf '%s\n' 'copilot-proxy: a proxy is required but none is configured.' >&2
+    return "$rc"
+  fi
+  if [ "$consumer" = service ] && [ -n "${LAZYCLASH_PROXY_ORIGIN:-}" ]; then
+    printf '%s\n' 'copilot-proxy: load the current networking helpers to check this temporary proxy before starting a service.' >&2
+    return 1
+  fi
+  if [ -n "$explicit" ]; then printf '%s' "$explicit"; return 0; fi
 
   # Prefer the shared detector (Clash Verge / mihomo / CFW / System Proxy).
   if command -v __net_detect_proxy >/dev/null 2>&1; then
@@ -1069,7 +1101,15 @@ _copilot_resolve_http_proxy() {
        && [ "$_NET_PROXY_CACHE" != "none" ]; then
       printf '%s' "$_NET_PROXY_CACHE"
       return 0
+    else
+      rc=$?
+      if [ "${_NET_PROXY_NATIVE:-0}" = 1 ]; then
+        [ "$rc" -eq 4 ] && [ "$mode" = auto ] && return 0
+        return "$rc"
+      fi
     fi
+    case "$mode" in always|on|1|true|yes) printf '%s\n' 'copilot-proxy: a proxy is required but none is configured.' >&2; return 4 ;; esac
+    return 0
   fi
 
   # Fallback when 50_networking.sh isn't sourced yet (rare; file order is 43→50).
@@ -1079,6 +1119,7 @@ _copilot_resolve_http_proxy() {
     printf '%s' "http://$sys"
     return 0
   fi
+  case "$mode" in always|on|1|true|yes) printf '%s\n' 'copilot-proxy: a proxy is required but none is configured.' >&2; return 4 ;; esac
   return 0
 }
 
@@ -1138,6 +1179,9 @@ copilot-proxy() {
   local action="${1:-status}"
   case "$action" in
     start)
+      # Check before shim startup, package installation, log rotation or nohup.
+      local http_proxy_url
+      http_proxy_url="$(_copilot_resolve_http_proxy service)" || return $?
       if _copilot_alive; then
         _copilot_require_shim || return 1
         printf '%s\n' "copilot-proxy: already running on port $port" >&2
@@ -1161,19 +1205,11 @@ copilot-proxy() {
       # launch (the old `bunx <pkg> start`) is what used to hang forever behind a
       # socks proxy, with nothing but "Resolving dependencies" in the log.
       _copilot_ensure_pkg || return 1
-      local bin srv_pid http_proxy_url use_proxy_env=0
+      local bin srv_pid use_proxy_env=0
       bin="$(_copilot_pkg_bin)"
-      http_proxy_url="$(_copilot_resolve_http_proxy)"
       if [ -n "$http_proxy_url" ]; then
         use_proxy_env=1
         printf '%s\n' "copilot-proxy: Node will fetch /models via $http_proxy_url (--proxy-env; COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto})"
-      else
-        case "${COPILOT_HTTP_PROXY:-auto}" in
-          always|on|1|true|yes)
-            printf '%s\n' "copilot-proxy: COPILOT_HTTP_PROXY=always but no local proxy detected — starting DIRECT (Claude catalog may be geo-filtered)." >&2
-            printf '%s\n' "  hint: start Clash Verge / mihomo, or set COPILOT_HTTP_PROXY=http://127.0.0.1:7897" >&2
-            ;;
-        esac
       fi
 
       # Flag sets differ per package: only the original has --rate-limit/--wait
@@ -1183,15 +1219,19 @@ copilot-proxy() {
         printf '%s\n' "copilot-proxy: starting ($pkg) on port $port (rate-limit ${COPILOT_PROXY_RATE:-15}s) ..."
         # Original package: HTTPS_PROXY alone is enough (no --proxy-env flag).
         if [ "$use_proxy_env" -eq 1 ]; then
-          nohup env HTTP_PROXY="$http_proxy_url" HTTPS_PROXY="$http_proxy_url" \
+          nohup env -u LAZYCLASH_PROXY_ORIGIN -u LAZYCLASH_PROXY_SESSION \
+            HTTP_PROXY="$http_proxy_url" HTTPS_PROXY="$http_proxy_url" \
             http_proxy="$http_proxy_url" https_proxy="$http_proxy_url" \
+            ALL_PROXY="$http_proxy_url" all_proxy="$http_proxy_url" \
             "$bin" start \
             --port "$port" \
             --rate-limit "${COPILOT_PROXY_RATE:-15}" \
             --wait \
             >"$logf" 2>&1 &
         else
-          nohup "$bin" start \
+          nohup env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
+            -u ALL_PROXY -u all_proxy -u LAZYCLASH_PROXY_ORIGIN -u LAZYCLASH_PROXY_SESSION \
+            "$bin" start \
             --port "$port" \
             --rate-limit "${COPILOT_PROXY_RATE:-15}" \
             --wait \
@@ -1201,14 +1241,18 @@ copilot-proxy() {
         printf '%s\n' "copilot-proxy: starting ($pkg) on port $port ..."
         # Fork: needs --proxy-env so Node fetch honours HTTPS_PROXY.
         if [ "$use_proxy_env" -eq 1 ]; then
-          nohup env HTTP_PROXY="$http_proxy_url" HTTPS_PROXY="$http_proxy_url" \
+          nohup env -u LAZYCLASH_PROXY_ORIGIN -u LAZYCLASH_PROXY_SESSION \
+            HTTP_PROXY="$http_proxy_url" HTTPS_PROXY="$http_proxy_url" \
             http_proxy="$http_proxy_url" https_proxy="$http_proxy_url" \
+            ALL_PROXY="$http_proxy_url" all_proxy="$http_proxy_url" \
             "$bin" start \
             --port "$port" \
             --proxy-env \
             >"$logf" 2>&1 &
         else
-          nohup "$bin" start \
+          nohup env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
+            -u ALL_PROXY -u all_proxy -u LAZYCLASH_PROXY_ORIGIN -u LAZYCLASH_PROXY_SESSION \
+            "$bin" start \
             --port "$port" \
             >"$logf" 2>&1 &
         fi
@@ -1265,6 +1309,7 @@ copilot-proxy() {
       printf '%s\n' "copilot-proxy: stopped (port $port free)"
       ;;
     restart)
+      _copilot_resolve_http_proxy service >/dev/null || return $?
       copilot-proxy stop || return 1
       copilot-proxy start
       ;;

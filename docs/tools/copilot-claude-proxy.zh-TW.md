@@ -117,10 +117,17 @@ permissions 與 session 中其他合法設定變更全部保留。即使 local p
 
 在 `$COPILOT_PROXY_PORT`（預設 `4141`）管理背景代理。
 
+搭配 lazyclash v0.1.7+ 時，啟動與重啟會先檢查 endpoint 是否適合長期服務，再安裝
+套件、輪替 log 或操作現有 backend。Shell／前景指令持有的臨時 SSH endpoint 會被
+拒絕，複製 URL 也一樣；請選穩定的本機代理或明確的穩定 endpoint。解析歧義、認證
+與 session 失效都會中止；只有確實尚未配置 proxy 時，`auto` 才能直連。明確穩定
+覆寫會替換六個 proxy 環境變數，並移除 backend 繼承的 SSH 生命週期標記。舊版
+lazyclash 保留相容 resolver，直到使用者明確升級。
+
 | 環境變數 | 預設 | 意義 |
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | 代理監聽的 port |
-| `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto`（本機 Clash/Verge/mihomo 有在聽就帶 `--proxy-env`）、`never`（直連）、`always`（一定要偵測到 proxy）、或明確 URL |
+| `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto` 使用已配置代理，未配置才直連；`never` 清除 backend 繼承的 proxy 變數後直連；`always` 必須有代理；或明確 URL |
 | `COPILOT_API_PKG` | 未設定 | 最高優先的暫時套件覆寫；否則使用已保存的 exact selection，再 fallback 到內建 `@jeffreycao/copilot-api@2.5.2`。設著時 update/rollback 不會改 persisted state。 |
 | `COPILOT_ASTRA_COMPACT_RATIO` | `0.70` | 新 Astra session/pin 使用此比例乘以 live prompt ceiling，須滿足 `0 < ratio <= 1`；明確 client compact 設定優先。 |
 | `COPILOT_PROXY_RATE` | `15` | 僅舊版 `copilot-api@0.7.0` 使用；fork 沒有 rate limiter |

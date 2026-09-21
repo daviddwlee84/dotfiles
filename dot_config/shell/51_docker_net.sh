@@ -120,18 +120,42 @@ _dnet_hint() { printf '    %-26s → %s\n' "" "$1"; }
 # a scheme Go's proxy parser or curl understands, and a daemon configured with it
 # silently makes no connections at all.
 _dnet_resolve_proxy() {
-  local mode="${1:-${DOCKER_NET_PROXY:-auto}}"
+  local mode="${1:-${DOCKER_NET_PROXY:-auto}}" consumer="${2:-process}" explicit='' resolved rc
   case "$mode" in
     never|off|0|false|no) return 0 ;;
     socks://*)
       printf 'docker-net: %s is not a valid proxy scheme — use socks5:// (or http://)\n' "$mode" >&2
       return 1 ;;
-    http://*|https://*|socks5://*|socks5h://*) printf '%s' "$mode"; return 0 ;;
+    http://*|https://*|socks5://*|socks5h://*) explicit="$mode" ;;
     always|auto|on|1|true|yes|"") ;;
     *)
       printf 'docker-net: unknown proxy mode %s (use auto|always|never|http://...)\n' "$mode" >&2
       return 1 ;;
   esac
+
+  if [ "$consumer" = service ] && _dnet_have __net_service_proxy; then
+    if resolved="$(__net_service_proxy "$explicit")"; then printf '%s' "$resolved"; return 0; else return $?; fi
+  fi
+  # Keep the same guard when this module is sourced without 50_networking.sh.
+  if [ "$consumer" = service ] && _dnet_have lazyclash \
+     && command lazyclash proxy _resolve-shell --help 2>/dev/null | command grep -q -- '--consumer'; then
+    local _NET_PROXY_CACHE _NET_PROXY_SOCKS_CACHE _NET_PROXY_SOURCE_CACHE
+    if [ -n "$explicit" ]; then
+      resolved="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$explicit")"
+    else
+      resolved="$(command lazyclash proxy _resolve-shell --consumer service)"
+    fi
+    rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
+    eval "$resolved"
+    printf '%s' "$_NET_PROXY_CACHE"
+    return 0
+  fi
+  if [ "$consumer" = service ] && [ -n "${LAZYCLASH_PROXY_ORIGIN:-}" ]; then
+    printf '%s\n' 'docker-net: load the current networking helpers to check this temporary proxy before configuring a daemon.' >&2
+    return 1
+  fi
+  if [ -n "$explicit" ]; then printf '%s' "$explicit"; return 0; fi
 
   # Delegate to the detector behind proxy-status. The `command -v` guard mirrors
   # copilot-proxy's: file order puts 50_networking.sh first, but a user sourcing
@@ -822,17 +846,15 @@ _dnet_on() {
   done
 
   _dnet_report_init
-  _dnet_prime_proxy
-  _dnet_info_load || { printf 'docker-net: no reachable Docker daemon\n' >&2; return 1; }
-
   local proxy shape target noproxy
-  proxy="$(_dnet_resolve_proxy "${url:-${DOCKER_NET_PROXY:-auto}}")" || return 2
+  proxy="$(_dnet_resolve_proxy "${url:-${DOCKER_NET_PROXY:-auto}}" service)" || return $?
   if [ -z "$proxy" ]; then
     printf 'docker-net: no proxy detected and none given\n' >&2
     # shellcheck disable=SC2016 # Backticks are literal in the diagnostic message.
     printf '  try: docker-net on http://127.0.0.1:7890   (or start your proxy and `proxy-refresh`)\n' >&2
     return 1
   fi
+  _dnet_info_load || { printf 'docker-net: no reachable Docker daemon\n' >&2; return 1; }
   shape="$(_dnet_shape)"
 
   # Refuse early, before computing anything or prompting about containers.

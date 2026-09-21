@@ -112,6 +112,7 @@ Notes:
 
 - **Every configured mirror host is added to `no-proxy` automatically.** A CN mirror routed back out through your proxy is slower and often broken.
 - The URL comes from `__net_detect_proxy` when you do not pass one — same answer as `proxy-status`. Override with `DOCKER_NET_PROXY` (`auto|always|never|http://host:port`) or a positional argument.
+- With lazyclash v0.1.7+, `on` checks the endpoint for service use before daemon inspection, writes or restart. Known shell/foreground SSH listeners are refused, including explicitly copied URLs; use a stable endpoint. This check does not create a long-lived tunnel for Docker. Older CLI versions retain the existing compatibility path.
 - `socks://` is **rejected**. It is not a scheme Go's proxy parser or curl accepts, and a daemon configured with it makes no connections at all while looking configured. Use `socks5://`.
 - Running containers are listed and confirmed before the restart. Without a TTY (e.g. `fleet exec`) it refuses rather than hangs unless you pass `-y`.
 - Requires Docker Engine ≥ 23 for the `proxies` key. Older engines need the systemd drop-in recipe under "Daemon-side proxy" in [containers.md](containers.md).
@@ -130,7 +131,7 @@ One file instead of two mechanisms; identical for rootless and rootful; no syste
 | `registry-mirrors` | chezmoi — [`modify_daemon.json.tmpl`](../../dot_config/docker/modify_daemon.json.tmpl), declarative, same on every host |
 | `proxies` | `docker-net on` / `off`, at runtime |
 
-The `modify_` script only ever sets or deletes `registry-mirrors`, so a `proxies` block written by `docker-net` survives every `chezmoi apply`. The split exists because the local proxy port moves between hosts and sessions (Clash Verge 7897, mihomo 7890, a random SSH tunnel) — a value baked in at apply time goes stale fast.
+The `modify_` script only ever sets or deletes `registry-mirrors`, so a `proxies` block written by `docker-net` survives every `chezmoi apply`. The split exists because stable local proxy ports differ between hosts (Clash Verge 7897, mihomo 7890) — a value baked in at apply time can go stale. A temporary SSH tunnel belongs to its shell or foreground command and is not a suitable persisted daemon endpoint.
 
 For fleet-wide setup, broadcast it explicitly:
 

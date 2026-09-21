@@ -295,6 +295,40 @@ __net_all_proxy_url() {
   fi
 }
 
+# Long-lived consumers must not persist a shell-owned SSH listener. New CLIs
+# provide the guard and a distinct "not configured" exit (4); older binaries
+# retain the legacy detector until their next explicit upgrade.
+__net_proxy_consumer_supported() {
+  command -v lazyclash >/dev/null 2>&1 || return 1
+  command lazyclash proxy _resolve-shell --help 2>/dev/null | command grep -q -- '--consumer'
+}
+
+__net_service_proxy() (
+  local requested="${1:-}" assignments rc
+  if __net_proxy_consumer_supported; then
+    if [ -n "$requested" ]; then
+      assignments="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$requested")"
+    else
+      assignments="$(command lazyclash proxy _resolve-shell --consumer service)"
+    fi
+    rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
+    eval "$assignments"
+    printf '%s' "$_NET_PROXY_CACHE"
+    return 0
+  fi
+  if [ -n "${LAZYCLASH_PROXY_ORIGIN:-}" ]; then
+    printf '%s\n' 'Service proxy lifetime cannot be checked by this CLI; upgrade lazyclash before starting a persistent consumer.' >&2
+    return 1
+  fi
+  if [ -n "$requested" ]; then printf '%s' "$requested"; return 0; fi
+  if __net_detect_proxy; then printf '%s' "$_NET_PROXY_CACHE"; return 0; else rc=$?; fi
+  # Only the legacy detector's explicit empty state may mean "use direct".
+  [ "${_NET_PROXY_NATIVE:-0}" != 1 ] && [ "${_NET_PROXY_CACHE:-}" = none ] && return 4
+  [ "$rc" -ne 0 ] || rc=1
+  return "$rc"
+)
+
 # Run one command with proxy env applied to the child process only.
 withproxy() {
   __net_detect_proxy
@@ -423,21 +457,24 @@ proxy-refresh() {
 # version supports it. Older/missing binaries retain the functions above.
 # Do not edit a managed rc from the CLI, and do not silently fall back to port
 # guesses after the native resolver reports ambiguity or an unavailable session.
+_NET_PROXY_NATIVE=0
 if [ "${LAZYCLASH_PROXY_SHELL:-1}" != 0 ] && command -v lazyclash >/dev/null 2>&1; then
   _net_proxy_shell=bash
   [ -z "${ZSH_VERSION:-}" ] || _net_proxy_shell=zsh
   if _net_proxy_init="$(command lazyclash proxy shell-init --shell "$_net_proxy_shell" --replace 2>/dev/null)"; then
+    _NET_PROXY_NATIVE=1
     eval "$_net_proxy_init"
     __net_detect_proxy() {
-      local _net_proxy_assignments
+      local _net_proxy_assignments _net_proxy_rc
       if _net_proxy_assignments="$(command lazyclash proxy _resolve-shell)"; then
         # The native protocol emits only three fixed, shell-quoted assignments.
         # It refuses credentials because these legacy caches are printed by
         # docker-net/copilot helpers. Native proxy-on/exec supports auth itself.
         eval "$_net_proxy_assignments"
       else
+        _net_proxy_rc=$?
         __net_set_proxy_cache none '' 'lazyclash unavailable'
-        return 1
+        return "$_net_proxy_rc"
       fi
     }
     __net_all_proxy_url() { printf '%s\n' "${_NET_PROXY_SOCKS_CACHE:-$_NET_PROXY_CACHE}"; }
