@@ -31,6 +31,10 @@ are compared in the superproject's `docs/summarization-tooling.md`.
 
 The ansible role is `dot_ansible/roles/summarize/`, tag `summarize`.
 
+The CLI has no native shell-completion generator (verified with 0.22.0).
+Do not run `summarize completion zsh` or `completion bash` during apply: these
+are rejected as excess input arguments.
+
 ## Configuration
 
 `~/.summarize/config.json` is managed as a chezmoi **`modify_` overlay**

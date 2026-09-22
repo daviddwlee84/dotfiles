@@ -301,7 +301,7 @@ EOF
 
 @test "every scripts/ consumer still sources the lib" {
   local f
-  for f in upgrade_tools.sh pre-commit-doctor.sh import_ssh_to_bw.sh; do
+  for f in upgrade_tools.sh pre-commit-doctor.sh import_ssh_to_bw.sh generate_completions.sh; do
     [ -f "$REPO_ROOT/scripts/$f" ] || fail "missing consumer: scripts/$f"
     grep -q 'scripts/lib/log_shared.sh' "$REPO_ROOT/scripts/$f" \
       || fail "scripts/$f no longer sources scripts/lib/log_shared.sh"

@@ -92,7 +92,6 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `lazymlflow` | `lazymlflow completion zsh` |
 | `lazypueue` | `lazypueue completion zsh` |
 | `exp` | `exp completion zsh` |
-| `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 **Usage pattern:**
@@ -134,7 +133,11 @@ These tools inject completions as part of broader shell integration. Most live i
 
 ### D. No completion support
 
-`claude`, `gemini`, `agy`/`agyc` (Antigravity CLI), `btop`, `lazygit` -- no generation command available.
+`claude`, `gemini`, `agy`/`agyc` (Antigravity CLI), `btop`, `lazygit`, `summarize` -- no generation command available.
+
+Verified with summarize 0.22.0: `summarize completion zsh` fails with
+`too many arguments`. Keep it out of the generator inventory; reinstalling a
+broken binary does not make this unsupported command valid.
 
 ### E. Python tools via `shtab` / `tyro` / `click` / `argcomplete`
 
@@ -228,6 +231,13 @@ shell's file completion. Both are deployed shell CLIs (strategy B).
 ## Generating Completions After Fresh Install
 
 **Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` for its registered tools, including all seven personal CLIs. Missing tools are skipped; generated files stay outside chezmoi source control.
+
+Generator failures keep any existing completion file and print the tool, shell,
+and exit status (or `empty output`), even under `--quiet`. The full run also
+reports a failure count and continues with other tools; a targeted `--tool`
+run exits nonzero on failure. `exit 137 (SIGKILL)` means the generator was killed;
+on macOS, check the named tool's crash report in `~/Library/Logs/DiagnosticReports`
+and its code signature before assuming a memory problem.
 
 For a narrow refresh after installation or an external upgrade:
 

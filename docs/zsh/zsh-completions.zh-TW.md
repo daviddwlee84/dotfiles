@@ -55,7 +55,6 @@ compinit runs once (inside oh-my-zsh.sh)
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
 | `lazyclash` | `lazyclash completion zsh` |
-| `summarize` | `summarize completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
 lazyclash 在 macOS/Linux 由 `go_tools` 安裝，completion 同樣由每次 apply 的
@@ -117,7 +116,10 @@ mise completion zsh > ~/.zfunc/_mise
 
 ### D. 不支援補全
 
-`claude`、`gemini`、`btop`、`lazygit` —— 沒有可用的產生命令。
+`claude`、`gemini`、`btop`、`lazygit`、`summarize` —— 沒有可用的產生命令。
+
+實測 summarize 0.22.0 的 `summarize completion zsh` 會回報
+`too many arguments`，因此不應列入自動產生清單。
 
 ### E. 透過 `shtab` / `tyro` 的 Python 工具
 
@@ -145,6 +147,12 @@ Python CLI 框架 (framework) 可以產生補全：
 - `dot_config/zsh/tools/` 中工具特定的 `eval`/`source` 整合
 
 ## 全新安裝後產生補全
+
+自動產生失敗時，即使使用 `--quiet`，仍會顯示工具名稱、shell 與退出碼
+（或 `empty output`），並保留原有補全。完整執行會繼續處理其他工具、
+顯示失敗數；指定 `--tool` 時失敗會回傳非零退出碼。
+`exit 137 (SIGKILL)` 表示程式被強制終止；macOS 可先查該工具在
+`~/Library/Logs/DiagnosticReports` 的紀錄與程式簽章，不要直接歸因於記憶體不足。
 
 在新機器上執行 `chezmoi apply` 後，多數補全已可透過 `zsh-completions` 外掛和 Homebrew site-functions 運作。對於想要**更豐富/更新版補全**的工具，可將其產生到 `~/.zfunc/`：
 

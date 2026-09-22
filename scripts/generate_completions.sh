@@ -23,6 +23,7 @@
 #   marimo, thefuck, try-cli   → cached eval at startup    (dot_config/shell/{29_marimo,27_thefuck}.sh + dot_config/zsh/tools/32_try.zsh)
 #   mi-router                  → tyro self-gen at startup  (dot_config/shell/47_mi_router.sh)
 #   fleet, mlf, pqsum, x       → hand-written eager-load   (dot_config/{zsh/tools,bash}/45-49_*_completion.*)
+#   summarize                 → no native shell-completion command (verified 0.22.0)
 #
 # Invoked from:
 #   - .chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl   (every chezmoi apply, no --force)
@@ -32,6 +33,9 @@
 # Full design: docs/zsh/zsh-completions.md "How autocomplete works" + Section A.
 
 set -euo pipefail
+
+# shellcheck source=scripts/lib/log_shared.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/log_shared.sh"
 
 force=0
 quiet=0
@@ -74,6 +78,30 @@ n_b_skip=0
 n_missing=0
 n_matched=0
 n_failed=0
+
+# Keep failures visible even in --quiet mode, without replacing a good cache
+# with partial output. Redirect the command group so Bash's own signal message
+# (which otherwise only names "$runner") becomes the actionable warning below.
+write_completion() {
+  local tool="$1" shell="$2" runner="$3" args="$4" file="$5"
+  local rc=0 reason
+  # shellcheck disable=SC2086  # registered argument strings split intentionally
+  { "$runner" $args >"$file.tmp"; } 2>/dev/null || rc=$?
+  if [ "$rc" -eq 0 ] && [ -s "$file.tmp" ]; then
+    mv "$file.tmp" "$file"
+    return $?
+  fi
+
+  reason="exit $rc"
+  if [ "$rc" -eq 0 ]; then
+    reason="empty output"
+  elif [ "$rc" -eq 137 ]; then
+    reason="exit 137 (SIGKILL)"
+  fi
+  rm -f "$file.tmp"
+  warn "completions: $tool ($shell) failed: $reason; existing completion retained if present"
+  return 1
+}
 
 # regen <tool> <zsh-args> <bash-args> [runner-path] [freshness-path]
 # Uses word-splitting on $zargs / $bargs deliberately (the upstream completion
@@ -118,13 +146,10 @@ regen() {
 
   # zsh
   if [ "$force" = 1 ] || [ ! -f "$zfile" ] || [ "$freshness" -nt "$zfile" ]; then
-    # shellcheck disable=SC2086  # word-split intentional
-    if "$runner" $zargs >"$zfile.tmp" 2>/dev/null && [ -s "$zfile.tmp" ]; then
-      mv "$zfile.tmp" "$zfile"
+    if write_completion "$tool" zsh "$runner" "$zargs" "$zfile"; then
       n_z_regen=$((n_z_regen + 1))
       [ "$quiet" = 0 ] && printf '  zsh   %-10s → %s\n' "$tool" "$zfile"
     else
-      rm -f "$zfile.tmp"
       n_failed=$((n_failed + 1))
     fi
   else
@@ -133,13 +158,10 @@ regen() {
 
   # bash
   if [ "$force" = 1 ] || [ ! -f "$bfile" ] || [ "$freshness" -nt "$bfile" ]; then
-    # shellcheck disable=SC2086
-    if "$runner" $bargs >"$bfile.tmp" 2>/dev/null && [ -s "$bfile.tmp" ]; then
-      mv "$bfile.tmp" "$bfile"
+    if write_completion "$tool" bash "$runner" "$bargs" "$bfile"; then
       n_b_regen=$((n_b_regen + 1))
       [ "$quiet" = 0 ] && printf '  bash  %-10s → %s\n' "$tool" "$bfile"
     else
-      rm -f "$bfile.tmp"
       n_failed=$((n_failed + 1))
     fi
   else
@@ -185,7 +207,6 @@ regen lazychezmoi "completion zsh" "completion bash"
 regen lazymlflow "completion zsh" "completion bash"
 regen lazypueue "completion zsh" "completion bash"
 regen exp "completion zsh" "completion bash"
-regen summarize "completion zsh" "completion bash"
 
 if [ "$n_matched" -eq 0 ]; then
   echo "generate_completions: unknown tool: $selected_tool" >&2
@@ -197,7 +218,7 @@ if [ -n "$selected_tool" ] && { [ "$n_missing" -gt 0 ] || [ "$n_failed" -gt 0 ];
   exit 1
 fi
 
-if [ "$n_z_regen" -gt 0 ] || [ "$n_b_regen" -gt 0 ] || [ "$quiet" = 0 ]; then
-  printf 'completions: regenerated %d zsh + %d bash | skipped %d zsh + %d bash | %d not installed\n' \
-    "$n_z_regen" "$n_b_regen" "$n_z_skip" "$n_b_skip" "$n_missing"
+if [ "$n_z_regen" -gt 0 ] || [ "$n_b_regen" -gt 0 ] || [ "$n_failed" -gt 0 ] || [ "$quiet" = 0 ]; then
+  printf 'completions: regenerated %d zsh + %d bash | skipped %d zsh + %d bash | %d not installed | %d failed\n' \
+    "$n_z_regen" "$n_b_regen" "$n_z_skip" "$n_b_skip" "$n_missing" "$n_failed"
 fi
