@@ -635,13 +635,15 @@ _copilot_admission_summary() {
   printf '%s' "$1" | jq -r '
     if .admission_available == null then
       "unknown (shim health has no admission fields)"
-    elif .admission_available == false or .recovery_required == true then
+    elif .admission_available == false then
       "blocked (unknown=\(.unknown // "?")); restart backend and shim together"
+    elif .recovery_required == true then
+      "degraded (unknown=\(.unknown // "?")); still accepting requests; controlled restart needed"
     else "available" end' 2>/dev/null
 }
 
 _copilot_admission_ok() {
-  printf '%s' "$1" | jq -e '.admission_available == true and .recovery_required == false' >/dev/null 2>&1
+  printf '%s' "$1" | jq -e '.admission_available == true' >/dev/null 2>&1
 }
 
 _copilot_auth_summary() {
@@ -1517,6 +1519,9 @@ copilot-proxy() {
             _admission_blocked=1
             _bad "admission" "$(_copilot_admission_summary "$_health")"
             _hint "copilot-proxy restart   # controlled backend and shim recovery"
+          elif [ "$(printf '%s' "$_health" | jq -r '.recovery_required // false')" = true ]; then
+            _note "admission" "$(_copilot_admission_summary "$_health")"
+            _hint "copilot-proxy restart   # after tracked streams settle"
           else
             _ok "admission" "available"
           fi
@@ -1541,8 +1546,10 @@ copilot-proxy() {
       local _role_rows _role _role_model _role_bad
       local _http_proxy _up_direct _up_via _dir_n _dir_c _via_n _via_c
       local _fast_json _fast_state _fast_routes
-      _http_proxy="$(_copilot_resolve_http_proxy)"
-      if [ -n "$_http_proxy" ]; then
+      if ! _http_proxy="$(_copilot_resolve_http_proxy service)"; then
+        _bad "http proxy" "service proxy resolution failed; start/restart will fail too"
+        _hint "fix the resolver/settings error above, then retry"
+      elif [ -n "$_http_proxy" ]; then
         _note "http proxy" "$_http_proxy (COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto}) — Node needs --proxy-env to use this"
       else
         _skip "http proxy" "none detected (COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto})"

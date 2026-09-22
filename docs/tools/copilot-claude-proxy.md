@@ -853,6 +853,13 @@ proof of shutdown. `start`, `status`, and `doctor` report a quarantined marker
 instead of calling a listening but unusable shim healthy. Do not delete the
 marker manually. A Codex "high demand" message following a local 503 is generic;
 the shim's `admission is quarantined` response identifies this failure.
+When only part of the capacity is unknown, health may still report
+`admission_available=true`: status/doctor call this **degraded**, not blocked.
+A controlled restart recovers the retained capacity. Doctor uses the same
+service proxy resolver as start/restart, so invalid lazyclash settings are reported
+as a failure rather than "none detected". A `408 user_request_timeout` means the
+upstream timed out reading the request body; restarting clears local retained
+state but does not establish that the upstream upload problem is fixed.
 
 | Env | Default | Meaning |
 |---|---|---|

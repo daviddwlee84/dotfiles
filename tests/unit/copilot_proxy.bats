@@ -518,6 +518,13 @@ JSON
   [[ "${lines[1]}" == *'unverified'* ]]
 }
 
+@test "partial unknown admission is degraded but still available" {
+  run bash -c '. "$1"; _copilot_admission_summary "$2"; _copilot_admission_ok "$2"' _ "$SHELL_LIB" \
+    '{"admission_available":true,"recovery_required":true,"unknown":5}'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'degraded (unknown=5); still accepting requests'* ]]
+}
+
 @test "auth evidence keeps the latest decisive inference and expires" {
   command -v bun >/dev/null 2>&1 || skip "bun not installed"
   run env SHIM_SOURCE="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js" DB="$TMP/auth.sqlite" bun -e '

@@ -694,6 +694,11 @@ marker。PID 檔遺失時也會盤點相符的程序，不會把缺少 PID 檔�
 `start`、`status`、`doctor` 會明示 admission 隔離，避免把仍監聽但無法推理的 shim
 當成健康。不要手動刪除 marker。Codex 在本機 503 後顯示的「high demand」是通用訊息；
 shim 回應中的 `admission is quarantined` 才是這次故障的識別訊息。
+只有部分容量為 unknown 時，health 仍可能回報 `admission_available=true`；
+status／doctor 會標示 degraded，而非 blocked。受控重啟可回收這些容量。
+Doctor 使用與 start／restart 相同的 service proxy resolver，lazyclash 設定錯誤
+會回報失敗，不再顯示「none detected」。`408 user_request_timeout` 表示上游讀取
+request body 逾時；重啟清除本機保留狀態，不代表上游上傳問題已修復。
 
 | Env | 預設 | 意義 |
 |---|---|---|
