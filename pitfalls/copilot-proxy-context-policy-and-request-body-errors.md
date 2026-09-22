@@ -54,6 +54,59 @@ For a 422, rephrase a legitimate benign request to remove ambiguous cybersecurit
 - `copilot-throttle-shim.js` replays request-body 408 once at most, never retries policy 422, and retains the same body, model, and trace id.
 - Unit fixtures cover the 408 replay and one-attempt 422 behavior. The Unix and Windows shim copies remain byte-identical.
 
+## Follow-up: route comparison on 2026-09-22
+
+The production backend was 2.5.2 and the selected model was `gpt-6-astra`.
+Production requests of roughly 0.37 MB and 2.25 MB returned request-body 408,
+while later requests of roughly 2.56 MB completed. This is not evidence of a
+fixed request-size limit. Admission was available with zero unknown leases
+during the comparison; another restart would not address that 408.
+
+Tests used synthetic text, not conversation history, with bounded output and no
+automatic replay. Isolated backend processes used private temporary API homes;
+their credential copies and processes were removed afterwards.
+
+| Test path | Payload bytes | Result | Seconds |
+|---|---:|---|---:|
+| Backend, no explicit proxy | 33,451 | completed | 10.32 |
+| Backend, HTTP proxy | 33,451 | completed | 20.45 |
+| Backend, HTTP proxy | 399,048 | completed | 8.70 |
+| Backend, no explicit proxy | 399,048 | completed | 8.97 |
+| Backend, no explicit proxy | 2,535,929 | HTTP 200, completion unconfirmed | 66.48 |
+| Backend, HTTP proxy | 2,535,929 | completed | 25.00 |
+
+Clash TUN was enabled. **No explicit HTTP proxy is not proof of direct egress.**
+The second comparison therefore sent the same 399,049-byte Responses payload
+directly to the authenticated Copilot endpoint with curl HTTP/1.1, first binding
+the physical default-route interface (`--noproxy '*' --interface en1`), then
+using the explicit HTTP proxy. It bypassed both local shim and backend.
+Credentials stayed in private temporary header files and were deleted afterwards.
+
+| Order | Route | Result | Seconds |
+|---|---|---|---:|
+| 1 | physical interface | response.completed | 4.91 |
+| 2 | HTTP proxy | HTTP 408 user_request_timeout | 65.89 |
+| 3 | HTTP proxy | response.completed | 8.09 |
+| 4 | physical interface | response.completed | 6.17 |
+
+Live controller connections showed Copilot matching `DomainKeyword/github` and
+using the configured PROXY group through its Singapore Reality node. These two
+pairs localize an observed failure to a request using that route, but do not
+prove whether the local proxy, tunnel/node, packet loss, or upstream handling
+caused it. The route is intermittent, not universally broken. Synthetic requests
+also do not reproduce the complete structure of a long agent conversation.
+
+Do not increase retries or reset admission as a claimed fix. A scoped follow-up
+can compare a different node or a Copilot-specific DIRECT rule; merely clearing
+HTTP proxy environment variables while TUN is active is not the same comparison.
+Record terminal events, not just HTTP 200, when checking streamed responses.
+
+Separately, an installed lazyclash with an older target schema could block
+`copilot-proxy restart` before either process was stopped. Explicit service URLs
+now use `--config /dev/null` for the supported lifetime-check interface. This
+preserves the separate temporary-SSH registry guard while avoiding unrelated
+target/profile parsing. Automatic discovery still requires valid settings.
+
 ## Related
 
 - [Codex/Astra remote compact 408 followed by success](codex-astra-remote-compact-408-then-succeeds.md) — includes verified recovery and timeout ownership; extending the shim watchdog does not extend a remote request-body-read deadline.
