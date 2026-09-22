@@ -77,6 +77,10 @@ Temporary-file detection covers `TMPDIR`, `TEMP`, `TMP`, Unix temp prefixes and
 known scratch names. Windows paths compare with normalized slashes and case, using
 directory boundaries. Quick-edit disables buffer diagnostics and autoformat, not
 plugins or Vim keys. `NVIM_QUICK_EDIT=1` / `0` explicitly override detection.
+For Codex `Ctrl+G`, `dotfiles-editor` identifies Codex in its caller process
+chain and sets quick-edit for the single prompt buffer even if the CLI changes
+its scratch path. Ordinary Markdown editing keeps diagnostics. An explicit
+`NVIM_QUICK_EDIT=0` still wins.
 For perceived latency, compare `nvim --clean` with the managed config on the same
 Windows terminal before attributing the cause to Neovim or LazyVim.
 

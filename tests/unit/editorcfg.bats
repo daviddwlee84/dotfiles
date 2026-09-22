@@ -16,7 +16,7 @@ setup() {
   export EDITOR_TEST_LOG="$BATS_TEST_TMPDIR/args"
   export EDITOR_TEST_CLOSED="$BATS_TEST_TMPDIR/closed"
   export EDITOR=dotfiles-editor VISUAL=dotfiles-editor
-  unset EDITOR_TEST_DELAY EDITOR_TEST_EXIT
+  unset EDITOR_TEST_DELAY EDITOR_TEST_EXIT NVIM_QUICK_EDIT
 }
 
 stub() {
@@ -100,6 +100,29 @@ launch() { run env PATH="$BIN" "$BIN/dotfiles-editor" "$@"; }
   launch file
   [ "$status" -eq 0 ]
   [[ "$output" == *'using vi'* ]]
+}
+
+@test "Codex external editor enables quick edit only for its Neovim invocation" {
+  stub nvim
+  cat > "$BIN/ps" <<'SH'
+#!/bin/sh
+case "$*" in
+  *comm=*) printf '%s\n' "${EDITOR_TEST_PARENT:-codex}" ;;
+  *ppid=*) printf '%s\n' 1 ;;
+esac
+SH
+  chmod +x "$BIN/ps"
+  launch '/unexpected/location/prompt.md'
+  [ "$status" -eq 0 ]
+  [ "$(cat "$EDITOR_TEST_LOG.quick")" = 1 ]
+
+  EDITOR_TEST_PARENT=zsh launch '/project/notes.md'
+  [ "$status" -eq 0 ]
+  [ -z "$(cat "$EDITOR_TEST_LOG.quick")" ]
+
+  run env PATH="$BIN" NVIM_QUICK_EDIT=0 "$BIN/dotfiles-editor" '/unexpected/location/prompt.md'
+  [ "$status" -eq 0 ]
+  [ "$(cat "$EDITOR_TEST_LOG.quick")" = 0 ]
 }
 
 @test "doctor reports environment overrides and missing launcher without executing editors" {

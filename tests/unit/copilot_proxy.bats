@@ -465,6 +465,84 @@ JSON
   done
 }
 
+@test "missing PID evidence can recover only after process inventory succeeds" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  mkdir -p "$TMP/state/copilot-proxy"
+  local marker="$TMP/state/copilot-proxy/metrics.sqlite.admission.json"
+  printf '%s\n' '{"version":1,"leases":[{"id":"unknown","phase":"unknown"}]}' >"$marker"
+  run env XDG_STATE_HOME="$TMP/state" TEST_TMP="$TMP" bash -c '
+    . "$1"
+    _copilot_shim_stop() { return 0; }
+    _copilot_port_pids() { return 1; }
+    _copilot_instance_processes() { return 0; }
+    _copilot_pidfile() { printf "%s/missing.pid" "$TEST_TMP"; }
+    copilot-proxy stop
+  ' _ "$SHELL_LIB"
+  [ "$status" -eq 0 ]
+  [ ! -e "$marker" ]
+
+  printf '%s\n' '{"version":1,"leases":[{"id":"unknown","phase":"unknown"}]}' >"$marker"
+  run env XDG_STATE_HOME="$TMP/state" TEST_TMP="$TMP" bash -c '
+    . "$1"
+    _copilot_shim_stop() { return 0; }
+    _copilot_port_pids() { return 1; }
+    _copilot_instance_processes() { return 1; }
+    _copilot_pidfile() { printf "%s/missing.pid" "$TEST_TMP"; }
+    copilot-proxy stop
+  ' _ "$SHELL_LIB"
+  [ "$status" -ne 0 ]
+  [ -e "$marker" ]
+  [[ "$output" == *"cannot verify backend processes"* ]]
+}
+
+@test "live failure hints identify admission and two credential layers" {
+  run bash -c '. "$1"; _copilot_live_failure_hint 503 "$2"; printf "\n";
+    _copilot_live_failure_hint 401 "$3"; printf "\n";
+    _copilot_live_failure_hint 500 "$4"' _ "$SHELL_LIB" \
+    '{"error":"shim admission is quarantined"}' \
+    '{"error":"IDE token expired: unauthorized: token expired"}' \
+    '{"error":"Bad credentials"}'
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == *'copilot-proxy restart'* ]]
+  [[ "${lines[1]}" == *'IDE token expired'* ]]
+  [[ "${lines[2]}" == *'copilot-proxy auth'* ]]
+}
+
+@test "health summaries distinguish blocked admission from cached auth evidence" {
+  run bash -c '. "$1";
+    _copilot_admission_summary "$2"; printf "\n";
+    _copilot_auth_summary "$2"' _ "$SHELL_LIB" \
+    '{"admission_available":false,"recovery_required":true,"unknown":4,"last_auth":{"state":"unknown"}}'
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == *'blocked (unknown=4)'* ]]
+  [[ "${lines[1]}" == *'unverified'* ]]
+}
+
+@test "auth evidence keeps the latest decisive inference and expires" {
+  command -v bun >/dev/null 2>&1 || skip "bun not installed"
+  run env SHIM_SOURCE="$SOURCE_DIR/dot_config/shell/copilot-throttle-shim.js" DB="$TMP/auth.sqlite" bun -e '
+    import { pathToFileURL } from "node:url";
+    const { openMetricsDb, lastAuthEvidence } = await import(pathToFileURL(process.env.SHIM_SOURCE));
+    const db = openMetricsDb(process.env.DB);
+    const add = (at, status, error, category) => db.query(`INSERT INTO request_metrics
+      (trace_id,created_at_ms,endpoint,status,error_kind,terminal_error_category)
+      VALUES (?,?,?,?,?,?)`).run(crypto.randomUUID(), at, "/responses", status, error, category);
+    const now = Date.now();
+    add(now, 401, "upstream_status", "ide_token_expired");
+    if (lastAuthEvidence(db).reason !== "ide_token_expired") process.exit(1);
+    add(now, 200, null, null);
+    if (lastAuthEvidence(db).state !== "ok") process.exit(2);
+    add(now, 503, "upstream_status", "server_error");
+    if (lastAuthEvidence(db).state !== "ok") process.exit(5);
+    add(now, 500, "upstream_status", "bad_credentials");
+    if (lastAuthEvidence(db).reason !== "bad_credentials") process.exit(3);
+    db.query("UPDATE request_metrics SET created_at_ms=?").run(now - 2 * 86400e3);
+    if (lastAuthEvidence(db).state !== "unknown") process.exit(4);
+    db.close();
+  '
+  [ "$status" -eq 0 ]
+}
+
 @test "controlled stop refuses a reused PID rather than signaling an unrelated process" {
   mkdir -p "$TMP/bin"
   printf '%s\n' '#!/bin/sh' 'exit 1' >"$TMP/bin/lsof"

@@ -313,6 +313,12 @@ or committed wholesale. See the [implementation and measured Ubuntu results](htt
 Diagnoses the whole path and exits non-zero on any failure. Read-only by default;
 `--live` adds one real `POST /v1/messages` (`max_tokens: 1`, a non-`[1m]` chat
 model) that costs one quota unit but is the only check that exercises streaming.
+`status` makes no inference request: it reports shim admission and the latest
+observed authentication result, or `unverified` when there is no recent evidence.
+The token file proves only that a credential is stored. `doctor --live` classifies
+the bounded error response: shim quarantine calls for a controlled restart, an
+expired IDE token calls for a restart and retry, and rejected stored credentials
+call for `copilot-proxy auth` followed by a restart. It never prints the token.
 
 Sections, in order: prerequisites (`bun`/`curl`/`jq`) → **package** → token file →
 proxy and throttle-shim liveness → stale installer → **models** → upstream
@@ -841,7 +847,12 @@ Health reports active/draining/unknown, actual artifact versions and deadline
 ordering; all-unknown admission fails promptly. Outstanding leases persist in
 `metrics.sqlite.admission.json`, so restarting only the shim cannot erase them.
 After tracked work settles, controlled `copilot-proxy restart` confirms both
-processes have exited before clearing that marker. Do not delete it manually.
+processes have exited before clearing that marker. If a PID file was lost, it
+also inventories matching processes rather than treating the missing file as
+proof of shutdown. `start`, `status`, and `doctor` report a quarantined marker
+instead of calling a listening but unusable shim healthy. Do not delete the
+marker manually. A Codex "high demand" message following a local 503 is generic;
+the shim's `admission is quarantined` response identifies this failure.
 
 | Env | Default | Meaning |
 |---|---|---|

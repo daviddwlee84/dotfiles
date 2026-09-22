@@ -631,6 +631,44 @@ _copilot_shim_health_json() {
   command curl -fsS --max-time 2 "$(_copilot_shim_base)/_shim/health" 2>/dev/null
 }
 
+_copilot_admission_summary() {
+  printf '%s' "$1" | jq -r '
+    if .admission_available == null then
+      "unknown (shim health has no admission fields)"
+    elif .admission_available == false or .recovery_required == true then
+      "blocked (unknown=\(.unknown // "?")); restart backend and shim together"
+    else "available" end' 2>/dev/null
+}
+
+_copilot_admission_ok() {
+  printf '%s' "$1" | jq -e '.admission_available == true and .recovery_required == false' >/dev/null 2>&1
+}
+
+_copilot_auth_summary() {
+  printf '%s' "$1" | jq -r '
+    (.last_auth // {}) as $a |
+    if $a.state == "failed" then
+      "last inference: \($a.reason // "authentication") at \($a.at // "unknown time")"
+    elif $a.state == "ok" then
+      "last inference: authenticated at \($a.at // "unknown time")"
+    else "unverified (run doctor --live for a current check)" end' 2>/dev/null
+}
+
+_copilot_live_failure_hint() {
+  local code="$1" body="$2"
+  if printf '%s' "$body" | command grep -qi 'shim admission is quarantined'; then
+    printf '%s' 'shim admission is quarantined; copilot-proxy restart'
+  elif printf '%s' "$body" | command grep -qi 'IDE token expired'; then
+    printf '%s' 'Copilot IDE token expired; copilot-proxy restart, then retry doctor --live'
+  elif printf '%s' "$body" | command grep -qi 'Bad credentials'; then
+    printf '%s' 'stored GitHub credential was rejected; copilot-proxy auth, then restart'
+  elif [ "$code" = 401 ]; then
+    printf '%s' 'authentication rejected; restart once, then run copilot-proxy auth if 401 persists'
+  else
+    printf '%s' 'inspect copilot-proxy logs 40 for the upstream error'
+  fi
+}
+
 # Live limiter control is deliberately process-local. Persistent defaults still
 # come from exported COPILOT_SHIM_MIN/MAX and take effect on the next shim start.
 # The custom header is required by the loopback-only admin endpoint, preventing
@@ -790,17 +828,41 @@ _copilot_shim_start() {
   return 1
 }
 
+# Find this instance even when a PID file was lost and its listener is gone.
+# ps failure is not evidence that no process exists.
+_copilot_instance_processes() {
+  local kind="$1" port="$2" listing line pid cmd match
+  listing="$(command ps -axo pid=,command=)" || return 1
+  if [ "$kind" = shim ]; then match="$(_copilot_shim_script)"
+  else match="$(_copilot_pkg_bin)"; fi
+  while IFS= read -r line; do
+    pid="${line%% *}"
+    cmd="${line#* }"
+    case "$pid" in ''|*[!0-9]*) continue ;; esac
+    case "$kind:$cmd " in
+      shim:*"$match"*) printf '%s\n' "$pid" ;;
+      backend:*"$match"*"--port $port "*) printf '%s\n' "$pid" ;;
+    esac
+  done <<EOF
+$listing
+EOF
+}
+
 # Stop only the tracked PID and listeners on this instance's port. A failed
 # health endpoint is not process-termination evidence; retained admission may
 # only be cleared after this check has confirmed both processes exited.
 _copilot_stop_listener() {
-  local kind="$1" port="$2" pidf="$3" pids tracked='' pid cmd i
+  local kind="$1" port="$2" pidf="$3" pids tracked='' pid cmd i discovered
   command -v lsof >/dev/null 2>&1 || {
     printf '%s\n' 'copilot-proxy: lsof is required to confirm a controlled stop; retained admission was not cleared.' >&2
     return 1
   }
   [ ! -f "$pidf" ] || tracked="$(command head -n1 "$pidf")"
-  pids="$(printf '%s\n%s\n' "$tracked" "$(_copilot_port_pids "$port" || true)" | command sed '/^$/d' | command sort -u)"
+  discovered="$(_copilot_instance_processes "$kind" "$port")" || {
+    printf '%s\n' "copilot-proxy: cannot verify $kind processes; retained admission was not cleared." >&2
+    return 1
+  }
+  pids="$(printf '%s\n%s\n%s\n' "$tracked" "$(_copilot_port_pids "$port" || true)" "$discovered" | command sed '/^$/d' | command sort -u)"
   printf '%s\n' "$pids" | while IFS= read -r pid; do
     [ -n "$pid" ] || continue
     case "$pid" in *[!0-9]*) return 1 ;; esac
@@ -822,7 +884,8 @@ _copilot_stop_listener() {
         ''|Z*) ;; *) return 1 ;;
       esac
     done; then
-      if [ -z "$(_copilot_port_pids "$port" || true)" ]; then
+      discovered="$(_copilot_instance_processes "$kind" "$port")" || return 1
+      if [ -z "$(_copilot_port_pids "$port" || true)" ] && [ -z "$discovered" ]; then
         command rm -f -- "$pidf"
         return 0
       fi
@@ -1182,6 +1245,14 @@ copilot-proxy() {
       # Check before shim startup, package installation, log rotation or nohup.
       local http_proxy_url
       http_proxy_url="$(_copilot_resolve_http_proxy service)" || return $?
+      if [ -f "$(_copilot_admission_state)" ]; then
+        local admission_health
+        admission_health="$(_copilot_shim_health_json || true)"
+        if ! _copilot_admission_ok "$admission_health"; then
+          printf '%s\n' 'copilot-proxy: inference is blocked by retained admission; run copilot-proxy restart for controlled backend and shim recovery.' >&2
+          return 1
+        fi
+      fi
       if _copilot_alive; then
         _copilot_require_shim || return 1
         printf '%s\n' "copilot-proxy: already running on port $port" >&2
@@ -1296,15 +1367,8 @@ copilot-proxy() {
       return 1
       ;;
     stop)
-      local backend_evidence=0
-      [ ! -f "$pidf" ] || backend_evidence=1
-      [ -z "$(_copilot_port_pids "$port" || true)" ] || backend_evidence=1
       _copilot_shim_stop || return 1
       _copilot_stop_listener backend "$port" "$pidf" || return 1
-      if [ -f "$(_copilot_admission_state)" ] && [ "$backend_evidence" -eq 0 ]; then
-        printf '%s\n' 'copilot-proxy: backend PID evidence is missing; retained admission requires process verification before recovery.' >&2
-        return 1
-      fi
       command rm -f -- "$(_copilot_admission_state)" || return 1
       printf '%s\n' "copilot-proxy: stopped (port $port free)"
       ;;
@@ -1333,17 +1397,21 @@ copilot-proxy() {
               if (.limit // null) == null then ""
               else " (active \(.active)/\(.limit), queued \(.queued), range \(.min)..\(.max))" end' 2>/dev/null)"
             printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)${_shim_detail}  → clients use this"
+            printf '%s\n' "  admit:  $(_copilot_admission_summary "$_shim_health")"
+            printf '%s\n' "  auth:   $(_copilot_auth_summary "$_shim_health")"
             _fast_state="$(printf '%s' "$_shim_health" | jq -r '.fast_routing.state // "old-shim"' 2>/dev/null)"
             _fast_count="$(printf '%s' "$_shim_health" | jq -r '.fast_routing.mappings // 0' 2>/dev/null)"
             printf '%s\n' "  fast:   $_fast_state ($_fast_count mapping(s); details: copilot-proxy doctor)"
           else
             printf '%s\n' "  shim:   ON but DOWN (managed clients fail closed; try 'copilot-proxy shim on')"
+            [ ! -f "$(_copilot_admission_state)" ] || printf '%s\n' '  admit:  retained marker; run copilot-proxy restart for controlled recovery'
           fi
         else
           printf '%s\n' "  shim:   off  (enable: copilot-proxy shim on)"
         fi
       else
         printf '%s\n' "copilot-proxy: not running on port $port  (start: copilot-proxy start)"
+        [ ! -f "$(_copilot_admission_state)" ] || printf '%s\n' '  admit:  retained marker; run copilot-proxy restart for controlled recovery'
         return 1
       fi
       ;;
@@ -1436,15 +1504,34 @@ copilot-proxy() {
       else
         _skip "installer" "no wedged 'bun add' process"
       fi
+      local _admission_blocked=0 _health=''
       if _copilot_shim_enabled; then
         if _copilot_shim_alive; then
-          local _health _health_detail
+          local _health_detail
           _health="$(_copilot_shim_health_json || true)"
           _health_detail="$(printf '%s' "$_health" | jq -r '
             if (.limit // null) == null then ""
             else "active \(.active)/\(.limit), queued \(.queued), range \(.min)..\(.max)" end' 2>/dev/null)"
           _ok "throttle shim" "up on $(_copilot_shim_base)${_health_detail:+ — $_health_detail}"
-        else _bad "throttle shim" "enabled but DOWN"; _hint "copilot-proxy shim on"; fi
+          if ! _copilot_admission_ok "$_health"; then
+            _admission_blocked=1
+            _bad "admission" "$(_copilot_admission_summary "$_health")"
+            _hint "copilot-proxy restart   # controlled backend and shim recovery"
+          else
+            _ok "admission" "available"
+          fi
+          if [ "$(printf '%s' "$_health" | jq -r '.last_auth.state // "unknown"' 2>/dev/null)" = failed ]; then
+            _bad "auth evidence" "$(_copilot_auth_summary "$_health")"
+          else
+            _skip "auth evidence" "$(_copilot_auth_summary "$_health")"
+          fi
+        else
+          _bad "throttle shim" "enabled but DOWN"
+          if [ -f "$(_copilot_admission_state)" ]; then
+            _admission_blocked=1
+            _bad "admission" "retained marker; run copilot-proxy restart"
+          else _hint "copilot-proxy shim on"; fi
+        fi
       else
         _skip "throttle shim" "off"
       fi
@@ -1707,30 +1794,38 @@ EOF
         _skip "skipped" "proxy is not running"
       elif [ -z "${_served:-}" ]; then
         _skip "skipped" "no served model to probe with"
+      elif [ "$_admission_blocked" -eq 1 ]; then
+        _skip "skipped" "shim admission is quarantined; recover before probing"
       else
         # Pick a chat model, never an embedding one, and never a "[1m]" alias:
         # that suffix is Claude Code-only sugar and the proxy rejects it from a
         # raw API client (see _copilot_default_model's notes).
-        local _probe_model _body
+        local _probe_model _body _probe_file _probe_response
         _probe_model="$(printf '%s\n' "$_served" \
           | command grep -vi 'embedding' | command grep -v '\[1m\]' | command head -n 1)"
+        if printf '%s\n' "$_served" | command grep -qxF 'gpt-5.6-luna'; then
+          _probe_model='gpt-5.6-luna'
+        fi
         _body="$(printf '{"model":"%s","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' "$_probe_model")"
         # Probe the base CLIENTS use (the shim when it's up), so the live check
         # exercises the same chain Claude Code does.
-        if _r="$(command curl -o /dev/null -s -w '%{http_code}|%{time_total}' --max-time 60 \
+        _probe_file="$(command mktemp "${TMPDIR:-/tmp}/copilot-doctor.XXXXXX")" || return 1
+        if _r="$(command curl -o "$_probe_file" -s -w '%{http_code}|%{time_total}' --max-time 60 \
                    -X POST "$(_copilot_client_base)/v1/messages?beta=true" \
                    -H 'content-type: application/json' -d "$_body" 2>/dev/null)"; then
           _code="${_r%%|*}"; _t="${_r##*|}"
+          _probe_response="$(command head -c 4096 "$_probe_file")"
           case "$_code" in
             2*) _ok "round-trip" "$_probe_model → HTTP $_code in ${_t}s" ;;
             000) _bad "round-trip" "$_probe_model → no response (timeout/reset)"
                  _hint "this is the streaming-fault class; suspect the local proxy chain" ;;
             *)  _bad "round-trip" "$_probe_model → HTTP $_code in ${_t}s"
-                _hint "copilot-proxy logs 40" ;;
+                _hint "$(_copilot_live_failure_hint "$_code" "$_probe_response")" ;;
           esac
         else
           _bad "round-trip" "request failed outright"
         fi
+        command rm -f -- "$_probe_file"
       fi
 
       printf '\n'

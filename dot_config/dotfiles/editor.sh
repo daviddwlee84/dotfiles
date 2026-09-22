@@ -51,10 +51,31 @@ editorcfg_resolve() {
     return 127
 }
 
+# Codex Ctrl+G opens this launcher with one prompt file. Its scratch location
+# changes across CLI versions, so identify the caller rather than its filename.
+editorcfg_called_by_codex() {
+    command -v ps >/dev/null 2>&1 || return 1
+    editorcfg_ancestor=${PPID:-}
+    editorcfg_depth=0
+    while [ -n "$editorcfg_ancestor" ] && [ "$editorcfg_depth" -lt 4 ]; do
+        editorcfg_comm=$(ps -p "$editorcfg_ancestor" -o comm= 2>/dev/null) || return 1
+        case ${editorcfg_comm##*/} in codex) return 0 ;; esac
+        set -- $(ps -p "$editorcfg_ancestor" -o ppid= 2>/dev/null) || return 1
+        editorcfg_ancestor=${1:-}
+        editorcfg_depth=$((editorcfg_depth + 1))
+    done
+    return 1
+}
+
 editorcfg_launch() {
     editorcfg_resolve || return $?
     if [ "$editorcfg_selected" != "$editorcfg_preferred" ]; then
         printf 'dotfiles-editor: %s unavailable; using %s (%s)\n' "$editorcfg_preferred" "$editorcfg_selected" "$editorcfg_executable" >&2
+    fi
+    if [ "$editorcfg_selected" = nvim ] && [ "$#" -eq 1 ] \
+        && [ -z "${NVIM_QUICK_EDIT+x}" ] && editorcfg_called_by_codex; then
+        NVIM_QUICK_EDIT=1
+        export NVIM_QUICK_EDIT
     fi
     # Exec preserves the terminal, cwd, wait semantics and the actual exit code.
     case $editorcfg_selected in

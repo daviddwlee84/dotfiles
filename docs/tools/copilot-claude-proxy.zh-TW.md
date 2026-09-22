@@ -259,6 +259,10 @@ trial 目錄包含私密憑證與設定副本，不可整包分享或提交；�
 診斷整條路徑，任何一項失敗就以非零狀態結束。預設**唯讀**；加上 `--live` 會多送一個真實的
 `POST /v1/messages`（`max_tokens: 1`、挑一個非 `[1m]` 的 chat model），會消耗一個 quota
 單位，但那是唯一能驗證 streaming 的檢查。
+`status` 不送推理請求：它顯示 shim admission，以及最近觀察到的認證結果；沒有近期
+證據時顯示 `unverified`。token 檔案只證明已儲存憑證。`doctor --live` 會從有長度上限的
+錯誤回應區分 shim 隔離、IDE token 過期與儲存憑證被拒絕，分別提示受控重啟、重啟後
+重試，或 `copilot-proxy auth` 後重啟；不會印出 token。
 
 檢查順序：前置工具（`bun`/`curl`/`jq`）→ **套件 (package)** → token 檔案 → 代理與
 throttle shim 是否存活 → 安裝殘留（stale installer）→ **模型**→ 上游連線 →
@@ -686,7 +690,10 @@ permit 並回報需要 recovery，不自動重播可能仍在執行的工作。H
 active/draining/unknown、artifact 版本與 deadline 順序；全數容量為 unknown 時會立即
 回報失敗。未完成 lease 寫入 `metrics.sqlite.admission.json`，單獨重啟 shim 不能清除。
 等 tracked work 結束後，`copilot-proxy restart` 會確認 shim/backend 都已退出才清除
-marker；不要手動刪除它。
+marker。PID 檔遺失時也會盤點相符的程序，不會把缺少 PID 檔當成程序已退出。
+`start`、`status`、`doctor` 會明示 admission 隔離，避免把仍監聽但無法推理的 shim
+當成健康。不要手動刪除 marker。Codex 在本機 503 後顯示的「high demand」是通用訊息；
+shim 回應中的 `admission is quarantined` 才是這次故障的識別訊息。
 
 | Env | 預設 | 意義 |
 |---|---|---|

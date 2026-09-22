@@ -71,6 +71,9 @@ SSH／WSL 使用 CLI 實際執行處的環境與檔案。
 Windows 會正規化斜線與大小寫，並確認目錄邊界。
 quick-edit 關閉該 buffer 的 diagnostics／autoformat，保留插件與 Vim 操作。
 可用 `NVIM_QUICK_EDIT=1`／`0` 強制開／關。
+Codex `Ctrl+G` 經 `dotfiles-editor` 開啟時，launcher 會從呼叫程序辨識 Codex，
+即使暫存檔路徑改變，也會對單一提示稿啟用 quick-edit；一般 Markdown 仍有診斷。
+明確設定的 `NVIM_QUICK_EDIT=0` 仍優先。
 若覺得卡頓，請在相同 Windows terminal 比較 `nvim --clean` 與受管設定，
 再判斷是否為 Neovim、LazyVim 或終端造成。
 

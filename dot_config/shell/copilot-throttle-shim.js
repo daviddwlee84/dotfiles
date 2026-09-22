@@ -997,6 +997,7 @@ function isEventStream(contentType) {
 function limiterStatus() {
   return {
     ...limiter.snapshot(),
+    last_auth: lastAuthEvidence(),
     active,
     draining: [...leases].filter((lease) => lease.phase === "draining").length,
     unknown: unknownCount(),
@@ -1012,6 +1013,28 @@ function limiterStatus() {
       compatible: STALL_MS > Math.max(BACKEND_HEADERS_MS, BACKEND_INACTIVITY_MS),
     },
   };
+}
+
+export function lastAuthEvidence(db) {
+  try {
+    db ??= getMetricsDb();
+    const row = db.query(`SELECT created_at_ms, status, error_kind,
+      terminal_error_category FROM request_metrics WHERE scope='normal'
+      AND ((status >= 200 AND status < 300 AND (error_kind IS NULL OR error_kind = ''))
+        OR status = 401
+        OR terminal_error_category IN ('ide_token_expired', 'bad_credentials', 'authentication'))
+      ORDER BY id DESC LIMIT 1`).get();
+    if (!row || Date.now() - row.created_at_ms > 86400e3) return { state: "unknown" };
+    const at = new Date(row.created_at_ms).toISOString();
+    const reason = row.terminal_error_category;
+    if (["ide_token_expired", "bad_credentials", "authentication"].includes(reason)
+        || row.status === 401) return { state: "failed", at, reason: reason ?? "authentication" };
+    if (row.status >= 200 && row.status < 300 && !row.error_kind) return { state: "ok", at };
+    return { state: "unknown", at };
+  } catch (error) {
+    logNonFatal("auth evidence unavailable", error);
+    return { state: "unknown" };
+  }
 }
 
 function isLoopbackRequest(req, server) {
