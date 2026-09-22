@@ -307,7 +307,9 @@ __net_service_proxy() (
   local requested="${1:-}" assignments rc
   if __net_proxy_consumer_supported; then
     if [ -n "$requested" ]; then
-      assignments="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$requested")"
+      # Fixed endpoints do not need the target/profile schema. The independent
+      # session registry still rejects temporary SSH listeners.
+      assignments="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$requested" --config /dev/null)"
     else
       assignments="$(command lazyclash proxy _resolve-shell --consumer service)"
     fi

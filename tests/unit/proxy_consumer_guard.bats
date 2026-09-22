@@ -14,6 +14,9 @@ case "$1 $2" in
   'proxy _resolve-shell')
     case "$*" in *--help*) [ "${CONSUMER_OLD:-0}" != 1 ] || exit 2; printf '%s\n' '--consumer string'; exit 0 ;; esac
     printf '%s\n' "$*" >> "$CONSUMER_LOG"
+    if [ "${CONSUMER_BAD_SETTINGS:-0}" = 1 ]; then
+      case "$*" in *'--config /dev/null'*) ;; *) printf 'incompatible target settings\n' >&2; exit 2 ;; esac
+    fi
     endpoint='http://stable:7890'
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --endpoint ]; then endpoint="$2"; shift 2; else shift; fi
@@ -87,6 +90,24 @@ run_consumer() {
     [ "$status" -eq 1 ]
     run "$shell" -c '. "$REPO_ROOT/dot_config/shell/51_docker_net.sh"; _dnet_resolve_proxy http://127.0.0.1:43210 service'
     [ "$status" -eq 1 ]
+  done
+}
+
+@test "explicit Copilot endpoint ignores incompatible target settings but retains lifetime guard" {
+  export CONSUMER_BAD_SETTINGS=1
+  for shell in bash zsh; do
+    run_consumer "$shell" 'COPILOT_HTTP_PROXY=http://stable:7890 _copilot_resolve_http_proxy service'
+    [ "$status" -eq 0 ]
+    [ "$output" = http://stable:7890 ]
+    run_consumer "$shell" 'COPILOT_HTTP_PROXY=http://127.0.0.1:43210 _copilot_resolve_http_proxy service'
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'temporary proxy endpoint rejected'* ]]
+    run "$shell" -c '. "$REPO_ROOT/dot_config/shell/43_copilot_proxy.sh"; COPILOT_HTTP_PROXY=http://stable:7890 _copilot_resolve_http_proxy service'
+    [ "$status" -eq 0 ]
+    [ "$output" = http://stable:7890 ]
+    run_consumer "$shell" 'COPILOT_HTTP_PROXY=auto _copilot_resolve_http_proxy service'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *'incompatible target settings'* ]]
   done
 }
 

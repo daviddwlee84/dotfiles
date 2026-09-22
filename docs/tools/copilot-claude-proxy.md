@@ -142,6 +142,13 @@ and unavailable-session errors stop startup; only a genuinely unconfigured proxy
 allows `auto` to go direct. Stable overrides replace all six proxy variables and
 remove inherited SSH lifetime markers from the backend. Older lazyclash versions
 retain the compatibility resolver until explicitly upgraded.
+The integration probes `--consumer` support rather than trusting a version string.
+For a fixed `COPILOT_HTTP_PROXY=http://127.0.0.1:7897`, the lifetime check uses empty
+target settings while still reading the independent SSH session registry. Thus
+unrelated target/profile schema errors cannot block that fixed endpoint. `auto`
+continues to use configured target discovery and requires valid lazyclash settings.
+Lazyclash is optional; without the supported interface, the compatibility resolver
+remains available, but inherited temporary-proxy metadata requires a compatible CLI.
 
 | Env var | Default | Meaning |
 |---|---|---|

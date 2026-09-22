@@ -586,6 +586,10 @@ explicit stable endpoint for background services. Copilot `auto` goes direct onl
 when no proxy is configured; ambiguity, authentication and lifetime errors stop the
 operation. `always` requires a proxy; `never` clears inherited proxy variables for
 the backend. Older CLIs keep the compatibility path until explicitly upgraded.
+Explicit service URLs use an empty target configuration for the lifetime check;
+the separate SSH session registry still applies. This keeps unrelated profile
+schema errors out of fixed-endpoint startup. Automatic discovery still validates
+the configured targets. Support is checked through `--consumer`, not version text.
 
 The opposite SSH direction is explicit: `lazyclash proxy ssh HOST` shares a selected
 proxy reachable from this machine with one remote shell; append `-- COMMAND...` for

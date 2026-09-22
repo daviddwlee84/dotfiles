@@ -123,6 +123,11 @@ permissions 與 session 中其他合法設定變更全部保留。即使 local p
 與 session 失效都會中止；只有確實尚未配置 proxy 時，`auto` 才能直連。明確穩定
 覆寫會替換六個 proxy 環境變數，並移除 backend 繼承的 SSH 生命週期標記。舊版
 lazyclash 保留相容 resolver，直到使用者明確升級。
+整合會檢查 `--consumer` 能力，不只比對版本字串。固定設定
+`COPILOT_HTTP_PROXY=http://127.0.0.1:7897` 時，生命週期檢查使用空的 target 設定，
+仍讀取獨立的 SSH session registry，因此不受無關的 target／profile schema 錯誤影響。
+`auto` 仍使用已配置的 target 探索，需要有效的 lazyclash 設定。Lazyclash 是可選依賴；
+沒有相容介面時保留原本 resolver，但若繼承臨時代理 metadata，仍要求相容 CLI。
 
 | 環境變數 | 預設 | 意義 |
 |---|---|---|

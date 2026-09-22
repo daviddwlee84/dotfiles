@@ -1143,7 +1143,9 @@ _copilot_resolve_http_proxy() {
      && command lazyclash proxy _resolve-shell --help 2>/dev/null | command grep -q -- '--consumer'; then
     local _NET_PROXY_CACHE _NET_PROXY_SOCKS_CACHE _NET_PROXY_SOURCE_CACHE
     if [ -n "$explicit" ]; then
-      resolved="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$explicit")"
+      # An explicit endpoint needs only the lifetime registry, not target/profile
+      # settings. Empty settings retain the SSH session guard in lazyclash.
+      resolved="$(command lazyclash proxy _resolve-shell --consumer service --endpoint "$explicit" --config /dev/null)"
     else
       resolved="$(command lazyclash proxy _resolve-shell --consumer service)"
     fi
