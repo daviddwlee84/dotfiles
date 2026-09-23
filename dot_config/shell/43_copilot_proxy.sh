@@ -2322,13 +2322,13 @@ _copilot_codex_pick_best_model() {
     | _copilot_tier_rows_for_ids "$models")"
 
   tier="$(_copilot_tier_prepass '^(gpt-|o[0-9])' "$rows" "$models" \
-    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
-    gpt-5.6-luna gpt-5.4-mini gpt-5-mini || true)"
+    gpt-6-astra gpt-6-sol gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-6-luna gpt-5.6-luna gpt-5.4-mini gpt-5-mini || true)"
   if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
 
   for preferred in \
-    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
-    gpt-5.6-luna gpt-5.4-mini gpt-5-mini
+    gpt-6-astra gpt-6-sol gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-6-luna gpt-5.6-luna gpt-5.4-mini gpt-5-mini
   do
     if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
       printf '%s' "$preferred"
@@ -2409,14 +2409,92 @@ _copilot_specstory_codex_cmd() {
   printf '%s' "${cmd:-codex}"
 }
 
+# Valid provider context limits, canonicalized for both CLI injection and the
+# derived Codex catalog cache. Invalid entries cannot override bundled limits.
+_copilot_model_context_map() {
+  jq -cS '
+    def positive_integer:
+      (if type == "number" then .
+       elif type == "string" then (select(test("^[0-9]+$")) | tonumber? // null)
+       else null end)
+      | select(type == "number")
+      | select(. > 0 and . == floor and . <= 9007199254740991);
+    (if (.data | type) == "array" then .data else [] end)
+    | [ .[] | select(type == "object")
+        | select((.id | type) == "string" and .id != "")
+        | .id as $id
+        | (try .capabilities.limits.max_context_window_tokens catch null)
+        | positive_integer | {key:$id, value:.} ]
+    | from_entries' 2>/dev/null
+}
+
+_copilot_codex_missing_model_metadata() {
+  printf '%s\n' "codex-copilot: exact bundled metadata for $1 is unavailable; upgrade Codex to 0.156.1 or newer, or provide a compatible -c model_catalog_json=... override." >&2
+}
+
 # Codex stores one global models_cache.json without provider namespacing. A
 # custom Copilot gateway refresh can therefore replace the first-party metadata
 # catalog with the gateway's much smaller adapter subset, making a bundled model
 # such as gpt-5.6-sol fall back to generic metadata. Pin this launcher to the
 # catalog bundled with the installed Codex binary instead. The binary version is
 # part of the path, so upgrades regenerate automatically while repeat launches
-# avoid another `codex debug models --bundled` subprocess.
+# avoid another `codex debug models --bundled` subprocess. No arguments returns
+# this untouched bundled cache. With live catalog + selected model arguments,
+# derive a separate provider catalog: Codex clamps a context override to the
+# descriptor's max_context_window, so changing only the CLI flag is insufficient.
 _copilot_codex_catalog_file() {
+  if [ "$#" -gt 0 ]; then
+    local bundled contexts digest derived derived_tmp selected="${2:-}" required_model=''
+    if ! bundled="$(_copilot_codex_catalog_file)"; then
+      case "$selected" in
+        gpt-6-sol|gpt-6-luna) _copilot_codex_missing_model_metadata "$selected"; return 2 ;;
+      esac
+      return 1
+    fi
+    case "$selected" in
+      gpt-6-sol|gpt-6-luna)
+        required_model="$selected"
+        if ! jq -e --arg id "$selected" 'any(.models[]?; .slug == $id)' "$bundled" >/dev/null 2>&1; then
+          _copilot_codex_missing_model_metadata "$selected"
+          return 2
+        fi ;;
+    esac
+    contexts="$(printf '%s' "$1" | _copilot_model_context_map)" || contexts='{}'
+    if [ "$contexts" = '{}' ]; then printf '%s' "$bundled"; return 0; fi
+    if command -v sha256sum >/dev/null 2>&1; then
+      digest="$(printf '%s' "$contexts" | command sha256sum)" || return 1
+      digest="${digest%% *}"
+    elif command -v shasum >/dev/null 2>&1; then
+      digest="$(printf '%s' "$contexts" | command shasum -a 256)" || return 1
+      digest="${digest%% *}"
+    else
+      digest="$(printf '%s' "$contexts" | command openssl dgst -sha256 2>/dev/null)" || return 1
+      digest="${digest##* }"
+    fi
+    case "$digest" in ''|*[!0-9a-f]*) return 1 ;; esac
+    [ "${#digest}" -eq 64 ] || return 1
+    derived="${bundled%.json}.copilot-v1-$digest.json"
+    if [ -s "$derived" ] && jq -e --arg required "$required_model" '
+      (.models | type == "array" and length > 0)
+      and ($required == "" or any(.models[]?; .slug == $required))' "$derived" >/dev/null 2>&1; then
+      printf '%s' "$derived"
+      return 0
+    fi
+    derived_tmp="$(command mktemp "${bundled%/*}/.copilot-catalog.XXXXXX")" || return 1
+    # Exact matches only: a fast sibling or a missing new model must never
+    # acquire another model's instructions, tools, or reasoning capabilities.
+    if jq --argjson contexts "$contexts" '
+      .models |= map(if $contexts[.slug] != null then
+        .context_window = $contexts[.slug] | .max_context_window = $contexts[.slug]
+        else . end)' "$bundled" >"$derived_tmp" \
+       && command mv -- "$derived_tmp" "$derived"; then
+      printf '%s' "$derived"
+    else
+      command rm -f -- "$derived_tmp"
+      return 1
+    fi
+    return 0
+  fi
   command -v codex >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
 
@@ -2450,7 +2528,7 @@ _copilot_codex_catalog_file() {
 # remain untouched. The alias-like sibling below exists for Claude wrapper
 # muscle memory; both names have identical zero-persistence semantics.
 codex-copilot() {
-  local ss="auto" arg explicit_model=0 explicit_compact=0 model='' flag_model='' catalog='' models='' next_model=0 next_config=0 config_arg config_key
+  local ss="auto" arg explicit_model=0 explicit_compact=0 explicit_catalog=0 model='' flag_model='' catalog='' models='' next_model=0 next_config=0 config_arg config_key
   case "${1:-}" in
     --no-specstory) ss="never"; shift ;;
     --specstory)    shift ;;
@@ -2489,6 +2567,7 @@ codex-copilot() {
       case "$config_key" in
         model) model="$(printf '%s' "${config_arg#*=}" | jq -Rr 'fromjson? // .')"; explicit_model=1 ;;
         model_auto_compact_token_limit) explicit_compact=1 ;;
+        model_catalog_json) explicit_catalog=1 ;;
       esac
       continue
     fi
@@ -2523,8 +2602,8 @@ codex-copilot() {
   cmd="$(_copilot_specstory_codex_cmd)"
   if _copilot_shim_enabled; then request_retries=0; stream_retries=0; fi
   if [ -n "$model" ]; then
-    context="$(printf '%s' "$catalog" | jq -r --arg id "$model" '
-      first(.data[]? | select(.id == $id) | .capabilities.limits.max_context_window_tokens) // empty' 2>/dev/null)"
+    context="$(printf '%s' "$catalog" | _copilot_model_context_map \
+      | jq -r --arg id "$model" '.[$id] // empty' 2>/dev/null)"
     if [ "$explicit_compact" -eq 0 ]; then
       compact="$(_copilot_compact_budget "$model" "$catalog" 1)" || compact_rc=$?
       case "$compact_rc" in
@@ -2538,12 +2617,18 @@ codex-copilot() {
   if [ -n "$compact" ]; then set -- -c "model_auto_compact_token_limit=$compact" "$@"; fi
   if [ -n "$context" ]; then set -- -c "model_context_window=$context" "$@"; fi
 
-  local bundled_catalog='' provider_args=""
-  if bundled_catalog="$(_copilot_codex_catalog_file)"; then
-    # Prepend so an explicit later user -c retains normal Codex precedence.
-    set -- -c "model_catalog_json=\"$bundled_catalog\"" "$@"
-  else
-    printf '%s\n' "codex-copilot: warning: could not build the bundled Codex model catalog; metadata may fall back" >&2
+  local bundled_catalog='' provider_args="" catalog_rc=0
+  if [ "$explicit_catalog" -eq 0 ]; then
+    if bundled_catalog="$(_copilot_codex_catalog_file "$catalog" "$model")"; then
+      set -- -c "model_catalog_json=$(jq -nr --arg path "$bundled_catalog" '$path | tojson')" "$@"
+    else
+      catalog_rc=$?
+      [ "$catalog_rc" -ne 2 ] || return 1
+      case "$model" in
+        gpt-6-sol|gpt-6-luna) _copilot_codex_missing_model_metadata "$model"; return 1 ;;
+      esac
+      printf '%s\n' "codex-copilot: warning: could not build the bundled Codex model catalog; metadata may fall back" >&2
+    fi
   fi
   # Build a shell-safe command fragment for SpecStory; direct execution below
   # uses the original argv and does not round-trip through a string.
@@ -3363,8 +3448,8 @@ _copilot_selectable_ids() {
 # `model_picker_category` is Copilot's own tier taxonomy and it lines up exactly
 # with OpenAI's *durable* capability tiers — Sol and Astra are `powerful`, Terra
 # is `versatile`, Luna is `lightweight`. That matters because generation and
-# tier advance independently: gpt-6-astra is the gen-6 flagship while Terra and
-# Luna stayed on 5.6, so "higher version wins" would happily promote a future
+# tier advance independently: Astra and Sol are gen-6 flagships, while the
+# gen-6 Luna remains lightweight. "Higher version wins" would promote
 # gpt-6-luna over gpt-5.6-sol. Ranking on the tier first is what makes that
 # impossible. It also tiers grok/gemini/mai, which we keep no allowlist for.
 #
@@ -3685,13 +3770,13 @@ _copilot_pick_best_model() {
   if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
 
   tier="$(_copilot_tier_prepass '^(gpt-|o[0-9])' "$rows" "$models" \
-    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
-    gpt-5.6-luna gpt-5.4-mini gpt-5-mini || true)"
+    gpt-6-astra gpt-6-sol gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-6-luna gpt-5.6-luna gpt-5.4-mini gpt-5-mini || true)"
   if [ -n "$tier" ]; then printf '%s' "$tier"; return 0; fi
 
   for preferred in \
-    gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
-    gpt-5.6-luna gpt-5.4-mini gpt-5-mini
+    gpt-6-astra gpt-6-sol gpt-5.6-sol gpt-5.6-terra gpt-5.5 gpt-5.4 gpt-5.3-codex \
+    gpt-6-luna gpt-5.6-luna gpt-5.4-mini gpt-5-mini
   do
     if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
       printf '%s' "$preferred"
@@ -3772,7 +3857,7 @@ _copilot_model_profile_json() {
       sonnet_raw="$(_copilot_first_served "$models" gpt-5.6-terra 2>/dev/null || true)"
       [ -n "$sonnet_raw" ] || sonnet_raw="$raw"
       haiku_raw="$(_copilot_first_served "$models" \
-        gpt-5.6-luna gpt-5.4-mini gpt-5-mini 2>/dev/null || true)"
+        gpt-6-luna gpt-5.6-luna gpt-5.4-mini gpt-5-mini 2>/dev/null || true)"
       [ -n "$haiku_raw" ] || haiku_raw="$raw"
       ;;
     grok-*)
@@ -3935,7 +4020,7 @@ copilot-model() {
         claude-fable-5 \
         claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
         claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 claude-haiku-4-5 \
-        gpt-6-astra \
+        gpt-6-astra gpt-6-sol gpt-6-luna \
         gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5 gpt-5.4 gpt-5.3-codex \
         gpt-5.4-mini gpt-5-mini \
         grok-4.6 grok-4.5

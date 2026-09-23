@@ -44,7 +44,7 @@ inside the same Codex 0.147.0 binary.
 Deleting `~/.codex/models_cache.json` appears to fix the next launch but is not
 durable: another custom-provider refresh can recreate the degraded cache.
 
-## Workaround
+## Original workaround (2026-08)
 
 `codex-copilot` generates the installed binary's bundled catalog once per Codex
 version:
@@ -65,9 +65,19 @@ The launcher also passes the selected model's live
 because bundled limits can lag Copilot's entitlement-specific long-context
 values. Explicit user `-c` arguments remain later in argv and still win.
 
+### Follow-up (2026-09-23)
+
+The launcher now derives a provider-specific catalog from those exact bundled
+descriptors, updating only `context_window` and `max_context_window` from the live
+Copilot snapshot. Its atomic cache key includes CLI version, cache schema and the
+canonical live context-map hash; explicit caller catalogs bypass generation.
+This also fixes the separate [1M override silently clamped to 872k](codex-copilot-context-window-clamped.md).
+The historical command above explains the original metadata repair; it is no
+longer the complete cache-generation recipe for current launchers.
+
 ## Prevention
 
-- Keep `_copilot_codex_catalog_file` version-keyed and validate `.models` before
+- Keep `_copilot_codex_catalog_file` keyed by CLI/schema/live-context map and validate `.models` before
   atomically replacing its cache file.
 - Do not "fix" this by deleting `~/.codex/models_cache.json` on every launch;
   plain Codex owns that cache and other providers may need it.

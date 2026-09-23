@@ -776,6 +776,220 @@ SH
   [ "$output" = "$TMP/cache/copilot-proxy/codex-models/codex-cli_9.9.9.json|$TMP/cache/copilot-proxy/codex-models/codex-cli_9.9.9.json|1" ]
 }
 
+prepare_codex_catalog_fixture() {
+  mkdir -p "$TMP/bin" "$TMP/proj"
+  export TEST_CODEX_BUNDLED="$TMP/bundled.json" TEST_CODEX_GENERATIONS="$TMP/generations"
+  export TEST_CODEX_ARGS="$TMP/args" TEST_CODEX_VERSION=0.156.1
+  export XDG_CACHE_HOME="$TMP/cache" PATH="$TMP/bin:$PATH"
+  jq -n '{models:["gpt-6-astra","gpt-6-sol","gpt-6-luna","gpt-5.6-sol","gpt-5.6-luna"]
+    | map({slug:.,context_window:272000,max_context_window:872000,
+      effective_context_window_percent:95,auto_compact_token_limit:null,
+      supported_reasoning_levels:[{effort:"high",description:"fixture"}],
+      model_messages:{instructions_template:"retain exactly"},
+      tools:{nested:["fixture"]}})}' >"$TEST_CODEX_BUNDLED"
+  cat >"$TMP/bin/codex" <<'SH'
+#!/bin/sh
+case "$1" in
+  --version) printf 'codex-cli %s\n' "$TEST_CODEX_VERSION" ;;
+  debug) cat "$TEST_CODEX_BUNDLED"; printf 'generated\n' >>"$TEST_CODEX_GENERATIONS" ;;
+  *) printf '%s\n' "$@" >"$TEST_CODEX_ARGS"; for arg do printf 'arg=<%s>\n' "$arg"; done ;;
+esac
+SH
+  cat >"$TMP/bin/specstory" <<'SH'
+#!/bin/sh
+exec sh -c "$4"
+SH
+  chmod +x "$TMP/bin/codex" "$TMP/bin/specstory"
+}
+
+codex_catalog_launch() {
+  local shell="$1"; shift
+  "$shell" -c '
+    cd "$2" || exit
+    . "$1"; shift 2
+    _copilot_alive() { return 0; }
+    _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf "%s" "$TEST_LIVE_CATALOG"; }
+    _copilot_specstory_codex_cmd() { printf codex; }
+    codex-copilot "$@"
+  ' _ "$SHELL_LIB" "$TMP/proj" "$@"
+}
+
+@test "Codex provider catalog preserves descriptors and removes the bundled context clamp" {
+  prepare_codex_catalog_fixture
+  local catalog='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}},{"id":"gpt-6-sol-fast","capabilities":{"limits":{"max_context_window_tokens":2000000}}}]}'
+  local shell derived
+  for shell in bash zsh; do
+    run "$shell" -c '. "$1"; _copilot_codex_catalog_file "$2" gpt-6-sol' _ "$SHELL_LIB" "$catalog"
+    [ "$status" -eq 0 ]
+    derived="$output"
+    [ -f "$derived" ]
+    jq -e --slurpfile original "$TEST_CODEX_BUNDLED" '
+      (.models | map(del(.context_window,.max_context_window))) ==
+        ($original[0].models | map(del(.context_window,.max_context_window)))
+      and (.models | length) == ($original[0].models | length)
+      and (.models[] | select(.slug == "gpt-5.6-sol") | .context_window == 272000 and .max_context_window == 872000)
+      and (.models[] | select(.slug == "gpt-6-sol") |
+        .context_window == 1000000 and .max_context_window == 1000000
+        and ([1000000,.max_context_window] | min) == 1000000
+        and (.context_window * .effective_context_window_percent / 100 | floor) == 950000
+        and ([872000,(.context_window * 0.9 | floor)] | min) == 872000)
+      and ([.models[].slug] | index("gpt-6-sol-fast")) == null' "$derived"
+    cmp "$TEST_CODEX_BUNDLED" "$XDG_CACHE_HOME/copilot-proxy/codex-models/codex-cli_0.156.1.json"
+  done
+  [ "$(wc -l <"$TEST_CODEX_GENERATIONS" | tr -d ' ')" = 1 ]
+}
+
+@test "Codex provider cache follows Codex version and canonical context limits only" {
+  prepare_codex_catalog_fixture
+  run bash -c '
+    . "$1"
+    first=$(_copilot_codex_catalog_file "$2" gpt-6-sol) || exit
+    reordered=$(_copilot_codex_catalog_file "$3" gpt-6-sol) || exit
+    changed=$(_copilot_codex_catalog_file "$4" gpt-6-sol) || exit
+    TEST_CODEX_VERSION=0.156.2
+    upgraded=$(_copilot_codex_catalog_file "$2" gpt-6-sol) || exit
+    [ "$first" = "$reordered" ] && [ "$first" != "$changed" ] && [ "$first" != "$upgraded" ]
+  ' _ "$SHELL_LIB" \
+    '{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}},{"id":"gpt-6-luna","capabilities":{"limits":{"max_context_window_tokens":1000000}}}]}' \
+    '{"data":[{"id":"gpt-6-luna","capabilities":{"limits":{"max_context_window_tokens":"1000000"}}},{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":800000}}}]}' \
+    '{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-6-luna","capabilities":{"limits":{"max_context_window_tokens":1000000}}}]}'
+  [ "$status" -eq 0 ]
+  [ "$(wc -l <"$TEST_CODEX_GENERATIONS" | tr -d ' ')" = 2 ]
+}
+
+@test "Codex regenerates a cached provider catalog missing the selected new descriptor" {
+  prepare_codex_catalog_fixture
+  run bash -c '
+    . "$1"
+    derived=$(_copilot_codex_catalog_file "$2" gpt-6-sol) || exit
+    printf "%s" "{\"models\":[{\"slug\":\"gpt-6-astra\"}]}" >"$derived"
+    repaired=$(_copilot_codex_catalog_file "$2" gpt-6-sol) || exit
+    [ "$derived" = "$repaired" ] || exit
+    jq -e '\''any(.models[]; .slug == "gpt-6-sol" and .max_context_window == 1000000)'\'' "$repaired"
+  ' _ "$SHELL_LIB" '{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000}}}]}'
+  [ "$status" -eq 0 ]
+}
+
+@test "Codex context map canonicalizes numeric strings and last valid duplicate entries" {
+  run bash -c '. "$1"; printf "%s" "$2" | _copilot_model_context_map' _ "$SHELL_LIB" \
+    '{"data":[null,false,2,"bad-row",{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":"900000"}}},{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":true}}},{"id":"fractional","capabilities":{"limits":{"max_context_window_tokens":1.5}}},{"id":"unsafe","capabilities":{"limits":{"max_context_window_tokens":9007199254740992}}},{"id":"float-string","capabilities":{"limits":{"max_context_window_tokens":"1000000.0"}}},{"id":"valid","capabilities":{"limits":{"max_context_window_tokens":"1000000"}}}]}'
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"gpt-6-sol":1000000,"valid":1000000}' ]
+}
+
+@test "Codex context metadata rejects invalid limits and retains untouched bundled fallback" {
+  prepare_codex_catalog_fixture
+  local value catalog
+  for value in null true false 0 -1 1.5 '"invalid"'; do
+    catalog="$(jq -nc --argjson value "$value" '{data:[{id:"gpt-6-sol",capabilities:{limits:{max_context_window_tokens:$value}}}]}')"
+    run bash -c '. "$1"; _copilot_codex_catalog_file "$2" gpt-6-sol' _ "$SHELL_LIB" "$catalog"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$XDG_CACHE_HOME/copilot-proxy/codex-models/codex-cli_0.156.1.json" ]
+    cmp "$TEST_CODEX_BUNDLED" "$output"
+  done
+  run bash -c '. "$1"; _copilot_codex_catalog_file "broken JSON" gpt-6-sol' _ "$SHELL_LIB"
+  [ "$status" -eq 0 ]
+  cmp "$TEST_CODEX_BUNDLED" "$output"
+  export TEST_LIVE_CATALOG='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":true,"max_prompt_tokens":872000}}}]}'
+  run codex_catalog_launch bash --no-specstory -m gpt-6-sol
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'model_context_window='* ]]
+  [[ "$output" == *'model_auto_compact_token_limit=872000'* ]]
+}
+
+@test "Codex requires exact GPT-6 Sol and Luna descriptors before starting a client" {
+  prepare_codex_catalog_fixture
+  jq '.models |= map(select(.slug == "gpt-6-astra"))' "$TEST_CODEX_BUNDLED" >"$TMP/old.json"
+  mv "$TMP/old.json" "$TEST_CODEX_BUNDLED"
+  export TEST_LIVE_CATALOG='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}}]}'
+  local shell model
+  for shell in bash zsh; do
+    for model in gpt-6-sol gpt-6-luna; do
+      run codex_catalog_launch "$shell" --no-specstory -m "$model"
+      [ "$status" -ne 0 ]
+      [[ "$output" == *"exact bundled metadata for $model is unavailable"* ]]
+      [[ "$output" == *'0.156.1 or newer'* ]]
+      [ ! -e "$TEST_CODEX_ARGS" ]
+    done
+  done
+  # Unknown/non-OpenAI models retain the pre-existing generic fallback contract.
+  run codex_catalog_launch bash --no-specstory -m claude-opus-5
+  [ "$status" -eq 0 ]
+  [ -e "$TEST_CODEX_ARGS" ]
+  rm "$TEST_CODEX_ARGS"
+  export TEST_CODEX_VERSION=0.156.2
+  printf 'invalid JSON' >"$TEST_CODEX_BUNDLED"
+  run codex_catalog_launch bash --no-specstory -m gpt-6-sol
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'exact bundled metadata for gpt-6-sol is unavailable'* ]]
+  [ ! -e "$TEST_CODEX_ARGS" ]
+}
+
+@test "Codex catalog paths survive spaces quotes and direct or SpecStory launch" {
+  prepare_codex_catalog_fixture
+  export XDG_CACHE_HOME="$TMP/cache path \"quoted\"\\slash"
+  export TEST_LIVE_CATALOG='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}}]}'
+  local shell mode
+  for shell in bash zsh; do
+    for mode in --no-specstory --specstory; do
+      run codex_catalog_launch "$shell" "$mode" -m gpt-6-sol
+      [ "$status" -eq 0 ]
+      [[ "$output" == *'model_context_window=1000000'* ]]
+      [[ "$output" == *'model_auto_compact_token_limit=872000'* ]]
+      python3 - "$TEST_CODEX_ARGS" <<'PY'
+import pathlib, sys, tomllib
+args = pathlib.Path(sys.argv[1]).read_text().splitlines()
+values = [tomllib.loads(a)["model_catalog_json"] for a in args if a.startswith("model_catalog_json=")]
+assert len(values) == 1 and pathlib.Path(values[0]).is_file(), values
+PY
+    done
+  done
+}
+
+@test "Codex explicit catalog skips managed generation and missing-descriptor checks before end of options" {
+  prepare_codex_catalog_fixture
+  printf '%s\n' '{"models":[{"slug":"gpt-6-astra"}]}' >"$TEST_CODEX_BUNDLED"
+  export TEST_LIVE_CATALOG='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}}]}'
+  local shell mode form
+  for shell in bash zsh; do
+    for mode in --no-specstory --specstory; do
+      for form in split long equals; do
+        case "$form" in
+          split) run codex_catalog_launch "$shell" "$mode" -m gpt-6-sol -c ' model_catalog_json = "/custom path/catalog.json" ' ;;
+          long) run codex_catalog_launch "$shell" "$mode" -m gpt-6-sol '--config=model_catalog_json="/custom path/catalog.json"' ;;
+          equals) run codex_catalog_launch "$shell" "$mode" -m gpt-6-sol '-c=model_catalog_json="/custom path/catalog.json"' ;;
+        esac
+        [ "$status" -eq 0 ]
+        [[ "$output" == *'/custom path/catalog.json'* ]]
+        [ ! -e "$TEST_CODEX_GENERATIONS" ]
+        [ ! -e "$XDG_CACHE_HOME" ]
+      done
+    done
+  done
+  rm "$TEST_CODEX_ARGS"
+  run codex_catalog_launch bash --no-specstory -m gpt-6-sol -- '-c=model_catalog_json="/prompt/not-config.json"'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'exact bundled metadata for gpt-6-sol is unavailable'* ]]
+  [ ! -e "$TEST_CODEX_ARGS" ]
+}
+
+@test "GPT-6 Sol launch keeps explicit context and compact overrides after managed defaults" {
+  prepare_codex_catalog_fixture
+  export TEST_LIVE_CATALOG='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}}]}'
+  local shell mode
+  for shell in bash zsh; do
+    for mode in --no-specstory --specstory; do
+      run codex_catalog_launch "$shell" "$mode" --model=gpt-6-sol \
+        -c model_context_window=600000 --config='model_auto_compact_token_limit=500000'
+      [ "$status" -eq 0 ]
+      [[ "$output" == *'model_context_window=1000000'*'model_context_window=600000'* ]]
+      [[ "$output" == *'model_auto_compact_token_limit=500000'* ]]
+      [[ "$output" != *'model_auto_compact_token_limit=872000'* ]]
+    done
+  done
+}
+
 @test "codex launcher: auto selects Sol, injects live limits, and writes no config" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   write_fake_codex
@@ -1807,9 +2021,9 @@ JS
 #
 # The catalog's `model_picker_category` is Copilot's own tier taxonomy and lines
 # up with OpenAI's DURABLE tiers (Sol/Astra = powerful, Terra = versatile, Luna =
-# lightweight). Generation and tier advance independently — gpt-6-astra is the
-# gen-6 flagship while Terra and Luna stayed on 5.6 — so ranking on the version
-# alone would promote a future gpt-6-luna over gpt-5.6-sol. These tests pin that
+# lightweight). Generation and tier advance independently — gen-6 Astra/Sol
+# are flagships, but gen-6 Luna remains lightweight — so ranking on the version
+# alone would promote gpt-6-luna over gpt-5.6-sol. These tests pin that
 # down; `tier_cat` below builds a catalog of `id:category` pairs.
 
 tier_cat() {
@@ -1846,6 +2060,42 @@ tier_rank() {
     gpt-6-astra:powerful gpt-5.6-sol:powerful gpt-5.6-terra:versatile gpt-5.6-luna:lightweight
   [ "$status" -eq 0 ]
   [ "$output" = "gpt-6-astra" ]
+}
+
+@test "GPT-6 curation keeps Astra first then new Sol ahead of old Sol in both rankers" {
+  local fn category
+  for fn in _copilot_pick_best_model _copilot_codex_pick_best_model; do
+    for category in powerful ''; do
+      run tier_rank "$fn" "gpt-6-astra:$category" "gpt-6-sol:$category" "gpt-5.6-sol:$category" gpt-6-luna:lightweight
+      [ "$status" -eq 0 ]
+      [ "$output" = gpt-6-astra ]
+      run tier_rank "$fn" "gpt-6-sol:$category" "gpt-5.6-sol:$category" gpt-6-luna:lightweight
+      [ "$status" -eq 0 ]
+      [ "$output" = gpt-6-sol ]
+      run tier_rank "$fn" "gpt-5.6-sol:$category" gpt-6-luna:lightweight
+      [ "$status" -eq 0 ]
+      [ "$output" = gpt-5.6-sol ]
+      run tier_rank "$fn" gpt-6-luna:lightweight gpt-5.6-luna:lightweight
+      [ "$status" -eq 0 ]
+      [ "$output" = gpt-6-luna ]
+    done
+  done
+}
+
+@test "GPT-6 Sol is excluded from automatic picks when disabled hidden or fast" {
+  local mode catalog fn
+  for mode in disabled hidden fast; do
+    catalog="$(tier_cat gpt-6-sol:powerful gpt-5.6-sol:powerful | jq -c --arg mode "$mode" '
+      (.data[] | select(.id == "gpt-6-sol")) |=
+        if $mode == "disabled" then .policy.state = "disabled"
+        elif $mode == "hidden" then .model_picker_enabled = false
+        else .id += "-fast" end')"
+    for fn in _copilot_pick_best_model _copilot_codex_pick_best_model; do
+      run bash -c '. "$1"; printf "%s" "$2" | _copilot_auto_candidate_ids | "$3" "$2"' _ "$SHELL_LIB" "$catalog" "$fn"
+      [ "$status" -eq 0 ]
+      [ "$output" = gpt-5.6-sol ]
+    done
+  done
 }
 
 @test "tier ranking: a newer LIGHTWEIGHT never displaces a served flagship" {
@@ -2237,6 +2487,39 @@ tier_rank() {
     _copilot_model_profile_json gpt-5.6-sol \"\$CATALOG\" | jq -c ."
   [ "$status" -eq 0 ]
   [ "$output" = '{"main":"gpt-5.6-sol[1m]","fable":"gpt-5.6-sol[1m]","opus":"gpt-5.6-sol[1m]","sonnet":"gpt-5.6-terra[1m]","haiku":"gpt-5.6-luna"}' ]
+}
+
+@test "GPT-6 Sol roles use new Luna when eligible and preserve the full live compact ceiling" {
+  local catalog shell mode expected
+  catalog='{"data":[{"id":"gpt-6-sol","capabilities":{"limits":{"max_context_window_tokens":1000000,"max_prompt_tokens":872000}}},{"id":"gpt-6-luna","capabilities":{"limits":{"max_context_window_tokens":1000000}}},{"id":"gpt-5.6-terra","capabilities":{"limits":{"max_context_window_tokens":1050000}}},{"id":"gpt-5.6-luna","capabilities":{"limits":{"max_context_window_tokens":1050000}}}]}'
+  for shell in bash zsh; do
+    for mode in enabled disabled absent; do
+      expected='gpt-6-luna[1m]'
+      [ "$mode" = enabled ] || expected='gpt-5.6-luna[1m]'
+      run env COPILOT_ASTRA_COMPACT_RATIO=invalid "$shell" -c '
+        . "$1"
+        catalog=$(printf "%s" "$2" | jq -c --arg mode "$3" '\''
+          if $mode == "disabled" then (.data[] | select(.id == "gpt-6-luna")).policy.state = "disabled"
+          elif $mode == "absent" then .data |= map(select(.id != "gpt-6-luna"))
+          else . end'\'')
+        _copilot_model_profile_json gpt-6-sol "$catalog" | jq -c .
+        _copilot_claude_compact_window gpt-6-sol "$catalog"
+      ' _ "$SHELL_LIB" "$catalog" "$mode"
+      [ "$status" -eq 0 ]
+      [ "${lines[0]}" = "{\"main\":\"gpt-6-sol[1m]\",\"fable\":\"gpt-6-sol[1m]\",\"opus\":\"gpt-6-sol[1m]\",\"sonnet\":\"gpt-5.6-terra[1m]\",\"haiku\":\"$expected\"}" ]
+      [ "${lines[1]}" = 872000 ]
+    done
+  done
+}
+
+@test "GPT-6 offline discovery includes Sol and Luna while automatic selection still fails" {
+  run bash -c '. "$1"; _copilot_model_catalog() { return 1; }; copilot-model --list' _ "$SHELL_LIB"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *gpt-6-sol* ]]
+  [[ "$output" == *gpt-6-luna* ]]
+  run bash -c '. "$1"; _copilot_model_catalog() { return 1; }; copilot-model --auto' _ "$SHELL_LIB"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'--auto needs a reachable proxy'* ]]
 }
 
 @test "model profile: missing OpenAI role tiers fall back to the selected main" {

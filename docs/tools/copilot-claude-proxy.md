@@ -231,10 +231,10 @@ header. To persist a range, export `COPILOT_SHIM_MIN/MAX` in
 `~/.shellrc.adhoc` and restart the shim later.
 
 ```sh
-copilot-proxy stats week --model gpt-5.6-sol
+copilot-proxy stats week --model gpt-6-sol
 copilot-proxy events day --limit 20 --json
 copilot-proxy quota --json
-copilot-proxy bench --model gpt-5.6-sol --runs 3 --max-output 256
+copilot-proxy bench --model gpt-6-sol --runs 3 --max-output 256
 ```
 
 `stats` defaults to normal interactive traffic; choose `--scope benchmark` or
@@ -501,15 +501,24 @@ remains Claude-first, while only this Codex launcher is OpenAI-first.
   Codex's vendor order: OpenAI/Codex first, then Claude, grok, Gemini, and any
   remaining chat model. Embedding, disabled, picker-hidden, and `-fast` main
   candidates are excluded.
-- The launcher supplies the selected model's live context and prompt limits and
-  pins `model_catalog_json` to a versioned cache of `codex debug models
-  --bundled`. Codex's global `~/.codex/models_cache.json` is not provider-scoped;
-  a gateway refresh can otherwise replace first-party entries with the smaller
-  adapter subset and trigger fallback-metadata warnings for bundled models such
-  as `gpt-5.6-sol`. The cache lives under
-  `$XDG_CACHE_HOME/copilot-proxy/codex-models/` (default
-  `~/.cache/copilot-proxy/codex-models/`) and regenerates after a Codex version
-  change. Explicit later `-c model_catalog_json=...` still wins.
+- The launcher builds a provider-derived `model_catalog_json` from the installed
+  `codex debug models --bundled` descriptors and the same live Copilot snapshot.
+  For exact matching model IDs, only `context_window` and `max_context_window`
+  are updated to the live context value; reasoning, tools, prompts and other
+  metadata stay bundled. Setting only `-c model_context_window=...` is insufficient:
+  Codex clamps it to the descriptor's `max_context_window`.
+- The catalog lives under `$XDG_CACHE_HOME/copilot-proxy/codex-models/` (default
+  `~/.cache/copilot-proxy/codex-models/`). Its cache key includes the Codex version,
+  cache schema and a hash of the canonical live model-to-context map; validated
+  JSON is published atomically. Prompt/output limits do not key this cache:
+  the launcher recomputes the compact override on each launch. The provider-global
+  `~/.codex/models_cache.json` is left alone.
+- A caller-supplied `-c model_catalog_json=...` bypasses managed catalog generation;
+  the caller owns that catalog's descriptors and limits. Otherwise, selecting
+  `gpt-6-sol` or `gpt-6-luna` without an exact bundled descriptor stops launch
+  with an upgrade hint. Use [Codex 0.156.1 or newer](https://github.com/openai/codex/releases/tag/rust-v0.156.1);
+  the helper does not copy another model's reasoning/tool metadata. See the
+  [context-clamping investigation](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/codex-copilot-context-window-clamped.md).
 - Claude/Gemini fallback uses the gateway's Responses Lite translation. Basic
   tools, compaction and multi-agent orchestration remain available, but Responses
   `tool_search` is not supported on that path. Auto selection therefore keeps
@@ -622,20 +631,18 @@ Behavior:
   (`restricted_to`) and price metadata are diagnostic only, not evidence of the
   current account's entitlement. Main selection, derived roles, `--why`, the
   details auto marker, and implicit `codex-copilot` use the same eligible set.
-- OpenAI generation and capability tier are independent: Astra succeeds Sol as
-  the flagship, while Terra and Luna remain on 5.6. Therefore `gpt-6-astra`
-  outranks `gpt-5.6-sol`, but a hypothetical lightweight `gpt-6-luna` would not.
-  The intent follows OpenAI's
-  [current model guidance](https://developers.openai.com/api/docs/guides/latest-model).
-  The Copilot catalog currently restricts Astra to `pro_plus` / Business /
-  Enterprise / Max and exposes a 1,000,000-token context with an 872,000-token
-  prompt ceiling (smaller than Sol's 1,050,000 / 922,000); it also starts at
-  `reasoning_effort=low`, with no `none` mode. The backward-compatible
-  offline fallback remains `gpt-5.6-sol[1m]`; that is not an entitlement
-  guarantee — check the live PLANS column with `copilot-model -L`.
-  `restricted_to` is advisory catalog metadata: `--auto` cannot prove the
-  active billing target/organization, so a later entitlement rejection still
-  requires choosing another served model manually.
+- OpenAI generation and capability tier are independent. Among selectable known
+  OpenAI models, main preference is `gpt-6-astra` > `gpt-6-sol` > `gpt-5.6-sol`;
+  `gpt-6-luna` stays in the lightweight/Haiku tier and cannot displace a flagship.
+  GitHub [announced GPT-6 Sol and Luna on 2026-09-22](https://github.blog/changelog/2026-09-22-openais-gpt-6-sol-and-gpt-6-luna-now-available/).
+  Terra remains `gpt-5.6-terra`; lower-role Luna prefers `gpt-6-luna`, then
+  `gpt-5.6-luna`, from the selectable live entries.
+  The backward-compatible offline default remains `gpt-5.6-sol[1m]`; it is not an
+  entitlement guarantee. `copilot-model -L` and `--json` show live plan/policy
+  metadata, but `billing.restricted_to` does not prove the active billing target's
+  access. A later entitlement rejection still requires choosing another served
+  model manually. Context and compact values below are a **2026-09-23 live gateway
+  snapshot**, not hard-coded promises for every account.
 - No argument → `fzf` picker. `-c` prints the main model, source layer, and
   complete role profile. `-l` is the pipeable bare-id list; `-L` / `--details`
   shows the live tier, price category, context/output limits, reasoning range,
@@ -646,10 +653,10 @@ Behavior:
   the explanation and then writes. `--json` returns the raw live `/v1/models`
   payload. That HTTP catalog is distinct from the shim's `/_shim/fast-routing`
   endpoint and from Codex's generated on-disk
-  `~/.cache/copilot-proxy/codex-models/codex-cli_<version>.json`.
+  provider-derived catalog under `~/.cache/copilot-proxy/codex-models/`.
 - A local pin writes the complete role set. For the current OpenAI profile:
   Main/Fable/Opus = Astra (or the selected main), Sonnet = Terra,
-  Haiku/background = Luna. Missing tiers fall back to the selected main, never
+  Haiku/background = GPT-6 Luna (then GPT-5.6 Luna). Missing tiers fall back to the selected main, never
   an unserved hard-coded id. Grok has no static version allowlist; the newest
   served model in its highest reported tier wins.
 - The global state file stays a backward-compatible one-line main id; wrappers
@@ -670,6 +677,7 @@ copilot-model --why        # explain the automatic pick; write nothing
 copilot-model -L            # inspect live tier/price/context/plan metadata
 copilot-model --auto        # save the main model / refresh a live project pin
 copilot-model -c            # inspect main + Fable/Opus/Sonnet/Haiku
+# Explicit alternatives: copilot-model gpt-6-sol; codex-copilot -m gpt-6-luna
 copilot-here on             # sticky project, or use claude-copilot-once
 ```
 
@@ -683,38 +691,69 @@ The role variables are read at Claude Code startup, so
 
 ## Injected env (what both layers set)
 
+Example: explicitly selected `gpt-6-sol`, with selectable Terra/Luna lower roles.
+
 ```json
 {
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:4141",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "gpt-5.6-sol[1m]",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": "gpt-5.6-sol[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_MODEL": "gpt-6-sol[1m]",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "gpt-6-sol[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gpt-6-sol[1m]",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-terra[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-luna[1m]",
-    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-luna[1m]",
-    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "922000",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-6-luna[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-6-luna[1m]",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "872000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
 ```
 
 `ANTHROPIC_AUTH_TOKEN` is ignored by the proxy but must be set.
-`CLAUDE_CODE_AUTO_COMPACT_WINDOW` is derived from the selected model's provider
-prompt ceiling, not its full context size. For example, a 1.05M-context GPT model with
-128k maximum output advertises a 922k prompt ceiling. The `[1m]` suffix keeps the
-HUD/full-window classification correct while this variable makes compaction run
-before the gateway rejects the request. Set `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`
-yourself only when you want to compact earlier.
-Astra uses `floor(live prompt ceiling × COPILOT_ASTRA_COMPACT_RATIO)`, initially
-70%: 872,000 becomes 610,400 tokens. This is a pilot setting, not a proven fix
-for remote body-read 408. Claude's 100,000-token minimum remains enforced;
-Codex requires a positive derived limit. Missing metadata retains the existing
-client fallback with a warning. Explicit `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
-(within the live ceiling) and Codex `-c model_auto_compact_token_limit=...` win.
-Only new launches and refreshed managed pins change; true context metadata,
-`[1m]`, existing safe pins and active session history remain intact.
+
+The **2026-09-23 live gateway snapshot** separates provider limits from client
+compaction:
+
+| Model | Provider context | Prompt ceiling | Maximum output | Launcher compact budget |
+|---|---:|---:|---:|---:|
+| `gpt-6-astra` | 1,050,000 | 1,050,000 | 128,000 | 735,000 (70%) |
+| `gpt-6-sol` | 1,000,000 | 872,000 | 128,000 | 872,000 |
+| `gpt-6-luna` | 1,000,000 | 872,000 | 128,000 | 872,000 |
+
+Explicit live `max_prompt_tokens` is authoritative, even when it does not equal
+context minus maximum output. Subtract maximum output only when the prompt field
+is absent. `[1m]` remains a Claude Code display/context hint; raw API IDs have no
+suffix. Sol/Luna do **not** inherit Astra's 70% experiment.
+
+Astra and its `-fast` sibling use
+`floor(live prompt ceiling × COPILOT_ASTRA_COMPACT_RATIO)`, default `0.70`:
+1,050,000 becomes 735,000. The ratio must satisfy `0 < ratio <= 1`; `1` restores
+the full prompt budget. Claude's 100,000-token minimum remains enforced; Codex
+requires a positive budget. This reduces large compact uploads but is not a
+proven fix for remote body-read 408s. Valid explicit
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `-c model_auto_compact_token_limit=...`
+retain precedence; Codex still enforces its own compact cap.
+
+With the matching provider-derived descriptors, **Codex 0.156.1** uses 95% of the
+context as usable input and caps auto-compact at 90% of the full context:
+
+| Model | Codex usable context | Effective Codex auto-compact trigger |
+|---|---:|---:|
+| `gpt-6-astra` | 997,500 | 735,000 |
+| `gpt-6-sol` / `gpt-6-luna` | 950,000 | 872,000 |
+
+The trigger is `min(launcher compact budget, 90% × context)`, not 90% of the
+already-reduced usable context. These values follow Codex's
+[model calculations](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/protocol/src/openai_models.rs#L513-L535).
+Claude separately applies its roughly-95% threshold to the injected budget
+(about 698,250 for Astra and 828,400 for Sol/Luna).
+Refresh managed pins and relaunch the wrapper after changing models; in-session
+switching does not recompute launch-time overrides. Existing safe pins and active
+session history are not rewritten. These settings do not change VS Code's
+context picker.
+
+Missing live metadata retains the existing client fallback with a warning.
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` cuts background chatter (helps with
 rate limits). Do **not** paste this into the committed `.claude/settings.json` —
 use `copilot-here on` instead.
@@ -996,7 +1035,7 @@ fails to match its built-in model table, so it:
   wrong budget.
 
 The helpers use hyphenated ids and derive `[1m]` from each live model's context
-metadata. That applies to GPT ids too (`gpt-5.6-sol[1m]`, for example). They
+metadata. That applies to GPT ids too (`gpt-6-sol[1m]`, for example). They
 separately derive the auto-compact capacity from `max_prompt_tokens`; `[1m]`
 alone is not an exact prompt-limit declaration. Claude Code strips the suffix
 before sending; a raw API client must use the plain id.
