@@ -1,0 +1,97 @@
+# inventory channel — every tool THIS REPO installs, what it is, who installs it,
+# and whether it is actually present on this host.
+#
+# Thin channel: all logic lives in ~/.config/television/tool-catalog.py, which
+# reads the SSOT ~/.config/docs/tools/tool-catalog.toml (source:
+# dot_config/docs/tools/tool-catalog.toml) and joins it with chezmoi data (the
+# init prompts) + PATH / /Applications probes.
+#
+# Status column:
+#   ● installed · × expected but missing (gate on, not found — a broken install)
+#   ○ gated off by an init prompt on this host · – not for this OS
+#   · nothing to probe (yazi plugins, gh extensions, fonts)
+# Filter by typing `missing`, `gated` or `n/a` (appended to non-OK rows), a
+# category ("Networking"), a role ("python_uv_tools") or a description word.
+#
+# vs neighbours: `tv tools` = curated quick-launcher (cli-tools.md);
+# `tv appsrc` = live OS scan of how *anything* got installed (repo or not).
+#
+# Usage:
+#   tv inventory
+#
+# Keybindings (Alt+ namespace — tmux root-table `bind -n C-*` shadows Ctrl+;
+# T/M match `tv appsrc`):
+#   Enter      Full detail (paged)
+#   Alt+T      tldr — quick usage
+#   Alt+M      man page
+#   Alt+D      Open the tool's doc page (glow → bat → less)
+#   Alt+I      Copy the install command (e.g. `just ansible-tags devtools`)
+#   Alt+U      Copy the upgrade command (e.g. `just upgrade-uv`)
+#   Alt+W      `appsrc which <bin>` — live cross-check of how it was installed
+#   Ctrl+/     Toggle preview panel
+
+[metadata]
+name = "inventory"
+description = "Tools this repo installs — category, installing role/recipe, installed / missing / gated-off on this host"
+requirements = ["uv"]
+
+[source]
+command = "~/.config/television/tool-catalog.py source"
+# id<TAB>status<TAB>category<TAB>role<TAB>method<TAB>desc<TAB>display
+display = "{split:\\t:6}"
+output = "{split:\\t:0}"
+
+[preview]
+command = "~/.config/television/tool-catalog.py preview '{split:\\t:0}'"
+
+[ui]
+input_header = "Repo tool inventory"
+
+[keybindings]
+enter = "actions:detail"
+alt-t = "actions:tldr"
+alt-m = "actions:man"
+alt-d = "actions:docs"
+alt-i = "actions:copy-install"
+alt-u = "actions:copy-upgrade"
+alt-w = "actions:appsrc"
+
+[actions.detail]
+description = "Full detail (paged)"
+command = "~/.config/television/tool-catalog.py preview '{split:\\t:0}' | less -R"
+mode = "execute"
+
+[actions.tldr]
+description = "tldr page (multi-language fallback)"
+command = "b=$(~/.config/television/tool-catalog.py cmd '{split:\\t:0}' bin); tldr -L zh_TW -L zh -L en \"$b\" 2>/dev/null || \"$b\" --help 2>&1 | head -60; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.man]
+description = "man page"
+command = "man \"$(~/.config/television/tool-catalog.py cmd '{split:\\t:0}' bin)\""
+mode = "execute"
+
+[actions.docs]
+description = "Open the repo doc page for this tool"
+command = """
+d=$(~/.config/television/tool-catalog.py cmd '{split:\\t:0}' docs)
+if [ -z "$d" ]; then echo 'No doc page recorded for this tool (add `docs = ...` in tool-catalog.toml).'; echo '[Press Enter to exit]'; read -r _; exit 0; fi
+f="$(chezmoi source-path 2>/dev/null)/$d"
+if command -v glow >/dev/null 2>&1; then glow -p "$f"; elif command -v bat >/dev/null 2>&1; then bat --paging=always "$f"; else less "$f"; fi
+"""
+mode = "execute"
+
+[actions.copy-install]
+description = "Copy the install command"
+command = "~/.config/television/tool-catalog.py cmd '{split:\\t:0}' install | tr -d '\\n' | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null || cat >/dev/null)"
+mode = "fork"
+
+[actions.copy-upgrade]
+description = "Copy the upgrade command"
+command = "~/.config/television/tool-catalog.py cmd '{split:\\t:0}' upgrade | tr -d '\\n' | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null || cat >/dev/null)"
+mode = "fork"
+
+[actions.appsrc]
+description = "appsrc which — how was it really installed?"
+command = "appsrc which \"$(~/.config/television/tool-catalog.py cmd '{split:\\t:0}' bin)\"; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"

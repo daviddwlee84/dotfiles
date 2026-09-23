@@ -35,6 +35,20 @@ repos:
           | ^Dockerfile$
           | ^README\.md$
 
+      # Tool catalog SSOT: dot_config/docs/tools/tool-catalog.toml generates the
+      # Tool index table in docs/this_repo/tool-managers.md (and feeds
+      # `tv inventory`). Fail if the table drifted — fix with `just gen-tool-index`.
+      - id: tool-catalog-gen-check
+        name: tool-managers.md Tool index in sync with tool-catalog.toml
+        entry: uv run --script dot_config/television/executable_tool-catalog.py --catalog dot_config/docs/tools/tool-catalog.toml index-md --check docs/this_repo/tool-managers.md docs/this_repo/tool-managers.zh-TW.md
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)
+          ^dot_config/docs/tools/tool-catalog\.toml$
+          | ^dot_config/television/executable_tool-catalog\.py$
+          | ^docs/this_repo/tool-managers(\.zh-TW)?\.md$
+
       # `dot_ansible/ansible.cfg` sets `inject_facts_as_vars = False`, so the
       # bare injected fact variables (`ansible_env`, `ansible_os_family`, …)
       # DO NOT EXIST at runtime — only `ansible_facts['env']['HOME']` etc. A

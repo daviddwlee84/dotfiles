@@ -974,208 +974,253 @@ agent-specific 升級路徑。
 
 > 字母序查詢。對於有多條安裝路徑的工具，第一條為主要路徑；其餘以 ` / `
 > 分隔列在同一格內。
+>
+> **自動產生 — 請勿手動編輯此表。** 單一真實來源是
+> [`dot_config/docs/tools/tool-catalog.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/docs/tools/tool-catalog.toml)
+> （同時記錄每個工具的分類、一行說明與 init prompt gate）。修改後執行
+> `just gen-tool-index`；表格內容與英文版相同（不另行翻譯，避免漂移）。
+> 想互動瀏覽並看本機安裝狀態，用 `tv inventory`。
 
-| 工具 | macOS | Linux | Role |
+<!-- BEGIN generated: tool-catalog (just gen-tool-index) -->
+| Tool | macOS | Linux | Role |
 |---|---|---|---|
-| **aerospace** | brew cask(`nikitabobko/tap`) | n/a | Brewfile.darwin |
-| **agy** / **agyc**(Antigravity CLI) | curl `antigravity.google/cli/install.sh` | 同 | coding_agents |
-| **alacritty** | brew cask | cargo 編譯(apt 依賴) | Brewfile.darwin / gui_apps_linux |
+| **actionlint** | brew | Linuxbrew (best-effort) | devtools |
+| **aerospace** | brew cask (`nikitabobko/tap`) | n/a | Brewfile.darwin |
+| **agy** / **agyc** (Antigravity CLI) | curl `antigravity.google/cli/install.sh` | same | coding_agents |
+| **alacritty** | brew cask | cargo build (apt deps) | Brewfile.darwin / gui_apps_linux |
 | **alt-tab** | brew cask | n/a | Brewfile.darwin |
 | **anki** | brew cask | n/a | Brewfile.darwin |
 | **ansible-core** | uv tool install | uv tool install | bootstrap |
-| **antigravity**(IDE) | brew cask | 佔位 | Brewfile.darwin |
-| **applite** | brew cask | n/a | Brewfile.darwin |
+| **antigravity** (IDE) | brew cask | placeholder | Brewfile.darwin |
 | **AppImageLauncher** | n/a | PPA → GitHub `.deb` → Lite AppImage | gui_apps_linux |
+| **applite** | brew cask | n/a | Brewfile.darwin |
 | **apprise** | uv tool | uv tool | python_uv_tools |
 | **arc** | brew cask | n/a | Brewfile.darwin |
 | **arp-scan** | brew | apt/yum | networking_tools |
 | **atuin** | brew | curl `setup.atuin.sh` | atuin |
 | **azure-cli** | brew | Microsoft apt repo → uv tool fallback | iac_tools |
-| **azure-cost-cli**(`azure-cost`) | `dotnet tool install --global` | 同 | dotnet_tools |
+| **azure-cost-cli** (`azure-cost`) | `dotnet tool install --global` | same | dotnet_tools |
 | **bandwhich** | brew | GitHub release musl | networking_tools |
-| **bash**(5.x) | brew(`primary_shell="bash"` 時) | 系統 | bash |
+| **bash** (5.x) | brew (when `primary_shell="bash"`) | system | bash |
 | **bat** | brew | apt + `/usr/bin/bat` symlink → GitHub musl | base/devtools |
 | **bats-core** | brew | apt → GitHub `install.sh` | devtools |
-| **Bitwarden CLI**(`bw`) | `mise exec -- npm install -g @bitwarden/cli` | 同 | bitwarden |
+| **Bitwarden CLI** (`bw`) | `mise exec -- npm install -g @bitwarden/cli` | same | bitwarden |
 | **Bitwarden Desktop** | brew cask | snap → `.deb` | bitwarden |
 | **btop** | brew | apt → GitHub release | devtools |
-| **build-essential** | n/a | apt | bootstrap(Linux) |
+| **build-essential** | n/a | apt | bootstrap (Linux) |
 | **bun** | mise | mise | mise |
-| **cargo-update** | cargo install(`cat_cargo` 的 bootstrap) | 同 | rust_cargo_tools |
-| **chatgpt** | brew cask（Intel + Apple Silicon；內含 Codex） | n/a | Brewfile.darwin |
+| **calibre** (`ebook-meta`) | brew cask — opt-in `installCalibre` | apt (`calibre`) — opt-in | devtools — backs Kindle .mobi/.azw/.azw3 metadata previews in yazi via `view-ebook`. See [yazi-previews.md](../tools/yazi-previews.md) |
+| **cargo-update** | cargo install (bootstrap for `cat_cargo`) | same | rust_cargo_tools |
+| **chafa** | brew | apt (`chafa`) | devtools — yazi image-display fallback (unicode-art); backs all image/pdf/video/heic previews. Shadowed by a `--probe off` shim (`dot_dotfiles/bin/executable_chafa`) to stop the OSC-query→rename-popup leak. See [yazi-previews.md](../tools/yazi-previews.md) |
+| **chatgpt** | brew cask (Intel + Apple Silicon; includes Codex) | n/a | Brewfile.darwin |
+| **Claude** (desktop) | brew cask `claude` | n/a | Brewfile.darwin |
 | **Claude Code** | brew cask `claude-code` | curl `claude.ai/install.sh` → `~/.claude/local/bin/claude` | coding_agents |
-| **claude-hud** | role 內跑 python 輔助 | 同 | coding_agents |
-| **cloudflared** | brew | GitHub `.deb`/binary / `.rpm` | networking_tools(tunnel) |
+| **claude-hud** | python helper run from role | same | coding_agents |
+| **cloudflared** | brew | GitHub `.deb`/binary / `.rpm` | networking_tools (tunnel) |
 | **CMux** | brew cask | n/a | Brewfile.darwin |
-| **CodexBar** | brew cask `codexbar`(homebrew-cask core) | Linuxbrew `steipete/tap/codexbar` → GitHub release;glibc < 2.38 時改抓 static-musl asset 並跳過 Linuxbrew | coding_agents |
-| **codex**(OpenAI Codex CLI) | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | coding_agents |
-| **CodeIsland** | brew cask(`wxtsky/tap`) | n/a | Brewfile.darwin |
-| **CopyQ** | n/a | apt | gui_apps_linux |
-| **coreutils** | brew | (GNU coreutils 透過 apt;macOS 透過 brew) | devtools |
+| **CodeIsland** | brew cask (`wxtsky/tap`) | n/a | Brewfile.darwin |
+| **codex** (OpenAI Codex CLI) | brew cask `codex` | `mise exec -- npm install -g @openai/codex` | coding_agents |
+| **CodexBar** | brew cask `codexbar` (homebrew-cask core) | Linuxbrew `steipete/tap/codexbar` → GitHub release; static-musl asset (and no Linuxbrew) when glibc < 2.38 | coding_agents |
 | **copyparty** | uv tool | uv tool | python_uv_tools |
-| **curl** | 系統 | apt/yum | base + bootstrap |
-| **cursor**(IDE) | brew cask | `.deb` 來自 `cursor.com/api/download` | Brewfile.darwin / gui_apps_linux |
-| **cursor-agent**(CLI) | curl `cursor.com/install` | 同 | coding_agents |
+| **CopyQ** | n/a | apt | gui_apps_linux |
+| **coreutils** | brew | (GNU coreutils via apt; macOS gets via brew) | devtools |
+| **curl** | system | apt/yum | base + bootstrap |
+| **cursor** (IDE) | brew cask | `.deb` from `cursor.com/api/download` | Brewfile.darwin / gui_apps_linux |
+| **cursor-agent** (CLI) | curl `cursor.com/install` | same | coding_agents |
 | **dasel** | brew | release | devtools |
-| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
 | **dbeaver-community** | brew cask | n/a | Brewfile.darwin |
+| **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Repository/task/worktree dashboard; binary `dev`. |
 | **diffnav** | brew | GitHub release | devtools |
-| **direnv** | brew | apt 或 curl-installer | devtools |
-| **discord** | brew cask | flatpak(預設)/ `.deb` | Brewfile.darwin / gui_apps_linux |
+| **direnv** | brew | apt or curl-installer | devtools |
+| **discord** | brew cask | flatpak (default) / `.deb` | Brewfile.darwin / gui_apps_linux |
 | **docker** | brew cask `orbstack` | `curl get.docker.com` rootless | docker |
 | **doggo** | brew | GitHub release | networking_tools |
-| **dotenv**(python-dotenv[cli]) | uv tool | uv tool | python_uv_tools |
-| **dotnet** | mise | mise | mise |
+| **dotenv** (python-dotenv[cli]) | uv tool | uv tool | python_uv_tools |
+| **dotnet** | mise (`10`, isolated) | mise (`10`, isolated) | mise |
+| **doxx** | brew (homebrew-core) | GitHub release `.tar.xz` | devtools |
 | **duckdb** | brew | GitHub release | devtools |
-| **exiftool** | brew | apt(`libimage-exiftool-perl`) | media_tools |
-| **exp-cli** (`exp`) | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
+| **duckdb.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
+| **ethtool** | n/a | apt / yum (`ethtool`) | wake_on_lan |
+| **exiftool** | brew | apt (`libimage-exiftool-perl`) | media_tools |
+| **exp-cli** (`exp`) | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Research workflow CLI and overview; binary `exp`. |
 | **eza** | brew | gierens.de apt repo → GitHub musl → brew aarch64 | devtools |
-| **fastfetch** | brew | (Linux release 視情況) | devtools |
-| **fd** | brew | apt(`fd-find` + symlink)→ GitHub release | base |
+| **fastfetch** | brew | (Linux release if added) | devtools |
+| **fd** | brew | apt (`fd-find` + symlink) → GitHub release | base |
 | **ffmpeg** | brew | apt | media_tools |
-| **figlet** | brew | (apt 視情況) | devtools |
+| **ffmpeg-full** | brew (keg-only) | — (Debian ffmpeg already links libass) | media_tools |
+| **figlet** | brew | (apt likely) | devtools |
 | **font-hack-nerd-font** | brew cask | GitHub release Hack.zip → `~/.local/share/fonts` | nerdfonts |
-| **fontconfig** | (系統) | apt/yum | nerdfonts |
+| **fontconfig** | (system) | apt/yum | nerdfonts |
 | **freeze** | brew | GitHub release | devtools |
-| **fzf** | brew(透過 `lazyvim_deps`) | chezmoi external + `~/.fzf/install --bin` | lazyvim_deps + externals |
+| **fzf** | brew (via `lazyvim_deps`) | chezmoi external + `~/.fzf/install --bin` | lazyvim_deps + externals |
 | **gawk** | brew | apt/yum | bash |
-| **google-chrome-stable** | (屬 Brewfile cask 範疇) | 來自 `dl.google.com` 的 `.deb`;postinst 會自行註冊 apt repo,之後由 `apt upgrade` 維護。**僅限 x86_64** —— 沒有 arm64 的 Linux 版 | gui_apps_linux —— Chromium 引擎的備用瀏覽器;Ubuntu 沒有 Chromium `.deb`,只有 snap shim |
-| **gcc / gcc-c++ / make** | (Xcode CLT) | apt(`build-essential`)/ yum | base + bootstrap |
-| **gemini**(Gemini CLI) | brew formula `gemini-cli` → npm fallback | `mise exec -- npm install -g @google/gemini-cli` | coding_agents |
-| **gh** | brew | 廠商 apt(.deb)→ GitHub tarball | base/devtools |
-| **gh-dash** | `gh extension install dlvhdr/gh-dash` | 同 | devtools |
-| **gh-notify** | `gh extension install meiji163/gh-notify` | 同 | devtools |
-| **gh-select** | `gh extension install remcostoeten/gh-select` | 同 | devtools |
+| **gcc / gcc-c++ / make** | (Xcode CLT) | apt (`build-essential`) / yum | base + bootstrap |
+| **gemini** (Gemini CLI) | brew formula `gemini-cli` → npm fallback | `mise exec -- npm install -g @google/gemini-cli` | coding_agents |
+| **gh** | brew | vendor apt (.deb) → GitHub tarball | base/devtools |
+| **gh-dash** | `gh extension install dlvhdr/gh-dash` | same | devtools |
+| **gh-notify** | `gh extension install meiji163/gh-notify` | same | devtools |
+| **gh-select** | `gh extension install remcostoeten/gh-select` | same | devtools |
+| **ghostty** | brew cask (`installBrewApps`) | native apt → Ubuntu 24.04 community PPA → classic Snap | GUI profile only; sudo + x64/arm64 on Linux. See [Ghostty](../tools/ghostty.md) |
 | **git** | brew | apt/yum | base |
-| **git-delta** | brew | `.deb`(x86_64)→ brew aarch64 → GitHub musl 使用者 | devtools |
+| **git-delta** | brew | `.deb` (x86_64) → brew aarch64 → GitHub musl user | devtools |
 | **git-filter-repo** | uv tool | uv tool | python_uv_tools |
-| **git-graph** | brew | GitHub release(僅 x86_64) | devtools |
+| **git-graph** | brew | GitHub release (x86_64 only) | devtools |
 | **git-lfs** | brew | apt/yum → GitHub release | base |
+| **git.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
+| **github-copilot-cli** (`@githubnext/github-copilot-cli`) | npm global | `mise exec -- npm install -g` | coding_agents |
 | **gitleaks** | brew | GitHub release | security_tools |
-| **glab** | brew | 廠商 apt(.deb)→ GitHub tarball | devtools |
+| **glab** | brew | vendor apt (.deb) → GitHub tarball | devtools |
 | **glow** | brew | GitHub release tarball | devtools |
-| **go** | mise(`go = "latest"`) | 同左(mise) | mise(`installExtraRuntimes`) |
+| **go** | mise (`go = "latest"`) | same (mise) | mise (`installExtraRuntimes`) |
+| **google-chrome-stable** | (Brewfile cask territory) | `.deb` from `dl.google.com`; postinst self-registers the apt repo, so `apt upgrade` maintains it. **x86_64 only** — no arm64 Linux build exists | gui_apps_linux — a Chromium-engine backup browser; Ubuntu has no Chromium `.deb`, only a snap shim |
 | **google-drive** | brew cask | n/a | Brewfile.darwin |
-| **github-copilot-cli**(`@githubnext/github-copilot-cli`) | npm 全域 | `mise exec -- npm install -g` | coding_agents |
+| **gopls** | brew | `go install` (`go_tools`) | Go language server for Claude Code's official `gopls-lsp` plugin |
 | **gping** | brew | GitHub release musl | networking_tools |
 | **grammarly-desktop** | brew cask | n/a | Brewfile.darwin |
 | **grc** | brew | apt | devtools |
 | **gum** | brew | GitHub release | devtools |
-| **Homebrew** | curl installer | 同(Linux,有控管) | bootstrap |
+| **herdr** | GitHub release single binary → `~/.local/bin/herdr` (**not brew** — see note) | GitHub release single binary → `~/.local/bin/herdr` | devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**) |
+| **herdr-plus** (herdr plugin) | `herdr plugin install cloudmanic/herdr-plus` (prebuilt binary when no Go; idempotent ansible task) | same | devtools |
+| **Homebrew** | curl installer | same (Linux, gated) | bootstrap |
 | **htop** | brew | apt | devtools |
-| **httpie** | brew | apt(Debian) | networking_tools |
+| **httpie** | brew | apt (Debian) | networking_tools |
 | **imagemagick** | brew | apt | media_tools |
-| **輸入法**(`mcbopomofo`、`squirrel`) | brew cask | (Debian)apt `ibus-rime` | input_method |
+| **input methods** (`mcbopomofo`, `squirrel`) | brew cask | (Debian) apt `ibus-rime` | input_method |
 | **iperf3** | brew | apt/yum | networking_tools |
+| **ipmitool** | n/a | apt/yum (gated on BMC detected) | homelab_tools |
 | **jnv** | brew | release | devtools |
 | **jq** | brew | apt/yum → GitHub release | base |
-| **jupyterlab**(`jupyter-lab`) | uv tool(配 notebook、ipykernel 等) | uv tool | python_uv_tools |
-| **just** | curl `just.systems/install.sh`(永遠) | 同 | base |
-| **lazychezmoi** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
-| **lazyclash** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
-| **lazygit** | brew → 官方 release fallback（最低 0.64.0） | 移除舊 PPA → brew 偵測 → 官方 system/user release（最低 0.64.0） | lazyvim_deps |
-| **lazymlflow** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
-| **lazypueue** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
-| **libnotify-bin** | n/a | apt(Debian) | coding_agents |
+| **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
+| **just** | curl `just.systems/install.sh` (always) | same | base |
+| **lazychezmoi** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Chezmoi state, diff, edit and apply TUI. |
+| **lazyclash** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Mihomo CLI/TUI and guarded proxy shell integration. |
+| **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
+| **lazymlflow** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — MLflow experiments, runs and artifact inspection. |
+| **lazypueue** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Pueue task/queue dashboard. |
 | **libfuse2** | n/a | apt | gui_apps_linux |
-| **litellm[proxy]**(`litellm`) | uv tool(python 3.13) | uv tool | llm_tools |
+| **libnotify-bin** | n/a | apt (Debian) | coding_agents |
+| **libreoffice** (`soffice`) | brew cask | apt (`libreoffice-writer/calc/impress`, no-recommends) | devtools |
+| **liquidctl** | n/a | apt/yum (gated on a USB cooler / telemetry PSU detected) | homelab_tools |
+| **litellm[proxy]** (`litellm`) | uv tool (python 3.13) | uv tool | llm_tools |
 | **llmfit** | brew formula | curl `llmfit.axjns.dev/install.sh` | llm_tools |
+| **lm-sensors** (`sensors`) | n/a | apt/yum (`lm-sensors`/`lm_sensors`) | homelab_tools |
 | **lnav** | brew | apt/release | devtools |
 | **lolcat** | brew | (apt) | devtools |
 | **maccy** | brew cask | n/a | Brewfile.darwin |
-| **marimo** | uv tool(`[recommended,mcp]`) | uv tool | python_uv_tools |
-| **mas** | brew(共用 Brewfile,僅 macOS) | n/a | Brewfile.tmpl |
-| **micro** | brew | apt／驗證 checksum 的 user-level release（no-root、RedHat） | devtools；[editorcfg](../tools/editor.zh-TW.md)，release 用 `just upgrade-micro` |
-| **mise** | curl `mise.run` | curl `mise.run` → 直接 binary → musl 變體 | bootstrap |
+| **marimo** | uv tool (`[recommended,mcp]`) | uv tool | python_uv_tools |
+| **markitdown** (`[docx,xlsx,pptx]`) | uv tool | uv tool | python_uv_tools |
+| **mas** | brew (shared Brewfile, macOS only) | n/a | Brewfile.tmpl |
+| **micro** | brew | apt / verified user-level release (no-root, RedHat) | devtools; [editorcfg](../tools/editor.md), `just upgrade-micro` for release installs |
+| **mise** | curl `mise.run` | curl `mise.run` → direct binary → musl variant | bootstrap |
 | **mlflow** | uv tool | uv tool | python_uv_tools |
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |
+| **mole** (`mo`) | brew formula, gated on `installMole` | n/a — macOS-only upstream | Brewfile.tmpl |
 | **mosh** | brew | apt | devtools |
 | **mtr** | brew | apt/yum | networking_tools |
+| **neovim** | healthy install → Apple Silicon brew (`state: present`) → official release; Intel official release when needed | apt → GitHub release → user → oldEL fork | neovim |
+| **ngrok** | brew cask | vendor apt repo → user tgz / RedHat tgz | networking_tools (tunnel) |
 | **nmap** | brew | apt/yum | networking_tools |
-| **neovim** | 健康安裝 → Apple Silicon brew（`state: present`）→ 官方 release；Intel 需要時使用官方 release | apt → GitHub release → 使用者 → oldEL 分支 | neovim |
-| **ngrok** | brew cask | 廠商 apt repo → 使用者 tgz / RedHat tgz | networking_tools(tunnel) |
-| **node** | brew(透過 `lazyvim_deps`) | mise | mise + lazyvim_deps |
+| **node** | brew (via `lazyvim_deps`) | mise | mise + lazyvim_deps |
+| **nowplaying-cli** | brew (gated `installMediaControl`) | n/a | media_control |
+| **nvme-cli** (`nvme`) | n/a | apt/yum (gated on NVMe detected) | homelab_tools |
 | **obsidian** | brew cask | n/a | Brewfile.darwin |
-| **ollama** | brew formula `ollama`(CLI)+ cask `ollama-app`(GUI) | curl `ollama.com/install.sh` | llm_tools |
-| **omp**(Oh My Pi) | curl `omp.sh/install --binary` → `~/.local/bin/omp` | 同 | coding_agents |
-| **openchamber**(`@openchamber/web`) | npm 全域 | `mise exec -- npm install -g` | coding_agents |
-| **opencode** | curl `opencode.ai/install`(`--no-modify-path`)→ `~/.opencode/bin/opencode` | 同 | coding_agents |
+| **ollama** | brew formula `ollama` (CLI) + cask `ollama-app` (GUI) | curl `ollama.com/install.sh` | llm_tools |
+| **omp** (Oh My Pi) | curl `omp.sh/install --binary` → `~/.local/bin/omp` | same | coding_agents |
+| **openchamber** (`@openchamber/web`) | npm global | `mise exec -- npm install -g` | coding_agents |
+| **opencode** | curl `opencode.ai/install` (`--no-modify-path`) → `~/.opencode/bin/opencode` | same | coding_agents |
 | **opencode-desktop** | brew cask | n/a | Brewfile.darwin |
-| **opentofu**(`tofu`) | brew formula | Cloudsmith apt repo → GitHub release | iac_tools |
+| **opentofu** (`tofu`) | brew formula | Cloudsmith apt repo → GitHub release | iac_tools |
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
-| **peon-ping** (`peon`) | brew tap `PeonPing/tap`（需 `brew trust`，Homebrew 6 gate） | `install.sh --openpeon --no-rc` | coding_agents —— agent 完成音效；**絕不要跑 `peon-ping-setup`**（hook 由 `dot_claude/modify_settings.json.tmpl` 宣告）。由 `agentSounds` prompt 控制。見 [agent-sounds.md](../tools/agent-sounds.md) |
-| **pi** | `mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent` | 同 | coding_agents |
-| **pia** | chezmoi external `~/.local/share/pi-agents/bin/pia` | 同 | `.chezmoiexternal.toml.tmpl`(`installCodingAgents`) |
-| **playerctl / wmctrl / xdotool** | n/a | apt | gui_apps_linux |
-| **pre-commit** | `uv tool install --python 3.13` | 同 | security_tools |
-| **procps** | (系統) | apt | bootstrap(Linux) |
+| **peon-ping** (`peon`) | brew tap `PeonPing/tap` (needs `brew trust`, Homebrew 6 gate) | `install.sh --openpeon --no-rc` | coding_agents — agent completion sounds; **never run `peon-ping-setup`** (hooks are declared in `dot_claude/modify_settings.json.tmpl`). Gated by the `agentSounds` prompt. See [agent-sounds.md](../tools/agent-sounds.md) |
+| **pi** | `mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent` | same | coding_agents |
+| **pia** | chezmoi external `~/.local/share/pi-agents/bin/pia` | same | `.chezmoiexternal.toml.tmpl` (`installCodingAgents`) |
+| **piper.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
+| **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
+| **playwright-cli** (`@playwright/cli`) | mise npm | mise npm (supported Debian/Ubuntu x64/arm64) | devtools, `installPlaywrightCli`; package skills refreshed on apply / upgrade-npm, Chromium preloading opt-in. See [browser-tools](../tools/browser-tools.md) |
+| **poppler** (`pdftoppm`) | brew | apt (`poppler-utils`) | devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md) |
+| **pre-commit** | `uv tool install --python 3.13` | same | security_tools |
+| **prettier** | Mason (Neovim-local) | Mason (Neovim-local) | LazyVim `ensure_installed`; Conform prefers project-local `node_modules/.bin/prettier` |
+| **procps** | (system) | apt | bootstrap (Linux) |
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
-| **python-dotenv[cli]** | uv tool | uv tool | python_uv_tools |
 | **raycast** | brew cask | n/a | Brewfile.darwin |
-| **rclone** | brew | 官方 installer 或 GitHub | devtools — macOS 的 `rclone mount` 還需要 **macFUSE**（macOS 26+ 需 5.x），手動安裝且**不由本 repo 管理**（需重開機 + GUI 授權）；brew rclone ≥1.73 已內建 `mount`，所以瓶頸不是 binary（[pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md)） |
-| **readability-cli**(`readable`) | npm 全域 | `mise exec -- npm install -g` | js_cli_tools |
-| **recon** | cargo install(git source) | 同 | rust_cargo_tools |
+| **rclone** | brew | official installer or GitHub | devtools — macOS `rclone mount` also needs **macFUSE** (5.x on macOS 26+), manual & **not** repo-managed (reboot + GUI approval); brew rclone ≥1.73 already ships `mount` so the binary isn't the blocker ([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md)) |
+| **readability-cli** (`readable`) | npm global | `mise exec -- npm install -g` | js_cli_tools |
+| **recon** | cargo install (git source) | same | rust_cargo_tools |
+| **resilio-sync** | brew cask (GUI app) | Resilio apt repo → headless daemon + WebUI (per-user systemd service) | resilio_sync |
+| **resvg** | brew | Linuxbrew → `cargo install resvg` (no apt pkg; non-fatal if absent) | devtools — yazi SVG preview. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **ripgrep** | brew | apt/yum → GitHub release | base |
-| **ruby** | mise | mise(noRoot 跳過) | mise |
+| **rsync** | brew | apt / yum (usually preinstalled) | base — replaces macOS's built-in openrsync 2.6.9 (no `--info` etc.); brew rsync 3.x lands in brew's bin (`/opt/homebrew/bin` Apple Silicon, `/usr/local/bin` Intel) ahead of `/usr/bin` on PATH |
+| **ruby** | mise | mise (skipped in noRoot) | mise |
 | **rust** | mise | mise → rustup-init → `static.rust-lang.org` fallback | mise + rust_cargo_tools |
 | **rustscan** | brew | GitHub release | networking_tools |
 | **scroll-reverser** | brew cask | n/a | Brewfile.darwin |
 | **sesh** | brew | GitHub release | devtools |
-| **shellcheck / shfmt** | brew | apt 或 release | devtools |
+| **sevenzip** (7-Zip; `7zz` / `7z`) | brew (`sevenzip`) | apt (`p7zip-full`) | devtools — yazi archive + dmg listing. See [yazi-previews.md](../tools/yazi-previews.md) |
+| **shellcheck / shfmt** | brew | apt or release | devtools |
 | **sidecar** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
-| **specify-cli** | `uv tool install` 從 git | 同 | coding_agents |
+| **skopeo** | brew | apt (`universe`) | devtools — client-side registry copy; rung 3 of `docker-net pull`. See [docker-net.md](../tools/docker-net.md) |
+| **smartmontools** (`smartctl`) | n/a | apt/yum | homelab_tools |
+| **specify-cli** | `uv tool install` from git | same | coding_agents |
 | **specstory** | brew tap `specstoryai/tap` → GitHub release | GitHub release tarball | coding_agents |
-| **speedtest**(Ookla) | brew(tap `teamookla/speedtest`) | `install.speedtest.net` | networking_tools |
+| **speedtest** (Ookla) | brew (tap `teamookla/speedtest`) | `install.speedtest.net` | networking_tools |
 | **spotify** | brew cask | n/a | Brewfile.darwin |
 | **sqlit-tui[ssh]** | uv tool | uv tool | python_uv_tools |
 | **starship** | brew | curl `starship.rs/install.sh` | starship |
+| **steam** | brew cask (gated by `installGamingApps`) | Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`) | Brewfile.darwin / gui_apps_linux |
+| **storcli** | n/a | vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos) | homelab_tools |
+| **summarize** | brew (gated `installSummarize`) | `mise exec -- npm install -g @steipete/summarize` (Node 24+; skipped on `oldEL`) | summarize — see [summarize.md](../tools/summarize.md) |
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
 | **superfile** | brew | installer/release | devtools |
-| **superset** | brew cask(arm64) | n/a | Brewfile.darwin |
-| **tailscale**(CLI) | 由 `tailscale-app` cask 的 wrapper 提供(`/usr/local/bin/tailscale` → app;無 formula) | apt/yum 走 `pkgs.tailscale.com`(`networking_tools` role,`tailscale` tag,由 `installTailscale` 控制) | Brewfile.darwin / networking_tools |
-| **tailscale-app** | brew cask(pkg 同時安裝 `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
-| **tsnet** | chezmoi(`dot_dotfiles/bin/executable_tsnet`,uv PEP-723 script) | 同左 | 自製 — tailnet → ssh config、tailnet-HTTPS serve |
-| **tailspin**(`tspin`) | brew | release | devtools |
+| **superset** | brew cask (arm64) | n/a | Brewfile.darwin |
+| **switchaudio-osx** (`SwitchAudioSource`) | brew (gated `installMediaControl`) | n/a | media_control |
+| **tailscale** (CLI) | via the `tailscale-app` cask wrapper (`/usr/local/bin/tailscale` → app; no formula) | apt/yum from `pkgs.tailscale.com` (`networking_tools` role, `tailscale` tag, gated on `installTailscale`) | Brewfile.darwin / networking_tools |
+| **tailscale-app** | brew cask (pkg also installs the `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
+| **tailspin** (`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
-| **television**(`tv`) | brew | apt+release | devtools |
-| **terminal-notifier** | brew | n/a | coding_agents(macOS) |
-| **terraform** | brew(`hashicorp/tap`) | HashiCorp apt repo → 使用者 zip | iac_tools |
+| **television** (`tv`) | brew | apt+release | devtools |
+| **terminal-browser** | brew cask | checksum-verified upstream stable release (supported Debian/Ubuntu x64/arm64) | devtools, `installTerminalBrowser`; package skills, upgrade-brew / upgrade-terminal-browser. See [browser-tools](../tools/browser-tools.md) |
+| **terminal-notifier** | brew | n/a | coding_agents (macOS) |
+| **terraform** | brew (`hashicorp/tap`) | HashiCorp apt repo → user zip | iac_tools |
 | **the-unarchiver** | brew cask | n/a | Brewfile.darwin |
-| **thefuck** | brew | uv tool(python 3.11 distutils) | devtools |
-| **tldr** | (macOS 透過 brew 用 `tlrc`) | 系統 npm 或 `mise exec -- npm install -g tldr` | devtools |
-| **tlrc** | brew | (Linux 改用 npm `tldr`) | devtools |
-| **tmux** | brew | apt → < 3.3 時 tmux-appimage | devtools |
+| **thefuck** | brew | uv tool (python 3.11 distutils) | devtools |
+| **tldr** | (macOS uses `tlrc` via brew) | system npm or `mise exec -- npm install -g tldr` | devtools |
+| **tlrc** | brew | (Linux uses `tldr` npm instead) | devtools |
+| **tmux** | brew | apt → tmux-appimage when < 3.3 | devtools |
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
-| **translate** | brew (`daviddwlee84/tap`) | 驗證過的 GitHub release；保留 legacy Go | `personal_tools` — 見個人工具安裝與升級文件 |
+| **trafilatura** | uv tool | uv tool | python_uv_tools |
+| **translate** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Terminal translation CLI/TUI. |
 | **tree** | brew | apt/yum | base |
 | **tree-sitter** / **tree-sitter-cli** | brew | mise-npm → cargo fallback | lazyvim_deps |
-| **trippy**(`trip`) | brew | apt/release | networking_tools |
-| **try-cli**(`try`) | gem | gem | ruby_gem_tools |
-| **uv** | curl `astral.sh/uv/install.sh` | 同 | bootstrap;`python_uv_tools` 自我升級分派 |
+| **trippy** (`trip`) | brew | apt/release | networking_tools |
+| **try-cli** (`try`) | gem | gem | ruby_gem_tools |
+| **tsnet** | chezmoi (`dot_dotfiles/bin/executable_tsnet`, uv PEP-723 script) | same | in-house — tailnet → ssh config, tailnet-HTTPS serve |
+| **uv** | curl `astral.sh/uv/install.sh` | same | bootstrap; `python_uv_tools` self-upgrade dispatch |
 | **vhs** | brew | GitHub release | devtools |
-| **visidata**(`vd`) | uv tool(配 pandas、pyarrow) | uv tool | python_uv_tools |
-| **vips** | brew | apt(`libvips-tools`) | media_tools |
+| **vips** | brew | apt (`libvips-tools`) | media_tools |
+| **visidata** (`vd`) | uv tool (with pandas, pyarrow) | uv tool | python_uv_tools |
 | **visual-studio-code** | brew cask | Microsoft apt repo | Brewfile.darwin / gui_apps_linux |
+| **wakeonlan** | brew | apt (`wakeonlan`) | networking_tools |
 | **warp** | brew cask | n/a | Brewfile.darwin |
 | **wget** | brew | apt/yum | base |
 | **witr** | brew | (release) | devtools |
-| **workmux** | brew(tap `raine/workmux`) | GitHub release `.tar.gz` | devtools |
+| **wl-clipboard** (`wl-copy`/`wl-paste`) | n/a (`pbcopy` built-in) | apt | gui_apps_linux — Wayland clipboard backend for Neovim yank, lazygit `Ctrl+O`, `x copy`. See [clipboard.md](../tools/clipboard.md) |
+| **workmux** | brew (tap `raine/workmux`) | GitHub release `.tar.gz` | devtools |
 | **worktrunk** | brew | GitHub release | devtools |
-| **wl-clipboard**(`wl-copy`/`wl-paste`) | n/a(內建 `pbcopy`) | apt | gui_apps_linux — Wayland 剪貼簿後端,供 Neovim yank、lazygit `Ctrl+O`、`x copy` 使用。見 [clipboard.md](../tools/clipboard.md) |
-| **xclip** | n/a(內建 `pbcopy`) | apt | gui_apps_linux — X11/XWayland 剪貼簿後端(消費者同 `wl-clipboard`) |
-| **xonsh** | uv tool(配 xontribs) | uv tool | python_uv_tools |
-| **xsel** | n/a(內建 `pbcopy`) | apt | gui_apps_linux — X11 剪貼簿後端;`x` 在 OSC 52 之前的最後一個後備,lazygit 錯誤訊息點名的工具 |
+| **xclip** | n/a (`pbcopy` built-in) | apt | gui_apps_linux — X11/XWayland clipboard backend (same consumers as `wl-clipboard`) |
+| **xonsh** | uv tool (with xontribs) | uv tool | python_uv_tools |
+| **xsel** | n/a (`pbcopy` built-in) | apt | gui_apps_linux — X11 clipboard backend; last non-OSC-52 fallback in `x`, named in lazygit's error text |
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
-| **yt-dlp** | uv tool（`[default]` + `yt-dlp-ejs`） | uv tool（`[default]` + `yt-dlp-ejs`） | python_uv_tools |
-| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`,之後以 glob `zen*.AppImage` 比對 | gui_apps_linux |
+| **yt-dlp** | uv tool (`[default]` + `yt-dlp-ejs`) | uv tool (`[default]` + `yt-dlp-ejs`) | python_uv_tools |
 | **zellij** | brew | GitHub release | devtools |
-| **zoxide** | brew | curl 官方 installer | devtools |
-| **zsh** | brew | apt/yum / 原始碼編譯(RHEL 7) | zsh |
+| **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage`, thereafter matched by glob `zen*.AppImage` | gui_apps_linux |
+| **zoxide** | brew | curl official installer | devtools |
+| **zsh** | brew | apt/yum / source build (RHEL 7) | zsh |
+<!-- END generated: tool-catalog -->
 
 > 未列出的工具:`oh-my-zsh`、`oh-my-bash`、`zsh-autosuggestions`、
 > `zsh-syntax-highlighting`、`zsh-completions`、`zsh-vi-mode`、

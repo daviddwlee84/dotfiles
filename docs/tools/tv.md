@@ -54,6 +54,42 @@ For pasting an invocation to the shell buffer (with trailing space for tools tha
 
 ---
 
+### `inventory` channel
+
+"What did this repo install, what is it for, and which role installs it?" Reads the
+tool catalog SSOT [`dot_config/docs/tools/tool-catalog.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/docs/tools/tool-catalog.toml)
+(~240 tools: category, one-line description, installing role / recipe, init-prompt
+gate) through `~/.config/television/tool-catalog.py`, and joins it with **live host
+state** — your chezmoi prompt answers plus PATH / `/Applications` probes:
+
+| Mark | Meaning | Filter word |
+|---|---|---|
+| `●` | installed | — |
+| `×` | expected but missing (gate on, right OS, not found — a broken install) | `missing` |
+| `○` | gated off by an init prompt on this host (preview names the prompt key) | `gated` |
+| `–` | not for this OS | `n/a` |
+| `·` | nothing to probe (yazi plugins, gh extensions, fonts) | — |
+
+Also type a category (`Networking`), a role (`python_uv_tools`) or a description word.
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Full detail (paged) |
+| `Alt+T` / `Alt+M` | tldr / man page (same letters as `tv appsrc`) |
+| `Alt+D` | Open the tool's repo doc page (glow → bat → less) |
+| `Alt+I` | Copy the install command (`just ansible-tags <tag>`, `brew bundle …`, `mise install`) |
+| `Alt+U` | Copy the upgrade command (`just upgrade-<category>`) |
+| `Alt+W` | `appsrc which <bin>` — live cross-check of how it was really installed |
+
+Neighbours: `tv tools` is the curated *quick-launcher* (55 everyday CLIs); `tv appsrc`
+is an OS-wide scan of how **anything** got installed, repo-managed or not. Adding a
+tool to the repo = add a `[[tool]]` entry to the catalog, then `just gen-tool-index`
+(regenerates the [Tool index](../this_repo/tool-managers.md#tool-index-az)); the
+`test_tool_catalog.py` coverage test fails if a role list / Brewfile names a tool the
+catalog lacks.
+
+---
+
 ### `agent-wakeup` channel
 
 Dashboard for live coding-agent panes that are waiting on quota/rate-limit

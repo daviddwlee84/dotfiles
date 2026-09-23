@@ -168,6 +168,19 @@ reconfigure *ARGS:
 gen-prompts *ARGS:
     uv run --script scripts/init/dotfiles_init.py gen --source . {{ARGS}}
 
+# Regenerate the Tool index table in docs/this_repo/tool-managers{,.zh-TW}.md from the
+# tool catalog SSOT (dot_config/docs/tools/tool-catalog.toml — also what
+# `tv inventory` reads). `just gen-tool-index --check` exits 1 on drift, the
+# same check the `tool-catalog-gen-check` pre-commit hook runs.
+gen-tool-index *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mode=--write
+    [[ "{{ARGS}}" == *--check* ]] && mode=--check
+    uv run --script dot_config/television/executable_tool-catalog.py \
+        --catalog dot_config/docs/tools/tool-catalog.toml \
+        index-md "$mode" docs/this_repo/tool-managers.md docs/this_repo/tool-managers.zh-TW.md
+
 # Clear run_once script state (allows re-running run_once scripts)
 chezmoi-clear-scripts:
     chezmoi state delete-bucket --bucket=scriptState

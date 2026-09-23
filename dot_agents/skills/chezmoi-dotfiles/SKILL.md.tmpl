@@ -202,7 +202,12 @@ tv <channel>            # open one, e.g. tv fleet-hosts | tv mlflow | tv pueue
 ls "$(chezmoi source-path)/dot_config/television/cable/"   # the channel definitions
 ```
 
-Handy ones: `fleet-hosts`, `tailnet`, `ssh-config`, `mlflow`, `pueue`, `ports`,
+**"What did this repo install / is X installed here / which role installs it?"** →
+`tv inventory` (or read `~/.config/docs/tools/tool-catalog.toml` directly; per-tool
+status: `~/.config/television/tool-catalog.py preview <id>`). It marks each tool
+installed / missing / gated-off-by-prompt / not-for-this-OS on the current host.
+
+Handy ones: `inventory`, `fleet-hosts`, `tailnet`, `ssh-config`, `mlflow`, `pueue`, `ports`,
 `kill-process`, `services`, `sessions`, `keybindings`, `aliases`, `git-ops`,
 `mac-apps`/`linux-apps`, the agent trio (`agent-panes`, `agent-sessions`,
 `agent-wakeup`, dual tmux/Herdr with stable agent-session scheduling) and the `herdr-*` family. Full reference: `docs/tools/tv.md`.

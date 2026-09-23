@@ -59,6 +59,36 @@ tv update-channels
 
 ---
 
+### `inventory` 頻道
+
+「這個 repo 幫我裝了什麼？是做什麼的？哪個 role 裝的？」讀取工具目錄 SSOT
+[`dot_config/docs/tools/tool-catalog.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/docs/tools/tool-catalog.toml)
+（約 240 個工具：分類、一行說明、安裝的 role / recipe、init prompt gate），透過
+`~/.config/television/tool-catalog.py` 與**本機即時狀態**（chezmoi prompt 答案 + PATH / `/Applications` 探測）合併：
+
+| 標記 | 意義 | 篩選字 |
+|---|---|---|
+| `●` | 已安裝 | — |
+| `×` | 應該有但找不到（gate 開、OS 對、卻沒裝 — 安裝壞掉） | `missing` |
+| `○` | 本機 init prompt 關閉（預覽會列出 prompt key） | `gated` |
+| `–` | 不適用此 OS | `n/a` |
+| `·` | 無可探測項（yazi plugin、gh extension、字型） | — |
+
+也可輸入分類（`Networking`）、role（`python_uv_tools`）或說明中的字。
+
+| 按鍵 | 動作 (action) |
+|-----|--------|
+| `Enter` | 完整細節（分頁） |
+| `Alt+T` / `Alt+M` | tldr / man（與 `tv appsrc` 同字母） |
+| `Alt+D` | 開啟該工具的 repo 文件（glow → bat → less） |
+| `Alt+I` | 複製安裝指令（`just ansible-tags <tag>`、`brew bundle …`、`mise install`） |
+| `Alt+U` | 複製升級指令（`just upgrade-<category>`） |
+| `Alt+W` | `appsrc which <bin>` — 即時交叉確認實際安裝來源 |
+
+鄰居：`tv tools` 是精選的*快速啟動器*（55 個常用 CLI）；`tv appsrc` 是整台機器「任何東西怎麼裝的」掃描（不論是否由 repo 管理）。新增工具 = 在目錄加一筆 `[[tool]]`，再跑 `just gen-tool-index`（重新產生 [Tool index](../this_repo/tool-managers.md#tool-index-az)）；若 role 清單 / Brewfile 出現目錄沒有的工具，`test_tool_catalog.py` 會失敗。
+
+---
+
 ### `lan-devices` 頻道
 
 模糊搜尋本地子網路上的裝置，含開放 port、MAC/廠商、主機名（rDNS + mDNS）、ping RTT、最後出現時戳。底層為 `~/.config/television/lan-scan.sh`，它會把結果遞增寫入 `~/.cache/tv/lan-devices.tsv`，並把每台主機的 nmap 細節寫入 `~/.cache/tv/lan-ports/<ip>.txt`。頻道使用 `watch = 2.0`，因此背景掃描進行的同時，列就會串流進選擇器（state 欄：`discovered` → `scanning` → `scanned`）。

@@ -1,0 +1,2355 @@
+# Tool catalog — SSOT for "what does this repo install, what is it, who installs it".
+#
+# Consumers (keep in sync with the schema below):
+#   - `tv inventory`            dot_config/television/cable/inventory.toml
+#   - helper / generator        dot_config/television/executable_tool-catalog.py
+#   - generated Tool index      docs/this_repo/tool-managers.md § Tool index (A–Z)
+#                               (`just gen-tool-index`; never hand-edit the marker region)
+#   - guardrail tests           tests/unit/test_tool_catalog.py
+#
+# The role defaults (dot_ansible/roles/*/defaults/main.yml), Brewfiles and mise config
+# stay the INSTALL source of truth — this file only adds metadata (category,
+# description, gate, docs). The test fails when a role list / Brewfile names a
+# tool this catalog doesn't know about.
+#
+# [[tool]] fields
+#   id          canonical, lowercase-ish id (unique)
+#   label       markdown for the index "Tool" column (default: **id**)
+#   bins        binaries to probe on PATH (default: [id]; [] = nothing to probe)
+#   pkgs        extra package / cask names this entry covers (coverage test only)
+#   category    one of `categories` below
+#   desc        one-line "what is it"
+#   role        installing ansible role, or a pseudo-role from [roles.*]
+#   role_linux  role on Linux when it differs from `role` (e.g. Brewfile.darwin → gui_apps_linux)
+#   tag         ansible tag when it differs from the role name
+#   gate        gate expression REPLACING the role's gate (see [roles.*])
+#   gate_linux  gate on Linux when it differs from `gate`
+#   app         macOS .app bundle name (probed in /Applications, ~/Applications)
+#   docs        repo-relative doc path
+#   upgrade     explicit upgrade command (default: derived from the install method)
+#   mac / linux install method markdown (verbatim in the index; "n/a"/"—" = not for this OS)
+#   role_md     verbatim index "Role" column when it carries more than the role name
+#
+# Gate expressions: terms joined by `&`; a term is `key` (truthy), `!key`, or
+# `key=value`, evaluated against chezmoi data (the init prompts). Missing keys
+# fall back to [gate_defaults], else false.
+
+categories = [
+  "File & Search", "Git & Diff", "Sessions & Multiplexing", "Navigation & Shell",
+  "Process & System", "Dev Tools", "Data & Docs", "Networking", "AI / Coding Agents",
+  "Media", "Runtimes & Package Managers", "Security & Secrets", "Cloud & Containers",
+  "Terminals & Editors", "GUI Apps", "Fonts & Input", "Homelab & Hardware",
+  "System Libraries", "Fun",
+]
+
+# Prompt defaults for keys absent from an older chezmoi.toml (mirror the
+# `hasKey` fallbacks in .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl).
+[gate_defaults]
+installExtraRuntimes = true
+installPersonalTools = true
+agentSounds = "notify"
+profile = ""
+
+# Role → gate / tag / OS. Mirrors the TAGS assembly in
+# .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl.
+# `install` overrides the derived `just ansible-tags <tag>` hint.
+[roles.base]
+[roles.zsh]
+[roles.bash]
+[roles.starship]
+[roles.atuin]
+[roles.neovim]
+[roles.lazyvim_deps]
+[roles.devtools]
+[roles.docker]
+[roles.nerdfonts]
+[roles.security_tools]
+[roles.personal_tools]
+gate = "installPersonalTools"
+[roles.rust_cargo_tools]
+gate = "installExtraRuntimes"
+[roles.go_tools]
+gate = "installExtraRuntimes"
+[roles.ruby_gem_tools]
+gate = "installExtraRuntimes"
+[roles.coding_agents]
+gate = "installCodingAgents"
+[roles.bitwarden]
+gate = "installBitwarden"
+[roles.python_uv_tools]
+gate = "installPythonUvTools"
+[roles.js_cli_tools]
+gate = "installJsCliTools"
+[roles.llm_tools]
+gate = "installLlmTools"
+[roles.summarize]
+gate = "installSummarize"
+[roles.input_method]
+gate = "installInputMethod"
+[roles.networking_tools]
+gate = "installNetworkingTools"
+[roles.iac_tools]
+gate = "installIacTools"
+[roles.media_tools]
+gate = "installMediaTools"
+[roles.media_control]
+gate = "installMediaControl"
+[roles.dotnet_tools]
+gate = "installDotnetTools"
+[roles.gui_apps_linux]
+gate = "profile=ubuntu_desktop"
+tag = "gui_apps"
+os = ["linux"]
+[roles.auditd]
+gate = "installAuditd"
+os = ["linux"]
+[roles.homelab_tools]
+gate = "installHomelabTools"
+os = ["linux"]
+[roles.resilio_sync]
+gate = "installResilioSync"
+os = ["linux"]
+[roles.wake_on_lan]
+gate = "installWakeOnLan"
+os = ["linux"]
+[roles.niri]
+gate = "installNiri&profile=ubuntu_desktop"
+os = ["linux"]
+
+# Pseudo-roles (not ansible)
+[roles."Brewfile.darwin"]
+gate = "installBrewApps"
+os = ["darwin"]
+install = "brew bundle --file=~/.config/homebrew/Brewfile.darwin"
+[roles.Brewfile]
+os = ["darwin"]
+install = "brew bundle --file=~/.config/homebrew/Brewfile"
+[roles.bootstrap]
+install = "chezmoi apply (run_once_before bootstrap script)"
+[roles.mise]
+install = "mise install --yes"
+[roles.chezmoi-external]
+install = "chezmoi apply --refresh-externals"
+[roles.in-house]
+install = "chezmoi apply"
+[roles.mason]
+install = "nvim → :Mason"
+
+[[tool]]
+id = "actionlint"
+category = "Dev Tools"
+desc = "GitHub Actions workflow linter"
+role = "devtools"
+docs = "docs/tools/actionlint.md"
+mac = "brew"
+linux = "Linuxbrew (best-effort)"
+
+[[tool]]
+id = "aerospace"
+bins = []
+category = "GUI Apps"
+desc = "i3-like tiling window manager for macOS"
+role = "Brewfile.darwin"
+app = "AeroSpace"
+mac = "brew cask (`nikitabobko/tap`)"
+linux = "n/a"
+
+[[tool]]
+id = "agy"
+label = "**agy** / **agyc** (Antigravity CLI)"
+bins = ["agy", "agyc"]
+category = "AI / Coding Agents"
+desc = "Antigravity CLI (Google agentic coding)"
+role = "coding_agents"
+mac = "curl `antigravity.google/cli/install.sh`"
+linux = "same"
+
+[[tool]]
+id = "alacritty"
+category = "Terminals & Editors"
+desc = "GPU-accelerated terminal emulator"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+app = "Alacritty"
+mac = "brew cask"
+linux = "cargo build (apt deps)"
+
+[[tool]]
+id = "alt-tab"
+bins = []
+category = "GUI Apps"
+desc = "Windows-style Alt-Tab window switcher"
+role = "Brewfile.darwin"
+app = "AltTab"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "anki"
+bins = []
+category = "GUI Apps"
+desc = "Spaced-repetition flashcards"
+role = "Brewfile.darwin"
+app = "Anki"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "ansible-core"
+bins = ["ansible", "ansible-playbook"]
+category = "Runtimes & Package Managers"
+desc = "Ansible engine that runs this repo's roles"
+role = "bootstrap"
+mac = "uv tool install"
+linux = "uv tool install"
+
+[[tool]]
+id = "antigravity"
+label = "**antigravity** (IDE)"
+bins = []
+category = "Terminals & Editors"
+desc = "Google Antigravity agentic IDE"
+role = "Brewfile.darwin"
+gate = "installAiDesktopApps"
+app = "Antigravity"
+mac = "brew cask"
+linux = "placeholder"
+
+[[tool]]
+id = "appimagelauncher"
+label = "**AppImageLauncher**"
+bins = ["AppImageLauncher", "ail-cli"]
+category = "GUI Apps"
+desc = "Integrate AppImages into the desktop menu"
+role = "gui_apps_linux"
+mac = "n/a"
+linux = "PPA → GitHub `.deb` → Lite AppImage"
+
+[[tool]]
+id = "applite"
+bins = []
+category = "GUI Apps"
+desc = "GUI for managing Homebrew casks"
+role = "Brewfile.darwin"
+app = "Applite"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "apprise"
+category = "Dev Tools"
+desc = "Push notifications to 100+ services (Slack, Telegram, …)"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "arc"
+bins = []
+category = "GUI Apps"
+desc = "Arc web browser"
+role = "Brewfile.darwin"
+app = "Arc"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "arp-scan"
+category = "Networking"
+desc = "ARP-based LAN host discovery"
+role = "networking_tools"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "atuin"
+category = "Navigation & Shell"
+desc = "Synced, searchable shell history"
+role = "atuin"
+docs = "docs/tools/atuin.md"
+upgrade = "just upgrade-atuin"
+mac = "brew"
+linux = "curl `setup.atuin.sh`"
+
+[[tool]]
+id = "azure-cli"
+bins = ["az"]
+category = "Cloud & Containers"
+desc = "Azure CLI (az)"
+role = "iac_tools"
+mac = "brew"
+linux = "Microsoft apt repo → uv tool fallback"
+
+[[tool]]
+id = "azure-cost-cli"
+label = "**azure-cost-cli** (`azure-cost`)"
+bins = ["azure-cost"]
+category = "Cloud & Containers"
+desc = "Azure cost reports in the terminal"
+role = "dotnet_tools"
+mac = "`dotnet tool install --global`"
+linux = "same"
+
+[[tool]]
+id = "bandwhich"
+category = "Networking"
+desc = "Per-process network bandwidth monitor"
+role = "networking_tools"
+mac = "brew"
+linux = "GitHub release musl"
+
+[[tool]]
+id = "bash"
+label = "**bash** (5.x)"
+category = "Navigation & Shell"
+desc = "Bash 5.x shell (brew on macOS when primaryShell=bash)"
+role = "bash"
+mac = "brew (when `primary_shell=\"bash\"`)"
+linux = "system"
+
+[[tool]]
+id = "bat"
+category = "File & Search"
+desc = "cat with syntax highlighting"
+role = "devtools"
+mac = "brew"
+linux = "apt + `/usr/bin/bat` symlink → GitHub musl"
+role_md = "base/devtools"
+
+[[tool]]
+id = "bats-core"
+bins = ["bats"]
+category = "Dev Tools"
+desc = "Bash Automated Testing System"
+role = "devtools"
+mac = "brew"
+linux = "apt → GitHub `install.sh`"
+
+[[tool]]
+id = "bitwarden-cli"
+label = "**Bitwarden CLI** (`bw`)"
+bins = ["bw"]
+category = "Security & Secrets"
+desc = "Bitwarden password manager CLI"
+role = "bitwarden"
+mac = "`mise exec -- npm install -g @bitwarden/cli`"
+linux = "same"
+
+[[tool]]
+id = "bitwarden-desktop"
+label = "**Bitwarden Desktop**"
+bins = ["bitwarden"]
+category = "Security & Secrets"
+desc = "Bitwarden desktop app"
+role = "bitwarden"
+app = "Bitwarden"
+mac = "brew cask"
+linux = "snap → `.deb`"
+
+[[tool]]
+id = "btop"
+category = "Process & System"
+desc = "Resource monitor TUI"
+role = "devtools"
+docs = "docs/tools/btop.md"
+mac = "brew"
+linux = "apt → GitHub release"
+
+[[tool]]
+id = "build-essential"
+bins = ["make"]
+category = "System Libraries"
+desc = "Debian compiler toolchain meta-package"
+role = "bootstrap"
+mac = "n/a"
+linux = "apt"
+role_md = "bootstrap (Linux)"
+
+[[tool]]
+id = "bun"
+category = "Runtimes & Package Managers"
+desc = "Fast JavaScript runtime and package manager"
+role = "mise"
+gate = "installExtraRuntimes"
+mac = "mise"
+linux = "mise"
+
+[[tool]]
+id = "calibre"
+label = "**calibre** (`ebook-meta`)"
+bins = ["ebook-meta"]
+category = "Media"
+desc = "E-book manager; ebook-meta backs Kindle previews in yazi"
+role = "devtools"
+gate = "installCalibre"
+app = "calibre"
+mac = "brew cask — opt-in `installCalibre`"
+linux = "apt (`calibre`) — opt-in"
+role_md = "devtools — backs Kindle .mobi/.azw/.azw3 metadata previews in yazi via `view-ebook`. See [yazi-previews.md](../tools/yazi-previews.md)"
+
+[[tool]]
+id = "cargo-update"
+bins = ["cargo-install-update"]
+category = "Runtimes & Package Managers"
+desc = "cargo install-update for cargo-installed tools"
+role = "rust_cargo_tools"
+mac = "cargo install (bootstrap for `cat_cargo`)"
+linux = "same"
+
+[[tool]]
+id = "chafa"
+category = "File & Search"
+desc = "Terminal image renderer (yazi preview backend)"
+role = "devtools"
+mac = "brew"
+linux = "apt (`chafa`)"
+role_md = "devtools — yazi image-display fallback (unicode-art); backs all image/pdf/video/heic previews. Shadowed by a `--probe off` shim (`dot_dotfiles/bin/executable_chafa`) to stop the OSC-query→rename-popup leak. See [yazi-previews.md](../tools/yazi-previews.md)"
+
+[[tool]]
+id = "chatgpt"
+bins = []
+category = "AI / Coding Agents"
+desc = "ChatGPT desktop app (includes Codex)"
+role = "Brewfile.darwin"
+gate = "installAiDesktopApps"
+app = "ChatGPT"
+mac = "brew cask (Intel + Apple Silicon; includes Codex)"
+linux = "n/a"
+
+[[tool]]
+id = "claude-desktop"
+label = "**Claude** (desktop)"
+bins = []
+pkgs = ["claude"]
+category = "AI / Coding Agents"
+desc = "Claude desktop app"
+role = "Brewfile.darwin"
+gate = "installAiDesktopApps"
+app = "Claude"
+mac = "brew cask `claude`"
+linux = "n/a"
+
+[[tool]]
+id = "claude-code"
+label = "**Claude Code**"
+bins = ["claude"]
+category = "AI / Coding Agents"
+desc = "Anthropic Claude Code agent CLI"
+role = "coding_agents"
+mac = "brew cask `claude-code`"
+linux = "curl `claude.ai/install.sh` → `~/.claude/local/bin/claude`"
+
+[[tool]]
+id = "claude-hud"
+bins = []
+category = "AI / Coding Agents"
+desc = "Claude Code statusline HUD (synced by the role)"
+role = "coding_agents"
+docs = "docs/tools/claude-hud.md"
+upgrade = "just upgrade-plugins"
+mac = "python helper run from role"
+linux = "same"
+
+[[tool]]
+id = "cloudflared"
+category = "Networking"
+desc = "Cloudflare Tunnel client"
+role = "networking_tools"
+tag = "tunnel_tools"
+gate = "installTunnelTools"
+mac = "brew"
+linux = "GitHub `.deb`/binary / `.rpm`"
+role_md = "networking_tools (tunnel)"
+
+[[tool]]
+id = "cmux"
+label = "**CMux**"
+bins = []
+pkgs = ["cmux"]
+category = "Terminals & Editors"
+desc = "Ghostty-based terminal for coding agents"
+role = "Brewfile.darwin"
+app = "cmux"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "codeisland"
+label = "**CodeIsland**"
+bins = []
+category = "AI / Coding Agents"
+desc = "Dynamic-Island-style agent status for macOS"
+role = "Brewfile.darwin"
+gate = "installAiDesktopApps"
+app = "CodeIsland"
+mac = "brew cask (`wxtsky/tap`)"
+linux = "n/a"
+
+[[tool]]
+id = "codex"
+label = "**codex** (OpenAI Codex CLI)"
+category = "AI / Coding Agents"
+desc = "OpenAI Codex CLI agent"
+role = "coding_agents"
+mac = "brew cask `codex`"
+linux = "`mise exec -- npm install -g @openai/codex`"
+
+[[tool]]
+id = "codexbar"
+label = "**CodexBar**"
+category = "AI / Coding Agents"
+desc = "Menu-bar usage/quota meter for coding agents"
+role = "coding_agents"
+app = "CodexBar"
+docs = "docs/tools/codexbar.md"
+mac = "brew cask `codexbar` (homebrew-cask core)"
+linux = "Linuxbrew `steipete/tap/codexbar` → GitHub release; static-musl asset (and no Linuxbrew) when glibc < 2.38"
+
+[[tool]]
+id = "copyparty"
+category = "Networking"
+desc = "Portable file server (HTTP/WebDAV/FTP) with uploads"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "copyq"
+label = "**CopyQ**"
+category = "GUI Apps"
+desc = "Clipboard manager with history"
+role = "gui_apps_linux"
+mac = "n/a"
+linux = "apt"
+
+[[tool]]
+id = "coreutils"
+bins = ["gdate", "date"]
+category = "Process & System"
+desc = "GNU core utilities (g-prefixed on macOS)"
+role = "devtools"
+mac = "brew"
+linux = "(GNU coreutils via apt; macOS gets via brew)"
+
+[[tool]]
+id = "curl"
+category = "Networking"
+desc = "HTTP client"
+role = "base"
+mac = "system"
+linux = "apt/yum"
+role_md = "base + bootstrap"
+
+[[tool]]
+id = "cursor"
+label = "**cursor** (IDE)"
+category = "Terminals & Editors"
+desc = "Cursor AI code editor"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+app = "Cursor"
+mac = "brew cask"
+linux = "`.deb` from `cursor.com/api/download`"
+
+[[tool]]
+id = "cursor-agent"
+label = "**cursor-agent** (CLI)"
+category = "AI / Coding Agents"
+desc = "Cursor CLI agent"
+role = "coding_agents"
+mac = "curl `cursor.com/install`"
+linux = "same"
+
+[[tool]]
+id = "dasel"
+category = "Data & Docs"
+desc = "Query/modify JSON/YAML/TOML/XML with one syntax"
+role = "devtools"
+mac = "brew"
+linux = "release"
+
+[[tool]]
+id = "dbeaver-community"
+bins = []
+category = "Data & Docs"
+desc = "Universal SQL database GUI"
+role = "Brewfile.darwin"
+app = "DBeaver"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "dev-cli"
+label = "**dev-cli** (`dev`)"
+bins = ["dev"]
+category = "Dev Tools"
+desc = "Repository/task/worktree dashboard (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — Repository/task/worktree dashboard; binary `dev`."
+
+[[tool]]
+id = "diffnav"
+category = "Git & Diff"
+desc = "TUI diff navigator (file tree + delta)"
+role = "devtools"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "direnv"
+category = "Navigation & Shell"
+desc = "Per-directory env vars via .envrc"
+role = "devtools"
+docs = "docs/tools/direnv.md"
+mac = "brew"
+linux = "apt or curl-installer"
+
+[[tool]]
+id = "discord"
+bins = []
+category = "GUI Apps"
+desc = "Discord chat"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+app = "Discord"
+mac = "brew cask"
+linux = "flatpak (default) / `.deb`"
+
+[[tool]]
+id = "docker"
+category = "Cloud & Containers"
+desc = "Container runtime (OrbStack on macOS, rootless Docker on Linux)"
+role = "docker"
+mac = "brew cask `orbstack`"
+linux = "`curl get.docker.com` rootless"
+
+[[tool]]
+id = "doggo"
+category = "Networking"
+desc = "Modern DNS client (dig alternative)"
+role = "networking_tools"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "python-dotenv"
+label = "**dotenv** (python-dotenv[cli])"
+bins = ["dotenv"]
+pkgs = ["python-dotenv[cli]"]
+category = "Dev Tools"
+desc = "Run commands with .env loaded (python-dotenv CLI)"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "dotnet"
+category = "Runtimes & Package Managers"
+desc = ".NET SDK (isolated, for dotnet global tools)"
+role = "mise"
+gate = "installDotnetTools"
+mac = "mise (`10`, isolated)"
+linux = "mise (`10`, isolated)"
+
+[[tool]]
+id = "doxx"
+category = "Data & Docs"
+desc = "Terminal .docx viewer / exporter"
+role = "devtools"
+mac = "brew (homebrew-core)"
+linux = "GitHub release `.tar.xz`"
+
+[[tool]]
+id = "duckdb"
+category = "Data & Docs"
+desc = "In-process SQL analytics engine"
+role = "devtools"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "duckdb.yazi"
+bins = []
+category = "File & Search"
+desc = "Yazi plugin: preview CSV/Parquet/xlsx via DuckDB"
+role = "devtools"
+upgrade = "just upgrade-yazi-plugins"
+mac = "`ya pkg` (Yazi plugin)"
+linux = "`ya pkg`"
+role_md = "devtools (yazi)"
+
+[[tool]]
+id = "ethtool"
+category = "Networking"
+desc = "NIC settings (enables Wake-on-LAN)"
+role = "wake_on_lan"
+mac = "n/a"
+linux = "apt / yum (`ethtool`)"
+
+[[tool]]
+id = "exiftool"
+category = "Media"
+desc = "Read/write image and media metadata"
+role = "media_tools"
+docs = "docs/tools/exiftool.md"
+mac = "brew"
+linux = "apt (`libimage-exiftool-perl`)"
+
+[[tool]]
+id = "exp-cli"
+label = "**exp-cli** (`exp`)"
+bins = ["exp"]
+category = "Dev Tools"
+desc = "Research-workflow CLI (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — Research workflow CLI and overview; binary `exp`."
+
+[[tool]]
+id = "eza"
+category = "File & Search"
+desc = "Modern ls with git status"
+role = "devtools"
+mac = "brew"
+linux = "gierens.de apt repo → GitHub musl → brew aarch64"
+
+[[tool]]
+id = "fastfetch"
+category = "Process & System"
+desc = "System info summary (neofetch successor)"
+role = "devtools"
+mac = "brew"
+linux = "(Linux release if added)"
+
+[[tool]]
+id = "fd"
+bins = ["fd", "fdfind"]
+category = "File & Search"
+desc = "Fast file finder"
+role = "base"
+mac = "brew"
+linux = "apt (`fd-find` + symlink) → GitHub release"
+
+[[tool]]
+id = "ffmpeg"
+category = "Media"
+desc = "Audio/video converter"
+role = "media_tools"
+docs = "docs/tools/ffmpeg.md"
+mac = "brew"
+linux = "apt"
+
+[[tool]]
+id = "ffmpeg-full"
+bins = []
+category = "Media"
+desc = "Keg-only ffmpeg with libass (subtitle burn-in for ytmv)"
+role = "media_tools"
+mac = "brew (keg-only)"
+linux = "— (Debian ffmpeg already links libass)"
+
+[[tool]]
+id = "figlet"
+category = "Fun"
+desc = "ASCII-art banners"
+role = "devtools"
+mac = "brew"
+linux = "(apt likely)"
+
+[[tool]]
+id = "font-hack-nerd-font"
+bins = []
+category = "Fonts & Input"
+desc = "Hack Nerd Font (icons for prompts and TUIs)"
+role = "nerdfonts"
+mac = "brew cask"
+linux = "GitHub release Hack.zip → `~/.local/share/fonts`"
+
+[[tool]]
+id = "fontconfig"
+bins = ["fc-list"]
+category = "System Libraries"
+desc = "Font discovery library + fc-* tools"
+role = "nerdfonts"
+mac = "(system)"
+linux = "apt/yum"
+
+[[tool]]
+id = "freeze"
+category = "Dev Tools"
+desc = "Render code / terminal output to images"
+role = "devtools"
+docs = "docs/tools/freeze.md"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "fzf"
+category = "File & Search"
+desc = "Interactive fuzzy finder"
+role = "lazyvim_deps"
+docs = "docs/tools/fzf.md"
+mac = "brew (via `lazyvim_deps`)"
+linux = "chezmoi external + `~/.fzf/install --bin`"
+role_md = "lazyvim_deps + externals"
+
+[[tool]]
+id = "gawk"
+category = "Process & System"
+desc = "GNU awk"
+role = "bash"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "gcc"
+label = "**gcc / gcc-c++ / make**"
+bins = ["gcc", "make"]
+category = "System Libraries"
+desc = "C/C++ compiler + make"
+role = "base"
+mac = "(Xcode CLT)"
+linux = "apt (`build-essential`) / yum"
+role_md = "base + bootstrap"
+
+[[tool]]
+id = "gemini"
+label = "**gemini** (Gemini CLI)"
+category = "AI / Coding Agents"
+desc = "Google Gemini CLI agent"
+role = "coding_agents"
+mac = "brew formula `gemini-cli` → npm fallback"
+linux = "`mise exec -- npm install -g @google/gemini-cli`"
+
+[[tool]]
+id = "gh"
+category = "Git & Diff"
+desc = "GitHub CLI"
+role = "devtools"
+mac = "brew"
+linux = "vendor apt (.deb) → GitHub tarball"
+role_md = "base/devtools"
+
+[[tool]]
+id = "gh-dash"
+bins = []
+category = "Git & Diff"
+desc = "gh extension: PR/issue dashboard (gh dash)"
+role = "devtools"
+mac = "`gh extension install dlvhdr/gh-dash`"
+linux = "same"
+
+[[tool]]
+id = "gh-notify"
+bins = []
+category = "Git & Diff"
+desc = "gh extension: notifications TUI (gh notify)"
+role = "devtools"
+mac = "`gh extension install meiji163/gh-notify`"
+linux = "same"
+
+[[tool]]
+id = "gh-select"
+bins = []
+category = "Git & Diff"
+desc = "gh extension: fuzzy repo picker (gh select)"
+role = "devtools"
+mac = "`gh extension install remcostoeten/gh-select`"
+linux = "same"
+
+[[tool]]
+id = "ghostty"
+category = "Terminals & Editors"
+desc = "Fast native terminal emulator"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+app = "Ghostty"
+docs = "docs/tools/ghostty.md"
+mac = "brew cask (`installBrewApps`)"
+linux = "native apt → Ubuntu 24.04 community PPA → classic Snap"
+role_md = "GUI profile only; sudo + x64/arm64 on Linux. See [Ghostty](../tools/ghostty.md)"
+
+[[tool]]
+id = "git"
+category = "Git & Diff"
+desc = "Version control"
+role = "base"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "git-delta"
+bins = ["delta"]
+category = "Git & Diff"
+desc = "Syntax-highlighting diff pager"
+role = "devtools"
+mac = "brew"
+linux = "`.deb` (x86_64) → brew aarch64 → GitHub musl user"
+
+[[tool]]
+id = "git-filter-repo"
+category = "Git & Diff"
+desc = "Rewrite git history"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "git-graph"
+category = "Git & Diff"
+desc = "Visual branch graph"
+role = "devtools"
+mac = "brew"
+linux = "GitHub release (x86_64 only)"
+
+[[tool]]
+id = "git-lfs"
+category = "Git & Diff"
+desc = "Git Large File Storage"
+role = "base"
+mac = "brew"
+linux = "apt/yum → GitHub release"
+
+[[tool]]
+id = "git.yazi"
+bins = []
+category = "File & Search"
+desc = "Yazi plugin: git status column"
+role = "devtools"
+upgrade = "just upgrade-yazi-plugins"
+mac = "`ya pkg` (Yazi plugin)"
+linux = "`ya pkg`"
+role_md = "devtools (yazi)"
+
+[[tool]]
+id = "github-copilot-cli"
+label = "**github-copilot-cli** (`@githubnext/github-copilot-cli`)"
+category = "AI / Coding Agents"
+desc = "GitHub Copilot in the CLI (npm)"
+role = "coding_agents"
+mac = "npm global"
+linux = "`mise exec -- npm install -g`"
+
+[[tool]]
+id = "gitleaks"
+category = "Security & Secrets"
+desc = "Secret scanner for git repos"
+role = "security_tools"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "glab"
+category = "Git & Diff"
+desc = "GitLab CLI"
+role = "devtools"
+mac = "brew"
+linux = "vendor apt (.deb) → GitHub tarball"
+
+[[tool]]
+id = "glow"
+category = "Data & Docs"
+desc = "Render Markdown in the terminal"
+role = "devtools"
+docs = "docs/tools/glow.md"
+mac = "brew"
+linux = "GitHub release tarball"
+
+[[tool]]
+id = "go"
+category = "Runtimes & Package Managers"
+desc = "Go toolchain"
+role = "mise"
+gate = "installExtraRuntimes"
+mac = "mise (`go = \"latest\"`)"
+linux = "same (mise)"
+role_md = "mise (`installExtraRuntimes`)"
+
+[[tool]]
+id = "google-chrome"
+label = "**google-chrome-stable**"
+bins = ["google-chrome", "google-chrome-stable"]
+category = "GUI Apps"
+desc = "Chrome browser (x86_64 Linux backup browser)"
+role = "gui_apps_linux"
+mac = "(Brewfile cask territory)"
+linux = "`.deb` from `dl.google.com`; postinst self-registers the apt repo, so `apt upgrade` maintains it. **x86_64 only** — no arm64 Linux build exists"
+role_md = "gui_apps_linux — a Chromium-engine backup browser; Ubuntu has no Chromium `.deb`, only a snap shim"
+
+[[tool]]
+id = "google-drive"
+bins = []
+category = "GUI Apps"
+desc = "Google Drive desktop sync"
+role = "Brewfile.darwin"
+app = "Google Drive"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "gopls"
+category = "Dev Tools"
+desc = "Go language server (Claude Code gopls-lsp plugin)"
+role = "Brewfile"
+role_linux = "go_tools"
+mac = "brew"
+linux = "`go install` (`go_tools`)"
+role_md = "Go language server for Claude Code's official `gopls-lsp` plugin"
+
+[[tool]]
+id = "gping"
+category = "Networking"
+desc = "Ping with a live graph"
+role = "networking_tools"
+mac = "brew"
+linux = "GitHub release musl"
+
+[[tool]]
+id = "grammarly-desktop"
+bins = []
+category = "GUI Apps"
+desc = "Grammarly writing assistant"
+role = "Brewfile.darwin"
+app = "Grammarly Desktop"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "grc"
+category = "Process & System"
+desc = "Generic colouriser for command output"
+role = "devtools"
+mac = "brew"
+linux = "apt"
+
+[[tool]]
+id = "gum"
+category = "Dev Tools"
+desc = "Glamorous prompts/widgets for shell scripts"
+role = "devtools"
+docs = "docs/tools/gum.md"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "herdr"
+category = "Sessions & Multiplexing"
+desc = "Terminal multiplexer for coding agents"
+role = "devtools"
+docs = "docs/tools/herdr.md"
+upgrade = "just upgrade-herdr"
+mac = "GitHub release single binary → `~/.local/bin/herdr` (**not brew** — see note)"
+linux = "GitHub release single binary → `~/.local/bin/herdr`"
+role_md = "devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**)"
+
+[[tool]]
+id = "herdr-plus"
+label = "**herdr-plus** (herdr plugin)"
+bins = []
+category = "Sessions & Multiplexing"
+desc = "herdr plugin with extra pane commands"
+role = "devtools"
+upgrade = "just upgrade-plugins"
+mac = "`herdr plugin install cloudmanic/herdr-plus` (prebuilt binary when no Go; idempotent ansible task)"
+linux = "same"
+
+[[tool]]
+id = "homebrew"
+label = "**Homebrew**"
+bins = ["brew"]
+category = "Runtimes & Package Managers"
+desc = "Homebrew package manager"
+role = "bootstrap"
+mac = "curl installer"
+linux = "same (Linux, gated)"
+
+[[tool]]
+id = "htop"
+category = "Process & System"
+desc = "Interactive process viewer"
+role = "devtools"
+mac = "brew"
+linux = "apt"
+
+[[tool]]
+id = "httpie"
+bins = ["http", "https"]
+category = "Networking"
+desc = "Human-friendly HTTP client"
+role = "networking_tools"
+mac = "brew"
+linux = "apt (Debian)"
+
+[[tool]]
+id = "imagemagick"
+bins = ["magick", "convert"]
+category = "Media"
+desc = "Image conversion / manipulation"
+role = "media_tools"
+docs = "docs/tools/imagemagick.md"
+mac = "brew"
+linux = "apt"
+
+[[tool]]
+id = "input-methods"
+label = "**input methods** (`mcbopomofo`, `squirrel`)"
+bins = []
+pkgs = ["mcbopomofo", "squirrel"]
+category = "Fonts & Input"
+desc = "Chinese input methods (McBopomofo, Squirrel/Rime)"
+role = "input_method"
+mac = "brew cask"
+linux = "(Debian) apt `ibus-rime`"
+
+[[tool]]
+id = "iperf3"
+category = "Networking"
+desc = "Network throughput tester"
+role = "networking_tools"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "ipmitool"
+category = "Homelab & Hardware"
+desc = "BMC / IPMI management"
+role = "homelab_tools"
+mac = "n/a"
+linux = "apt/yum (gated on BMC detected)"
+
+[[tool]]
+id = "jnv"
+category = "Data & Docs"
+desc = "Interactive JSON viewer with jq filters"
+role = "devtools"
+mac = "brew"
+linux = "release"
+
+[[tool]]
+id = "jq"
+category = "Data & Docs"
+desc = "JSON processor"
+role = "base"
+mac = "brew"
+linux = "apt/yum → GitHub release"
+
+[[tool]]
+id = "jupyterlab"
+label = "**jupyterlab** (`jupyter-lab`)"
+bins = ["jupyter-lab", "jupyter", "jupyter-notebook"]
+category = "Data & Docs"
+desc = "JupyterLab notebooks"
+role = "python_uv_tools"
+mac = "uv tool (with notebook, ipykernel, etc.)"
+linux = "uv tool"
+
+[[tool]]
+id = "just"
+category = "Dev Tools"
+desc = "Command runner (justfile)"
+role = "base"
+mac = "curl `just.systems/install.sh` (always)"
+linux = "same"
+
+[[tool]]
+id = "lazychezmoi"
+category = "Dev Tools"
+desc = "chezmoi state/diff/edit/apply TUI (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — Chezmoi state, diff, edit and apply TUI."
+
+[[tool]]
+id = "lazyclash"
+category = "Networking"
+desc = "Mihomo/Clash proxy CLI/TUI (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — Mihomo CLI/TUI and guarded proxy shell integration."
+
+[[tool]]
+id = "lazygit"
+category = "Git & Diff"
+desc = "Git TUI"
+role = "lazyvim_deps"
+docs = "docs/tools/lazygit.md"
+mac = "brew → official release fallback (minimum 0.64.0)"
+linux = "stale PPA purge → brew detection → official system/user release (minimum 0.64.0)"
+
+[[tool]]
+id = "lazymlflow"
+category = "Data & Docs"
+desc = "MLflow experiments/runs TUI (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — MLflow experiments, runs and artifact inspection."
+
+[[tool]]
+id = "lazypueue"
+category = "Process & System"
+desc = "Pueue task/queue dashboard (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — Pueue task/queue dashboard."
+
+[[tool]]
+id = "libfuse2"
+bins = []
+category = "System Libraries"
+desc = "FUSE 2 runtime needed by AppImages"
+role = "gui_apps_linux"
+mac = "n/a"
+linux = "apt"
+
+[[tool]]
+id = "libnotify-bin"
+bins = ["notify-send"]
+category = "System Libraries"
+desc = "Desktop notifications (notify-send) for agent hooks"
+role = "coding_agents"
+mac = "n/a"
+linux = "apt (Debian)"
+
+[[tool]]
+id = "libreoffice"
+label = "**libreoffice** (`soffice`)"
+bins = ["soffice"]
+category = "Data & Docs"
+desc = "Office suite (headless conversion for Office previews)"
+role = "devtools"
+app = "LibreOffice"
+mac = "brew cask"
+linux = "apt (`libreoffice-writer/calc/impress`, no-recommends)"
+
+[[tool]]
+id = "liquidctl"
+category = "Homelab & Hardware"
+desc = "Liquid cooler / PSU telemetry"
+role = "homelab_tools"
+mac = "n/a"
+linux = "apt/yum (gated on a USB cooler / telemetry PSU detected)"
+
+[[tool]]
+id = "litellm"
+label = "**litellm[proxy]** (`litellm`)"
+category = "AI / Coding Agents"
+desc = "LLM proxy / gateway (OpenAI-compatible)"
+role = "llm_tools"
+mac = "uv tool (python 3.13)"
+linux = "uv tool"
+
+[[tool]]
+id = "llmfit"
+category = "AI / Coding Agents"
+desc = "Which local LLMs fit your hardware"
+role = "llm_tools"
+mac = "brew formula"
+linux = "curl `llmfit.axjns.dev/install.sh`"
+
+[[tool]]
+id = "lm-sensors"
+label = "**lm-sensors** (`sensors`)"
+bins = ["sensors"]
+category = "Homelab & Hardware"
+desc = "Hardware temperature / fan sensors"
+role = "homelab_tools"
+mac = "n/a"
+linux = "apt/yum (`lm-sensors`/`lm_sensors`)"
+
+[[tool]]
+id = "lnav"
+category = "Process & System"
+desc = "Log file navigator"
+role = "devtools"
+mac = "brew"
+linux = "apt/release"
+
+[[tool]]
+id = "lolcat"
+category = "Fun"
+desc = "Rainbow text"
+role = "devtools"
+mac = "brew"
+linux = "(apt)"
+
+[[tool]]
+id = "maccy"
+bins = []
+category = "GUI Apps"
+desc = "Clipboard history (cb / cbl / cbe)"
+role = "Brewfile.darwin"
+app = "Maccy"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "marimo"
+category = "Data & Docs"
+desc = "Reactive Python notebooks"
+role = "python_uv_tools"
+mac = "uv tool (`[recommended,mcp]`)"
+linux = "uv tool"
+
+[[tool]]
+id = "markitdown"
+label = "**markitdown** (`[docx,xlsx,pptx]`)"
+category = "Data & Docs"
+desc = "Convert Office/PDF/HTML to Markdown"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "mas"
+category = "Runtimes & Package Managers"
+desc = "Mac App Store CLI"
+role = "Brewfile"
+gate = "installBrewApps"
+mac = "brew (shared Brewfile, macOS only)"
+linux = "n/a"
+role_md = "Brewfile.tmpl"
+
+[[tool]]
+id = "micro"
+category = "Terminals & Editors"
+desc = "Simple terminal text editor"
+role = "devtools"
+upgrade = "just upgrade-micro"
+mac = "brew"
+linux = "apt / verified user-level release (no-root, RedHat)"
+role_md = "devtools; [editorcfg](../tools/editor.md), `just upgrade-micro` for release installs"
+
+[[tool]]
+id = "mise"
+category = "Runtimes & Package Managers"
+desc = "Runtime version manager (node/go/rust/…)"
+role = "bootstrap"
+mac = "curl `mise.run`"
+linux = "curl `mise.run` → direct binary → musl variant"
+
+[[tool]]
+id = "mlflow"
+category = "Data & Docs"
+desc = "ML experiment tracking server/CLI"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "models"
+category = "AI / Coding Agents"
+desc = "Browse AI model specs and pricing (models.dev)"
+role = "llm_tools"
+mac = "brew formula"
+linux = "Linuxbrew → cargo `modelsdev`"
+
+[[tool]]
+id = "mole"
+label = "**mole** (`mo`)"
+bins = ["mo"]
+category = "Process & System"
+desc = "macOS cleanup and optimisation CLI"
+role = "Brewfile"
+gate = "installMole"
+docs = "docs/tools/mole.md"
+mac = "brew formula, gated on `installMole`"
+linux = "n/a — macOS-only upstream"
+role_md = "Brewfile.tmpl"
+
+[[tool]]
+id = "mosh"
+category = "Networking"
+desc = "Roaming-friendly mobile shell (SSH alternative)"
+role = "devtools"
+mac = "brew"
+linux = "apt"
+
+[[tool]]
+id = "mtr"
+category = "Networking"
+desc = "traceroute + ping combined"
+role = "networking_tools"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "neovim"
+bins = ["nvim"]
+category = "Terminals & Editors"
+desc = "Neovim (LazyVim)"
+role = "neovim"
+mac = "healthy install → Apple Silicon brew (`state: present`) → official release; Intel official release when needed"
+linux = "apt → GitHub release → user → oldEL fork"
+
+[[tool]]
+id = "ngrok"
+category = "Networking"
+desc = "Expose local ports via public tunnels"
+role = "networking_tools"
+tag = "tunnel_tools"
+gate = "installTunnelTools"
+mac = "brew cask"
+linux = "vendor apt repo → user tgz / RedHat tgz"
+role_md = "networking_tools (tunnel)"
+
+[[tool]]
+id = "nmap"
+category = "Networking"
+desc = "Network scanner"
+role = "networking_tools"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "node"
+bins = ["node", "npm"]
+category = "Runtimes & Package Managers"
+desc = "Node.js runtime"
+role = "mise"
+mac = "brew (via `lazyvim_deps`)"
+linux = "mise"
+role_md = "mise + lazyvim_deps"
+
+[[tool]]
+id = "nowplaying-cli"
+category = "Media"
+desc = "Query/control macOS now-playing media"
+role = "media_control"
+mac = "brew (gated `installMediaControl`)"
+linux = "n/a"
+
+[[tool]]
+id = "nvme-cli"
+label = "**nvme-cli** (`nvme`)"
+bins = ["nvme"]
+category = "Homelab & Hardware"
+desc = "NVMe drive management / health"
+role = "homelab_tools"
+mac = "n/a"
+linux = "apt/yum (gated on NVMe detected)"
+
+[[tool]]
+id = "obsidian"
+bins = []
+category = "GUI Apps"
+desc = "Markdown knowledge base"
+role = "Brewfile.darwin"
+app = "Obsidian"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "ollama"
+pkgs = ["ollama", "ollama-app"]
+category = "AI / Coding Agents"
+desc = "Run local LLMs"
+role = "llm_tools"
+app = "Ollama"
+mac = "brew formula `ollama` (CLI) + cask `ollama-app` (GUI)"
+linux = "curl `ollama.com/install.sh`"
+
+[[tool]]
+id = "omp"
+label = "**omp** (Oh My Pi)"
+category = "AI / Coding Agents"
+desc = "Oh My Pi coding agent"
+role = "coding_agents"
+mac = "curl `omp.sh/install --binary` → `~/.local/bin/omp`"
+linux = "same"
+
+[[tool]]
+id = "openchamber"
+label = "**openchamber** (`@openchamber/web`)"
+category = "AI / Coding Agents"
+desc = "Web UI for OpenCode sessions"
+role = "coding_agents"
+mac = "npm global"
+linux = "`mise exec -- npm install -g`"
+
+[[tool]]
+id = "opencode"
+category = "AI / Coding Agents"
+desc = "OpenCode terminal coding agent"
+role = "coding_agents"
+docs = "docs/tools/opencode.md"
+mac = "curl `opencode.ai/install` (`--no-modify-path`) → `~/.opencode/bin/opencode`"
+linux = "same"
+
+[[tool]]
+id = "opencode-desktop"
+bins = []
+category = "AI / Coding Agents"
+desc = "OpenCode desktop app"
+role = "Brewfile.darwin"
+gate = "installAiDesktopApps"
+app = "OpenCode"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "opentofu"
+label = "**opentofu** (`tofu`)"
+bins = ["tofu"]
+category = "Cloud & Containers"
+desc = "Open-source Terraform fork"
+role = "iac_tools"
+mac = "brew formula"
+linux = "Cloudsmith apt repo → GitHub release"
+
+[[tool]]
+id = "orbstack"
+label = "**OrbStack**"
+bins = ["orb"]
+category = "Cloud & Containers"
+desc = "Docker + Linux VMs on macOS"
+role = "docker"
+app = "OrbStack"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "pandoc"
+category = "Data & Docs"
+desc = "Universal document converter"
+role = "devtools"
+mac = "brew"
+linux = "apt"
+
+[[tool]]
+id = "peon-ping"
+label = "**peon-ping** (`peon`)"
+bins = ["peon"]
+category = "AI / Coding Agents"
+desc = "Agent completion sounds"
+role = "coding_agents"
+gate = "agentSounds=peon"
+mac = "brew tap `PeonPing/tap` (needs `brew trust`, Homebrew 6 gate)"
+linux = "`install.sh --openpeon --no-rc`"
+role_md = "coding_agents — agent completion sounds; **never run `peon-ping-setup`** (hooks are declared in `dot_claude/modify_settings.json.tmpl`). Gated by the `agentSounds` prompt. See [agent-sounds.md](../tools/agent-sounds.md)"
+
+[[tool]]
+id = "pi"
+category = "AI / Coding Agents"
+desc = "Pi coding agent"
+role = "coding_agents"
+mac = "`mise exec -- npm install -g --ignore-scripts --prefix ~/.local @earendil-works/pi-coding-agent`"
+linux = "same"
+
+[[tool]]
+id = "pia"
+category = "AI / Coding Agents"
+desc = "pi-agents launcher"
+role = "chezmoi-external"
+gate = "installCodingAgents"
+upgrade = "just upgrade-externals"
+mac = "chezmoi external `~/.local/share/pi-agents/bin/pia`"
+linux = "same"
+role_md = "`.chezmoiexternal.toml.tmpl` (`installCodingAgents`)"
+
+[[tool]]
+id = "piper.yazi"
+bins = []
+category = "File & Search"
+desc = "Yazi plugin: preview files via any shell command"
+role = "devtools"
+upgrade = "just upgrade-yazi-plugins"
+mac = "`ya pkg` (Yazi plugin)"
+linux = "`ya pkg`"
+role_md = "devtools (yazi)"
+
+[[tool]]
+id = "playerctl"
+label = "**playerctl / wmctrl / xdotool**"
+bins = ["playerctl", "wmctrl", "xdotool"]
+category = "GUI Apps"
+desc = "Media-key and window-control helpers (X11)"
+role = "gui_apps_linux"
+mac = "n/a (playerctl: brew via media_control)"
+linux = "apt"
+role_md = "gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`)"
+
+[[tool]]
+id = "playwright-cli"
+label = "**playwright-cli** (`@playwright/cli`)"
+category = "Dev Tools"
+desc = "Playwright browser automation CLI for agents"
+role = "devtools"
+gate = "installPlaywrightCli"
+mac = "mise npm"
+linux = "mise npm (supported Debian/Ubuntu x64/arm64)"
+role_md = "devtools, `installPlaywrightCli`; package skills refreshed on apply / upgrade-npm, Chromium preloading opt-in. See [browser-tools](../tools/browser-tools.md)"
+
+[[tool]]
+id = "poppler"
+label = "**poppler** (`pdftoppm`)"
+bins = ["pdftoppm", "pdftotext"]
+category = "Data & Docs"
+desc = "PDF utilities (yazi PDF preview)"
+role = "devtools"
+mac = "brew"
+linux = "apt (`poppler-utils`)"
+role_md = "devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md)"
+
+[[tool]]
+id = "pre-commit"
+category = "Dev Tools"
+desc = "Git hook framework"
+role = "security_tools"
+docs = "docs/tools/pre-commit.md"
+mac = "`uv tool install --python 3.13`"
+linux = "same"
+
+[[tool]]
+id = "prettier"
+bins = []
+category = "Dev Tools"
+desc = "Code formatter (Neovim-local via Mason)"
+role = "mason"
+mac = "Mason (Neovim-local)"
+linux = "Mason (Neovim-local)"
+role_md = "LazyVim `ensure_installed`; Conform prefers project-local `node_modules/.bin/prettier`"
+
+[[tool]]
+id = "procps"
+bins = ["ps"]
+category = "System Libraries"
+desc = "ps / top / free"
+role = "bootstrap"
+mac = "(system)"
+linux = "apt"
+role_md = "bootstrap (Linux)"
+
+[[tool]]
+id = "pueue"
+bins = ["pueue", "pueued"]
+category = "Process & System"
+desc = "Command queue / background task manager"
+role = "rust_cargo_tools"
+docs = "docs/tools/pueue.md"
+mac = "brew formula"
+linux = "`cargo install pueue --locked` + systemd user unit"
+
+[[tool]]
+id = "raycast"
+bins = []
+category = "GUI Apps"
+desc = "Launcher (Spotlight replacement)"
+role = "Brewfile.darwin"
+app = "Raycast"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "rclone"
+category = "File & Search"
+desc = "Sync files to/from cloud storage"
+role = "devtools"
+mac = "brew"
+linux = "official installer or GitHub"
+role_md = "devtools — macOS `rclone mount` also needs **macFUSE** (5.x on macOS 26+), manual & **not** repo-managed (reboot + GUI approval); brew rclone ≥1.73 already ships `mount` so the binary isn't the blocker ([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md))"
+
+[[tool]]
+id = "readability-cli"
+label = "**readability-cli** (`readable`)"
+bins = ["readable"]
+category = "Data & Docs"
+desc = "Extract readable article text from web pages"
+role = "js_cli_tools"
+mac = "npm global"
+linux = "`mise exec -- npm install -g`"
+
+[[tool]]
+id = "recon"
+category = "AI / Coding Agents"
+desc = "tmux dashboard for live Claude Code sessions"
+role = "rust_cargo_tools"
+mac = "cargo install (git source)"
+linux = "same"
+
+[[tool]]
+id = "resilio-sync"
+bins = ["rslsync"]
+category = "File & Search"
+desc = "P2P file sync"
+role = "Brewfile.darwin"
+role_linux = "resilio_sync"
+gate = "installResilioSync"
+app = "Resilio Sync"
+docs = "docs/tools/resilio-sync.md"
+mac = "brew cask (GUI app)"
+linux = "Resilio apt repo → headless daemon + WebUI (per-user systemd service)"
+role_md = "resilio_sync"
+
+[[tool]]
+id = "resvg"
+category = "Media"
+desc = "SVG renderer (yazi SVG preview)"
+role = "devtools"
+mac = "brew"
+linux = "Linuxbrew → `cargo install resvg` (no apt pkg; non-fatal if absent)"
+role_md = "devtools — yazi SVG preview. See [yazi-previews.md](../tools/yazi-previews.md)"
+
+[[tool]]
+id = "ripgrep"
+bins = ["rg"]
+category = "File & Search"
+desc = "Fast regex search"
+role = "base"
+mac = "brew"
+linux = "apt/yum → GitHub release"
+
+[[tool]]
+id = "rsync"
+category = "File & Search"
+desc = "File sync/copy (modern 3.x on macOS)"
+role = "base"
+mac = "brew"
+linux = "apt / yum (usually preinstalled)"
+role_md = "base — replaces macOS's built-in openrsync 2.6.9 (no `--info` etc.); brew rsync 3.x lands in brew's bin (`/opt/homebrew/bin` Apple Silicon, `/usr/local/bin` Intel) ahead of `/usr/bin` on PATH"
+
+[[tool]]
+id = "ruby"
+category = "Runtimes & Package Managers"
+desc = "Ruby runtime"
+role = "mise"
+gate = "installExtraRuntimes"
+mac = "mise"
+linux = "mise (skipped in noRoot)"
+
+[[tool]]
+id = "rust"
+bins = ["rustc", "cargo"]
+category = "Runtimes & Package Managers"
+desc = "Rust toolchain"
+role = "mise"
+gate = "installExtraRuntimes"
+mac = "mise"
+linux = "mise → rustup-init → `static.rust-lang.org` fallback"
+role_md = "mise + rust_cargo_tools"
+
+[[tool]]
+id = "rustscan"
+category = "Networking"
+desc = "Fast port scanner"
+role = "networking_tools"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "scroll-reverser"
+bins = []
+category = "GUI Apps"
+desc = "Per-device scroll direction"
+role = "Brewfile.darwin"
+app = "Scroll Reverser"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "sesh"
+category = "Sessions & Multiplexing"
+desc = "Smart tmux session manager"
+role = "devtools"
+docs = "docs/tools/sesh.md"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "sevenzip"
+label = "**sevenzip** (7-Zip; `7zz` / `7z`)"
+bins = ["7zz", "7z"]
+category = "File & Search"
+desc = "7-Zip archiver (yazi archive preview)"
+role = "devtools"
+mac = "brew (`sevenzip`)"
+linux = "apt (`p7zip-full`)"
+role_md = "devtools — yazi archive + dmg listing. See [yazi-previews.md](../tools/yazi-previews.md)"
+
+[[tool]]
+id = "shellcheck"
+label = "**shellcheck / shfmt**"
+bins = ["shellcheck", "shfmt"]
+category = "Dev Tools"
+desc = "Shell script linter + formatter"
+role = "devtools"
+mac = "brew"
+linux = "apt or release"
+
+[[tool]]
+id = "sidecar"
+category = "AI / Coding Agents"
+desc = "TUI companion for coding-agent sessions"
+role = "coding_agents"
+mac = "brew tap `marcus/tap`"
+linux = "Linuxbrew → GitHub release"
+
+[[tool]]
+id = "skopeo"
+category = "Cloud & Containers"
+desc = "Registry client: copy images without the Docker daemon"
+role = "devtools"
+mac = "brew"
+linux = "apt (`universe`)"
+role_md = "devtools — client-side registry copy; rung 3 of `docker-net pull`. See [docker-net.md](../tools/docker-net.md)"
+
+[[tool]]
+id = "smartmontools"
+label = "**smartmontools** (`smartctl`)"
+bins = ["smartctl"]
+category = "Homelab & Hardware"
+desc = "Disk SMART health"
+role = "homelab_tools"
+mac = "n/a"
+linux = "apt/yum"
+
+[[tool]]
+id = "specify-cli"
+bins = ["specify"]
+category = "AI / Coding Agents"
+desc = "GitHub Spec Kit (spec-driven development)"
+role = "coding_agents"
+mac = "`uv tool install` from git"
+linux = "same"
+
+[[tool]]
+id = "specstory"
+category = "AI / Coding Agents"
+desc = "Save agent chat history to .specstory/"
+role = "coding_agents"
+docs = "docs/tools/specstory.md"
+mac = "brew tap `specstoryai/tap` → GitHub release"
+linux = "GitHub release tarball"
+
+[[tool]]
+id = "speedtest"
+label = "**speedtest** (Ookla)"
+category = "Networking"
+desc = "Ookla internet speed test"
+role = "networking_tools"
+mac = "brew (tap `teamookla/speedtest`)"
+linux = "`install.speedtest.net`"
+
+[[tool]]
+id = "spotify"
+bins = []
+category = "GUI Apps"
+desc = "Music streaming"
+role = "Brewfile.darwin"
+app = "Spotify"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "sqlit"
+label = "**sqlit-tui[ssh]**"
+pkgs = ["sqlit-tui[ssh]"]
+category = "Data & Docs"
+desc = "SQL TUI for many databases (SSH tunnels)"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "starship"
+category = "Navigation & Shell"
+desc = "Cross-shell prompt"
+role = "starship"
+docs = "docs/tools/starship.md"
+mac = "brew"
+linux = "curl `starship.rs/install.sh`"
+
+[[tool]]
+id = "steam"
+category = "GUI Apps"
+desc = "Steam gaming client"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+gate = "installGamingApps"
+app = "Steam"
+mac = "brew cask (gated by `installGamingApps`)"
+linux = "Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`)"
+
+[[tool]]
+id = "storcli"
+bins = ["storcli", "storcli64"]
+category = "Homelab & Hardware"
+desc = "Broadcom/LSI RAID controller CLI"
+role = "homelab_tools"
+mac = "n/a"
+linux = "vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos)"
+
+[[tool]]
+id = "summarize"
+category = "AI / Coding Agents"
+desc = "Summarize URLs/files/videos with LLMs"
+role = "summarize"
+docs = "docs/tools/summarize.md"
+mac = "brew (gated `installSummarize`)"
+linux = "`mise exec -- npm install -g @steipete/summarize` (Node 24+; skipped on `oldEL`)"
+role_md = "summarize — see [summarize.md](../tools/summarize.md)"
+
+[[tool]]
+id = "super-productivity"
+bins = []
+category = "GUI Apps"
+desc = "Task and time tracking"
+role = "Brewfile.darwin"
+app = "Super Productivity"
+docs = "docs/tools/super-productivity.md"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "superfile"
+bins = ["spf"]
+category = "File & Search"
+desc = "TUI file manager"
+role = "devtools"
+mac = "brew"
+linux = "installer/release"
+
+[[tool]]
+id = "superset"
+bins = []
+category = "AI / Coding Agents"
+desc = "Superset desktop app (Apple Silicon only)"
+role = "Brewfile.darwin"
+app = "Superset"
+mac = "brew cask (arm64)"
+linux = "n/a"
+
+[[tool]]
+id = "switchaudio-osx"
+label = "**switchaudio-osx** (`SwitchAudioSource`)"
+bins = ["SwitchAudioSource"]
+category = "Media"
+desc = "Switch macOS audio devices"
+role = "media_control"
+mac = "brew (gated `installMediaControl`)"
+linux = "n/a"
+
+[[tool]]
+id = "tailscale"
+label = "**tailscale** (CLI)"
+category = "Networking"
+desc = "Tailscale VPN CLI"
+role = "Brewfile.darwin"
+role_linux = "networking_tools"
+tag = "tailscale"
+gate_linux = "installTailscale"
+docs = "docs/tools/tailscale.md"
+mac = "via the `tailscale-app` cask wrapper (`/usr/local/bin/tailscale` → app; no formula)"
+linux = "apt/yum from `pkgs.tailscale.com` (`networking_tools` role, `tailscale` tag, gated on `installTailscale`)"
+
+[[tool]]
+id = "tailscale-app"
+bins = []
+category = "Networking"
+desc = "Tailscale macOS app (ships the CLI wrapper)"
+role = "Brewfile.darwin"
+app = "Tailscale"
+mac = "brew cask (pkg also installs the `/usr/local/bin/tailscale` CLI wrapper)"
+linux = "n/a"
+
+[[tool]]
+id = "tailspin"
+label = "**tailspin** (`tspin`)"
+bins = ["tspin"]
+category = "Process & System"
+desc = "Log file highlighter"
+role = "devtools"
+mac = "brew"
+linux = "release"
+
+[[tool]]
+id = "taplo"
+category = "Dev Tools"
+desc = "TOML toolkit (format / lint / LSP)"
+role = "devtools"
+mac = "brew"
+linux = "apt+release"
+
+[[tool]]
+id = "td"
+category = "AI / Coding Agents"
+desc = "Task tracker for AI agents"
+role = "coding_agents"
+mac = "brew tap `marcus/tap`"
+linux = "Linuxbrew → GitHub release"
+
+[[tool]]
+id = "television"
+label = "**television** (`tv`)"
+bins = ["tv"]
+category = "File & Search"
+desc = "Fuzzy finder with channels (this picker)"
+role = "devtools"
+docs = "docs/tools/tv.md"
+mac = "brew"
+linux = "apt+release"
+
+[[tool]]
+id = "terminal-browser"
+category = "Dev Tools"
+desc = "Real browser inside the terminal"
+role = "devtools"
+gate = "installTerminalBrowser"
+upgrade = "just upgrade-terminal-browser"
+mac = "brew cask"
+linux = "checksum-verified upstream stable release (supported Debian/Ubuntu x64/arm64)"
+role_md = "devtools, `installTerminalBrowser`; package skills, upgrade-brew / upgrade-terminal-browser. See [browser-tools](../tools/browser-tools.md)"
+
+[[tool]]
+id = "terminal-notifier"
+category = "Process & System"
+desc = "macOS notifications from the CLI"
+role = "coding_agents"
+mac = "brew"
+linux = "n/a"
+role_md = "coding_agents (macOS)"
+
+[[tool]]
+id = "terraform"
+category = "Cloud & Containers"
+desc = "Infrastructure as code"
+role = "iac_tools"
+mac = "brew (`hashicorp/tap`)"
+linux = "HashiCorp apt repo → user zip"
+
+[[tool]]
+id = "the-unarchiver"
+bins = []
+category = "GUI Apps"
+desc = "Archive extraction"
+role = "Brewfile.darwin"
+app = "The Unarchiver"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "thefuck"
+category = "Navigation & Shell"
+desc = "Correct the previous command"
+role = "devtools"
+mac = "brew"
+linux = "uv tool (python 3.11 distutils)"
+
+[[tool]]
+id = "tldr"
+category = "Navigation & Shell"
+desc = "Simplified man pages (Linux npm client)"
+role = "devtools"
+mac = "(macOS uses `tlrc` via brew)"
+linux = "system npm or `mise exec -- npm install -g tldr`"
+
+[[tool]]
+id = "tlrc"
+bins = ["tldr"]
+category = "Navigation & Shell"
+desc = "tldr client in Rust (macOS)"
+role = "devtools"
+mac = "brew"
+linux = "(Linux uses `tldr` npm instead)"
+
+[[tool]]
+id = "tmux"
+category = "Sessions & Multiplexing"
+desc = "Terminal multiplexer"
+role = "devtools"
+mac = "brew"
+linux = "apt → tmux-appimage when < 3.3"
+
+[[tool]]
+id = "tmuxinator"
+category = "Sessions & Multiplexing"
+desc = "tmux session layouts from YAML"
+role = "ruby_gem_tools"
+mac = "gem"
+linux = "gem"
+
+[[tool]]
+id = "tmuxp"
+category = "Sessions & Multiplexing"
+desc = "tmux session manager (YAML/JSON)"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "toilet"
+category = "Fun"
+desc = "Coloured ASCII-art text"
+role = "devtools"
+mac = "brew"
+linux = "(apt)"
+
+[[tool]]
+id = "trafilatura"
+category = "Data & Docs"
+desc = "Web page text / metadata extraction"
+role = "python_uv_tools"
+mac = "uv tool"
+linux = "uv tool"
+
+[[tool]]
+id = "translate"
+category = "Dev Tools"
+desc = "Terminal translation CLI/TUI (in-house)"
+role = "personal_tools"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+role_md = "`personal_tools` — Terminal translation CLI/TUI."
+
+[[tool]]
+id = "tree"
+category = "File & Search"
+desc = "Directory tree listing"
+role = "base"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "tree-sitter"
+label = "**tree-sitter** / **tree-sitter-cli**"
+category = "Dev Tools"
+desc = "Tree-sitter CLI (Neovim parsers)"
+role = "lazyvim_deps"
+mac = "brew"
+linux = "mise-npm → cargo fallback"
+
+[[tool]]
+id = "trippy"
+label = "**trippy** (`trip`)"
+bins = ["trip"]
+category = "Networking"
+desc = "traceroute / ping TUI"
+role = "networking_tools"
+mac = "brew"
+linux = "apt/release"
+
+[[tool]]
+id = "try-cli"
+label = "**try-cli** (`try`)"
+bins = ["try"]
+category = "Dev Tools"
+desc = "Ephemeral experiment directories"
+role = "ruby_gem_tools"
+mac = "gem"
+linux = "gem"
+
+[[tool]]
+id = "tsnet"
+category = "Networking"
+desc = "Tailnet → ssh config, tailnet HTTPS serve (in-house)"
+role = "in-house"
+docs = "docs/tools/tsnet.md"
+mac = "chezmoi (`dot_dotfiles/bin/executable_tsnet`, uv PEP-723 script)"
+linux = "same"
+role_md = "in-house — tailnet → ssh config, tailnet-HTTPS serve"
+
+[[tool]]
+id = "uv"
+bins = ["uv", "uvx"]
+category = "Runtimes & Package Managers"
+desc = "Python package / tool manager"
+role = "bootstrap"
+mac = "curl `astral.sh/uv/install.sh`"
+linux = "same"
+role_md = "bootstrap; `python_uv_tools` self-upgrade dispatch"
+
+[[tool]]
+id = "vhs"
+category = "Dev Tools"
+desc = "Record terminal GIFs from scripts"
+role = "devtools"
+docs = "docs/tools/vhs.md"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "vips"
+category = "Media"
+desc = "Fast image processing (libvips)"
+role = "media_tools"
+mac = "brew"
+linux = "apt (`libvips-tools`)"
+
+[[tool]]
+id = "visidata"
+label = "**visidata** (`vd`)"
+bins = ["vd"]
+category = "Data & Docs"
+desc = "Spreadsheet TUI for CSV/JSON/Parquet"
+role = "python_uv_tools"
+mac = "uv tool (with pandas, pyarrow)"
+linux = "uv tool"
+
+[[tool]]
+id = "visual-studio-code"
+bins = ["code"]
+pkgs = ["visual-studio-code"]
+category = "Terminals & Editors"
+desc = "VS Code editor"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+app = "Visual Studio Code"
+mac = "brew cask"
+linux = "Microsoft apt repo"
+
+[[tool]]
+id = "wakeonlan"
+category = "Networking"
+desc = "Send Wake-on-LAN magic packets"
+role = "networking_tools"
+mac = "brew"
+linux = "apt (`wakeonlan`)"
+
+[[tool]]
+id = "warp"
+bins = []
+category = "Terminals & Editors"
+desc = "Warp terminal"
+role = "Brewfile.darwin"
+app = "Warp"
+docs = "docs/tools/warp.md"
+upgrade = "just upgrade-warp"
+mac = "brew cask"
+linux = "n/a"
+
+[[tool]]
+id = "wget"
+category = "Networking"
+desc = "HTTP/FTP downloader"
+role = "base"
+mac = "brew"
+linux = "apt/yum"
+
+[[tool]]
+id = "witr"
+category = "Process & System"
+desc = "Explain why a process is running"
+role = "devtools"
+mac = "brew"
+linux = "(release)"
+
+[[tool]]
+id = "wl-clipboard"
+label = "**wl-clipboard** (`wl-copy`/`wl-paste`)"
+bins = ["wl-copy", "wl-paste"]
+category = "System Libraries"
+desc = "Wayland clipboard backend"
+role = "gui_apps_linux"
+mac = "n/a (`pbcopy` built-in)"
+linux = "apt"
+role_md = "gui_apps_linux — Wayland clipboard backend for Neovim yank, lazygit `Ctrl+O`, `x copy`. See [clipboard.md](../tools/clipboard.md)"
+
+[[tool]]
+id = "workmux"
+category = "Sessions & Multiplexing"
+desc = "git worktrees + tmux windows for agents"
+role = "devtools"
+docs = "docs/tools/workmux.md"
+mac = "brew (tap `raine/workmux`)"
+linux = "GitHub release `.tar.gz`"
+
+[[tool]]
+id = "worktrunk"
+bins = ["wt"]
+category = "Git & Diff"
+desc = "Git worktree manager"
+role = "devtools"
+docs = "docs/tools/worktrunk.md"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "xclip"
+category = "System Libraries"
+desc = "X11 clipboard backend"
+role = "gui_apps_linux"
+mac = "n/a (`pbcopy` built-in)"
+linux = "apt"
+role_md = "gui_apps_linux — X11/XWayland clipboard backend (same consumers as `wl-clipboard`)"
+
+[[tool]]
+id = "xonsh"
+category = "Navigation & Shell"
+desc = "Python-powered shell"
+role = "python_uv_tools"
+mac = "uv tool (with xontribs)"
+linux = "uv tool"
+
+[[tool]]
+id = "xsel"
+category = "System Libraries"
+desc = "X11 clipboard backend (last fallback)"
+role = "gui_apps_linux"
+mac = "n/a (`pbcopy` built-in)"
+linux = "apt"
+role_md = "gui_apps_linux — X11 clipboard backend; last non-OSC-52 fallback in `x`, named in lazygit's error text"
+
+[[tool]]
+id = "yazi"
+category = "File & Search"
+desc = "TUI file manager"
+role = "devtools"
+docs = "docs/tools/yazi.md"
+mac = "brew"
+linux = "Linuxbrew/GitHub release"
+
+[[tool]]
+id = "yq"
+category = "Data & Docs"
+desc = "YAML/JSON/XML processor"
+role = "devtools"
+mac = "brew"
+linux = "release"
+
+[[tool]]
+id = "yt-dlp"
+category = "Media"
+desc = "Video / audio downloader"
+role = "python_uv_tools"
+mac = "uv tool (`[default]` + `yt-dlp-ejs`)"
+linux = "uv tool (`[default]` + `yt-dlp-ejs`)"
+
+[[tool]]
+id = "zellij"
+category = "Sessions & Multiplexing"
+desc = "Terminal workspace / multiplexer"
+role = "devtools"
+mac = "brew"
+linux = "GitHub release"
+
+[[tool]]
+id = "zen-browser"
+label = "**Zen Browser**"
+bins = []
+category = "GUI Apps"
+desc = "Zen browser (AppImage)"
+role = "gui_apps_linux"
+mac = "n/a"
+linux = "GitHub release AppImage → `~/Applications/zen.AppImage`, thereafter matched by glob `zen*.AppImage`"
+
+[[tool]]
+id = "zoxide"
+category = "Navigation & Shell"
+desc = "Smarter cd"
+role = "devtools"
+mac = "brew"
+linux = "curl official installer"
+
+[[tool]]
+id = "zsh"
+category = "Navigation & Shell"
+desc = "Z shell"
+role = "zsh"
+mac = "brew"
+linux = "apt/yum / source build (RHEL 7)"
