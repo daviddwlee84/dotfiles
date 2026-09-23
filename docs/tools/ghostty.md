@@ -95,7 +95,7 @@ shell-integration-features = ssh-env,ssh-terminfo
 
 ### Option 2 — manual helper (works everywhere)
 
-A zsh function `ghostty-ssh-terminfo` is defined in [`dot_config/zsh/10_aliases.zsh`](../../dot_config/zsh/10_aliases.zsh).
+A shared-shell function `ghostty-ssh-terminfo` is defined in [`dot_config/shell/10_aliases.sh`](../../dot_config/shell/10_aliases.sh).
 
 ```bash
 ghostty-ssh-terminfo <ssh-host>
@@ -118,6 +118,17 @@ ghostty-ssh-terminfo remote
 # Verify
 ssh remote 'infocmp xterm-ghostty >/dev/null && echo ok'
 ```
+
+### Snap `nvtop` on a remote host
+
+The Snap build of `nvtop` changes `HOME` to `~/snap/nvtop/<revision>`, so it
+cannot find the Ghostty entry installed in the user's `~/.terminfo`. It then
+reports `Error opening terminal: xterm-ghostty`, even though `infocmp` succeeds
+outside the Snap. The shared-shell `nvtop` function copies that entry to
+`~/snap/nvtop/common/.terminfo` and sets `TERMINFO` for the Snap invocation.
+The `common` directory survives Snap revisions. Other terminal types and native
+`nvtop` use their normal configuration. Open a new shell after applying this
+change, or source `~/.config/shell/10_aliases.sh` in the current shell.
 
 ### Smoke-test against `localhost`
 

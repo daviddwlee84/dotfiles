@@ -137,6 +137,15 @@ but sends frames through SSH; the outer terminal and every multiplexer in the
 path must support the graphics protocol. Remote Playwright CLI is usually better
 for unattended tests because it does not stream a visible UI.
 
+For an interactive preview from a remote Herdr session, run `terminal-browser`
+on the **local** machine instead, using `--ssh my-server` as above. Running it
+inside remote Herdr sends every rendered frame through Herdr and SSH, and sends
+each input event back to the remote browser; this can feel very slow even when
+the remote CPU is mostly idle. Keep remote Herdr for the agent and run the
+preview locally. A remote agent's `terminal-browser action` does not control
+that local browser; issue actions locally or use a separate remote automation
+session.
+
 ## Install, refresh and upgrade
 
 `chezmoi apply` installs selected missing packages and repairs package-owned skills;

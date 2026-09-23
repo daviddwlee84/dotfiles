@@ -41,7 +41,7 @@ shell-integration-features = ssh-env,ssh-terminfo
 
 ### 選項 2 — 手動 helper（任何情境皆可用）
 
-zsh 函式 `ghostty-ssh-terminfo` 定義於 [`dot_config/zsh/10_aliases.zsh`](../../dot_config/zsh/10_aliases.zsh)。
+共用 shell 函式 `ghostty-ssh-terminfo` 定義於 [`dot_config/shell/10_aliases.sh`](../../dot_config/shell/10_aliases.sh)。
 
 ```bash
 ghostty-ssh-terminfo <ssh-host>
@@ -64,6 +64,15 @@ ghostty-ssh-terminfo remote
 # 驗證
 ssh remote 'infocmp xterm-ghostty >/dev/null && echo ok'
 ```
+
+### 遠端主機的 Snap 版 `nvtop`
+
+Snap 版 `nvtop` 會把 `HOME` 改成 `~/snap/nvtop/<revision>`，因此讀不到使用者
+`~/.terminfo` 裡的 Ghostty 條目。即使 Snap 外面的 `infocmp` 成功，`nvtop` 仍會顯示
+`Error opening terminal: xterm-ghostty`。共用 shell 的 `nvtop` 函式會把條目複製到
+`~/snap/nvtop/common/.terminfo`，並只為該次執行指定 `TERMINFO`。`common` 目錄在
+Snap 更新版本後仍會保留。其他終端機型別和原生版 `nvtop` 照常執行。套用設定後請開新
+shell，或在目前 shell 載入 `~/.config/shell/10_aliases.sh`。
 
 ### 對 `localhost` 的煙霧測試
 

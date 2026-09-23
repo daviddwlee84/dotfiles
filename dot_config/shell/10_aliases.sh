@@ -394,6 +394,24 @@ ghostty-ssh-terminfo() {
 	echo "Installed xterm-ghostty terminfo on $host (in ~/.terminfo)"
 }
 
+# The nvtop Snap changes HOME to ~/snap/nvtop/<revision> and cannot read the
+# hidden ~/.terminfo directory. Keep a copy in its revision-independent common
+# directory and point only this invocation at it. Native nvtop needs no change.
+nvtop() (
+	if [ "${TERM-}" = xterm-ghostty ] && [ -x /snap/bin/nvtop ] &&
+		[ -z "${TERMINFO-}" ] && [ -f "$HOME/.terminfo/x/xterm-ghostty" ]; then
+		_snap_terminfo="$HOME/snap/nvtop/common/.terminfo"
+		if { [ -f "$_snap_terminfo/x/xterm-ghostty" ] &&
+			cmp -s "$HOME/.terminfo/x/xterm-ghostty" "$_snap_terminfo/x/xterm-ghostty"; } ||
+			{ mkdir -p "$_snap_terminfo/x" &&
+				cp "$HOME/.terminfo/x/xterm-ghostty" "$_snap_terminfo/x/xterm-ghostty"; }; then
+			TERMINFO="$_snap_terminfo" command nvtop "$@"
+			return $?
+		fi
+	fi
+	command nvtop "$@"
+)
+
 # --- Homebrew mirror switch (GFW workaround) -------------------------------
 # Default baseline (BFSU) is set in 00_exports.sh.tmpl; use this only when a
 # mirror misbehaves. Benchmarks (2026-07, CN network): BFSU fastest overall
