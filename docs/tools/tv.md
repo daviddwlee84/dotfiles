@@ -90,6 +90,41 @@ catalog lacks.
 
 ---
 
+### `herdr-panes` channel {#herdr-panes-channel}
+
+Open `tv herdr-panes` inside Herdr, or press `prefix+a`. This replaces the old
+`herdr-agent-panes` name; chezmoi removes the old channel file during migration.
+
+`Ctrl+S` cycles **non-shell → agent → process → shell**. The first view combines
+agents, ordinary foreground programs, and unknown results. Rows show type,
+workspace/tab/pane, program names and agent state, plus the terminal title or cwd.
+Search this metadata; the pane's visible text is a live preview, not searchable
+source content. Use `herdr-grep --pick` for content search.
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+S` | Next view |
+| `Ctrl+R` | Rescan the current session |
+| `Enter` / `Alt+T` | Exit picker and jump to the exact pane, including splits |
+| `Alt+K` | Confirm closing one pane and exit; default answer is No |
+| `Ctrl+Y` / `Alt+P` | Copy pane ID / current directory |
+
+Classification reads live `pane process-info`: recognized agents are **agent**,
+only known shell executables in the foreground group means **shell**, and other
+programs are **process**. Shell PID alone is insufficient after `exec nvim`.
+Failed or missing process information stays **unknown** in the non-shell view;
+server failures appear as non-actionable error rows. The picker excludes itself.
+**Shell does not mean safe to close:** background jobs are not inspected.
+
+The stdlib-only `~/.config/television/herdr-panes.py` helper scans the current
+inherited session socket with at most four concurrent process queries, each with
+a five-second timeout. Source cycling and reload rescan; previews are uncached.
+Encoded routes feed the existing `~/.config/herdr/focus-pane.py` helper without
+interpolating titles or paths into shell commands. No cross-session aggregation
+or bulk cleanup is performed. [Herdr integration](herdr.md#television-integration).
+
+---
+
 ### `agent-wakeup` channel
 
 Dashboard for live coding-agent panes that are waiting on quota/rate-limit

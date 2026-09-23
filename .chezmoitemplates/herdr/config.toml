@@ -264,8 +264,8 @@ description = "Session / workspace / dir switcher (herdr-aware tv channel)"
 [[keys.command]]
 key = "prefix+a"
 type = "pane"
-command = "tv herdr-agent-panes"
-description = "Live agent panes (herdr-aware tv channel)"
+command = "tv herdr-panes"
+description = "Pane picker: non-shell / agent / process / shell"
 
 [[keys.command]]
 key = "prefix+alt+a"

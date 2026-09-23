@@ -1,7 +1,7 @@
 # Review-pending inbox cable channel for herdr (tv) — herdr-aware
 #
 # Lists herdr panes carrying a "review-pending" flag (⭐) — the ones whose agent
-# finished but you haven't reviewed yet. Companion to `herdr-agent-panes.toml`;
+# finished but you haven't reviewed yet. Companion to `herdr-panes.toml`;
 # the flag is set by hmark / prefix+m (see dot_config/herdr/executable_review-mark.sh)
 # and stored as the pane's `review` metadata TOKEN, orthogonal to agent state.
 # Bound to `prefix+i` in ~/.config/herdr/config.toml.

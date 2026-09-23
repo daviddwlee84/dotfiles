@@ -44,6 +44,38 @@ tv update-channels
 
 ## 自訂頻道
 
+### `herdr-panes` channel {#herdr-panes-channel}
+
+在 Herdr 內執行 `tv herdr-panes`，或按 `prefix+a`。這是原本
+`herdr-agent-panes` 的新名稱；chezmoi 會在遷移時刪除舊 channel 檔案。
+
+`Ctrl+S` 循環 **非 shell → agent → process → shell**。第一頁合併 agent、
+一般前景程式和未知結果。每列顯示類型、workspace/tab/pane、程式與 agent
+狀態，以及標題或 cwd。搜尋只比對這些資料；pane 畫面是即時預覽，
+要搜尋畫面內容請用 `herdr-grep --pick`。
+
+| 按鍵 | 操作 |
+|------|------|
+| `Ctrl+S` | 下一種檢視 |
+| `Ctrl+R` | 重新掃描目前 session |
+| `Enter` / `Alt+T` | 退出 picker 並精準跳到 pane，包含 split pane |
+| `Alt+K` | 確認後關閉單一 pane 並退出，預設為取消 |
+| `Ctrl+Y` / `Alt+P` | 複製 pane ID／目前目錄 |
+
+分類讀取即時 `pane process-info`：Herdr 辨識的 agent 屬於 **agent**；
+前景程序全是已知 shell executable 時屬於 **shell**，其餘屬於 **process**。
+不能只看 shell PID，因為 `exec nvim` 會保留 PID。程序資訊缺失或查詢失敗
+標為 **unknown**，留在非 shell 頁；server 錯誤顯示為不可操作的提示列。
+清單排除 picker 本身。**Shell 不等於可以安全關閉**，這裡不檢查背景工作。
+
+`~/.config/television/herdr-panes.py` 只使用 Python 標準庫，沿用目前 session
+socket，最多並行 4 個程序查詢，每個命令 timeout 為 5 秒。切換頁面與重新整理
+都重掃，預覽不快取。編碼後的 route 交給現有 `~/.config/herdr/focus-pane.py`
+精準跳轉，標題和路徑不插入 shell 指令。不做跨 session 彙整或批次清理。
+[Herdr 整合](herdr.zh-TW.md#television-integration)。
+
+---
+
 ### `tools` 頻道
 
 執行期解析 `~/.config/docs/tools/cli-tools.md`（透過 chezmoi 從 `dot_config/docs/tools/` 部署）。該 markdown 檔是單一真實來源 (source of truth) — 編輯它即可新增或更新工具。

@@ -88,7 +88,7 @@ herdr-grep -F -- -leading-dash              # 保護以 `-` 開頭的 pattern
 
 搜尋範圍受限於 live Herdr server 仍保留的內容：已關閉的 pane、早於 history limit 的輸出，以及 alternate screen 已丟棄的內容都無法找回。命令必須在能存取 Unix socket 的環境執行；遠端 server 請透過 SSH 執行已部署的 CLI，例如 `ssh server 'herdr-grep --all-sessions -F -- "connection refused"'`。**`herdr --remote` 是互動式 thin-client attach，不是 pane 子指令的 RPC 前綴。**
 
-`tv herdr-agent-panes` 與 `tv herdr-review` 仍只 fuzzy-search metadata（pane/session identifiers、狀態、cwd）。可見 pane 文字只是 preview，不在 Television 的 searchable source 中。Television 在 live query 之前執行 source，且 source 收不到 query，因此 content selection 刻意採 `herdr-grep --pick` → fzf，而不是新增 `tv herdr-grep` channel。
+`tv herdr-panes` 與 `tv herdr-review` 仍只 fuzzy-search metadata（pane/session identifiers、狀態、cwd）。可見 pane 文字只是 preview，不在 Television 的 searchable source 中。Television 在 live query 之前執行 source，且 source 收不到 query，因此 content selection 刻意採 `herdr-grep --pick` → fzf，而不是新增 `tv herdr-grep` channel。
 
 ## cwd 與 workspace 命名模型
 
@@ -176,7 +176,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + U` | `tv tools`（CLI launcher） | command pane |
 | `` prefix + u `` | **URL 選單** — 從 pane fzf 挑一個 URL 並開啟（`x open`）；tmux-fzf-url 對應物。`--source recent` = 完整 scrollback | command pane |
 | `prefix + T` | `tv herdr-sesh`（workspace/dir 切換） | command pane |
-| `prefix + a` | `tv herdr-agent-panes`（即時 agent panes） | command pane |
+| `prefix + a` | `tv herdr-panes`（非 shell / agent / process / shell） | command pane |
 | `prefix + Alt + A` | `tv agent-wakeup`（tmux/Herdr 雙 backend quota 等待與排程 continue） | command pane |
 | `prefix + f` | `tv fleet-hosts`（SSH picker） | command pane |
 | `prefix + Alt + F` | 輸入 pane-content pattern → `herdr-grep --pick --visible` → fzf 精確跳轉；Alt+S = scrollback、Alt+V = visible | command pane |
@@ -265,12 +265,12 @@ Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic
 大多數 `tv` channel（`tools`、`fleet-hosts`、`mlflow`、`kill-process`、`ssh-config`）的 action **不與 tmux 耦合**，所以在 herdr command pane 裡原樣就能跑——綁一個鍵到 `tv <channel>` 即可。只有那些 action 會呼叫 `tmux …` 的 channel 才需要 herdr-aware 變體。這裡出貨三個：
 
 - `herdr-sesh`（`dot_config/television/cable/herdr-sesh.toml`）—— 列出 herdr session/workspace + zoxide 目錄；Enter 會分派 `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd`，而不是 `sesh connect` / `tmux switch-client`。`Ctrl+D` 關閉選中的 workspace;**`Alt+Y` 複製它的目錄**（workspace 列與 zoxide 目錄列都適用——見 [`dir` 與 `cwd` 的差別](#space-dir)）。preview 會把推導出的目錄顯示在 `workspace get` 原始 JSON 之上,讓你先看清楚 `Alt+Y` 會給你什麼。
-- `herdr-agent-panes`（`dot_config/television/cable/herdr-agent-panes.toml`）—— 與 `agent-panes` 同來源，但切換/kill 改用 `herdr pane focus` / `herdr pane close`。
+- `herdr-panes`（`dot_config/television/cable/herdr-panes.toml`）—— 通用 pane picker，由 `herdr-agent-panes` 更名。`Ctrl+S` 切換 **非 shell → agent → process → shell**，`Ctrl+R` 重掃目前 session。每列顯示類型、workspace/tab/pane、前景程式、agent 狀態及標題或 cwd。**Enter / Alt+T** 退出 picker，透過共用 `focus-pane.py` 精準跳到 pane（包含 split pane）。**Alt+K** 確認後關閉單一 pane 並退出；**Ctrl+Y / Alt+P** 複製 ID／目前目錄。詳見 [TV pane picker](tv.zh-TW.md#herdr-panes-channel)。
 - `herdr-review`（`dot_config/television/cable/herdr-review.toml`）—— **待 review 收件匣**：只列出帶 ⭐ 旗標的 pane（`tokens.review` 非空）。Enter 會 focus 該 pane 的 workspace/tab 並**保留**旗標;`Alt+C` 則 focus **並**清除旗標（「mark read」）。綁在 `prefix+i`。見下方 **待 review 旗標** 一節。
 
 原本綁 tmux 的 `sesh` / `agent-panes` channel 保持不變以利共存。
 
-> **綁在 command pane 的 channel，Enter action 要用 `mode = "execute"` 而不是 `"fork"`。** `type = "pane"` 綁定只有在它的指令結束時才會消失，而 tv 在 `execute` action 之後會退出、在 `fork` 之後則會繼續活著——所以 `fork` 的 Enter 會讓 picker pane 懸在你剛 focus 的 workspace 上面。`herdr-sesh` 的 `[actions.open]` 正是為此改用 `execute`；它的 `ctrl-d`（`close_ws`）仍保留 `fork`，因為它與 `reload_source` 搭配，tv 必須活著才能重繪清單。同樣的取捨也適用於 `herdr-agent-panes` / `herdr-review`，這兩個目前仍是 `fork`（Enter 重新 focus 但不離開 picker——對分診（triage）是刻意設計；若你想要一次性跳轉就改掉它）。
+> **綁在 command pane 的 channel，Enter action 要用 `mode = "execute"` 而不是 `"fork"`。** `type = "pane"` 綁定只有在它的指令結束時才會消失，而 tv 在 `execute` action 之後會退出、在 `fork` 之後則會繼續活著——所以 `fork` 的 Enter 會讓 picker pane 懸在你剛 focus 的 workspace 上面。`herdr-sesh` 的 `[actions.open]` 正是為此改用 `execute`；它的 `ctrl-d`（`close_ws`）仍保留 `fork`，因為它與 `reload_source` 搭配，tv 必須活著才能重繪清單。`herdr-panes` 的 Enter / Alt+T 與確認關閉也使用 `execute`；`herdr-review` 維持既有 `fork` 跳轉行為，方便持續檢視。
 
 ## Agent 狀態（取代 6 檔案的 workmux 整合）
 
