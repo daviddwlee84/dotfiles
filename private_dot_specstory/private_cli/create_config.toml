@@ -87,7 +87,7 @@ antigravity_cmd = "agy --dangerously-skip-permissions"
 claude_cmd = "claude --dangerously-skip-permissions"
 
 # Codex CLI command
-codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed" -c model_supports_reasoning_summaries=true'
+codex_cmd = 'codex -c --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'
 
 # Cursor CLI command
 cursor_cmd = "cursor-agent --force"

@@ -32,12 +32,14 @@ Configured providers:
 
 - `antigravity_cmd = "agy --dangerously-skip-permissions"`
 - `claude_cmd = "claude --dangerously-skip-permissions"`
-- `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed" -c model_supports_reasoning_summaries=true'`
+- `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'`
 - `cursor_cmd = "cursor-agent --force"`
 - `droid_cmd = "droid --yolo"`
 - `gemini_cmd = "gemini --sandbox=none"`
 
 These are the commands `specstory run claude`, `specstory run codex`, and similar provider shortcuts will execute by default unless overridden per project or on the command line.
+
+Codex 0.156.0 rejects the old `model_supports_reasoning_summaries` override and reports it as an ignored `session-flags` setting at startup. Keep `model_reasoning_summary="detailed"` to request detailed summaries. On existing hosts, remove only `-c model_supports_reasoning_summaries=true` from `codex_cmd` in `~/.specstory/cli/config.toml` (and any project override); `chezmoi apply` does not update this seed-only file. Restart the Codex session to use the corrected command.
 
 ### Always name the provider — the no-arg default is not stable
 

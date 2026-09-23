@@ -37,12 +37,14 @@
 
 - `antigravity_cmd = "agy --dangerously-skip-permissions"`
 - `claude_cmd = "claude --dangerously-skip-permissions"`
-- `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed" -c model_supports_reasoning_summaries=true'`
+- `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'`
 - `cursor_cmd = "cursor-agent --force"`
 - `droid_cmd = "droid --yolo"`
 - `gemini_cmd = "gemini --sandbox=none"`
 
 這些是 `specstory run claude`、`specstory run codex` 與類似 provider 捷徑預設會執行的命令，除非在專案內或命令列上另行覆寫。
+
+Codex 0.156.0 不接受舊的 `model_supports_reasoning_summaries` 覆寫值，啟動時會將它列為被忽略的 `session-flags` 設定。保留 `model_reasoning_summary="detailed"` 即可要求詳細摘要。既有主機需從 `~/.specstory/cli/config.toml` 的 `codex_cmd`（及任何專案覆寫）中移除 `-c model_supports_reasoning_summaries=true`；`chezmoi apply` 不會更新這個只種一次的檔案。重新啟動 Codex 工作階段後才會使用修正後的命令。
 
 ### 一律明寫 provider —— 無參數的預設值並不穩定
 
