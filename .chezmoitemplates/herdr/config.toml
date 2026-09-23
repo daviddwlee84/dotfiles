@@ -47,11 +47,10 @@ status_indicators = "symbols" # distinct static glyphs for each agent state
 # "spaces").
 agent_panel_sort = "priority"
 
-# Expanded Agent sidebar row layout. herdr 0.9.1's own default is
-#   [["state_icon", "machine", "workspace", "tab"], ["agent"]]
-# Move machine to the second row to leave workspace names room in narrow sidebars.
-# Herdr hides machine when only Local is present. Keep the `$review` metadata
-# token so the review-pending ⭐ (prefix+m / hmark) is visible in the sidebar.
+# Expanded Agent sidebar: keep workspace names on the first row, machine/agent
+# on the second, and the task title without its activity glyph on the third.
+# Empty titles disappear; machine is hidden when only Local is present.
+# Keep `$review` for the review-pending star (prefix+m / hmark).
 #
 # Required since herdr 0.7.4: `--custom-status` / the flat `custom_status` field
 # were replaced by a namespaced token map, and unlike custom_status a token is
