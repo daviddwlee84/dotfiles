@@ -27,7 +27,7 @@
 
 [theme]
 name = "catppuccin"             # mocha (dark)
-auto_switch = true              # follow OS light/dark
+auto_switch = false             # keep Catppuccin Mocha regardless of terminal appearance
 light_name = "catppuccin-latte"
 dark_name = "catppuccin"
 
@@ -37,6 +37,7 @@ pane_borders = true
 pane_gaps = true
 confirm_close = true
 show_agent_labels_on_pane_borders = true
+status_indicators = "symbols" # distinct static glyphs for each agent state
 
 # Agent sidebar ordering. herdr's default is "spaces" (grouped by space);
 # "priority" turns the panel into an attention queue (blocked/waiting agents
@@ -46,10 +47,10 @@ show_agent_labels_on_pane_borders = true
 # "spaces").
 agent_panel_sort = "priority"
 
-# Expanded Agent sidebar row layout. herdr's own default is
-#   [["state_icon", "workspace", "tab"], ["agent"]]
-# and we append the `$review` metadata token so the review-pending ⭐ (prefix+m /
-# hmark) is actually VISIBLE in the sidebar.
+# Expanded Agent sidebar: keep workspace names on the first row, machine/agent
+# on the second, and the task title without its activity glyph on the third.
+# Empty titles disappear; machine is hidden when only Local is present.
+# Keep `$review` for the review-pending star (prefix+m / hmark).
 #
 # Required since herdr 0.7.4: `--custom-status` / the flat `custom_status` field
 # were replaced by a namespaced token map, and unlike custom_status a token is
@@ -60,7 +61,11 @@ agent_panel_sort = "priority"
 # NOTE this pins the layout: upstream changes to the default rows will NOT reach
 # us, so re-check this block against `herdr --default-config` on herdr upgrades.
 [ui.sidebar.agents]
-rows = [["state_icon", "workspace", "tab", "$review"], ["agent"]]
+rows = [
+  ["state_icon", "workspace", "tab", "$review"],
+  ["machine", "agent"],
+  ["terminal_title_stripped"],
+]
 
 [terminal]
 shell_mode = "auto" # login/non-login auto-detect; follows $SHELL
@@ -140,6 +145,7 @@ type = "pane"
 command = "lazygit"
 description = "lazygit (temporary pane)"
 
+# Prefix-free alias; use the same temporary-pane launcher as prefix+G.
 [[keys.command]]
 # Lowercase g: alt+G would require Alt+Shift+g.
 key = "alt+g"

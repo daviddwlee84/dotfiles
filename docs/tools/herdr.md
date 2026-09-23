@@ -127,7 +127,7 @@ description = "new tab at the workspace (space) root dir"
 
 | Current capability | herdr story | How it's handled here |
 |---|---|---|
-| Catppuccin theme + light/dark | **Native** `[theme]` + `auto_switch` | Configured in `config.toml` |
+| Catppuccin theme + light/dark | **Native** `[theme]` + `auto_switch` | Fixed Mocha in the managed config (`auto_switch = false`) |
 | Splits / zoom / new tab+workspace / pane nav | **Native** `[keys]` actions | Rebound to tmux muscle memory |
 | Session persistence (resurrect/continuum) | **Native** detach/reattach | Skipped — native |
 | Mouse / right-click menus | **Native** mouse-first | Skipped — native |
@@ -286,6 +286,8 @@ herdr pane report-agent w1:p1 --agent claude --state working
 ```
 
 For the trial we rely on native detection — the tmux-side workmux 🤖/💬/✅ system (Claude/OpenCode hooks → `@workmux_status`) is untouched and only applies under tmux.
+
+The managed UI uses fixed Catppuccin Mocha and `status_indicators = "symbols"`. Agent rows show state/workspace/tab/review, then `machine · agent`, then the task's `terminal_title_stripped`. Machine labels disappear with only Local; absent titles omit the third row. `Alt+g` and `prefix+G` both launch LazyGit in a temporary pane.
 
 ### Optional agent integrations (the onboarding "install" button)
 

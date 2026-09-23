@@ -123,7 +123,7 @@ description = "new tab at the workspace (space) root dir"
 
 | 現有能力 | herdr 做法 | 這裡怎麼處理 |
 |---|---|---|
-| Catppuccin 主題 + 明暗 | **原生** `[theme]` + `auto_switch` | 在 `config.toml` 設定 |
+| Catppuccin 主題 + 明暗 | **原生** `[theme]` + `auto_switch` | 受管設定固定 Mocha（`auto_switch = false`） |
 | Splits / zoom / 開新 tab+workspace / pane 導覽 | **原生** `[keys]` actions | 重綁成 tmux 肌肉記憶 |
 | Session 持久化（resurrect/continuum） | **原生** detach/reattach | 略過——原生 |
 | 滑鼠 / 右鍵選單 | **原生** mouse-first | 略過——原生 |
@@ -281,6 +281,8 @@ herdr pane report-agent w1:p1 --agent claude --state working
 ```
 
 試用期間我們仰賴原生偵測——tmux 端的 workmux 🤖/💬/✅ 系統（Claude/OpenCode hook → `@workmux_status`）不動，且只在 tmux 下生效。
+
+受管 UI 固定使用 Catppuccin Mocha 與 `status_indicators = "symbols"`。Agents 第一行顯示狀態／workspace／tab／review，第二行是 `machine · agent`，第三行是 `terminal_title_stripped` 任務標題。只有 Local 時 machine 會隱藏；沒有標題時第三行不顯示。`Alt+g` 與 `prefix+G` 都以暫時 pane 開啟 LazyGit。
 
 ### 可選的 agent 整合（onboarding 的「install」按鈕）
 
