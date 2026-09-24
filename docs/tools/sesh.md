@@ -482,18 +482,17 @@ single physical directory's frecency across two phantom entries. Sesh
 wildcards should target the canonical pattern (`/Volumes/Data/Program/*/*`)
 rather than the surface symlink.
 
-To bootstrap a fresh DB with the directories you'd like sesh to surface
-immediately (without waiting for organic `cd` traffic), the simplest path
-is a one-shot Python script that reads the binary `db.zo` (version 3
-format: `u32 ver, u64 count, then per-entry: u64 path_len, path bytes,
-f64 rank, u64 ts`), inserts new entries with `rank=1.0`, and writes back.
-Existing entries with higher scores are preserved. Sample workflow lives
-in [pitfalls/zoxide-symlink-fragmentation.md](../../pitfalls/zoxide-symlink-fragmentation.md)
-if/when that pitfall doc is created.
+For a complete repo inventory, use [shared dev candidates](dev-projects.md)
+instead of filling usage history. Do not edit zoxide's binary database. If an
+explicit one-time seed is wanted, use native `zoxide add` only for selected
+missing paths: it updates frequency and timestamps, so replaying it periodically
+is not neutral synchronization. Sesh 2.22 supports importing a separate named
+session configuration fragment; that is a better boundary for a future explicit
+catalog export than modifying history or creating live sessions.
 
 ### Neovim (in-editor zoxide picker)
 
-For jumping between repos without leaving Neovim, [`nvim/lua/plugins/zoxide-picker.lua`](../../dot_config/nvim/exact_plugins/zoxide-picker.lua)
+For jumping between repos without leaving Neovim, [`nvim/lua/plugins/zoxide-picker.lua`](../../dot_config/nvim/lua/exact_plugins/zoxide-picker.lua)
 adds a snacks.picker over `zoxide query --list --score`:
 
 | Keymap | Action |
@@ -506,32 +505,28 @@ project-root detection when you have buffers from multiple projects open.
 Use `:cd` (`<leader>fZ`) when you genuinely want the whole nvim session
 to follow.
 
-### Three project pickers compared
+### Project entry points compared
 
-LazyVim ends up with **three overlapping but distinct** project-jump
-entry points. Pick the one that matches your intent:
+| Where | Trigger | Source | Behavior |
+|---|---|---|---|
+| Neovim | `:DevRepositories` | on-demand dev REPOS | browse selected files; cwd/session unchanged |
+| Neovim | `<leader>fp` / dashboard `p` | selected LazyVim util.project backend | native project navigation |
+| Neovim | `Snacks.picker.projects()` | oldfiles Git roots + configured fd roots | native load-session action |
+| Neovim | `<leader>fz` / `<leader>fZ` | zoxide frequency | explicit tab-local/global cwd change |
+| tmux | `prefix+g` | live tmux + sesh config + zoxide | switch/create session |
 
-| Where | Trigger | Source | What it does |
-|-------|---------|--------|--------------|
-| Inside nvim | `<leader>fp` (or dashboard `p`) | `snacks.picker.projects` — oldfiles git roots + `fd` over `dev` dirs | `:tcd` + `persistence.nvim` restore (last buffers/windows for that cwd) |
-| Inside nvim | `<leader>fz` / `<leader>fZ` | Full zoxide DB (frecency, 100+ entries) | Pure `:tcd` / `:cd`, no session restore |
-| Inside tmux | `prefix + g` (sesh fzf) | tmux + sesh.toml + zoxide | Switch/create tmux session, spawn nvim + lazygit fresh |
-
-Rough heuristic:
-
-- **Already in nvim, want to peek at another repo's file** → `<leader>fz`
-  (cheap, no session ceremony)
-- **Already in nvim, want to fully resume work on another repo** →
-  `<leader>fp` (restores buffers/windows you had last time)
-- **Outside nvim, want a clean per-repo workspace** → `prefix+g` from tmux
-  (gets you the layout from `~/.config/tmuxp/project.yaml`)
+The current install keeps LazyVim's older fzf default, so util.project reads
+project.nvim history. The separate Snacks source configuration below does not
+necessarily affect dashboard `p`. Check the active keymap before changing it.
+Native session restoration remains explicit; listing dev candidates does not
+populate project.nvim or persistence state.
 
 ### Configuring the snacks projects picker
 
 The defaults look at `~/dev` and `~/projects` (which probably don't exist
-on your machine), plus oldfiles-derived git roots. To make `<leader>fp`
-surface every repo under your project home, add it to `dev` —
-[`projects.lua`](../../dot_config/nvim/exact_plugins/projects.lua) does this
+on your machine), plus oldfiles-derived git roots. To make an explicit `Snacks.picker.projects()` call
+surface repos under your project home, add it to `dev` —
+[`projects.lua`](../../dot_config/nvim/lua/exact_plugins/projects.lua) does this
 for `/Volumes/Data/Program`:
 
 ```lua
@@ -563,12 +558,14 @@ projects = {
 ```
 
 Both `dev` (auto-discovered via `fd`) and `projects` (manual list) are
-merged with oldfiles entries before fzf renders. Snacks dedupes by path.
+merged with oldfiles entries by the Snacks finder. Snacks dedupes by path.
 
 The `confirm = "load_session"` default delegates to `persistence.nvim`
 (also wired in `projects.lua`); it restores the last buffer/window
 layout for that cwd. If `persistence.nvim` isn't installed, `load_session`
-silently falls back to opening the file picker after `:tcd`.
+falls back to a file picker after its native cwd change. The installed Snacks
+action uses `vim.fn.chdir`; do not assume it is tab-local. Use
+`:DevRepositories` to browse another repo without changing the editor cwd.
 
 ### Television (tv)
 

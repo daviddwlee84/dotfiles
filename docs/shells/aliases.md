@@ -440,6 +440,13 @@ direct `v` remains Neovim. See [editor selection](../tools/editor.md).
 
 ## Tools Picker
 
+`dev-projects` is a standalone helper (not a shell alias): `list --json` supplies
+local REPOS candidates; `open PATH --tool sidecar|nvim` opens a selected checkout;
+`sidecar-import` previews optional add-only registration. It lives in
+`dot_dotfiles/bin/executable_dev-projects` and has both bash/zsh completions.
+`tv dev-repos` selects a path without launching anything. See
+[shared repo navigation](../tools/dev-projects.md).
+
 > Requires `fzf`. Data file (`~/.config/docs/tools/cli-tools.md`) must be deployed via `chezmoi apply`.
 
 | Command | Type | Source File | Description |

@@ -44,6 +44,14 @@ tv update-channels
 
 ## 自訂頻道
 
+### `dev-repos` 頻道
+
+`tv dev-repos` 按需讀取 `dev-projects list --json` 的本機 dev REPOS 候選。
+Enter 只回傳完整路徑，不開 session 或登記 project。需要 `dev-projects`、
+`dev`、`jq` 與 bash。見 [共用 repo 導航](dev-projects.zh-TW.md) 的安全引用
+路徑開啟 Sidecar 範例；這份來源與 zoxide frequency、Herdr live workspaces
+及 remote forge clone channel 分開。
+
 ### `herdr-panes` channel {#herdr-panes-channel}
 
 在 Herdr 內執行 `tv herdr-panes`，或按 `prefix+a`。這是原本

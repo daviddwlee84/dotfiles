@@ -590,6 +590,15 @@ linux = "Verified GitHub release; legacy Go preserved"
 role_md = "`personal_tools` — Repository/task/worktree dashboard; binary `dev`."
 
 [[tool]]
+id = "dev-projects"
+category = "Navigation & Shell"
+desc = "Shared dev REPOS candidates and explicit add-only Sidecar project import"
+role = "in-house"
+docs = "docs/tools/dev-projects.md"
+mac = "chezmoi (`dot_dotfiles/bin/executable_dev-projects`, Python stdlib)"
+linux = "same"
+
+[[tool]]
 id = "diffnav"
 category = "Git & Diff"
 desc = "TUI diff navigator (file tree + delta)"

@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+"""Share fresh dev repository candidates with editors and Sidecar (stdlib only)."""
+
+import argparse
+import collections
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+
+
+TIMEOUT = 30
+MAX_OUTPUT = 8 * 1024 * 1024
+GIT_PATH_ENV = {
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_PREFIX",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+}
+PROJECT_FIELDS = {
+    "name", "path", "theme", "lastOpenInApp", "openIn", "worktreeSetup", "addedAt",
+}
+THEME_FIELDS = {"name", "community", "overrides"}
+SETUP_FIELDS = {"copyEnvFiles", "envFiles", "runHook", "hookPath", "hookRequired"}
+
+
+class Failure(Exception):
+    pass
+
+
+class Cancelled(BaseException):
+    def __init__(self, signum):
+        self.signum = signum
+
+
+def stop_probe(proc):
+    """Stop only the private session created for this one probe, then reap it."""
+    if proc is None:
+        return
+    if proc.returncode is not None:
+        # communicate already reaped this leader. Its PID no longer pins the
+        # group, so never signal it (even if detached descendants might survive).
+        for stream in (proc.stdout, proc.stderr):
+            if stream:
+                stream.close()
+        return
+    posix = os.name == "posix"
+    mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM}) if posix else None
+    failed = False
+    try:
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                if posix:
+                    os.killpg(proc.pid, sig)
+                elif sig == signal.SIGTERM:
+                    proc.terminate()
+                else:
+                    proc.kill()
+            except ProcessLookupError:
+                pass
+            except OSError:
+                failed = True
+            # Do not reap until after killing surviving descendants: the
+            # unreaped leader pins this private group against PID reuse.
+            if sig == signal.SIGTERM:
+                time.sleep(0.1)
+    finally:
+        try:
+            proc.wait(timeout=1)
+        except (subprocess.TimeoutExpired, OSError):
+            failed = True
+        finally:
+            for stream in (proc.stdout, proc.stderr):
+                if stream:
+                    stream.close()
+            if mask is not None:
+                signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+    if failed:
+        raise Failure("probe cleanup could not be confirmed; inspect its processes before retrying")
+
+
+def executable(variable, default):
+    # One executable, never a shell command or an argument string.
+    return os.environ.get(variable, default)
+
+
+def absolute(path):
+    return os.path.abspath(os.path.expanduser(path))
+
+
+def canonical(path):
+    return os.path.realpath(absolute(path))
+
+
+def has_control(value):
+    return any(ord(char) < 32 or ord(char) == 127 for char in value)
+
+
+def child_env(probe=False):
+    # A caller may be a Git hook or have selected another checkout through its
+    # environment. Every child here must discover Git from its own selected path.
+    env = {key: value for key, value in os.environ.items() if key not in GIT_PATH_ENV}
+    if probe:
+        env.update(GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
+    return env
+
+
+def decode_json(data, label):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate key")
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(data, object_pairs_hook=pairs)
+    except (ValueError, UnicodeError):
+        raise Failure(label + " returned invalid JSON; check that source directly") from None
+
+
+def run(argv, label, cwd=None):
+    proc = None
+    posix = os.name == "posix"
+    starting, cancelled = True, None
+
+    def cancel_probe(signum, _frame):
+        nonlocal cancelled
+        cancelled = signum
+        # Finish obtaining Popen's handle before raising, so a signal delivered
+        # during spawn cannot orphan the new child. Children inherit no mask.
+        if not starting:
+            raise Cancelled(signum)
+
+    previous = signal.signal(signal.SIGTERM, cancel_probe) if posix else None
+    try:
+        if cancelled is not None:
+            raise Cancelled(cancelled)
+        proc = subprocess.Popen(
+            argv, cwd=cwd or os.path.expanduser("~"), stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=child_env(probe=True), start_new_session=posix,
+        )
+        starting = False
+        if cancelled is not None:
+            raise Cancelled(cancelled)
+        stdout, _ = proc.communicate(timeout=TIMEOUT)
+    except subprocess.TimeoutExpired:
+        stop_probe(proc)
+        raise Failure(label + " timed out; inspect its state before trying again") from None
+    except (Cancelled, KeyboardInterrupt):
+        stop_probe(proc)
+        raise
+    except OSError:
+        raise Failure(label + " could not start; check its executable and directory") from None
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGTERM, previous)
+    if proc.returncode != 0:
+        raise Failure(label + " failed (exit " + str(proc.returncode) + "); check that command directly")
+    if len(stdout) > MAX_OUTPUT:
+        raise Failure(label + " output exceeded 8 MiB")
+    return stdout
+
+
+def candidates():
+    rows = decode_json(run(
+        [executable("DEV_PROJECTS_DEV", "dev"), "repo", "list", "--json"],
+        "dev repo list",
+    ), "dev repo list")
+    if not isinstance(rows, list):
+        raise Failure("dev repo list must return a JSON array")
+    result, seen = [], set()
+    for row in rows:
+        if not isinstance(row, dict) or any(
+            not isinstance(row.get(key), str) for key in ("name", "path")
+        ) or any(type(row.get(key)) is not bool for key in ("has_git", "bare")):
+            raise Failure("dev repo list has an unsupported row; expected name/path and has_git/bare")
+        if any(key in row and not isinstance(row[key], str) for key in ("display", "category")):
+            raise Failure("dev repo list has invalid display/category fields")
+        if not row["has_git"] or row["bare"]:
+            continue
+        if has_control(row["path"]):
+            raise Failure("dev repo list contains a path with ASCII control characters; line-based navigation cannot represent it")
+        if not os.path.isabs(row["path"]) or not row["name"].strip():
+            raise Failure("dev repo list returned an invalid repository name or non-absolute path")
+        path = absolute(row["path"])
+        real = canonical(path)
+        if has_control(real):
+            raise Failure("a repository resolves to a path with ASCII control characters; line-based navigation cannot represent it")
+        if real in seen or not os.path.isdir(real):
+            continue
+        seen.add(real)
+        result.append({
+            "name": row["name"], "display": row.get("display") or row["name"],
+            "category": row.get("category", ""), "path": path, "real_path": real,
+        })
+    return result
+
+
+def directory_identity(path):
+    try:
+        stat = os.stat(path)
+    except OSError:
+        raise Failure("repository directory is unavailable") from None
+    return (stat.st_dev, stat.st_ino)
+
+
+def repo_identity(path):
+    before = directory_identity(path)
+    root = run(["git", "-C", path, "rev-parse", "--show-toplevel"], "Git root check", path)
+    gitdir = run(["git", "-C", path, "rev-parse", "--absolute-git-dir"], "Git identity check", path)
+    try:
+        root = root.decode("utf-8").rstrip("\n")
+        gitdir = gitdir.decode("utf-8").rstrip("\n")
+    except UnicodeError:
+        raise Failure("Git returned a path that is not UTF-8") from None
+    if canonical(root) != path or directory_identity(path) != before:
+        raise Failure("repository root changed or the selected directory is not its Git root")
+    return before + directory_identity(canonical(gitdir))
+
+
+def validated_candidate(path, rows):
+    real = canonical(path)
+    matches = [row for row in rows if row["real_path"] == real]
+    if len(matches) != 1:
+        raise Failure("selected path is not an available repository in the fresh dev candidates")
+    return matches[0], repo_identity(real)
+
+
+def config_snapshot(path):
+    try:
+        data = Path(path).read_bytes()
+    except FileNotFoundError:
+        return None, []
+    except OSError:
+        raise Failure("Sidecar config could not be read; check its permissions") from None
+    if len(data) > MAX_OUTPUT:
+        raise Failure("Sidecar config exceeds 8 MiB")
+    doc = decode_json(data, "Sidecar config")
+    if not isinstance(doc, dict) or not isinstance(doc.get("projects", {}), dict):
+        raise Failure("Sidecar config has an unsupported projects section")
+    entries = doc.get("projects", {}).get("list", [])
+    if not isinstance(entries, list) or any(not isinstance(p, dict) for p in entries):
+        raise Failure("Sidecar config projects.list must contain objects")
+    # Keep the entire projects object privately, including its unknown fields.
+    return hashlib.sha256(data).digest(), doc.get("projects", {})
+
+
+def sidecar_argv(config, *args):
+    return [executable("DEV_PROJECTS_SIDECAR", "sidecar"), "--config", config, *args]
+
+
+def sidecar_projects(config):
+    before, _ = config_snapshot(config)
+    doc = decode_json(run(sidecar_argv(config, "project", "list", "--json"),
+                          "sidecar project list"), "sidecar project list")
+    after, raw = config_snapshot(config)
+    if before != after:
+        raise Failure("Sidecar config changed while listing; refresh the preview")
+    if not isinstance(doc, dict) or not isinstance(doc.get("projects"), list):
+        raise Failure("Sidecar project list must return an object with projects")
+    for p in doc["projects"]:
+        if not isinstance(p, dict) or any(not isinstance(p.get(k), str) or not p[k]
+                                          for k in ("name", "path")):
+            raise Failure("Sidecar project list has an unsupported project entry")
+    return doc["projects"], raw, after
+
+
+def supported_projects(raw):
+    """Refuse fields the audited Sidecar 1.14 project serializer would discard."""
+    if not raw:
+        return []
+    if set(raw) - {"mode", "root", "list"}:
+        raise Failure("Sidecar projects contains unsupported fields; native import could discard them")
+    entries = raw.get("list", [])
+    for entry in entries:
+        if set(entry) - PROJECT_FIELDS:
+            raise Failure("a Sidecar project has unsupported fields; native import could discard them")
+        theme = entry.get("theme")
+        if isinstance(theme, dict) and set(theme) - THEME_FIELDS:
+            raise Failure("a Sidecar project theme has unsupported fields; import was refused")
+        setup = entry.get("worktreeSetup")
+        if isinstance(setup, dict) and set(setup) - SETUP_FIELDS:
+            raise Failure("a Sidecar project setup has unsupported fields; import was refused")
+    return entries
+
+
+def normalized_project(entry):
+    theme = entry.get("theme")
+    if isinstance(theme, str):
+        theme = {"name": theme}
+    if isinstance(theme, dict):
+        theme = {"name": theme.get("name", ""), "community": theme.get("community", ""),
+                 "overrides": theme.get("overrides") or {}}
+    setup = entry.get("worktreeSetup")
+    if isinstance(setup, dict):
+        setup = {key: setup.get(key, [] if key == "envFiles" else "" if key == "hookPath" else False)
+                 for key in SETUP_FIELDS}
+        setup["envFiles"] = setup["envFiles"] or []
+    date = entry.get("addedAt")
+    if isinstance(date, str):
+        try:
+            date = datetime.datetime.fromisoformat(date.replace("Z", "+00:00")).astimezone(
+                datetime.timezone.utc).isoformat()
+        except ValueError:
+            pass
+    return {"name": entry.get("name", ""), "path": canonical(entry.get("path", "")),
+            "theme": theme, "worktreeSetup": setup, "addedAt": date,
+            "openIn": entry.get("openIn", ""), "lastOpenInApp": entry.get("lastOpenInApp", "")}
+
+
+def classify(row, projects, proposed_names=None):
+    matches = [p for p in projects if canonical(p["path"]) == row["path"]]
+    if len(matches) == 1:
+        return "already_present"
+    if len(matches) > 1:
+        return "name_conflict"
+    name = row["name"].casefold()
+    if any(p["name"].casefold() == name for p in projects) or (proposed_names or {}).get(name, 0) > 1:
+        return "name_conflict"
+    return "add"
+
+
+def import_projects(args):
+    config = absolute(args.config or "~/.config/sidecar/config.json")
+    rows = candidates()
+    projects, raw, _ = sidecar_projects(config)
+    selections = args.repo or [row["path"] for row in rows]
+    plan, identities, seen = [], {}, set()
+    for path in selections:
+        real = canonical(path)
+        if real in seen:
+            continue
+        seen.add(real)
+        item = {"name": Path(real).name, "path": real, "status": "unavailable"}
+        try:
+            row, identity = validated_candidate(path, rows)
+            # Sidecar AddProject applies strings.TrimSpace to the path. A
+            # distinct checkout ending in whitespace could otherwise register
+            # its unselected, trimmed sibling before post-write verification.
+            # Python strip includes Go's Unicode whitespace (and conservatively
+            # rejects a few additional controls). List/open keep exact paths.
+            if real.strip() != real:
+                raise Failure("Sidecar import would trim whitespace from this repository path; registration was refused")
+            if has_control(row["name"]):
+                raise Failure("Sidecar import cannot register a project name with ASCII control characters")
+            item["name"] = row["name"].strip()
+            if item["name"].startswith("-"):
+                raise Failure("Sidecar project add cannot accept a name beginning with a dash")
+            identities[real] = identity
+            item["status"] = "add"
+        except Failure as exc:
+            item["reason"] = str(exc)
+        plan.append(item)
+    proposed = collections.Counter(item["name"].casefold() for item in plan if item["status"] == "add")
+    for item in plan:
+        if item["status"] == "add":
+            item["status"] = classify(item, projects, proposed)
+    report = {"schema": 1, "mode": "apply" if args.apply else "preview", "config": config,
+              "items": plan}
+    if args.apply:
+        apply_import(config, plan, identities, raw)
+    report["summary"] = dict(collections.Counter(item["status"] for item in plan))
+    emit(report)
+    if args.apply and any(item["status"] not in ("added", "already_present") for item in plan):
+        return 3
+    return 0
+
+
+def apply_import(config, plan, identities, raw):
+    pending = [item for item in plan if item["status"] == "add"]
+    if not pending:
+        return
+    try:
+        supported_projects(raw)
+    except Failure as exc:
+        for item in pending:
+            item.update(status="not_attempted", reason=str(exc))
+        return
+    stopped = False
+    for item in pending:
+        if stopped:
+            item.update(status="not_attempted", reason="an earlier operation failed; refresh before continuing")
+            continue
+        started = False
+        try:
+            _, current_identity = validated_candidate(item["path"], candidates())
+            if current_identity != identities[item["path"]]:
+                item.update(status="unavailable", reason="repository identity changed since the preview")
+                continue
+            projects, raw, fingerprint = sidecar_projects(config)
+            before = [normalized_project(p) for p in supported_projects(raw)]
+            status = classify(item, projects)
+            if status != "add":
+                item["status"] = status
+                continue
+            # Last local check; Sidecar has no shared lock/CAS, so concurrent
+            # foreign writers remain outside this adapter's guarantees.
+            if config_snapshot(config)[0] != fingerprint:
+                raise Failure("Sidecar config changed before add; refresh the preview")
+            if repo_identity(item["path"]) != identities[item["path"]]:
+                item.update(status="unavailable", reason="repository identity changed before add")
+                continue
+            started = True
+            run(sidecar_argv(config, "project", "add", item["name"], "--path", item["path"], "--json"),
+                "sidecar project add")
+            projects, raw_after, _ = sidecar_projects(config)
+            after = [normalized_project(p) for p in supported_projects(raw_after)]
+            if (classify(item, projects) != "already_present" or after[:len(before)] != before
+                    or len(after) != len(before) + 1 or after[-1]["name"] != item["name"]
+                    or after[-1]["path"] != item["path"]):
+                raise Failure("Sidecar add verification failed; inspect its config before continuing")
+            item["status"] = "added"
+        except Failure as exc:
+            # A process may have written even if it timed out or exited nonzero.
+            # Never retry or roll back an outcome we cannot prove.
+            item.update(status="unknown" if started else "failed", reason=str(exc))
+            stopped = True
+
+
+def emit(value):
+    print(json.dumps(value, ensure_ascii=False, indent=2))
+
+
+def parser():
+    p = argparse.ArgumentParser(prog="dev-projects", description=__doc__, epilog=(
+        "Requires Python 3, dev and Git. DEV_PROJECTS_DEV and DEV_PROJECTS_SIDECAR "
+        "override one executable path each (no shell syntax). Probes time out after 30s. "
+        "Path-specific Git environment overrides are cleared for children. "
+        "Repository paths containing ASCII control characters are rejected for line-based navigation. "
+        "Exit codes: 0 success/preview, 1 dependency/data failure, 2 usage, 3 incomplete import, "
+        "128+signal cancelled. POSIX cancellation stops the probe's private process group while "
+        "its leader remains unreaped; independently detached children are outside this boundary. "
+        "All list/import output is JSON; diagnostics go to stderr. No inventory runs at shell startup. "
+        "Examples: dev-projects list --json; dev-projects open /path/to/repo --tool nvim; "
+        "dev-projects sidecar-import --repo /path/to/repo."
+    ))
+    sub = p.add_subparsers(dest="command", required=True)
+    listing = sub.add_parser("list", help="read fresh dev repo candidates; write a JSON array")
+    listing.add_argument("--json", action="store_true", help="JSON is also the default")
+    opening = sub.add_parser("open", help="revalidate a candidate and launch its editor or companion")
+    opening.add_argument("path", metavar="PATH")
+    opening.add_argument("--tool", choices=("sidecar", "nvim"), default="sidecar")
+    importing = sub.add_parser("sidecar-import", help="preview optional add-only registration", description=(
+        "Preview missing Sidecar projects. Apply requires --apply --yes. Existing canonical paths "
+        "are never edited; name collisions are skipped. No rename, delete, mirror, shell creation "
+        "or UI switch. Audited with Sidecar 1.14: its native serializer rewrites configuration and "
+        "has no lock/CAS or atomic batch. Avoid concurrent configuration writers; only supported "
+        "project fields can be preserved. Unknown project fields block writes. Use --config with "
+        "an isolated file and XDG_STATE_HOME with an isolated directory for trials. A failed "
+        "started write is reported unknown, never retried or rolled back. External cancellation "
+        "may prevent a report and leave the native write outcome unknown."
+    ))
+    importing.add_argument("--config", metavar="PATH", help="Sidecar config file (default ~/.config/sidecar/config.json)")
+    importing.add_argument("--repo", action="append", metavar="PATH", help="select a repo; repeat (default: all fresh candidates)")
+    importing.add_argument("--apply", action="store_true", help="apply missing entries; requires --yes")
+    importing.add_argument("--yes", action="store_true", help="confirm this add-only batch; requires --apply")
+    importing.add_argument("--json", action="store_true", help="JSON is also the default")
+    return p
+
+
+def main(argv=None):
+    p = parser()
+    args = p.parse_args(argv)
+    if args.command == "sidecar-import" and args.apply != args.yes:
+        p.error("sidecar-import writes require both --apply and --yes; omit both to preview")
+    try:
+        if args.command == "list":
+            emit(candidates())
+            return 0
+        if args.command == "sidecar-import":
+            return import_projects(args)
+        row, identity = validated_candidate(args.path, candidates())
+        path = row["real_path"]
+        if repo_identity(path) != identity:
+            raise Failure("repository changed before launch; refresh the candidates")
+        tool = executable("DEV_PROJECTS_SIDECAR", "sidecar") if args.tool == "sidecar" else "nvim"
+        cmd = [tool, "--project", path] if args.tool == "sidecar" else [tool, "."]
+        os.chdir(path)
+        os.execvpe(tool, cmd, child_env())
+    except (Failure, OSError) as exc:
+        message = str(exc) if isinstance(exc, Failure) else "launch failed; check the selected executable"
+        print("dev-projects: " + message, file=sys.stderr)
+        return 1
+    except (Cancelled, KeyboardInterrupt) as exc:
+        print("dev-projects: cancelled", file=sys.stderr)
+        return 128 + (exc.signum if isinstance(exc, Cancelled) else signal.SIGINT)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

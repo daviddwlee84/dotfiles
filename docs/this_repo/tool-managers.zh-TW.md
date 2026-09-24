@@ -1030,6 +1030,7 @@ agent-specific 升級路徑。
 | **dasel** | brew | release | devtools |
 | **dbeaver-community** | brew cask | n/a | Brewfile.darwin |
 | **dev-cli** (`dev`) | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Repository/task/worktree dashboard; binary `dev`. |
+| **dev-projects** | chezmoi (`dot_dotfiles/bin/executable_dev-projects`, Python stdlib) | same | in-house |
 | **diffnav** | brew | GitHub release | devtools |
 | **direnv** | brew | apt or curl-installer | devtools |
 | **discord** | brew cask | flatpak (default) / `.deb` | Brewfile.darwin / gui_apps_linux |

@@ -279,6 +279,7 @@ nav:
       - Random hard power-offs: playbooks/random-hard-poweroff.md
   - Tools:
       - Personal CLI suite: tools/personal-tools.md
+      - Shared repo navigation (dev-projects): tools/dev-projects.md
       - tools/aicapture.md
       - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
       - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
