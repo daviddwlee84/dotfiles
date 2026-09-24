@@ -26,6 +26,21 @@ Micro：Homebrew 用 `just upgrade-brew`，apt 使用單套件升級；受管 Li
 - 由 macOS 官方 release fallback 安裝的 Neovim 位於 Homebrew 之外，因此 `upgrade-brew` 不會刷新它。role 只會在目前生效的 `nvim` 低於 `neovim_min_version` 時替換；否則需從官方 archive 手動更新 fallback。只有在 `PATH` 上沒有其他已符合最低版本的 `nvim` 時，移除 `~/.local/bin/nvim` 後重新 apply 才會重裝。既有 Homebrew Neovim 仍由 `upgrade-brew` 管理。
 - LazyGit 也因託管設定使用 `git.diffRenderers` 而強制最低版本 >= 0.64.0。舊 Homebrew formula 會執行定向的 `brew upgrade lazygit`；其他過舊或被 PATH shadow 的安裝則 fallback 到 `~/.local/bin` 中經 checksum 驗證的官方 release。達到最低版本後，一般更新仍由 `upgrade-brew` 或原安裝來源負責。
 
+## Tasks 工具組 {#tasks-suite}
+
+[Tasks](../tools/tasks.zh-TW.md) 隨 coding agents 安裝，升級則跟隨原安裝來源。
+Homebrew/Linuxbrew 使用 `just upgrade-brew`，或先執行 `brew update`，再執行
+`brew upgrade marcus/tap/tasks`。先更新 tap metadata，可避免舊資料誤報目前
+版本已安裝；formula 會一起更新 `tasks`、`tasks-tui`、`tasks-api`。
+
+Linux GitHub-release fallback 沒有自動升級 category。明確更新時，從
+[官方 release](https://github.com/marcus/tasks/releases) 下載指定版本的 Linux
+amd64/arm64 archive 與 `checksums.txt`，驗證該 archive 的 checksum，再解壓到
+暫存目錄。先對**三個解出的執行檔**執行 `--version`，再將 `~/.local/bin` 中
+由 release 管理的三個 binary 成組替換。保留既有 config 與資料；不要以 release
+binary 覆蓋套件管理器持有的路徑。執行中的 Tasks TUI/API 由使用者選擇時機重開。
+`chezmoi apply` 不會升級已完整安裝的工具組，也不會重設資料設定。
+
 ## 進入點
 
 ```bash

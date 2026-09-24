@@ -213,6 +213,7 @@ ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ] && command -v brew
 - `base/tasks/main.yml`:`git`、`git-lfs`、`curl`、`wget`、`ripgrep`、`fd`、`jq`、`tree`、`just`
 - `devtools/tasks/main.yml`:大量集合——`bat`、`gh`、`glab`、`diffnav`、`git-delta`、`eza`、`tlrc`、`glow`、`gum`、`vhs`、`freeze`、`thefuck`、`zoxide`、`direnv`、`yazi`、`superfile`、`tmux`、`sesh`、`worktrunk`、`workmux`、`zellij`、`btop`、`htop`、`duckdb`、`rclone`、`coreutils`、`taplo`、`television`、`pandoc`、`tailspin`、`lnav`、`grc`、`dasel`、`yq`、`jnv`、`witr`、`figlet`、`toilet`、`lolcat`、`fastfetch`、`shellcheck`、`shfmt`、`bats-core`、`git-graph`、`mosh`
 - `coding_agents/tasks/main.yml`:`claude-code`(cask)、`codex`(cask)、`gemini-cli`(formula)、`rtk`(formula)、`specstory`、`codexbar`、`td`、`sidecar`(除 `codexbar` 外都有 tap 設定;它的 cask 在 homebrew-cask core)
+- `coding_agents/tasks/tasks.yml`（由 `main.yml` import）：`marcus/tap/tasks`，一次安裝 `tasks`、`tasks-tui`、`tasks-api`
 - `networking_tools/`:`nmap`、`arp-scan`、`mtr`、`iperf3`、`doggo`、`httpie`、`gping`、`trippy`、`bandwhich`、`rustscan`、`speedtest`(tap `teamookla/speedtest`)、`ngrok`、`cloudflared`
 - `media_tools/`:`ffmpeg`、`imagemagick`、`exiftool`、`vips`
 - `iac_tools/`:`azure-cli`、`hashicorp/tap/terraform`、`opentofu`
@@ -228,7 +229,7 @@ Linuxbrew(存在時)或 GitHub releases。每個 role 都有明確的
 
 **Tap 清單**(各 role 加進來的):`nikitabobko/tap`、`wxtsky/tap`
 (CodeIsland)、`hashicorp/tap`(terraform)、`teamookla/speedtest`、
-`specstoryai/tap`、`steipete/tap`(CodexBar 的 **CLI formula**——cask 在 homebrew-cask core,不需要 tap)、`marcus/tap`(td、sidecar)、
+`specstoryai/tap`、`steipete/tap`(CodexBar 的 **CLI formula**——cask 在 homebrew-cask core,不需要 tap)、`marcus/tap`(td、sidecar、Tasks)、
 `dlvhdr/formulae`、`raine/workmux`。
 
 **透過 homebrew 新增**:只在「macOS 出貨且 Linux 對應品走 apt 或
@@ -357,6 +358,7 @@ Role:`dot_ansible/roles/coding_agents/tasks/main.yml`。由
 | **CodexBar** | brew cask `codexbar`——homebrew-cask **core**(不需 tap)、universal binary、macOS 14+ | glibc ≥ 2.38:Linuxbrew `steipete/tap/codexbar` → GitHub release;低於此:只走 static-musl GitHub release | 597–864 行。判斷依據是 `/Applications/CodexBar.app` 而非 `which codexbar`;會先移除衝突的 CLI formula(兩者連結同一個 binary 名稱);預編的 Linux CLI 需要 `GLIBC_2.38`,所以舊 glibc 主機會整個跳過 Linuxbrew。見 [codexbar.md](../tools/codexbar.md) |
 | **td** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/td` | 865–1078 行。包含「現有 td 是否與 Sidecar 相容?」版本檢查;不相容則移除衝突的 formula |
 | **sidecar** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/sidecar` | 1080–1256 行 |
+| **Tasks** (`tasks` / `tasks-tui` / `tasks-api`) | `marcus/tap/tasks` formula | Linuxbrew → 經 checksum 驗證的 amd64/arm64 GitHub release | `tasks.yml` 由 `main.yml` import；三個執行檔完整時不升級，fallback 成組安裝到 `~/.local/bin`。首次 XDG 設定見 [tasks.md](../tools/tasks.zh-TW.md) |
 | **Specify CLI** | `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git` | 同 | 1153–1184 行。目前唯一在 role 中直接用 `uv tool install` 而非透過 `python_uv_tools` defaults 的工具 |
 | **OpenChamber** | npm `@openchamber/web` | `mise exec -- npm install -g` | 1188–1222 行 |
 | **claude-hud** 插件 | 執行 `files/claude_hud_sync.py --only-if-missing` | 同 | 1239–1247 行;install-only,顯式的 `just upgrade-plugins` 才會刷新 |
@@ -765,6 +767,7 @@ GitHub release tarball 並解壓到 `~/.local/bin`(使用者可寫,已在 PATH)�
 - `lazyvim_deps`:`lazygit` fallback
 - `coding_agents`:`specstory`、`codexbar`、`td`、`sidecar`、`agy`
   (都同時有 brew formula / cask 當主要路徑)
+- `coding_agents/tasks/tasks.yml`：Tasks 工具組；Linuxbrew 失敗後驗證官方 release checksum，成組安裝 `tasks`、`tasks-tui`、`tasks-api`；完整安裝不重下。明確升級見 [Tasks 升級](upgrades.zh-TW.md#tasks-suite)。
 - `security_tools`:`gitleaks`
 - `iac_tools`:`terraform`、`opentofu` 使用者 fallback(來自
   `releases.hashicorp.com` / GitHub 的 zip)
@@ -882,6 +885,7 @@ GitHub release tarball 並解壓到 `~/.local/bin`(使用者可寫,已在 PATH)�
 | **Specstory** | macOS:brew tap → GitHub release fallback;Linux:GitHub release tarball | brew formula 可用性 + 版本新鮮度 |
 | **CodexBar** | macOS:brew cask(homebrew-cask core、universal);Linux:Linuxbrew formula → GitHub release | macOS 裝的是選單列應用程式,本身就內含 CLI(formula 的超集);Linux 只有 CLI |
 | **td** / **sidecar** | macOS:brew tap;Linux:Linuxbrew → GitHub release | 同維護者(`marcus/tap`);Linuxbrew 存在時走快路 |
+| **Tasks 工具組** | macOS：`marcus/tap/tasks`；Linux：Linuxbrew → checksum 驗證的 release | 與 td/Sidecar 同屬 `marcus/tap`；三個 binary 一起安裝，完整既有工具組維持 install-only |
 | **Ollama** | 永遠 brew formula(CLI);`installAiDesktopApps + installLlmTools` 時 brew cask `ollama-app`;Linux:`curl ollama.com/install.sh` | CLI vs GUI 切分;廠商 installer 是 Linux 標準路徑 |
 | **fzf** | macOS:`lazyvim_deps` brew。Linux:chezmoi external + `~/.fzf/install --bin` | macOS 用 brew 沒問題;Linux 拿到最新的 git tip |
 | **bash** | 永遠有系統 bash;macOS 上只有 `primary_shell="bash"` 時才裝 homebrew bash 5.x | macOS 出貨 bash 3.2(GPL2 vintage);brew bash 5 只在使用者真的想當登入 shell 時才需要 |
@@ -915,6 +919,7 @@ fallback。多層 fallback 會增加實際沒人會跑的測試組合(5 層 × 5
 | **Cursor `.deb` (Linux)** | `get_url` 配 retries=4(大檔,GFW-prone)— 單一機制但重試多次 |
 | **Bitwarden Desktop (Linux)** | snap → `.deb` fallback |
 | **CodexBar / td / sidecar / RTK / specstory / llmfit** | Linuxbrew → GitHub release tarball |
+| **Tasks 工具組 (Linux)** | 完整既有安裝 → Linuxbrew `marcus/tap/tasks` → checksum 驗證的 amd64/arm64 release，將三個 binary 安裝到 `~/.local/bin` |
 | **uv (升級端)** | 檢查 binary 路徑 → `brew upgrade uv` 或 `uv self update` |
 | **Discord (Linux)** | flatpak(預設)→ `.deb`(由 `discordChannel` 選) |
 | **tree-sitter-cli (Linux)** | `mise exec -- npm install -g tree-sitter-cli`(timeout 180)→ `cargo install tree-sitter-cli`(先裝 `libclang-dev`) |
@@ -935,6 +940,7 @@ fallback。多層 fallback 會增加實際沒人會跑的測試組合(5 層 × 5
 | 類別 | 為什麼沒升級 | 如何刷新 |
 |---|---|---|
 | **GitHub-release 使用者層級 fallback**(~30 個工具 — 見 [§ 11](#11-github-release-下載-使用者層級-fallback)) | `creates:` 守衛讓 ansible 永遠不重下 | `rm ~/.local/bin/<tool>` 後 `chezmoi apply` |
+| **Tasks Linux release 工具組** | 完整工具組 guard 維持 install-only；沒有自動 release 升級 category | 驗證指定 release checksum，成組替換三個 binary；見 [Tasks 升級](upgrades.zh-TW.md#tasks-suite)。Brew 安裝仍走 `just upgrade-brew` |
 | **Debian 上的廠商 apt-repo 套件**(terraform、azure-cli、vscode、opentofu、ngrok、PPA 的 lazygit) | 依賴本 repo 流程外的 `sudo apt upgrade` | `sudo apt update && sudo apt upgrade`(非 chezmoi 的職責) |
 | **Docker 便利腳本安裝** | 沒有升級目標 | 重跑 `curl get.docker.com \| sh` |
 | **OrbStack** | macOS brew cask | 由 `cat_brew --cask --greedy` 涵蓋 |
@@ -1179,6 +1185,7 @@ agent-specific 升級路徑。
 | **tailscale-app** | brew cask (pkg also installs the `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
 | **tailspin** (`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
+| **Tasks** (`tasks` / `tasks-tui` / `tasks-api`) | brew (`marcus/tap/tasks`) | Linuxbrew → verified GitHub release | coding_agents — all three binaries; user-owned XDG data/config. See [tasks.md](../tools/tasks.md) |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
 | **television** (`tv`) | brew | apt+release | devtools |
 | **terminal-browser** | brew cask | checksum-verified upstream stable release (supported Debian/Ubuntu x64/arm64) | devtools, `installTerminalBrowser`; package skills, upgrade-brew / upgrade-terminal-browser. See [browser-tools](../tools/browser-tools.md) |

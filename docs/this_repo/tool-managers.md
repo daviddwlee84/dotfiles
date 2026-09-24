@@ -220,6 +220,7 @@ Most CLI formulae land via ansible roles, not the Brewfile. Examples:
 - `base/tasks/main.yml`: `git`, `git-lfs`, `curl`, `wget`, `ripgrep`, `fd`, `jq`, `tree`, `just`
 - `devtools/tasks/main.yml`: large set — `bat`, `gh`, `glab`, `diffnav`, `git-delta`, `eza`, `tlrc`, `glow`, `gum`, `vhs`, `freeze`, `thefuck`, `zoxide`, `direnv`, `yazi`, `superfile`, `tmux`, `sesh`, `worktrunk`, `workmux`, `zellij`, `btop`, `htop`, `duckdb`, `rclone`, `coreutils`, `taplo`, `television`, `pandoc`, `tailspin`, `lnav`, `grc`, `dasel`, `yq`, `jnv`, `witr`, `figlet`, `toilet`, `lolcat`, `fastfetch`, `shellcheck`, `shfmt`, `bats-core`, `git-graph`, `mosh`, `doxx`, `libreoffice`
 - `coding_agents/tasks/main.yml`: `claude-code` (cask), `codex` (cask), `gemini-cli` (formula), `rtk` (formula), `specstory`, `codexbar`, `td`, `sidecar` (all with tap setup except `codexbar`, whose cask is in homebrew-cask core)
+- `coding_agents/tasks/tasks.yml` (imported by `main.yml`): `marcus/tap/tasks`, installing `tasks`, `tasks-tui`, and `tasks-api` together
 - `networking_tools/`: `nmap`, `arp-scan`, `mtr`, `iperf3`, `doggo`, `httpie`, `gping`, `trippy`, `bandwhich`, `rustscan`, `speedtest` (tap `teamookla/speedtest`), `ngrok`, `cloudflared`
 - `media_tools/`: `ffmpeg`, `imagemagick`, `exiftool`, `vips`
 - `iac_tools/`: `azure-cli`, `hashicorp/tap/terraform`, `opentofu`
@@ -237,7 +238,7 @@ explicit `when: ansible_facts["os_family"] == "Darwin"` guard.
 `wxtsky/tap` (CodeIsland), `hashicorp/tap` (terraform),
 `teamookla/speedtest`, `specstoryai/tap`, `steipete/tap` (CodexBar **CLI formula** — the
 cask is in homebrew-cask core, no tap needed),
-`marcus/tap` (td, sidecar), `dlvhdr/formulae`, `raine/workmux`.
+`marcus/tap` (td, sidecar, Tasks), `dlvhdr/formulae`, `raine/workmux`.
 
 Homebrew 6+ refuses formulae/casks from untrusted third-party taps. Role-driven
 taps must run a `brew tap-info <tap>` → `brew trust <tap>` check before installing
@@ -371,6 +372,7 @@ ships via a different mechanism upstream, and the role mirrors that.
 | **CodexBar** | brew cask `codexbar` — homebrew-cask **core** (no tap), universal binary, macOS 14+ | glibc ≥ 2.38: Linuxbrew `steipete/tap/codexbar` → GitHub release; below that: static-musl GitHub release only | lines 597–864. Guards on `/Applications/CodexBar.app`, not `which codexbar`; removes a conflicting CLI formula first (both link the same binary name); the prebuilt Linux CLI needs `GLIBC_2.38`, so old-glibc hosts skip Linuxbrew entirely. See [codexbar.md](../tools/codexbar.md) |
 | **td** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/td` | lines 865–1078. Includes "is current td Sidecar-compatible?" version check; removes conflicting formula if not |
 | **sidecar** | brew tap `marcus/tap` + formula | Linuxbrew → GitHub release `marcus/sidecar` | lines 1080–1256 |
+| **Tasks** (`tasks` / `tasks-tui` / `tasks-api`) | `marcus/tap/tasks` formula | Linuxbrew → checksum-verified amd64/arm64 GitHub release | `tasks.yml`, imported by `main.yml`; a complete suite is left installed, and fallback installs all three into `~/.local/bin`. First-use XDG config: [tasks.md](../tools/tasks.md) |
 | **Specify CLI** | `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git` | same | lines 1153–1184. Only role-installed tool currently using `uv tool install` directly (not via `python_uv_tools` defaults) |
 | **OpenChamber** | npm `@openchamber/web` | `mise exec -- npm install -g` | lines 1188–1222 |
 | **claude-hud** plugin | runs `files/claude_hud_sync.py --only-if-missing` | same | lines 1239–1247; install-only, explicit `just upgrade-plugins` for refresh |
@@ -818,6 +820,7 @@ and extracting to `~/.local/bin` (user-writable, already on PATH).
 - `neovim`: nvim tarball (Linux fallback + macOS Intel/minimum-version fallback)
 - `lazyvim_deps`: `lazygit` fallback
 - `coding_agents`: `specstory`, `codexbar`, `td`, `sidecar`, `agy` (all also have brew formula / cask as primary)
+- `coding_agents/tasks/tasks.yml`: Tasks suite; Linuxbrew fallback verifies the official release checksum and installs `tasks`, `tasks-tui`, and `tasks-api` together. Complete suites are not refreshed; use the [explicit Tasks upgrade procedure](upgrades.md#tasks-suite).
 - `security_tools`: `gitleaks`
 - `iac_tools`: `terraform`, `opentofu` user fallback (zip from `releases.hashicorp.com` / GitHub)
 - `gui_apps_linux`: `AppImageLauncher Lite`, Zen Browser AppImage
@@ -959,6 +962,7 @@ with rationale.
 | **Specstory** | macOS: brew tap → GitHub release fallback; Linux: GitHub release tarball | brew formula availability + version freshness |
 | **CodexBar** | macOS: brew cask (homebrew-cask core, universal); Linux: Linuxbrew formula → GitHub release | macOS ships the menu bar app, which bundles the CLI (a superset of the formula); Linux has CLI only |
 | **td** / **sidecar** | macOS: brew tap; Linux: Linuxbrew → GitHub release | same maintainer (`marcus/tap`); Linuxbrew is fast path when present |
+| **Tasks suite** | macOS: `marcus/tap/tasks`; Linux: Linuxbrew → checksum-verified release | Same `marcus/tap` family as td/Sidecar; all three binaries install together, while a complete existing suite stays install-only |
 | **Ollama** | brew formula always (CLI); brew cask `ollama-app` when `installAiDesktopApps + installLlmTools`; Linux: `curl ollama.com/install.sh` | CLI vs GUI split; vendor installer is the canonical Linux path |
 | **fzf** | macOS: `lazyvim_deps` brew. Linux: chezmoi external + `~/.fzf/install --bin` | brew is fine on macOS; Linux gets the latest git tip |
 | **bash** | system bash always; homebrew bash 5.x only when `primary_shell="bash"` on macOS | macOS ships bash 3.2 (GPL2 vintage); brew bash 5 needed only if user actually wants it as login shell |
@@ -995,6 +999,7 @@ Notable cascading-fallback patterns:
 | **Cursor `.deb` (Linux)** | `get_url` with retries=4 (large file, GFW-prone) — single mechanism but heavily retried |
 | **Bitwarden Desktop (Linux)** | snap → `.deb` fallback |
 | **CodexBar / td / sidecar / RTK / specstory / llmfit** | Linuxbrew → GitHub release tarball |
+| **Tasks suite (Linux)** | Complete existing install → Linuxbrew `marcus/tap/tasks` → checksum-verified amd64/arm64 release with all three binaries in `~/.local/bin` |
 | **uv (upgrade-side)** | inspect binary path → `brew upgrade uv` or `uv self update` |
 | **Discord (Linux)** | flatpak (default) → `.deb` (selectable via `discordChannel`) |
 | **tree-sitter-cli (Linux)** | `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → `cargo install tree-sitter-cli` (installs `libclang-dev` first) |
@@ -1016,6 +1021,7 @@ manually removed and re-installed.
 | Class | Why no upgrade | How to refresh |
 |---|---|---|
 | **GitHub-release user-level fallbacks** (~30 tools — see [§ 12](#12-github-release-downloads-user-level-fallback)) | `creates:` guard means ansible never re-downloads | `rm ~/.local/bin/<tool>` then `chezmoi apply` |
+| **Tasks Linux release suite** | Complete-suite guard keeps apply install-only; no automatic release upgrade category | Verify the chosen release checksum and replace all three binaries together; see [Tasks upgrades](upgrades.md#tasks-suite). Brew installs stay with `just upgrade-brew` |
 | **Vendor apt-repo packages** on Debian (terraform, azure-cli, vscode, opentofu, ngrok, lazygit-from-PPA) | Rely on `sudo apt upgrade` outside this repo | `sudo apt update && sudo apt upgrade` (not chezmoi's job) |
 | **Docker convenience-script install** | No upgrade target | re-run `curl get.docker.com \| sh` |
 | **OrbStack** | Macos brew cask | Covered by `cat_brew --cask --greedy` |
@@ -1265,6 +1271,7 @@ list.
 | **tailscale-app** | brew cask (pkg also installs the `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
 | **tailspin** (`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
+| **Tasks** (`tasks` / `tasks-tui` / `tasks-api`) | brew (`marcus/tap/tasks`) | Linuxbrew → verified GitHub release | coding_agents — all three binaries; user-owned XDG data/config. See [tasks.md](../tools/tasks.md) |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
 | **television** (`tv`) | brew | apt+release | devtools |
 | **terminal-browser** | brew cask | checksum-verified upstream stable release (supported Debian/Ubuntu x64/arm64) | devtools, `installTerminalBrowser`; package skills, upgrade-brew / upgrade-terminal-browser. See [browser-tools](../tools/browser-tools.md) |

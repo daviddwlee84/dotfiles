@@ -7,6 +7,15 @@
 
 `td` 是給 AI 輔助工作流使用的任務管理 (task management) CLI。`sidecar` 則是搭配這些工作流的 TUI 儀表板 (dashboard)。
 
+| 工具 | 角色 |
+|---|---|
+| `td` | Agent issue、執行 context 與 handoff。 |
+| [Tasks](tasks.zh-TW.md) | Inbox、Next actions、Agenda、Projects 等個人規劃；提供 `tasks` / `tasks-tui` / `tasks-api`。 |
+| Sidecar | 並排 dashboard 或整合 workspace，內嵌 td 與 Tasks 介面。 |
+
+Tasks 使用自己的 JSONL store，與 td 的 project database 分開。首次 XDG 資料
+位置與獨立工具使用方式見 [Tasks](tasks.zh-TW.md)。
+
 ## 選用 task workflow
 
 需要 structured issues 或 handoff 時才在該 project 使用 td。Repository 導航
@@ -16,7 +25,9 @@ project 也可能 auto-sync。見 [共用 repo 導航](dev-projects.zh-TW.md)。
 
 ## 在這個 dotfiles repo 中的安裝方式
 
-兩個工具都會由 `coding_agents` ansible role 自動安裝。
+`installCodingAgents=true` 時，`coding_agents` ansible role 會安裝三個工具：
+Sidecar、配套的 `marcus/td`，以及完整 [Tasks 工具組](tasks.zh-TW.md)。
+Herdr 的安裝與此開關分開。
 
 - macOS：優先使用 Homebrew (`marcus/tap`)
 - Linux：優先使用 Homebrew (Linuxbrew)；備援為 GitHub release 的二進位檔，安裝到 `~/.local/bin`

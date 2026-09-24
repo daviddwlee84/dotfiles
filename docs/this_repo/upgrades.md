@@ -89,6 +89,25 @@ to reinstall from the refreshed registry. `:MasonUpdate` alone updates metadata;
 `just upgrade-plugins` updates Neovim plugins but not installed Mason tool versions.
 LazyVim's `ensure_installed` only fills missing tools.
 
+### Tasks suite {#tasks-suite}
+
+[Tasks](../tools/tasks.md) is installed with coding agents, but its upgrade owner
+is its install channel. Homebrew/Linuxbrew installs use `just upgrade-brew`, or
+run `brew update` followed by `brew upgrade marcus/tap/tasks`. Refreshing Homebrew
+metadata first avoids an outdated tap reporting that the current version is
+already installed. The formula updates `tasks`, `tasks-tui`, and `tasks-api`
+together.
+
+The Linux GitHub-release fallback has no automatic upgrade category. For an
+explicit update, download the selected version's Linux amd64/arm64 archive and
+`checksums.txt` from the [official release](https://github.com/marcus/tasks/releases),
+verify that archive's checksum, and extract into a temporary directory. Verify
+`--version` on **all three extracted executables**, then replace the three
+release-owned binaries in `~/.local/bin` as one suite. Keep the existing config
+and data store; do not replace package-managed paths with release binaries.
+Restart a running Tasks TUI/API yourself when ready. `chezmoi apply` does not
+upgrade a complete existing suite or reset its data configuration.
+
 ### Run order
 
 ```mermaid

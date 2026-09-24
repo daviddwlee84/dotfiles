@@ -3,6 +3,15 @@
 `td` is a task-management CLI for AI-assisted workflows. `sidecar` provides both
 a companion dashboard and an integrated workspace for agents, Git, files, and tasks.
 
+| Tool | Role |
+|---|---|
+| `td` | Agent issues, execution context, and handoffs. |
+| [Tasks](tasks.md) | Personal planning across Inbox, Next actions, Agenda, and Projects; standalone `tasks` / `tasks-tui` / `tasks-api` suite. |
+| Sidecar | Companion dashboard or integrated workspace, with embedded td and Tasks interfaces. |
+
+Tasks has its own JSONL store; td's project database remains separate. See
+[Tasks](tasks.md) for the first-use XDG data location and standalone tools.
+
 ## Opt-in task workflow
 
 Use td when structured issues or handoffs help the selected project. Repository
@@ -13,9 +22,9 @@ projects. See [shared repo navigation](dev-projects.md).
 
 ## Installation in This Dotfiles Repo
 
-Both tools are installed automatically by the `coding_agents` ansible role when
-`installCodingAgents=true`. This shared switch installs Sidecar and its companion
-`marcus/td`; Herdr's installation is separate.
+All three tools are installed automatically by the `coding_agents` ansible role
+when `installCodingAgents=true`: Sidecar, its companion `marcus/td`, and the
+complete [Tasks suite](tasks.md). Herdr's installation is separate.
 
 - macOS: Homebrew preferred (`marcus/tap`)
 - Linux: Homebrew (Linuxbrew) preferred; fallback to GitHub release binaries in `~/.local/bin`

@@ -1986,6 +1986,18 @@ mac = "brew"
 linux = "apt+release"
 
 [[tool]]
+id = "tasks"
+label = "**Tasks** (`tasks` / `tasks-tui` / `tasks-api`)"
+bins = ["tasks", "tasks-tui", "tasks-api"]
+category = "AI / Coding Agents"
+desc = "Personal task planning: CLI, TUI, and local API"
+role = "coding_agents"
+docs = "docs/tools/tasks.md"
+mac = "brew (`marcus/tap/tasks`)"
+linux = "Linuxbrew → verified GitHub release"
+role_md = "coding_agents — all three binaries; user-owned XDG data/config. See [tasks.md](../tools/tasks.md)"
+
+[[tool]]
 id = "td"
 category = "AI / Coding Agents"
 desc = "Task tracker for AI agents"
