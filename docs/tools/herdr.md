@@ -174,6 +174,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` / `Alt + g` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
+| `prefix + S` | [Sidecar](td_sidecar.md) to the right of the focused pane, 50/50, in its current directory; focus moves to Sidecar | command pane |
 | `prefix + Y` | [Yazi](yazi.md) file manager rooted at the focused pane cwd; `q` returns to the unchanged layout | 90% × 85% popup |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
@@ -196,6 +197,24 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 > Uppercase letters resolve to `prefix+shift+<letter>`; many are built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above, while `prefix+Y` is unused upstream; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
 
 The direct lazygit shortcut uses lowercase `alt+g` (no prefix); `alt+G` would require `Alt+Shift+g`. Ghostty/cmux sends the configured Meta key from **Left Option** (`macos-option-as-alt = left`).
+
+`prefix+S` (`Ctrl+b`, then `Shift+s`) uses Herdr's native temporary-pane lifecycle
+and `~/.config/herdr/sidecar.sh`. The helper removes the command pane's initial
+zoom to expose a 50/50 split beside the source pane; focus stays on Sidecar.
+Exiting Sidecar closes the temporary pane and restores the previous layout.
+Repeated presses open additional panes. Sidecar and `td` are installed together
+under `installCodingAgents`; the launcher reports a missing Sidecar rather than
+installing it or initializing a task database. This keeps the agent in Herdr's
+original pane; see [Sidecar's companion and integrated workflows](td_sidecar.md#ux-evolution)
+for how that differs from starting agents inside Sidecar Workspaces. See the
+[Windows/WSL compatibility audit](td_sidecar.md#windows-compatibility) before
+trying this workflow in the separate Windows dotfiles repo.
+
+Sidecar **0.71.1** requires **80 columns × 24 rows inside its pane**; **1.14.0**
+requires **60×24**. On a phone, keep this binding and press `prefix+z` to zoom
+Sidecar; press it again to restore the split. If even the full pane is too small,
+reduce font size or change orientation. Herdr's mobile layout does not remove
+tiled splits. See [Sidecar's size guard and upgrade caveat](td_sidecar.md#open-sidecar-beside-an-agent-in-herdr).
 
 `prefix+Y` is deliberately session-modal because it is for quick filesystem
 operations while reading an agent pane. It starts in the focused pane's cwd,

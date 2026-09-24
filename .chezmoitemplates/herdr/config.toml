@@ -164,6 +164,15 @@ width = "90%"
 height = "85%"
 description = "yazi file manager (popup)"
 
+# Native command panes split the focused pane to the right at 50/50, then zoom.
+# The helper removes that zoom so Sidecar stays beside the source pane. Herdr
+# still owns focus restoration and closes the temporary pane when Sidecar exits.
+[[keys.command]]
+key = "prefix+S"
+type = "pane"
+command = "~/.config/herdr/sidecar.sh"
+description = "sidecar (right split)"
+
 # btop / nvtop monitors as temporary command panes (same mechanism as prefix+G —
 # a real PTY that closes when you quit the tool). Quick Actions can't host these:
 # herdr-plus runs an action via `sh -c` with no PTY/stdin, so an interactive TUI
