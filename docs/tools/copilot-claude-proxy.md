@@ -42,11 +42,12 @@ copilot-proxy auth      # one-time: GitHub device login (stores a ghu_ token)
 copilot-proxy start
 copilot-model --auto    # best live main + role profile, independent of previous state
 
-claude-copilot          # one-off session on the proxy (auto-starts it; no file writes)
-claude-copilot --fast   # same, using a live-catalog fast sibling when available
-claude-copilot-once     # pin THIS project, run one session, then auto-unpin (proxy must be up)
-codex-copilot           # one-off Codex session; auto-picks OpenAI first
-codex-copilot-once      # exact alias; neither name writes Codex config
+claude-copilot-once     # single-session CLI settings; auto-starts the proxy
+claude-copilot-once --fast  # live-catalog fast sibling, session only
+codex-copilot-once      # single-session provider; auto-picks OpenAI first
+# The shorter claude-copilot / codex-copilot names are identical aliases.
+claude-copilot-once --specstory-mode exit  # export history after the agent exits
+codex-copilot-once --specstory-mode exit
 
 # One-shot planning presets. Codex still needs `/plan` after the TUI opens;
 # Codex 0.151.0 exposes no startup collaboration-mode flag.
@@ -82,7 +83,7 @@ Codex ──OpenAI /v1/responses──────────▶ the same :4142
 - The original (`copilot-api@0.7.0`) always translates through
   `/chat/completions` — thinking blocks are dropped and WebSearch doesn't work.
 - Claude Code is pointed at the proxy via `ANTHROPIC_BASE_URL` — injected either
-  as per-process env (`claude-copilot`) or via the gitignored
+  in one merged CLI `--settings` object (both Claude launchers), or via the gitignored
   `./.claude/settings.local.json` (`copilot-here on`). See "Settings-layer design".
 
 ## Settings-layer design (which file gets the proxy config, and why)
@@ -102,22 +103,27 @@ Two of those layers are already owned by other tooling and must stay clean:
 | `~/.claude/settings.json` | chezmoi (`dot_claude/modify_settings.json.tmpl`) | always-on for *every* project; fights the chezmoi merge. Its top-level `model` must not hold a proxy-only GPT/Gemini id. |
 | `./.claude/settings.json` | `claude-plans-here` (`plansDirectory`) | committed to git — proxy config would leak to the team |
 
-So the proxy uses the two layers nobody else owns:
+The explicit launchers and persistent pin have separate lifetimes:
 
 | Enable | Mechanism | Scope | Disable |
 |---|---|---|---|
-| `claude-copilot` / `copilot-run` | per-process env vars | one session | just run plain `claude` next time |
-| `claude-copilot-once` | `./.claude/settings.local.json` pin, auto-reverted | one session | automatic — unpins on exit |
-| `copilot-here on` | `./.claude/settings.local.json` (gitignored) | this project, sticky | `copilot-here off` |
+| `claude-copilot-once` / `claude-copilot` | merged CLI `--settings` | one session | exit the session |
+| `codex-copilot-once` / `codex-copilot` | CLI `-c` / `-m` | one session | exit the session |
+| `copilot-run <cmd...>` | process environment | one process | exit the process |
+| `copilot-here on` | local Claude settings | project, persistent | `copilot-here off` |
 
-```
-~/.claude/settings.json          .claude/settings.json         shell env                    .claude/settings.local.json
-(chezmoi: hooks/plugins)    <    (git: plansDirectory)     <   (claude-copilot)         <   (copilot-here on/off)
-```
+Claude 2.1.281 was tested against a localhost mock: CLI settings override a
+local pin and preserve unspecified user/project keys. Repeated `--settings`
+flags use only the last one, so the launcher reads the effective JSON or file,
+merges it with the proxy defaults, and supplies **one** settings argument.
+Explicit caller values win. A settings-level model or permission mode is
+recognized before choosing the context budget or adding default bypass flags.
+No project pin is created, refreshed, or removed by a single-session launcher.
 
-(Shell env still beats the user- and project-level settings files, so
-`claude-copilot` works everywhere `copilot-here` is off — it just cannot
-*override* an active `copilot-here` pin.)
+Ordinary new `claude` / `codex` / `specstory run` sessions keep their previous
+routing unless you explicitly enabled a persistent pin. Resuming a Copilot
+thread is different: Codex saves the thread's provider, and the user overlay
+registers `copilot_api` so those threads can be reopened.
 
 One upstream UI action crosses those ownership boundaries: pressing **Enter**
 in Claude Code's `/model` picker means "set as default" and writes the selected
@@ -371,84 +377,55 @@ HTTP status (including an auth rejection) proves network reachability, while
 timeouts and TLS certificate failures remain distinct. `codex_apps` is a
 remote ChatGPT MCP, not an Apple-Silicon-only Codex Desktop bridge.
 
-### `claude-copilot [--fast] [--no-specstory] [claude args...]` — one-off session
+### `claude-copilot-once` / `claude-copilot` — one session
 
-Layer 1: run a single Claude Code session on the proxy with **zero file
-writes**. Auto-starts the proxy if it isn't answering, then launches `claude`
-with the `ANTHROPIC_*` env injected per-process (shell env beats the user- and
-project-level settings files — but **not** an active `copilot-here` pin in
-`settings.local.json`; see Gotchas).
+Both names auto-start the proxy and inject the same role profile and live
+compact ceiling using CLI settings. They need `jq` and Python 3.11+ (or `uv`).
+They override a project pin for this session without changing its file or
+asking to refresh it. Review a persistent pin explicitly with `copilot-here on`.
 
-- Wraps in `specstory run claude` when specstory is installed (markdown
-  auto-save — same convention as `scode`/`svibe`); opt out with
-  `--no-specstory`. Extra args reach the claude CLI via specstory's
-  `-c "custom command"` passthrough: `claude-copilot -c` → continue session.
-- **The passthrough preserves your `claude_cmd`.** specstory's `-c` *replaces*
-  the provider command rather than appending to it, so the args are appended to
-  the effective `claude_cmd` from your specstory config (project
-  `./.specstory/cli/config.toml` > user `~/.specstory/cli/config.toml` > bare
-  `claude`). That is what keeps `claude_cmd = "claude --dangerously-skip-permissions"`
-  in force for `claude-copilot --resume <id>` and not just for a bare
-  `claude-copilot` — the two used to disagree, see
-  [`pitfalls/specstory-custom-command-drops-configured-flags.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-custom-command-drops-configured-flags.md).
-  `--no-specstory` still inherits **none of that command** (no alternate binary,
-  resume flag, or extra prompt), but the raw path now asserts the same trusted
-  `--dangerously-skip-permissions` posture itself. An explicit
-  `--permission-mode` / `--permission-prompts` / `--restricted` replaces the
-  repo-seeded bypass. A custom project/user `claude_cmd` is never rewritten:
-  the wrapper appends its default bypass when no alternate mode was requested,
-  while any permission flags already embedded in that custom command remain the
-  command owner's responsibility. This matches the Windows wrapper.
-- Revert = nothing to revert; plain `claude` next time is untouched.
-- Claude Code itself can still write one global key: `/model` + **Enter** saves
-  the highlighted custom id to `~/.claude/settings.json`. An EXIT guard removes
-  that proxy-only value or restores the prior native default, including on a
-  non-zero/Ctrl-C exit. Other settings changed during the session are retained.
+`--fast` resolves the selected model's live fast sibling; absence produces a
+warning and keeps the standard model. Put wrapper flags before agent arguments.
+`--fast` with a `--` boundary is rejected because appending a model there would
+turn it into prompt data. The user-level `/model` cleanup guard remains active.
 
-`claude-copilot --fast` resolves the requested/default model against the shim's
-live fast-routing map and appends the matching sibling for this invocation only.
-It does not write Claude settings. If Copilot advertises no eligible sibling,
-the launcher warns and continues with the standard model.
+### Recording: `--specstory-mode run|exit|off`
 
-### `claude-copilot-once [--fast] [--no-specstory] [claude args...]` — one-shot pinned session
+This option is shared by both Claude and both Codex launcher names:
 
-Layer 1's ephemerality with Layer 2's reliability: pin **this project** via
-`copilot-here on`, run one `claude-copilot` session, then `copilot-here off` on
-exit — even on Ctrl-C. Use it when pure env injection isn't enough because
-`settings.local.json` outranks shell env (see Gotchas), but you don't want to
-leave a sticky pin behind.
+| Mode | Behavior |
+|---|---|
+| `run` (default; `--specstory`) | live recording through `specstory run`; raw fallback if SpecStory is absent |
+| `exit` | native agent terminal; `specstory sync claude` or `codex` after it exits |
+| `off` (`--no-specstory`) | bare provider command, no new recording request |
 
-- **Precondition:** the proxy must already be running — unlike `claude-copilot`
-  this does **not** auto-start it; it prints a `copilot-proxy start` hint and
-  returns non-zero if the proxy isn't answering.
-- **Prior-pin safe:** if `copilot-here` is already `on` here, the existing pin is
-  left in place on exit (nothing is unpinned that you didn't ask for). If that
-  pin has gone **stale** — it differs from what this launch's
-  `copilot-here on <model>` would write now, e.g. an unavailable Claude id after
-  the account moved to the OpenAI fallback, or a pin written before the Fable key
-  was added — it prints the drift and asks whether to refresh it in place or
-  keep it. `--fast` is resolved *before* that comparison, so a fast pin no longer
-  offers to downgrade itself to the standard sibling; a standard pin instead
-  shows the honest standard → fast upgrade.
-  The answer defaults to **keep** (and keeps automatically on a non-interactive
-  stdin). Drift is computed by diffing the live file against the exact env block
-  `copilot-here on` would merge (`_copilot_env_json`, the single source of truth
-  for both), so it is precisely "the keys `on` would change" — no hand-picked
-  subset that can silently fall behind. Keys present in the file but not in that
-  block are *not* drift: `on` merges and never removes (only `off` removes).
-  `copilot-here status` prints the global-default form of the same drift report.
-  If a `--fast` refresh is declined, the session's main model still goes fast,
-  but the pinned `ANTHROPIC_DEFAULT_*` role ids remain unchanged because
-  `settings.local.json` outranks process env.
-- The session itself is just `claude-copilot "$@"`, so specstory auto-save,
-  `--no-specstory`, and `-c` (continue) all work the same way. Wrapper flags such
-  as `--fast` must precede Claude arguments; a later token is refused with a
-  correction hint so prompt text containing `--fast` is never consumed.
-- On exit it reminds you the proxy is still up and how to `copilot-proxy stop`.
+`exit` prevents this launcher from continuously rewriting history while the
+agent commits. It exports **all saved sessions for the same project/provider**,
+not a guessed latest session. Other separately launched recorders can still
+write history. Within these launchers, sync waits for the last active session
+of that provider and project; project sync operations are serialized.
+
+Normal exit, nonzero exit and Ctrl+C all wait for the agent before syncing.
+Repeated Ctrl+C does not cancel the sync, which has a 30-second limit. A failed
+or interrupted export remains pending under `$XDG_STATE_HOME/copilot-proxy/`
+(default `~/.local/state/copilot-proxy/`) and is retried before the next launch
+in that project when no same-provider launcher is active. An `off` launch can
+therefore finish an older pending export. Agent exit status is preserved;
+sync errors are reported separately. SIGKILL of the supervisor or power loss
+cannot run cleanup immediately; native history not flushed to disk cannot be
+recovered. Background/detached, worktree-creating and non-persistent session
+flags are rejected in `exit` mode. SpecStory must be installed for that mode.
+
+`run` and `exit` preserve `[providers].claude_cmd` / `codex_cmd` from project
+then user SpecStory TOML. Settings, quoting, empty arguments and prompt boundaries
+survive the handoff. Explicit caller permission choices override the configured
+command, then the wrapper supplies bypass defaults only for missing axes.
+`off` does not inherit the configured command. Existing SpecStory output,
+redaction and cloud preferences govern sync. Neither recording mode commits files.
 
 ### `copilot-run <cmd...>` — generic env injector
 
-The building block under `claude-copilot`: auto-starts the proxy and runs *any*
+Auto-starts the proxy and runs *any*
 command with the proxy env. Useful for other Anthropic-compatible tools or a
 custom specstory invocation:
 
@@ -460,7 +437,7 @@ compares against, so the two can no longer disagree about which keys exist.
 pinned base a settings file records.
 
 ```sh
-copilot-run specstory run claude    # exactly what claude-copilot does
+copilot-run specstory run claude    # environment injection; local pins can override it
 copilot-run claude --resume         # raw claude, no specstory
 ```
 
@@ -533,13 +510,13 @@ remains Claude-first, while only this Codex launcher is OpenAI-first.
   `--ask-for-approval never --sandbox danger-full-access` posture unless the
   caller supplied an approval/sandbox policy of their own.
 
-Codex intentionally does not get a `copilot-here` equivalent. Official Codex
-configuration allows project `.codex/config.toml` for trusted project settings,
-but ignores `model_provider`, `model_providers`, provider auth and other
-host-owned metadata at project scope. An explicit launcher is therefore the
-project/session boundary without changing the user-wide default. See the
-[configuration reference](https://developers.openai.com/codex/config-reference)
-and [configuration basics](https://developers.openai.com/codex/config-basic).
+Codex 0.156.1 ignores project-local `model_provider` / `model_providers`.
+Consequently `copilot-here codex on` reports this limitation without writing a
+config; use `codex-copilot-once`. Project `.codex/config.toml` remains available
+for legitimate shared customization. Parser-only `debug models` validation
+missed this restriction; the actual startup warning and a version-sensitive
+retest procedure are recorded in the
+[project-provider pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/codex-project-config-provider-ignored.md).
 
 #### Experimental direct provider (not used by the helper)
 
@@ -568,28 +545,25 @@ did work. Endpoint routing also comes from that exchange; hard-coding personal
 versus enterprise hosts is not portable. For those reasons the supported helper
 uses the already authenticated localhost gateway.
 
-### `copilot-here [on|off|status]` — sticky per-project toggle
+### `copilot-here [claude] [on [MODEL] [--yes]|off|status]`
 
-Layer 2: pin **this project** to the proxy via `./.claude/settings.local.json`
-so plain `claude` (and `scode`/`svibe` panes, which just run
-`specstory run claude`) uses the proxy until you turn it off. Requires `jq`.
+An explicit **persistent** Claude project pin. Plain `claude` and
+`specstory run claude` use it until it is turned off.
 
-- `on` — jq-merges the proxy `env` block into `settings.local.json` (creates it
-  if missing) and makes sure git ignores the file (via `.git/info/exclude`;
-  Claude Code only auto-gitignores files *it* creates). The committed
-  `.claude/settings.json` (`plansDirectory` etc.) is never touched.
-- `off` — removes exactly the env keys `on` added; other content you put in
-  `settings.local.json` survives, and the file is deleted if it becomes empty.
-  It also removes a proxy-only top-level `model` accidentally persisted in
-  `~/.claude/settings.json`, including the "already off" case.
-- `status` — pinned? which base URL / model? Flags a **stale** pin (model/base
-  drifted from the current defaults) with the exact diff and a `copilot-here on`
-  refresh hint, and warns when the proxy isn't running. It then prints a
-  read-only **plain Claude launch audit**: user/project/local settings, inherited
-  model/base env, the effective backend/model, and any already-running Claude
-  PIDs that must restart before they can see disk changes. A native Anthropic
-  backend paired with a proxy-only user model is called out with the cleanup
-  command.
+- `on` creates a fresh pin, does nothing when unchanged, or shows the changes
+  and asks before replacing an existing pin (default: keep). `--yes` accepts an
+  update in scripts; non-interactive updates otherwise return nonzero unchanged.
+  Authentication values are redacted in the preview.
+- A tracked/staged target is refused even with `--yes`. An existing unignored
+  file also needs confirmation because the whole file becomes locally ignored.
+  Git's resolved `info/exclude` path supports worktrees and nested projects.
+- New pins save their previous owned fields privately. `off` restores those
+  fields only if they still match the last write, preserving unrelated and
+  subsequently edited values. Older pins without a journal retain the legacy
+  remove-owned-fields behavior. The native user-model cleanup still runs.
+- `status` shows pin drift and the plain-Claude launch audit. Pin updates keep
+  `plansDirectory` and other settings intact. The proxy remains running.
+
 
 ### `copilot-model [<id>|-l|-L|-c|--auto|--why|--json]`
 
@@ -681,7 +655,7 @@ copilot-model -c            # inspect main + Fable/Opus/Sonnet/Haiku
 copilot-here on             # sticky project, or use claude-copilot-once
 ```
 
-`claude-copilot-once` temporarily writes the same full profile and restores the
+`claude-copilot-once` injects the same full profile through CLI settings and preserves the
 previous local state. An existing `copilot-here` pin still outranks shell env;
 refresh it with `copilot-model --auto` or `copilot-here on`.
 
@@ -857,17 +831,13 @@ The tell is in the startup banner:
 Full write-up:
 [`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-api-caches-degraded-model-list-at-startup.md).
 
-### `settings.local.json` env beats shell env (docs say otherwise)
+### `settings.local.json` env beats shell env
 
-Verified empirically (2026-07): current Claude Code lets the `env` block of
-`./.claude/settings.local.json` **override inherited shell env vars** — the
-opposite of what the official settings docs imply. Consequences:
+The generic `copilot-run` only sets inherited environment variables, which a
+Claude local settings file can override. Both Claude launchers use CLI
+`--settings` instead (verified with Claude 2.1.281), so they can override a local
+pin for one session. Update the persistent pin separately with `copilot-here on`.
 
-- `claude-copilot` / `copilot-run` **cannot** redirect a project where
-  `copilot-here on` is active (harmless when both point at the same proxy,
-  silently wrong when they don't).
-- Trialing another proxy/port via the wrapper requires `copilot-here off`
-  first.
 
 ### OpenAI models go silent while they think — the shim keeps the socket warm
 
@@ -1062,7 +1032,7 @@ guess which models have 1M context.
 
 ```sh
 claude-copilot                       # one-off proxy session (specstory-wrapped)
-claude-copilot-once                  # one-shot session via the settings.local.json pin (auto-reverted)
+claude-copilot-once                  # single-session merged CLI settings
 copilot-here status                  # is this project pinned to the proxy?
 copilot-model -c                     # current model + which layer it came from
 copilot-proxy status                 # up? which Claude models?

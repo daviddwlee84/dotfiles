@@ -220,6 +220,8 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 
 ### Config Files
 
+- Copilot agent launchers — `claude-copilot-once` / `codex-copilot-once` inject one-session settings; `--specstory-mode exit` exports history after exit. Persistent Claude routing is an explicit `copilot-here on` operation ([guide](docs/tools/copilot-claude-proxy.md)).
+
 - `~/.ssh/config` and `~/.ssh/config.d/{git,common}/` — create-only grouped seeds on new machines, with explicit Include order and four-space indentation. Existing layouts are preserved; optional `dev ssh format` / `organize` provide reviewed cleanup ([guide](docs/tutorials/setup_ssh_key_on_remote.md#grouped-ssh-configuration-and-dev-integration)).
 
 - `~/.config/shell/96_ssh_setup.sh` - Shared bash/zsh `ssh-setup-remote` wizard; gum key selection preserves paths with spaces and stops on picker errors or cancellation ([guide](docs/tutorials/setup_ssh_key_on_remote.md#automation-ssh-setup-remote))

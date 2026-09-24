@@ -21,9 +21,8 @@
 #   copilot-run <cmd...>       - run any command with the proxy env injected
 #                                (auto-starts the proxy first)
 #   claude-copilot [--fast] [args...] - one-off Claude Code session on the proxy
-#                                (specstory-wrapped when available; zero file writes)
-#   claude-copilot-once [--fast] [args...] - one-shot session via the copilot-here pin
-#                                (settings.local.json; auto-reverted, even on Ctrl-C)
+#                                (run/exit/off recording; no persistent provider configuration)
+#   claude-copilot-once [--fast] [args...] - identical single-session CLI injection
 #   codex-copilot [args...]    - one-off Codex session on the Responses gateway
 #   codex-copilot-once [args...] - identical zero-persistence spelling
 #   copilot-here [on|off|status] - sticky per-project toggle via the gitignored
@@ -43,8 +42,8 @@
 #   - Claude Code precedence (low→high): user < project < settings.local.json
 #     (gitignored) < CLI flags. GOTCHA (verified 2026-07): current Claude Code
 #     lets the settings.local.json env block BEAT inherited shell env vars —
-#     so copilot-run/claude-copilot cannot override a project where
-#     `copilot-here on` points elsewhere (run `copilot-here off` first).
+#     so the generic copilot-run cannot override a project pin. The Claude
+#     launchers use a merged CLI --settings object and do override it per session.
 #
 # Portability notes (POSIX subset, both shells source this file):
 #   - the pinned package is INSTALLED ONCE into _copilot_pkg_prefix and the proxy
@@ -463,7 +462,7 @@ _copilot_snapshot_runtime() {
         '{spec:$spec,integrity:$integrity,registry:"",restored_from:"installed-spec"}' >"$bundle/selection.json" || exit 1
     fi
     command mkdir "$bundle/deployed" || exit 1
-    for f in 43_copilot_proxy.sh copilot-throttle-shim.js; do
+    for f in 43_copilot_proxy.sh copilot-throttle-shim.js copilot-session.py; do
       [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/shell/$f" ] || \
         command cp -p "${XDG_CONFIG_HOME:-$HOME/.config}/shell/$f" "$bundle/deployed/$f" || exit 1
     done
@@ -2115,58 +2114,7 @@ _copilot_model_value_is_proxy_only() {
   return 1
 }
 
-_copilot_model_guard_begin() {
-  _copilot_model_guard_file="$(_copilot_claude_settings_file)"
-  _copilot_model_guard_had_native=0
-  _copilot_model_guard_native_json=''
-  _copilot_model_guard_changed=0
-
-  [ -f "$_copilot_model_guard_file" ] || return 0
-  jq -e 'has("model")' "$_copilot_model_guard_file" >/dev/null 2>&1 || return 0
-
-  local value
-  value="$(jq -r '.model | strings' "$_copilot_model_guard_file" 2>/dev/null)"
-  if ! _copilot_model_value_is_proxy_only "$value"; then
-    _copilot_model_guard_native_json="$(jq -c '.model' "$_copilot_model_guard_file" 2>/dev/null)" || return 1
-    _copilot_model_guard_had_native=1
-  fi
-}
-
-_copilot_model_guard_restore() {
-  local settings="${_copilot_model_guard_file:-$(_copilot_claude_settings_file)}"
-  [ -f "$settings" ] || return 0
-  jq -e 'has("model")' "$settings" >/dev/null 2>&1 || return 0
-
-  local current tmp
-  current="$(jq -r '.model | strings' "$settings" 2>/dev/null)"
-  _copilot_model_value_is_proxy_only "$current" || return 0
-
-  tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-claude-model.XXXXXX")" || return 1
-  if [ "${_copilot_model_guard_had_native:-0}" = "1" ]; then
-    if jq --argjson model "$_copilot_model_guard_native_json" '.model = $model' "$settings" >"$tmp"; then
-      command mv -- "$tmp" "$settings"
-      _copilot_model_guard_changed=1
-      printf '%s\n' "copilot-proxy: restored native user model in $settings"
-      return 0
-    fi
-  else
-    if jq 'del(.model)' "$settings" >"$tmp"; then
-      command mv -- "$tmp" "$settings"
-      _copilot_model_guard_changed=1
-      printf '%s\n' "copilot-proxy: removed stale proxy model from $settings"
-      return 0
-    fi
-  fi
-
-  command rm -f -- "$tmp"
-  printf '%s\n' "copilot-proxy: could not restore $settings; model key left unchanged" >&2
-  return 1
-}
-
-_copilot_clean_stale_user_model() {
-  _copilot_model_guard_begin || return 1
-  _copilot_model_guard_restore
-}
+_copilot_clean_stale_user_model() { _copilot_session clean-model; }
 
 # Explain the launch that would result from running plain `claude` in the
 # current directory, without exposing auth tokens. This keeps the four relevant
@@ -2392,22 +2340,25 @@ _copilot_codex_pick_best_model() {
   printf '%s\n' "$models" | command sort -V | command tail -1
 }
 
-# Effective SpecStory Codex command, matching SpecStory's own precedence.
-# `specstory run ... -c` replaces this command wholesale, so callers must append
-# to this value rather than fall back to a bare `codex` and silently lose the
-# configured reasoning / sandbox flags.
-_copilot_specstory_codex_cmd() {
-  local f cmd=''
-  for f in ".specstory/cli/config.toml" "$HOME/.specstory/cli/config.toml"; do
-    [ -f "$f" ] || continue
-    cmd="$(command sed -n \
-      -e "s/^[[:space:]]*codex_cmd[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
-      -e "s/^[[:space:]]*codex_cmd[[:space:]]*=[[:space:]]*'\([^']*\)'.*/\1/p" \
-      "$f" 2>/dev/null | command head -n 1)"
-    if [ -n "$cmd" ]; then break; fi
-  done
-  printf '%s' "${cmd:-codex}"
+# Private Python backend shared by both shells. The override is useful when
+# testing the source tree before chezmoi deployment.
+_copilot_session() {
+  local script="${COPILOT_SESSION_HELPER:-${XDG_CONFIG_HOME:-$HOME/.config}/shell/copilot-session.py}"
+  if [ ! -f "$script" ]; then
+    printf '%s\n' "copilot: missing $script; apply the Copilot shell files together" >&2
+    return 2
+  fi
+  if command -v python3 >/dev/null 2>&1 && command python3 -c 'import tomllib' >/dev/null 2>&1; then
+    command python3 "$script" "$@"
+  elif command -v uv >/dev/null 2>&1; then
+    command uv run --no-project --quiet --python '>=3.11' python "$script" "$@"
+  else
+    printf '%s\n' 'copilot: Python 3.11+ or uv is required' >&2
+    return 2
+  fi
 }
+
+_copilot_specstory_codex_cmd() { _copilot_session command codex; }
 
 # Valid provider context limits, canonicalized for both CLI injection and the
 # derived Codex catalog cache. Invalid entries cannot override bundled limits.
@@ -2528,17 +2479,26 @@ _copilot_codex_catalog_file() {
 # remain untouched. The alias-like sibling below exists for Claude wrapper
 # muscle memory; both names have identical zero-persistence semantics.
 codex-copilot() {
-  local ss="auto" arg explicit_model=0 explicit_compact=0 explicit_catalog=0 model='' flag_model='' catalog='' models='' next_model=0 next_config=0 config_arg config_key
-  case "${1:-}" in
-    --no-specstory) ss="never"; shift ;;
-    --specstory)    shift ;;
-    -h|--help)
-      printf '%s\n' "Usage: codex-copilot [--no-specstory] [codex args...]"
-      printf '%s\n' "  One-off Codex session on the local Copilot Responses gateway."
-      printf '%s\n' "  Auto model: OpenAI/Codex > Claude > grok > Gemini > other served chat models."
-      printf '%s\n' "  Alias: codex-copilot-once"
-      return 0 ;;
-  esac
+  local ss="run" arg explicit_model=0 explicit_compact=0 explicit_catalog=0 model='' catalog='' models='' prepared
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --no-specstory) ss=off; shift ;;
+      --specstory) ss=run; shift ;;
+      --specstory-mode)
+        [ "$#" -ge 2 ] || { printf '%s\n' '--specstory-mode needs run, exit or off' >&2; return 2; }
+        ss="$2"; shift 2 ;;
+      --specstory-mode=*) ss="${1#*=}"; shift ;;
+      -h|--help)
+        printf '%s\n' 'Usage: codex-copilot-once [--specstory-mode run|exit|off] [codex args...]'
+        printf '%s\n' '  Single-session Copilot gateway; codex-copilot is an identical spelling.'
+        printf '%s\n' '  run (default): live recording; exit: sync after exit; off: no recording.'
+        printf '%s\n' '  --specstory / --no-specstory are aliases for run / off.'
+        return 0 ;;
+      *) break ;;
+    esac
+  done
+  case "$ss" in run|exit|off) ;; *) printf '%s\n' "copilot: invalid recording mode: $ss" >&2; return 2 ;; esac
+  prepared="$(_copilot_session inspect codex "$ss" -- "$@")" || return $?
 
   if ! command -v jq >/dev/null 2>&1; then
     printf '%s\n' "codex-copilot: jq is required for live model selection" >&2
@@ -2553,33 +2513,13 @@ codex-copilot() {
     printf '%s\n' "codex-copilot: could not read the live gateway model catalog" >&2
     return 1
   }
-  for arg in "$@"; do
-    [ "$arg" = "--" ] && break
-    if [ "$next_model" -eq 1 ]; then flag_model="$arg"; next_model=0; continue; fi
-    config_arg=''
-    if [ "$next_config" -eq 1 ]; then
-      config_arg="$arg"; next_config=0
-    else
-      case "$arg" in --config=*|-c=*) config_arg="${arg#*=}" ;; esac
-    fi
-    if [ -n "$config_arg" ]; then
-      config_key="$(printf '%s' "${config_arg%%=*}" | command sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-      case "$config_key" in
-        model) model="$(printf '%s' "${config_arg#*=}" | jq -Rr 'fromjson? // .')"; explicit_model=1 ;;
-        model_auto_compact_token_limit) explicit_compact=1 ;;
-        model_catalog_json) explicit_catalog=1 ;;
-      esac
-      continue
-    fi
-    case "$arg" in
-      -m|--model) explicit_model=1; next_model=1 ;;
-      -m=*|--model=*) explicit_model=1; flag_model="${arg#*=}" ;;
-      -c|--config) next_config=1 ;;
-    esac
-  done
-  # Codex's dedicated --model field overrides config assignments independent
-  # of argv order; use that same model for the derived compact/context metadata.
-  [ -z "$flag_model" ] || model="$flag_model"
+  model="$(printf '%s' "$prepared" | jq -r '.model')"
+  [ -z "$model" ] || explicit_model=1
+  [ "$(printf '%s' "$prepared" | jq -r '.config | has("model_auto_compact_token_limit")')" = false ] || explicit_compact=1
+  [ "$(printf '%s' "$prepared" | jq -r '.config | has("model_catalog_json")')" = false ] || explicit_catalog=1
+  # Only generated arguments go in this argv; the backend preserves the full
+  # configured command plus the caller's original argv separately.
+  set --
   if [ "$explicit_model" -eq 0 ]; then
     models="$(printf '%s' "$catalog" | _copilot_auto_candidate_ids)"
     model="$(printf '%s\n' "$models" | _copilot_codex_pick_best_model "$catalog")" || {
@@ -2597,9 +2537,8 @@ codex-copilot() {
   # Keep these overrides per-process/per-invocation. `name = OpenAI` is an
   # upstream gateway requirement; the dummy key only satisfies Codex's provider
   # auth contract and is ignored by our unauthenticated localhost listener.
-  local base cmd context='' compact='' compact_rc=0 request_retries=3 stream_retries=1
+  local base context='' compact='' compact_rc=0 request_retries=3 stream_retries=1
   base="$(_copilot_client_base)"
-  cmd="$(_copilot_specstory_codex_cmd)"
   if _copilot_shim_enabled; then request_retries=0; stream_retries=0; fi
   if [ -n "$model" ]; then
     context="$(printf '%s' "$catalog" | _copilot_model_context_map \
@@ -2617,7 +2556,7 @@ codex-copilot() {
   if [ -n "$compact" ]; then set -- -c "model_auto_compact_token_limit=$compact" "$@"; fi
   if [ -n "$context" ]; then set -- -c "model_context_window=$context" "$@"; fi
 
-  local bundled_catalog='' provider_args="" catalog_rc=0
+  local bundled_catalog='' catalog_rc=0
   if [ "$explicit_catalog" -eq 0 ]; then
     if bundled_catalog="$(_copilot_codex_catalog_file "$catalog" "$model")"; then
       set -- -c "model_catalog_json=$(jq -nr --arg path "$bundled_catalog" '$path | tojson')" "$@"
@@ -2630,9 +2569,7 @@ codex-copilot() {
       printf '%s\n' "codex-copilot: warning: could not build the bundled Codex model catalog; metadata may fall back" >&2
     fi
   fi
-  # Build a shell-safe command fragment for SpecStory; direct execution below
-  # uses the original argv and does not round-trip through a string.
-  for arg in \
+  set -- \
     -c 'model_provider="copilot_api"' \
     -c 'model_providers.copilot_api.name="OpenAI"' \
     -c "model_providers.copilot_api.base_url=\"$base\"" \
@@ -2644,82 +2581,17 @@ codex-copilot() {
     -c "model_providers.copilot_api.stream_max_retries=$stream_retries" \
     -c 'model_providers.copilot_api.stream_idle_timeout_ms=300000' \
     -c 'features.remote_compaction_v2=true' \
-    -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]'
-  do provider_args="$provider_args $(_copilot_shquote "$arg")"; done
-  for arg in "$@"; do provider_args="$provider_args $(_copilot_shquote "$arg")"; done
+    -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]' \
+    "$@"
+  _copilot_session launch codex "$ss" "$prepared" "$(jq -cn '$ARGS.positional' --args -- "$@")"
 
-  if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
-    command env GITHUB_COPILOT_API_KEY=dummy specstory run codex -c "$cmd$provider_args"
-  else
-    # Mirror the approval posture the specstory path inherits from `codex_cmd`.
-    _copilot_codex_has_sandbox_flag "$@" \
-      || set -- --sandbox danger-full-access "$@"
-    _copilot_codex_has_approval_flag "$@" \
-      || set -- --ask-for-approval never "$@"
-    command env GITHUB_COPILOT_API_KEY=dummy codex \
-      -c 'model_provider="copilot_api"' \
-      -c 'model_providers.copilot_api.name="OpenAI"' \
-      -c "model_providers.copilot_api.base_url=\"$base\"" \
-      -c 'model_providers.copilot_api.env_key="GITHUB_COPILOT_API_KEY"' \
-      -c 'model_providers.copilot_api.requires_openai_auth=true' \
-      -c 'model_providers.copilot_api.supports_websockets=false' \
-      -c 'model_providers.copilot_api.wire_api="responses"' \
-      -c "model_providers.copilot_api.request_max_retries=$request_retries" \
-      -c "model_providers.copilot_api.stream_max_retries=$stream_retries" \
-      -c 'model_providers.copilot_api.stream_idle_timeout_ms=300000' \
-      -c 'features.remote_compaction_v2=true' \
-      -c 'features.code_mode.excluded_tool_namespaces=["mcp__codex_apps__sites"]' \
-      "$@"
-  fi
 }
 
 codex-copilot-once() { codex-copilot "$@"; }
 
-# --- specstory `-c` passthrough (why the base command must come from config) ----
-#
-# specstory's `-c/--command` REPLACES the provider's configured command — it does
-# NOT append to it. The shipped config says as much: "Use of these is equivalent
-# to -c \"custom command\"" — same slot, last write wins. So a hardcoded
-# `-c "claude $*"` silently drops every flag in `claude_cmd` the moment
-# claude-copilot has args to pass through.
-#
-# Symptom that found this (verified 2026-07, specstory 2.5.0): with
-# `claude_cmd = "claude --dangerously-skip-permissions"` in the specstory config,
-# a bare `claude-copilot-once` took the no-`-c` branch and correctly ran in
-# bypass-permissions mode, but `claude-copilot-once --resume X` took the `-c`
-# branch and fell back to ~/.claude/settings.json's permissions.defaultMode
-# ("auto"). Same wrapper, opposite permission mode, no warning either way.
-#
-# Deriving the base command from the config keeps specstory the single source of
-# truth for BOTH branches: change `claude_cmd` there and both paths follow.
-# `--no-specstory` still does NOT inherit the COMMAND — no custom binary, no
-# configured flags, nothing that would drag `--resume` or an --append-system-prompt
-# into a path the user explicitly asked to keep raw. It only asserts the same
-# PERMISSION POSTURE (see _copilot_claude_has_permission_flag), because that
-# posture is a property of this wrapper — a trusted, hands-off localhost gateway
-# — not of specstory. Without that, `claude-copilot --no-specstory` silently
-# dropped to ~/.claude/settings.json's defaultMode while the specstory path ran
-# in bypass: same wrapper, opposite permission mode, no warning. The Windows
-# port has always injected it directly (Copilot.psm1); this matches it.
-
-# Effective `claude_cmd`, honouring specstory's own precedence:
-#   project ./.specstory/cli/config.toml > user ~/.specstory/cli/config.toml
-#   > bare `claude`
-# Matches UNCOMMENTED assignments only — both shipped configs carry a commented
-# `# claude_cmd = "claude"` example, and matching that would re-introduce the very
-# bug this exists to fix. Handles TOML's double- and single-quoted strings.
-_copilot_specstory_claude_cmd() {
-  local f cmd=''
-  for f in ".specstory/cli/config.toml" "$HOME/.specstory/cli/config.toml"; do
-    [ -f "$f" ] || continue
-    cmd="$(command sed -n \
-      -e "s/^[[:space:]]*claude_cmd[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
-      -e "s/^[[:space:]]*claude_cmd[[:space:]]*=[[:space:]]*'\([^']*\)'.*/\1/p" \
-      "$f" 2>/dev/null | command head -n 1)"
-    if [ -n "$cmd" ]; then break; fi
-  done
-  printf '%s' "${cmd:-claude}"
-}
+# Configured commands are parsed by copilot-session.py with SpecStory's
+# tokenizer. Run/exit preserve them; off uses the bare provider executable.
+_copilot_specstory_claude_cmd() { _copilot_session command claude; }
 
 # A wrapper-only --fast that appears after Claude arguments is almost certainly
 # misplaced. Respect prompt/data boundaries so literal prompt text never trips it.
@@ -2743,98 +2615,9 @@ _copilot_claude_has_late_fast() {
   return 1
 }
 
-# True when argv already states a permission posture, so the wrapper must not
-# add a second, contradictory one. Keep in sync with the Windows twin
-# Test-CopilotClaudePermissionFlag.
-_copilot_claude_has_permission_flag() {
-  local a skip=0
-  for a in "$@"; do
-    # `--` ends options even when it follows -p; it is not -p's data value.
-    [ "$a" = "--" ] && return 1
-    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
-    case "$a" in
-      --append-system-prompt|--system-prompt|--settings|--model)
-        skip=1 ;;
-      --dangerously-skip-permissions|--restricted|\
-      --permission-mode|--permission-mode=*|\
-      --permission-prompts|--permission-prompts=*|\
-      --permission-prompt-tool|--permission-prompt-tool=*) return 0 ;;
-    esac
-  done
-  return 1
-}
-
-# True only for an explicit posture that must OVERRIDE bypass, not for bypass
-# itself. The SpecStory base command may already contain the seeded bypass; in
-# that case merely declining to add a second token is insufficient — strip the
-# configured token before appending the user's explicit mode.
-_copilot_claude_has_nonbypass_permission_flag() {
-  local a skip=0
-  for a in "$@"; do
-    [ "$a" = "--" ] && return 1
-    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
-    case "$a" in
-      --append-system-prompt|--system-prompt|--settings|--model)
-        skip=1 ;;
-      --restricted|\
-      --permission-mode|--permission-mode=*|\
-      --permission-prompts|--permission-prompts=*|\
-      --permission-prompt-tool|--permission-prompt-tool=*) return 0 ;;
-    esac
-  done
-  return 1
-}
-
-_copilot_claude_drop_bypass_token() {
-  # Only rewrite the exact repo-seeded command. Arbitrary project/user
-  # `claude_cmd` strings own their permission posture; parsing/reconstructing
-  # shell text here can silently corrupt prompt data or tokens after `--`.
-  case "$1" in
-    'claude --dangerously-skip-permissions') printf '%s\n' 'claude' ;;
-    *) printf '%s\n' "$1" ;;
-  esac
-}
-
-# Codex has TWO independent permission axes. Detect them separately: a caller
-# who asks for `--sandbox read-only` still wants the wrapper's no-prompt approval
-# default, and a caller who asks for `--ask-for-approval untrusted` still wants
-# the wrapper's full-access sandbox default. The compound modes cover both.
-_copilot_codex_has_approval_flag() {
-  local a
-  for a in "$@"; do
-    [ "$a" = "--" ] && return 1
-    case "$a" in
-      -a|-a?*|--ask-for-approval|--ask-for-approval=*|--approve-for-me|\
-      --full-auto|--dangerously-bypass-approvals-and-sandbox) return 0 ;;
-    esac
-  done
-  return 1
-}
-
-_copilot_codex_has_sandbox_flag() {
-  local a
-  for a in "$@"; do
-    [ "$a" = "--" ] && return 1
-    case "$a" in
-      -s|-s?*|--sandbox|--sandbox=*|--approve-for-me|\
-      --full-auto|--dangerously-bypass-approvals-and-sandbox) return 0 ;;
-    esac
-  done
-  return 1
-}
-
-# Single-quote ONE argument for embedding in specstory's `-c` command STRING.
-# specstory shell-splits that string honouring quotes (verified: `-p 'a b'`
-# arrives as a single argv entry), so quoting is both possible and necessary —
-# the old `"claude $*"` flattened `claude-copilot -p "two words"` into two
-# separate arguments. POSIX escape for an embedded quote: close, \', reopen.
-_copilot_shquote() {
-  printf "'%s'" "$(printf '%s' "${1:-}" | command sed "s/'/'\\\\''/g")"
-}
-
 # One-off Claude Code session backed by the Copilot proxy. The launcher itself
-# writes no user config; if Claude Code's `/model` picker writes its custom model
-# to ~/.claude/settings.json, a subshell EXIT guard restores only that `.model`
+# writes no provider config; if Claude Code's `/model` picker writes its custom model
+# to ~/.claude/settings.json, the supervisor restores only that `.model`
 # key (including Ctrl-C/non-zero exits) while preserving every unrelated change.
 # Wraps in `specstory run` when specstory is installed (markdown auto-save,
 # same convention as scode/svibe); opt out with --no-specstory. Extra args go
@@ -2880,126 +2663,62 @@ _copilot_claude_fast_base_model() {
   esac
 }
 
-# Resolve the model whose prompt ceiling must govern this Claude process. The
-# final --model wins; role aliases are expanded through the same live profile as
-# ANTHROPIC_DEFAULT_* so the compact window follows the actual provider id.
-_copilot_claude_launch_model() {
-  local explicit
-  explicit="$(_copilot_claude_model_arg "$@")"
-  _copilot_claude_fast_base_model "$explicit"
-}
-
-# A settings.local pin outranks process env for keys it contains. Refuse only
-# the unsafe case: a persisted window larger than the explicitly launched
-# model's live prompt ceiling. A smaller pin merely compacts early.
-_copilot_assert_pinned_compact_safe() {
-  local model="$1" settings=".claude/settings.local.json" catalog limit pinned
-  [ -f "$settings" ] || return 0
-  [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" ] || return 0
-  pinned="$(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // empty' "$settings" 2>/dev/null)"
-  case "$pinned" in ''|*[!0-9]*) return 0 ;; esac
-  catalog="$(_copilot_model_catalog 2>/dev/null || true)"
-  limit="$(_copilot_prompt_ceiling "$model" "$catalog" 2>/dev/null)" || return 0
-  if [ "$pinned" -gt "$limit" ]; then
-    printf '%s\n' "claude-copilot: active copilot-here pin has compact window $pinned, but $model allows $limit." >&2
-    printf '%s\n' "  run: copilot-model $(_copilot_strip_context_hint "$model")   (then restart Claude Code)" >&2
-    return 1
-  fi
-}
-
 claude-copilot() {
-  local ss="auto" fast=0
+  local ss=run fast=0 prepared explicit_model launch_model fast_model env_json
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --fast) fast=1; shift ;;
-      --no-specstory) ss="never"; shift ;;
-      --specstory) ss="auto"; shift ;;
+      --no-specstory) ss=off; shift ;;
+      --specstory) ss=run; shift ;;
+      --specstory-mode)
+        [ "$#" -ge 2 ] || { printf '%s\n' '--specstory-mode needs run, exit or off' >&2; return 2; }
+        ss="$2"; shift 2 ;;
+      --specstory-mode=*) ss="${1#*=}"; shift ;;
       -h|--help)
-      printf '%s\n' "Usage: claude-copilot [--fast] [--no-specstory] [claude args...]"
-      printf '%s\n' "  One-off Claude Code session on the Copilot proxy (no file writes)."
-      printf '%s\n' "  --fast selects this session's live-catalog fast sibling; unavailable falls back with a warning."
-      printf '%s\n' "  Sticky per-project instead: copilot-here on"
-      return 0 ;;
+        printf '%s\n' 'Usage: claude-copilot-once [--fast] [--specstory-mode run|exit|off] [claude args...]'
+        printf '%s\n' '  Single-session CLI settings; claude-copilot is an identical spelling.'
+        printf '%s\n' '  run (default): live recording; exit: sync after exit; off: no recording.'
+        printf '%s\n' '  --specstory / --no-specstory are aliases for run / off.'
+        printf '%s\n' '  Persistent project routing: copilot-here on'
+        return 0 ;;
       *) break ;;
     esac
   done
-
+  case "$ss" in run|exit|off) ;; *) printf '%s\n' "copilot: invalid recording mode: $ss" >&2; return 2 ;; esac
   if _copilot_claude_has_late_fast "$@"; then
     printf '%s\n' "claude-copilot: '--fast' must come before other arguments; refusing to forward it." >&2
     return 2
   fi
   if [ "$fast" -eq 1 ]; then
-    local explicit_model base_model fast_model _fast_arg
-    for _fast_arg in "$@"; do
-      if [ "$_fast_arg" = "--" ]; then
+    local arg
+    for arg in "$@"; do
+      if [ "$arg" = -- ]; then
         printf '%s\n' "claude-copilot: --fast cannot be combined with '--' (the resolved --model would become prompt data)." >&2
         return 2
       fi
     done
-    if [ -n "${_copilot_resolved_fast_for_once:-}" ]; then
-      # claude-copilot-once already resolved/pinned this exact sibling. Reuse it
-      # so a catalog/routing TTL boundary cannot make launch disagree with drift.
-      fast_model="$_copilot_resolved_fast_for_once"
-      base_model="$fast_model"
-    elif ! command -v jq >/dev/null 2>&1; then
-      printf '%s\n' "claude-copilot: --fast needs jq; using the standard model." >&2
-    else
-      if ! _copilot_alive; then copilot-proxy start || return 1; fi
-      _copilot_require_shim || return 1
-      explicit_model="$(_copilot_claude_model_arg "$@")"
-      base_model="$(_copilot_claude_fast_base_model "$explicit_model")"
-      fast_model="$(_copilot_fast_model_for "$base_model" 2>/dev/null || true)"
-    fi
+  fi
+  prepared="$(_copilot_session inspect claude "$ss" -- "$@")" || return $?
+  if ! command -v jq >/dev/null 2>&1; then printf '%s\n' 'claude-copilot: jq is required' >&2; return 1; fi
+  if ! _copilot_alive; then copilot-proxy start || return 1; fi
+  _copilot_require_shim || return 1
+  explicit_model="$(printf '%s' "$prepared" | jq -r '.model')"
+  launch_model="$(_copilot_claude_fast_base_model "$explicit_model")" || return 1
+  if [ "$fast" -eq 1 ]; then
+    fast_model="$(_copilot_fast_model_for "$launch_model" 2>/dev/null || true)"
     if [ -n "$fast_model" ]; then
-      # Appended last so it overrides an explicit earlier --model while still
-      # using that value as the base model whose sibling was resolved.
-      set -- "$@" --model "$fast_model"
+      launch_model="$fast_model"
+      prepared="$(printf '%s' "$prepared" | jq --arg model "$fast_model" '.argv += ["--model", $model] | .model = $model')" || return 1
       printf '%s\n' "claude-copilot: --fast -> $fast_model (session only)" >&2
-    elif command -v jq >/dev/null 2>&1; then
-      printf '%s\n' "claude-copilot: --fast unavailable for ${base_model:-the selected model}; using the standard model." >&2
+    else
+      printf '%s\n' "claude-copilot: --fast unavailable for $launch_model; using the standard model." >&2
     fi
   fi
-  (
-    local launch_model
-    launch_model="$(_copilot_claude_launch_model "$@")" || exit 1
-    _copilot_assert_pinned_compact_safe "$launch_model" || exit 1
-    COPILOT_CLAUDE_MODEL="$launch_model"
-    export COPILOT_CLAUDE_MODEL
-
-    _copilot_model_guard_begin || exit 1
-    trap '_copilot_model_guard_restore' EXIT
-
-    if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
-      # Always rebuild the complete command, including zero-argument sessions.
-      # Otherwise a custom bare claude_cmd prompts at zero args while the same
-      # wrapper with --resume gets bypass — the pitfall this block exists to fix.
-      local _cc_cmd _cc_arg
-      _cc_cmd="$(_copilot_specstory_claude_cmd)"
-      if _copilot_claude_has_nonbypass_permission_flag "$@"; then
-        _cc_cmd="$(_copilot_claude_drop_bypass_token "$_cc_cmd")"
-      elif ! _copilot_claude_has_permission_flag "$@" \
-           && [ "$_cc_cmd" != 'claude --dangerously-skip-permissions' ]; then
-        # Assert the wrapper's unattended posture independently of a custom
-        # SpecStory command, matching Windows. Arbitrary command text is never
-        # rewritten; an existing non-seeded bypass may be duplicated harmlessly.
-        _cc_cmd="$_cc_cmd --dangerously-skip-permissions"
-      fi
-      for _cc_arg in "$@"; do
-        _cc_cmd="$_cc_cmd $(_copilot_shquote "$_cc_arg")"
-      done
-      copilot-run specstory run claude -c "$_cc_cmd"
-    else
-      # Same permission posture as the specstory path, which gets it from
-      # `claude_cmd` in specstory's config. Placed BEFORE "$@" so an explicit
-      # user flag still wins inside claude's own parser.
-      if _copilot_claude_has_permission_flag "$@"; then
-        copilot-run claude "$@"
-      else
-        copilot-run claude --dangerously-skip-permissions "$@"
-      fi
-    fi
-  )
+  env_json="$(_copilot_env_json_for_model --live "$launch_model")" || return 1
+  _copilot_session launch claude "$ss" "$prepared" "$env_json"
 }
+
+claude-copilot-once() { claude-copilot "$@"; }
 
 # --- per-project toggle (Layer 2: sticky, gitignored settings.local.json) --------
 
@@ -3078,268 +2797,55 @@ _copilot_env_json() {
 #   copilot-here status    # pinned? which model?
 #   copilot-here off       # unpin (removes only our env keys)
 copilot-here() {
-  if ! command -v jq >/dev/null 2>&1; then
-    printf '%s\n' "copilot-here: jq is required" >&2; return 1
-  fi
-
-  local settings=".claude/settings.local.json"
-  local action="${1:-status}"
-  case "$action" in
-    on)
-      command mkdir -p .claude
-      local base='{}'
-      [ -f "$settings" ] && base="$(command cat "$settings")"
-      [ -n "$base" ] || base='{}'
-      local base_url model want_env old_model old_compact has_compact requested_model="${2:-}"
-      if [ -n "$requested_model" ]; then
-        want_env="$(_copilot_env_json_for_model "$requested_model")" || return 1
-      else
-        want_env="$(_copilot_env_json)" || return 1
-      fi
-      base_url="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_BASE_URL')"
-      model="$(printf '%s' "$want_env" | jq -r '.ANTHROPIC_MODEL')"
-      old_model="$(printf '%s' "$base" | jq -r '.env.ANTHROPIC_MODEL // empty' 2>/dev/null)"
-      old_compact="$(printf '%s' "$base" | jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // empty' 2>/dev/null)"
-      has_compact="$(printf '%s' "$want_env" | jq -r 'has("CLAUDE_CODE_AUTO_COMPACT_WINDOW")')"
-      local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
-      if printf '%s' "$base" | jq --argjson want "$want_env" \
-          --arg old_model "$old_model" --arg new_model "$model" --arg has_compact "$has_compact" '
-          .env = ((.env // {}) + $want)
-          | if $has_compact == "false" and (($old_model | sub("\\[1m\\]$"; "")) != ($new_model | sub("\\[1m\\]$"; "")))
-            then del(.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW) else . end' >"$tmp"; then
-        command mv -- "$tmp" "$settings"
-      else
-        command rm -f -- "$tmp"
-        printf '%s\n' "copilot-here: jq failed; $settings unchanged" >&2
-        return 1
-      fi
-      # Claude Code only auto-gitignores settings.local.json when IT creates the
-      # file — since we created it, belt-and-braces via .git/info/exclude (a
-      # per-clone, never-committed ignore, so the proxy toggle leaves nothing to
-      # commit — unlike Claude Code's own root-.gitignore entry).
-      if command git rev-parse --git-dir >/dev/null 2>&1; then
-        if ! command git check-ignore -q "$settings" 2>/dev/null; then
-          local exclude; exclude="$(command git rev-parse --git-dir)/info/exclude"
-          # MUST be the un-anchored **/ form, NOT a bare .claude/settings.local.json:
-          # a pattern with an internal slash is anchored to the repo ROOT, so it
-          # would not ignore the file when THIS project lives in a subdirectory of
-          # a larger repo (e.g. skills/foo/.claude/…). **/ matches at any depth —
-          # one idempotent line covers root + every nested project.
-          printf '%s\n' "**/.claude/settings.local.json" >>"$exclude"
-        fi
-      fi
-      printf '%s\n' "copilot-here: ON — $settings pins Claude Code to $base_url (model: $model)"
-      if [ "$has_compact" = "true" ]; then
-        printf '%s\n' "  compact window: $(printf '%s' "$want_env" | jq -r '.CLAUDE_CODE_AUTO_COMPACT_WINDOW') tokens (live model metadata)"
-      elif [ -n "$old_compact" ] && [ "$(_copilot_strip_context_hint "$old_model")" = "$(_copilot_strip_context_hint "$model")" ]; then
-        printf '%s\n' "  ⚠ compact window: $old_compact tokens (last-known; live metadata unavailable)"
-      else
-        printf '%s\n' "  ⚠ compact window not pinned; refresh with 'copilot-here on' when the proxy is available"
-      fi
-      printf '%s\n' "  plain \`claude\` in this project now uses the proxy (restart any running session)"
-      _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
-      ;;
-    off)
-      if [ ! -f "$settings" ]; then
-        _copilot_clean_stale_user_model || return 1
-        printf '%s\n' "copilot-here: already off (no $settings)"
-        return 0
-      fi
-      local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
-      # Remove only OUR env keys; drop .env when it empties; keep other content.
-      if jq --argjson keys "$_copilot_here_keys" '
-          .env = ((.env // {}) | with_entries(select(.key as $k | ($keys | index($k)) == null)))
-          | if .env == {} then del(.env) else . end' \
-          "$settings" >"$tmp"; then
-        if [ "$(jq -r 'if . == {} then "empty" else "kept" end' "$tmp")" = "empty" ]; then
-          command rm -f -- "$tmp" "$settings"
-          printf '%s\n' "copilot-here: OFF — removed $settings (it held only proxy config)"
-        else
-          command mv -- "$tmp" "$settings"
-          printf '%s\n' "copilot-here: OFF — proxy env removed from $settings (other content kept)"
-        fi
-        _copilot_clean_stale_user_model || return 1
-        printf '%s\n' "  plain \`claude\` is back on the real Anthropic backend (restart any running session)"
-      else
-        command rm -f -- "$tmp"
-        printf '%s\n' "copilot-here: jq failed; $settings unchanged" >&2
-        return 1
-      fi
-      ;;
-    status)
-      local _status_rc=0
-      if [ -f "$settings" ] && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" != "" ]; then
-        printf '%s\n' "copilot-here: ON  (base: $(jq -r '.env.ANTHROPIC_BASE_URL' "$settings"), model: $(jq -r '.env.ANTHROPIC_MODEL // "(unset)"' "$settings"))"
-        printf '%s\n' "  compact window: $(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW // "unverified"' "$settings")"
-        local _drift; _drift="$(_copilot_here_drift)"
-        [ -n "$_drift" ] && { printf '%s\n' "  ⚠ stale vs current defaults:"; printf '%s\n' "$_drift"; printf '%s\n' "  refresh in place: copilot-here on"; }
-        _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
-      else
-        printf '%s\n' "copilot-here: off  (enable: copilot-here on; one-off: claude-copilot)"
-        _status_rc=1
-      fi
-      _copilot_claude_launch_report
-      return "$_status_rc"
-      ;;
-    -h|--help|help)
-      printf '%s\n' "Usage: copilot-here [on|off|status]   (toggles ./.claude/settings.local.json)"
-      ;;
-    *)
-      printf '%s\n' "copilot-here: unknown action '$action' (try --help)" >&2
-      return 1
-      ;;
-  esac
-}
-
-# --- one-shot pinned session (Layer 2, auto-reverted) ---------------------------
-
-# Combine copilot-here (settings.local.json pin — beats inherited env, see Gotchas)
-# with claude-copilot's ephemerality: pin THIS project, run ONE specstory-wrapped
-# session, then unpin — even on Ctrl-C / kill. The proxy must already be up (we only
-# notify; start it with `copilot-proxy start`). If copilot-here is already ON here,
-# the existing pin is left untouched on exit (safe to run inside a pinned project).
-# Example:
-#   claude-copilot-once                 # pin, run, auto-unpin
-#   claude-copilot-once -c              # continue last session
-#   claude-copilot-once --no-specstory  # raw claude, no markdown auto-save
-claude-copilot-once() {
-  case "${1:-}" in
-    -h|--help)
-      printf '%s\n' "Usage: claude-copilot-once [--fast] [--no-specstory] [claude args...]"
-      printf '%s\n' "  Pin THIS project to the proxy (copilot-here on), run one Claude Code"
-      printf '%s\n' "  session, then auto-unpin (copilot-here off) — even on Ctrl-C."
-      printf '%s\n' "  Needs the proxy already running:  copilot-proxy start"
-      return 0 ;;
-  esac
-
-  # 1. Proxy must already be answering — notify only, never auto-start.
-  if ! _copilot_alive; then
-    printf '%s\n' "claude-copilot-once: proxy not reachable on port $(_copilot_port)." >&2
-    printf '%s\n' "  start it first:  copilot-proxy start" >&2
-    return 1
-  fi
-  # copilot-here needs jq — fail early with a clear message.
-  if ! command -v jq >/dev/null 2>&1; then
-    printf '%s\n' "claude-copilot-once: jq is required (used by copilot-here)" >&2
-    return 1
-  fi
-
-  # 2. Don't clobber an existing pin: only turn OFF what we turn ON.
-  local _cco_was_on=0
-  if [ -f ".claude/settings.local.json" ] \
-     && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' ".claude/settings.local.json" 2>/dev/null)" != "" ]; then
-    _cco_was_on=1
-  fi
-
-  # The model this launch will actually use. Computed BEFORE the pinned/unpinned
-  # split so both branches agree: the drift check below has to compare the pin
-  # against what --fast is about to ask for, not against the global default.
-  # Leading options only, matching claude-copilot's own parser — a bare --fast
-  # buried in a prompt string (`-p "...--fast..."`) must not count.
-  local _cco_explicit _cco_model='' _cco_arg _cco_fast=0 _cco_fast_model=''
-  for _cco_arg in "$@"; do
-    case "$_cco_arg" in
-      --fast) _cco_fast=1 ;;
-      --no-specstory|--specstory) ;;
-      *) break ;;
+  local provider=claude action= model='' yes=0 arg want='{}' rc=0
+  case "${1:-}" in claude|codex) provider="$1"; shift ;; esac
+  action="${1:-status}"
+  [ "$#" -eq 0 ] || shift
+  for arg in "$@"; do
+    case "$arg" in
+      --yes) yes=1 ;;
+      --*) printf '%s\n' "copilot-here: unknown option $arg" >&2; return 2 ;;
+      *) [ -z "$model" ] || { printf '%s\n' 'copilot-here: specify one model' >&2; return 2; }; model="$arg" ;;
     esac
   done
-  if [ "$_cco_fast" -eq 1 ]; then
-    for _cco_arg in "$@"; do
-      if [ "$_cco_arg" = "--" ]; then
-        printf '%s\n' "claude-copilot-once: --fast cannot be combined with '--' (the resolved --model would become prompt data)." >&2
-        return 2
-      fi
-    done
-  fi
-  if _copilot_claude_has_late_fast "$@"; then
-    printf '%s\n' "claude-copilot-once: '--fast' must come before other arguments; refusing to forward it." >&2
-    printf '%s\n' "  try:  claude-copilot-once --fast $*" >&2
+  case "$action" in
+    -h|--help|help)
+      printf '%s\n' 'Usage: copilot-here [claude] [on [MODEL] [--yes]|off|status]'
+      printf '%s\n' '  Explicit persistent Claude project pin; changed pins ask before updating.'
+      printf '%s\n' '  Codex ignores project provider settings; use codex-copilot-once.'
+      return 0 ;;
+    on|off|status) ;;
+    *) printf '%s\n' "copilot-here: unknown action $action" >&2; return 2 ;;
+  esac
+  if [ "$provider" = codex ]; then
+    printf '%s\n' 'copilot-here: Codex ignores project-local model_provider/model_providers; use codex-copilot-once.' >&2
     return 2
   fi
-  if [ "$_cco_fast" -eq 1 ]; then _copilot_require_shim || return 1; fi
-  _cco_explicit="$(_copilot_claude_model_arg "$@")"
-  if [ -n "$_cco_explicit" ] || [ "$_cco_fast" -eq 1 ]; then
-    _cco_model="$(_copilot_claude_fast_base_model "$_cco_explicit")"
-    if [ "$_cco_fast" -eq 1 ]; then
-      # Idempotent on an id that is already a fast sibling, so re-running
-      # --fast against a fast pin resolves to that same pin (no drift).
-      _cco_fast_model="$(_copilot_fast_model_for "$_cco_model" 2>/dev/null || true)"
-      [ -n "$_cco_fast_model" ] && _cco_model="$_cco_fast_model"
-    fi
-  fi
-
-  if [ "$_cco_was_on" = "0" ]; then
-    if [ -n "$_cco_model" ]; then
-      copilot-here on "$_cco_model" || return 1
-    else
-      copilot-here on || return 1
-    fi
-    # Auto-unpin even on Ctrl-C / kill. Mirror tmux_status_run's INT/TERM/HUP
-    # trap + explicit normal-path cleanup; a bare function-scope EXIT trap would
-    # fire on the wrong event when bash sources this file.
-    trap '_copilot_once_trap' INT TERM HUP
-  else
-    # Already pinned here. If the pin drifted from current defaults (model bump,
-    # proxy moved), offer to refresh it in place; otherwise leave it untouched.
-    # Either way it was already ON, so it stays ON on exit (no revert, no trap).
-    local _drift; _drift="$(_copilot_here_drift "$_cco_model")"
-    if [ -n "$_drift" ]; then
-      printf '%s\n' "claude-copilot-once: this project's copilot-here pin looks stale:" >&2
-      printf '%s\n' "$_drift" >&2
-      if _copilot_confirm "  override with current defaults? (keep = default) [y/N]"; then
-        if [ -n "$_cco_model" ]; then
-          copilot-here on "$_cco_model" || return 1
-        else
-          copilot-here on || return 1
-        fi
+  command -v jq >/dev/null 2>&1 || { printf '%s\n' 'copilot-here: jq is required' >&2; return 1; }
+  case "$action" in
+    on)
+      if [ -n "$model" ]; then want="$(_copilot_env_json_for_model "$model")"; else want="$(_copilot_env_json)"; fi || return 1
+      set -- pin on "$want" "$_copilot_here_keys"
+      [ "$yes" -eq 0 ] || set -- "$@" --yes
+      _copilot_session "$@" || return $?
+      _copilot_alive || printf '%s\n' '  proxy not running — start it with: copilot-proxy start'
+      ;;
+    off)
+      _copilot_session pin off '{}' "$_copilot_here_keys" || return $?
+      _copilot_clean_stale_user_model || return 1
+      ;;
+    status)
+      _copilot_session pin status '{}' "$_copilot_here_keys" || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        printf '%s\n' 'copilot-here: ON'
+        local drift; drift="$(_copilot_here_drift)"
+        [ -z "$drift" ] || { printf '%s\n' '  differs from current defaults:' "$drift"; printf '%s\n' '  review/update: copilot-here on'; }
       else
-        printf '%s\n' "claude-copilot-once: kept the existing pin (stays ON on exit)." >&2
-        if [ "$_cco_fast" -eq 1 ]; then
-          # settings.local.json outranks process env for the keys it holds, so
-          # --fast can only move the main model this session.
-          printf '%s\n' "  --fast still applies to the session's main model, but the pinned" >&2
-          printf '%s\n' "  ANTHROPIC_DEFAULT_* role models stay on the non-fast ids." >&2
-        fi
+        printf '%s\n' 'copilot-here: off (single session: claude-copilot-once)'
       fi
-    else
-      printf '%s\n' "claude-copilot-once: copilot-here already ON here — leaving the pin in place on exit."
-    fi
-  fi
-
-  # 3. One session — specstory-wrapped + arg passthrough (reuses claude-copilot).
-  # Pass the already-resolved fast id through one internal, session-only env so
-  # the inner wrapper does not re-query catalog/routing and race the pin decision.
-  # Bash and zsh both dynamically scope locals into called shell functions.
-  # This avoids an ambient/exported env knob that could override an unrelated
-  # direct claude-copilot --fast invocation.
-  local _copilot_resolved_fast_for_once=''
-  if [ "$_cco_fast" -eq 1 ] && [ -n "$_cco_fast_model" ]; then
-    _copilot_resolved_fast_for_once="$_cco_fast_model"
-  fi
-  claude-copilot "$@"
-  local _rc=$?
-
-  # 4. Revert only what we enabled.
-  if [ "$_cco_was_on" = "0" ]; then
-    trap - INT TERM HUP
-    copilot-here off
-  fi
-
-  # 5. We never auto-stop the proxy — remind how.
-  printf '%s\n' "claude-copilot-once: session ended. Proxy still running on $(_copilot_base)."
-  printf '%s\n' "  stop it when done:  copilot-proxy stop"
-  return $_rc
-}
-
-# Internal: INT/TERM/HUP handler — unpin, clear trap, re-raise INT so the
-# interactive shell sees correct exit semantics (mirrors _tmux_status_run_trap
-# in dot_config/shell/60_tmux_status.sh).
-_copilot_once_trap() {
-  copilot-here off >/dev/null 2>&1
-  trap - INT TERM HUP
-  printf '\n%s\n' "claude-copilot-once: interrupted — unpinned (copilot-here off). Proxy still up." >&2
-  kill -INT $$ 2>/dev/null
+      _copilot_claude_launch_report
+      return "$rc" ;;
+  esac
 }
 
 # --- pin staleness: detect drift + confirm-to-refresh ---------------------------
@@ -3391,7 +2897,9 @@ _copilot_here_drift() {
     | [ $want
         | to_entries[]
         | select($cur[.key] != .value)
-        | "  \(.key) : \($cur[.key] // "(unset)") -> \(.value)" ]
+        | if (.key | test("TOKEN|KEY|SECRET|PASSWORD"; "i"))
+          then "  \(.key) : (redacted) -> (redacted)"
+          else "  \(.key) : \($cur[.key] // "(unset)") -> \(.value)" end ]
     | .[]' "$settings" 2>/dev/null)"
   [ -n "$out" ] || return 1
   printf '%s\n' "$out"
@@ -4262,7 +3770,12 @@ copilot-model() {
            elif $old_raw != $new_raw then del(.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW)
            else . end' \
          "$settings" >"$tmp"; then
-      command mv -- "$tmp" "$settings"
+      # Explicit model changes update pin ownership, so off can restore them.
+      local want_env update_rc=0
+      want_env="$(jq -c --argjson keys "$_copilot_here_keys" '.env | with_entries(select(.key as $k | $keys | index($k)))' "$tmp")" || { command rm -f -- "$tmp"; return 1; }
+      _copilot_session pin on "$want_env" "$_copilot_here_keys" --yes --quiet || update_rc=$?
+      command rm -f -- "$tmp"
+      [ "$update_rc" -eq 0 ] || return "$update_rc"
       if [ "$old" = "$resolved" ]; then
         printf '%s\n' "copilot-model: refreshed role profile for $resolved  (project: $settings)"
       else

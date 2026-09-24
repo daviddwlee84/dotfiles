@@ -161,6 +161,20 @@ binaries; generated Bash/Zsh completions follow successful changes. See
 - **`lazymlflow`** — experiment/run/artifact exploration; local stores may need MLflow separately.
 - **`lazypueue`** — task and queue dashboard; Pueue daemons are configured separately.
 
+## Copilot agent launchers
+
+`claude-copilot-once` / `codex-copilot-once` (and the identical names without
+`-once`) auto-start the local proxy and inject single-session CLI settings.
+`--specstory-mode run|exit|off` defaults to live recording; `exit` exports saved
+history after the agent exits and retries pending sync next launch. Wrapper
+flags precede agent arguments. Claude merges the effective user `--settings`
+JSON/file into one CLI object; no temporary project pin. `copilot-here on`
+explicitly pins Claude, previews changed settings (default keep; `--yes` for
+scripts), and refuses tracked targets. `off` restores owned settings while
+preserving later edits. Codex 0.156.1 ignores project-local provider settings;
+use its single-session launcher. `copilot-run` remains a generic environment
+injector. See `docs/tools/copilot-claude-proxy.md`.
+
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 
 Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, but not all (`x` → `clipboard.md`, `view-ebook` → `yazi-previews.md`, `fleet` → `this_repo/fleet-apply.md`); grep `docs/` if the obvious path 404s. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.

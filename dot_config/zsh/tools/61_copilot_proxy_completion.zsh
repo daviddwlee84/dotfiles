@@ -42,3 +42,19 @@ _copilot_proxy() {
 }
 
 compdef _copilot_proxy copilot-proxy
+
+_copilot_agent_launch() {
+  local -a extra
+  case "$words[1]" in claude-*) extra=('--fast[select a fast sibling for this session]') ;; esac
+  _arguments "$extra[@]" \
+    '--specstory-mode[recording lifecycle]:mode:(run exit off)' \
+    '--specstory[live SpecStory recording]' \
+    '--no-specstory[disable recording]' \
+    '*:agent argument:'
+}
+compdef _copilot_agent_launch claude-copilot claude-copilot-once codex-copilot codex-copilot-once
+
+_copilot_here() {
+  _arguments '--yes[accept a changed project pin]' '*:pin action:(claude on off status)'
+}
+compdef _copilot_here copilot-here

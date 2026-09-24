@@ -32,7 +32,7 @@ Configured providers:
 
 - `antigravity_cmd = "agy --dangerously-skip-permissions"`
 - `claude_cmd = "claude --dangerously-skip-permissions"`
-- `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'`
+- `codex_cmd = 'codex --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'`
 - `cursor_cmd = "cursor-agent --force"`
 - `droid_cmd = "droid --yolo"`
 - `gemini_cmd = "gemini --sandbox=none"`
@@ -46,6 +46,18 @@ Codex 0.156.0 rejects the old `model_supports_reasoning_summaries` override and 
 `<id>_cmd` controls **how** a provider launches, never **which** one bare `specstory run` picks. There is no `default_provider` key: with no argument, specstory resolves to the **alphabetically-first** entry of its provider registry. Adding `antigravity` in 2.9.0 therefore silently displaced `claude` as the default on every existing install, and `specstory run --help` re-generated itself to match (`By default, launches Antigravity CLI.`). Since `agy` was installed, the wrong agent launched successfully with no error.
 
 Always write `specstory run claude`. This repo's wrappers do — see `_sesh_wrap_agent()` in `dot_config/shell/22_sesh.sh` (shared by `scode` / `svibe` / `hcode` / `hvibe`) and [pitfalls/specstory-run-default-agent-drift.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-run-default-agent-drift.md).
+
+## Optional export after a Copilot session
+
+`claude-copilot-once --specstory-mode exit` and
+`codex-copilot-once --specstory-mode exit` run the agent directly and export
+same-project/provider history after exit. Default `run` still records live;
+`off` / `--no-specstory` skips a new recording request. Both `run` and `exit`
+inherit provider commands from the real TOML configuration. Explicit caller
+permissions override those defaults; the launchers supply bypass only where
+no posture was chosen. See the [recording lifecycle](copilot-claude-proxy.md#recording---specstory-mode-runexitoff)
+for concurrency, pending recovery and signal limitations. These helpers never
+commit the export automatically.
 
 ## Safety Tradeoff
 
