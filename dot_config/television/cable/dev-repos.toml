@@ -1,0 +1,10 @@
+[metadata]
+name = "dev-repos"
+description = "Local dev REPOS candidates; selecting returns a path without opening a session"
+requirements = ["dev-projects", "dev", "jq", "bash"]
+
+[source]
+command = "bash -o pipefail -c 'dev-projects list --json | jq -r \".[].path\"'"
+
+[ui]
+input_header = "Dev Repositories (select a local path)"

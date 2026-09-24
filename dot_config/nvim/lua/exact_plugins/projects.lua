@@ -1,4 +1,8 @@
--- LazyVim dashboard `Projects` (p) integration.
+-- Optional Snacks Projects discovery and persistence session configuration.
+-- Native dashboard `p` / <leader>fp follows the selected LazyVim picker:
+-- util.project uses project.nvim history with fzf/Telescope; the configuration
+-- below applies when Snacks.picker.projects() is invoked. :DevRepositories is
+-- a separate view of dev's catalog and does not change either source.
 --
 -- Two pieces:
 --   1. Snacks picker `projects` dev sources — point at /Volumes/Data/Program
@@ -9,19 +13,20 @@
 --
 --   2. persistence.nvim — per-cwd session save/restore. Snacks's projects
 --      picker default `confirm = "load_session"` calls `:lua
---      require("persistence").load()` after `:tcd`, which restores buffers,
+--      require("persistence").load()` after changing cwd, which restores buffers,
 --      windows, tabs, and even nvim-tree state from the last time you were
 --      in that repo. Without persistence, `load_session` is a no-op and you
---      just get a `:tcd` + file picker.
+--      just get a cwd change + file picker.
 --
 -- Why /Volumes/Data/Program (not ~/Documents/Program):
 --   ~/Documents/Program is a symlink to /Volumes/Data/Program. fd's
 --   --absolute-path resolves through the symlink, so listing the canonical
 --   side avoids duplicate entries in the picker.
 --
--- Three pickers compared (all useful, different scope):
---   * `<leader>fp` (this) → snacks projects: oldfiles + dev fd, with session
---                           restore on confirm.
+-- Project navigation entry points (different sources):
+--   * `<leader>fp`        → the selected LazyVim backend's native Projects.
+--   * Snacks projects    → oldfiles + fd, with session restore on confirm.
+--   * :DevRepositories   → dev's repository catalog, then a file picker.
 --   * `<leader>fz`        → custom zoxide picker: full 154-entry zoxide DB,
 --                           plain :tcd, no session restore.
 --   * `prefix+g` (tmux)   → sesh: spawn/switch tmux session per project,

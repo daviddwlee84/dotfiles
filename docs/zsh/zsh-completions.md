@@ -181,6 +181,7 @@ shell's file completion. Both are deployed shell CLIs (strategy B).
 | `ytmv` | `dot_dotfiles/bin/executable_ytmv` + `scripts/ytmv/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/60_ytmv_completion.zsh` + `dot_config/bash/60_ytmv_completion.bash`; completes `help <leaf>` and `doctor --cookies`; `--profile` candidates come from `ytmv doctor --list-profiles`; enum flags (`--id3-version`, `--lrc-encoding`, `--lyrics`, …) complete their allowed values |
 | `copilot-proxy` | `dot_config/shell/43_copilot_proxy.sh` (**shell function**) | shell hand-rolled | B | `dot_config/zsh/tools/61_copilot_proxy_completion.zsh` + `dot_config/bash/61_copilot_proxy_completion.bash`; completes actions, periods, scopes, `logs --follow`, live limiter controls and benchmark/update flags |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
+| `dev-projects` | `dot_dotfiles/bin/executable_dev-projects` | argparse | B | `dot_config/zsh/tools/61_dev_projects_completion.zsh` + `dot_config/bash/61_dev_projects_completion.bash`; static commands/flags and paths, no inventory reads during shell startup |
 
 **Dynamic candidates wired up:**
 

@@ -39,6 +39,15 @@ Notable community channels: `sesh`, `git-branch`, `git-log`, `git-stash`, `git-d
 
 ## Custom Channels
 
+### `dev-repos` channel
+
+`tv dev-repos` reads the on-demand `dev-projects list --json` projection of
+local dev REPOS. Enter returns one full path; it never opens a session or
+registers a project. Requires `dev-projects`, `dev`, `jq`, and bash. See
+[shared repo navigation](dev-projects.md) for a quoted Sidecar launcher example.
+This source is separate from zoxide frequency, Herdr live workspaces and the
+remote forge clone channels.
+
 ### `tools` channel
 
 Parses `~/.config/docs/tools/cli-tools.md` at runtime (deployed via chezmoi from `dot_config/docs/tools/`). The markdown file is the single source of truth — edit it to add or update tools.
