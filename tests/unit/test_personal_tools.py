@@ -26,13 +26,20 @@ class SelectionTests(unittest.TestCase):
                 with self.subTest(system=system, extra=extra):
                     self.assertEqual(m.selection(tools, "disabled", system, extra), [])
                     enabled = m.selection(tools, "enabled", system, extra)
-                    self.assertEqual(len(enabled), 7)
+                    self.assertEqual(len(enabled), 13)
                     self.assertEqual({t["method"] for t in enabled}, {"brew" if system == "Darwin" else "release"})
                     legacy = m.selection(tools, "legacy", system, extra)
                     expected = {"dev-cli", "translate"} if system == "Darwin" else set()
                     if extra:
                         expected |= {"dev-cli", "translate", "lazyclash"}
                     self.assertEqual({t["id"] for t in legacy}, expected)
+
+    def test_personal_registry_entries_are_in_inventory_and_completions(self):
+        catalog = (ROOT / "dot_config/docs/tools/tool-catalog.toml").read_text()
+        completions = (ROOT / "scripts/generate_completions.sh").read_text()
+        for tool in m.load_tools():
+            self.assertIn('id = "' + tool["id"] + '"', catalog)
+            self.assertIn('regen ' + tool["binary"] + ' "completion zsh" "completion bash"', completions)
 
     def test_disabled_cli_makes_no_installer_calls(self):
         with patch.object(m.Installer, "execute", side_effect=AssertionError("must not install")):
@@ -269,9 +276,14 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(sum(argv[1] == "install" for argv in calls), 1)
         self.assertEqual(self.installer.receipt(tool)["method"], "go")
 
-
 @unittest.skipUnless(m.shutil.which("chezmoi"), "chezmoi unavailable")
 class TemplateTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.config = Path(self.tmp.name) / "chezmoi.toml"
+        self.config.write_text("")
+
     def test_selected_suite_survives_extra_runtime_gate_and_no_root(self):
         hook = (ROOT / ".chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl").read_text()
         brew = (ROOT / "dot_config/homebrew/Brewfile.tmpl").read_text()
@@ -281,10 +293,14 @@ class TemplateTests(unittest.TestCase):
                     for no_root in (False, True):
                         with self.subTest(system=system, enabled=enabled, extra=extra, no_root=no_root):
                             data = {"profile": profile, "installExtraRuntimes": extra, "noRoot": no_root,
+                                    "installInputMethod": False, "useChineseMirror": False,
+                                    "installCodingAgents": False, "installPythonUvTools": False,
+                                    "installBrewApps": False,
                                     "chezmoi": {"os": system, "arch": "arm64", "sourceDir": str(ROOT)}}
                             if enabled is not None:
                                 data["installPersonalTools"] = enabled
-                            args = ["chezmoi", "--source", str(ROOT), "execute-template", "--override-data", json.dumps(data)]
+                            args = ["chezmoi", "--config", str(self.config), "--source", str(ROOT),
+                                    "execute-template", "--override-data", json.dumps(data)]
                             result = subprocess.run(args, input=hook, capture_output=True, text=True, check=True)
                             mode = "legacy" if enabled is None else "enabled" if enabled else "disabled"
                             self.assertIn("personal_tools_mode=" + mode, result.stdout)

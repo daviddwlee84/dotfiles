@@ -44,7 +44,7 @@ If you want to know:
 | **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), pi-agents, toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
 | **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
-| **personal tools** | dev, translate, exp and four lazy CLIs; macOS Homebrew, Linux verified releases | `personal_tools/files/tools.json` | `personal` (`just upgrade-personal`) |
+| **personal tools** | Thirteen CLIs: macOS Homebrew / Linux verified release binaries | `personal_tools/files/tools.json` | `personal` (`just upgrade-personal`) |
 
 ---
 
@@ -648,13 +648,13 @@ uses mise Go, installs into `~/.local/bin` with `GOPATH=~/.local/share/go`, and
 preserves its `creates:` install-only guard. `just upgrade-go` explicitly runs
 `go install <package>@latest` for this non-personal manifest.
 
-### Personal tools (Homebrew / verified releases / legacy Go)
+### Personal tools (Homebrew / verified releases / Go source)
 
-`installPersonalTools` selects seven package-managed CLIs. The single registry is
+`installPersonalTools` selects thirteen CLIs with binary packages. The single registry is
 `dot_ansible/roles/personal_tools/files/tools.json`; the `personal_tools` role and
 `just upgrade-personal` share its selection and owner-aware installer.
 
-Explicit enablement uses Homebrew formulas on macOS and checksummed release
+The binary packages use Homebrew formulas on macOS and checksummed release
 archives on Linux amd64/arm64. Fresh install pins are recorded per tool; apply
 never upgrades an existing binary. Unknown binaries are preserved. Linux user
 installs need no sudo or Go SDK. Download/checksum/version failures preserve the
@@ -665,6 +665,12 @@ Brew; Linux dev/translate and macOS/Linux lazyclash via Go only when extra
 runtimes are enabled. Those Go installs still use the old fresh-install pins and
 XDG output/cache paths, and skip when no Go exists. `gopls` stays outside this
 suite. Backend daemons and credentials are never installed by the suite.
+
+The six new members are `lazyansible`, `lazycrontab`, `lazyfind`, `lazypkg`,
+`lazymermaid` and `lazyset`. Their immutable public releases and personal tap
+formulas use the same paths and validation as the original suite. No new SDK,
+first-use download or backend installation is added. Runtime prerequisites and
+per-tool baseline versions are documented in the personal-tools guide.
 
 See [Personal tools](../tools/personal-tools.md) for migration, ownership receipts,
 source-to-Brew backups, explicit upgrade, and platform limits. Register completion
@@ -1178,11 +1184,17 @@ list.
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh` (always) | same | base |
+| **lazyansible** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Ansible inventory/playbook workspace; personal fork. |
 | **lazychezmoi** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Chezmoi state, diff, edit and apply TUI. |
 | **lazyclash** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Mihomo CLI/TUI and guarded proxy shell integration. |
+| **lazycrontab** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Local/SSH cron inspection, schedules and reviewed edits. |
+| **lazyfind** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Local/SSH file and text search with result actions. |
 | **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
+| **lazymermaid** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Mermaid repository workbench with optional Neovim and renderers. |
 | **lazymlflow** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — MLflow experiments, runs and artifact inspection. |
+| **lazypkg** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Software inventory and reviewed package-manager operations. |
 | **lazypueue** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Pueue task/queue dashboard. |
+| **lazyset** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Local/SSH TUI catalog and retained-session workspace. |
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libreoffice** (`soffice`) | brew cask | apt (`libreoffice-writer/calc/impress`, no-recommends) | devtools |
@@ -1358,7 +1370,7 @@ Is it a .NET global tool?
 └── No → continue
 
 Is it a Go CLI tool (installable via `go install`)?
-├── Personal CLI suite → personal_tools registry (Homebrew / verified release / legacy source)
+├── Personal CLI suite → personal_tools registry (Homebrew / verified release / explicit Go source)
 ├── Other Go tool → go_tools/defaults/main.yml: name=<module>@<ver>, binary=<cmd>, platforms=[Linux,Darwin]
 │         · Installs to ~/.local/bin via GOBIN; gated on installExtraRuntimes
 │         · Upgrade handled by cat_go in scripts/upgrade_tools.sh (just upgrade-go)

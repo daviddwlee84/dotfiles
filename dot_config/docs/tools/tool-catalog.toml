@@ -634,6 +634,72 @@ mac = "brew"
 linux = "GitHub release"
 
 [[tool]]
+id = "lazyansible"
+category = "Dev Tools"
+desc = "Ansible inventory/playbook workspace; personal fork (in-house)"
+role = "personal_tools"
+docs = "docs/tools/personal-tools.md"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+upgrade = "just upgrade-personal"
+role_md = "`personal_tools` — Ansible inventory/playbook workspace; personal fork."
+
+[[tool]]
+id = "lazycrontab"
+category = "Process & System"
+desc = "Local/SSH cron inspection, schedules and reviewed edits (in-house)"
+role = "personal_tools"
+docs = "docs/tools/personal-tools.md"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+upgrade = "just upgrade-personal"
+role_md = "`personal_tools` — Local/SSH cron inspection, schedules and reviewed edits."
+
+[[tool]]
+id = "lazyfind"
+category = "File & Search"
+desc = "Local/SSH file and text search with result actions (in-house)"
+role = "personal_tools"
+docs = "docs/tools/personal-tools.md"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+upgrade = "just upgrade-personal"
+role_md = "`personal_tools` — Local/SSH file and text search with result actions."
+
+[[tool]]
+id = "lazymermaid"
+category = "Data & Docs"
+desc = "Mermaid repository workbench with optional Neovim and renderers (in-house)"
+role = "personal_tools"
+docs = "docs/tools/personal-tools.md"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+upgrade = "just upgrade-personal"
+role_md = "`personal_tools` — Mermaid repository workbench with optional Neovim and renderers."
+
+[[tool]]
+id = "lazypkg"
+category = "Runtimes & Package Managers"
+desc = "Software inventory and reviewed package-manager operations (in-house)"
+role = "personal_tools"
+docs = "docs/tools/personal-tools.md"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+upgrade = "just upgrade-personal"
+role_md = "`personal_tools` — Software inventory and reviewed package-manager operations."
+
+[[tool]]
+id = "lazyset"
+category = "Sessions & Multiplexing"
+desc = "Local/SSH TUI catalog and retained-session workspace (in-house)"
+role = "personal_tools"
+docs = "docs/tools/personal-tools.md"
+mac = "brew (`daviddwlee84/tap`)"
+linux = "Verified GitHub release; legacy Go preserved"
+upgrade = "just upgrade-personal"
+role_md = "`personal_tools` — Local/SSH TUI catalog and retained-session workspace."
+
+[[tool]]
 id = "python-dotenv"
 label = "**dotenv** (python-dotenv[cli])"
 bins = ["dotenv"]

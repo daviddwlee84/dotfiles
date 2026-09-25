@@ -55,9 +55,19 @@ compinit runs once (inside oh-my-zsh.sh)
 | `translate` | `translate completion zsh` |
 | `dev` | `dev completion zsh` |
 | `lazyclash` | `lazyclash completion zsh` |
+| `lazychezmoi` | `lazychezmoi completion zsh` |
+| `lazymlflow` | `lazymlflow completion zsh` |
+| `lazypueue` | `lazypueue completion zsh` |
+| `exp` | `exp completion zsh` |
+| `lazyansible` | `lazyansible completion zsh` |
+| `lazycrontab` | `lazycrontab completion zsh` |
+| `lazyfind` | `lazyfind completion zsh` |
+| `lazypkg` | `lazypkg completion zsh` |
+| `lazymermaid` | `lazymermaid completion zsh` |
+| `lazyset` | `lazyset completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 
-lazyclash 在 macOS/Linux 由 `go_tools` 安裝，completion 同樣由每次 apply 的
+個人工具由 `personal_tools` 安裝；macOS 使用 personal tap、Linux 使用驗證過的 release binaries。Completion 同樣由每次 apply 的
 `run_after_50` 產生；檔案放在未納入版本控制的 `~/.zfunc/_lazyclash` 與 bash
 使用者 completion 目錄。若只要刷新它，執行：
 

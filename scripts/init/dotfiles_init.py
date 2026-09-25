@@ -252,10 +252,10 @@ PROMPTS: tuple[Prompt, ...] = (
     # --- Personal tools --------------------------------------------------
     Prompt("installPersonalTools", "bool", "Personal tools",
            "Personal CLI suite",
-           "dev, translate, exp, lazychezmoi, lazyclash, lazymlflow and lazypueue. Installs CLIs only; no first-use downloads or backend services.",
+           "dev, translate, exp and ten lazy tools. macOS uses Homebrew; Linux uses verified binary releases. Installs CLIs only; no first-use downloads or backend services.",
            default=True,
            prompt_text="Install personal CLI suite (dev, translate, exp and lazy tools)",
-           comment=("是否安裝七件個人 CLI 套件；macOS 走 Homebrew，Linux 走驗證 checksum 的 release。\n"
+           comment=("是否安裝十三件個人 CLI；macOS 走 Homebrew，Linux 走驗證 checksum 的 release（不需 Go SDK）。\n"
                     "只裝 CLI，不啟動後端、不建立 credentials，也不在首次呼叫時下載。")),
 
     # --- Dev tooling -----------------------------------------------------

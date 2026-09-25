@@ -59,7 +59,7 @@ just upgrade-<category>   # 單獨執行一個類別
 | `npm` | `npm -g update`，當 `npm` 不在 PATH 上時退回 `mise exec -- npm -g update`（與 [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml) 相同的偵測邏輯）。Pi 是例外：它使用固定 `~/.local` prefix，由 `agents` 類別更新，而不是這個 active-prefix 批次命令。 |
 | `cargo` | 若不存在則先 bootstrap `cargo-update` crate，再執行 `cargo install-update -a`。涵蓋 pueue（Linux）以及 [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml) 中未來的條目。 |
 | `go` | 用既有 Go 升級非 personal manifest（Linux gopls），不安裝 SDK。 |
-| `personal` | `just upgrade-personal` 依套件選擇與實際 owner 升級已安裝工具；Brew／release／legacy Go 各守其來源。停用、缺席或未知來源不補裝；成功後刷新兩個 shell 的 completion。 |
+| `personal` | `just upgrade-personal` 依套件選擇與實際 owner 升級已安裝工具；Brew／release／legacy Go 各守其來源。新增 lazyansible/crontab/find/pkg/mermaid/set 使用相同的 Brew／release 安裝來源。停用、缺席或未知來源不補裝；成功後刷新兩個 shell 的 completion。 |
 | `dotnet` | 從 [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) 解析工具名，逐一執行 `dotnet tool update --global <name>`（透過 mise 的 dotnet shim）。若解析不到任何結果，退回 `dotnet tool list --global`。 |
 | `gem` | 透過 mise 的 ruby shim 執行 `gem update --system` + `gem update`。 |
 | `flatpak` | 對使用者範疇 (user-scope) 的 Flathub 應用程式執行 `flatpak update --user --noninteractive --assumeyes`（當 `discordChannel=flatpak` 時的 Discord 等等 — 見 [`docs/playbooks/linux-gui-apps.md`](../playbooks/linux-gui-apps.md)）。當 `flatpak` 不存在或沒有任何 user-scope 應用程式安裝時跳過。系統範疇 (system-scope)（`flatpak update --system`）刻意不涵蓋 — 它需要 `sudo` 且在本 repo 流程中很罕見；需要時請手動執行。 |

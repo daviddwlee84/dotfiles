@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       live_install:
-        description: Install all seven public releases on disposable runners
+        description: Install all thirteen public releases on disposable runners
         type: boolean
         default: false
 

@@ -91,6 +91,12 @@ Most modern CLI tools can output their own completion script. **Auto-generated f
 | `lazychezmoi` | `lazychezmoi completion zsh` |
 | `lazymlflow` | `lazymlflow completion zsh` |
 | `lazypueue` | `lazypueue completion zsh` |
+| `lazyansible` | `lazyansible completion zsh` |
+| `lazycrontab` | `lazycrontab completion zsh` |
+| `lazyfind` | `lazyfind completion zsh` |
+| `lazypkg` | `lazypkg completion zsh` |
+| `lazymermaid` | `lazymermaid completion zsh` |
+| `lazyset` | `lazyset completion zsh` |
 | `exp` | `exp completion zsh` |
 | `bw` | `bw completion --shell zsh` |
 

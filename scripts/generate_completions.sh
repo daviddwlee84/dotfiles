@@ -206,6 +206,12 @@ regen lazyclash "completion zsh" "completion bash"
 regen lazychezmoi "completion zsh" "completion bash"
 regen lazymlflow "completion zsh" "completion bash"
 regen lazypueue "completion zsh" "completion bash"
+regen lazyansible "completion zsh" "completion bash"
+regen lazycrontab "completion zsh" "completion bash"
+regen lazyfind "completion zsh" "completion bash"
+regen lazypkg "completion zsh" "completion bash"
+regen lazymermaid "completion zsh" "completion bash"
+regen lazyset "completion zsh" "completion bash"
 regen exp "completion zsh" "completion bash"
 
 if [ "$n_matched" -eq 0 ]; then

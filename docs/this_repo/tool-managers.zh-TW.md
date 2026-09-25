@@ -47,7 +47,7 @@ Micro 隨 devtools 安裝：macOS 用 brew，Linux 用 apt／驗證 checksum 的
 | **chezmoi externals** | 每週刷新的 git checkout：oh-my-zsh + 插件、oh-my-bash、ble.sh、TPM、fzf（Linux）、pi-agents、toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
 | **apt** / **yum** | 發行版套件（編譯依賴、ffmpeg、audit、fontconfig、libnotify-bin、系統 git/zsh/bash 等） | role 中散布的 `ansible.builtin.apt:` / `ansible.builtin.yum:` | **無**（依賴 repo 流程外的 `apt upgrade`） |
 | **flatpak** | Discord（Linux 上的預設頻道） | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
-| **personal tools** | dev、translate、exp 與四個 lazy CLI | `personal_tools/files/tools.json` | `personal` |
+| **personal tools** | 十三件 CLI：macOS Homebrew／Linux verified release binaries | `personal_tools/files/tools.json` | `personal` |
 
 ---
 
@@ -611,16 +611,20 @@ crates.io 來源時才 hard-code 到 `tasks/main.yml`(見 `recon`、`pueue`)。
 Homebrew 管理。它維持 `installExtraRuntimes`、mise Go、`creates:` 與
 `just upgrade-go` 的既有 install-only／明確升級分工。
 
-七個個人工具改由 `personal_tools` role 管理，單一來源是
+十三個個人工具由 `personal_tools` role 管理，單一來源是
 `dot_ansible/roles/personal_tools/files/tools.json`。`installPersonalTools=true`
-時 macOS 走 Homebrew formula，Linux amd64/arm64 走驗證 checksum 的 GitHub
-release；一般安裝不需 Go 或 sudo。`just upgrade-personal` 只升級已安裝且能辨識
+時，macOS 走 Homebrew formula，Linux amd64/arm64 走驗證 checksum 的 GitHub
+release；這十三件不需 Go 或 sudo。`just upgrade-personal` 只升級已安裝且能辨識
 owner 的選定工具，不補裝缺失工具，也不覆蓋未知同名程式。
 
 舊機缺少新 key 時保留舊選擇：macOS 的 dev／translate 維持 Brew；Linux 的
 這兩者與兩平台 lazyclash 仍受 extra runtimes 控制，使用既有 Go 安裝基線。
 Go output/cache 維持 `~/.local/bin`／`~/.local/share/go`；沒有 Go 就略過，
-不默默安裝 SDK。其他四個不會自動加入。套件只安裝 CLI，不啟動後端或建立密鑰。
+不默默安裝 SDK。套件其他工具不會自動加入。套件只安裝 CLI，不啟動後端或建立密鑰。
+
+新增 lazyansible、lazycrontab、lazyfind、lazypkg、lazymermaid、lazyset 沿用
+同樣的不可變 release 與 personal tap formula。沒有新增 SDK、首次呼叫下載或
+backend 安裝。各工具版本基線與 runtime 前置條件見個人工具文件。
 
 詳見 [個人工具](../tools/personal-tools.md) 的遷移、receipt、可回復 Brew
 轉換與平台限制。安裝／升級成功後沿用 completion generator 更新對應的兩個 shell。
@@ -1092,11 +1096,17 @@ agent-specific 升級路徑。
 | **jq** | brew | apt/yum → GitHub release | base |
 | **jupyterlab** (`jupyter-lab`) | uv tool (with notebook, ipykernel, etc.) | uv tool | python_uv_tools |
 | **just** | curl `just.systems/install.sh` (always) | same | base |
+| **lazyansible** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Ansible inventory/playbook workspace; personal fork. |
 | **lazychezmoi** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Chezmoi state, diff, edit and apply TUI. |
 | **lazyclash** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Mihomo CLI/TUI and guarded proxy shell integration. |
+| **lazycrontab** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Local/SSH cron inspection, schedules and reviewed edits. |
+| **lazyfind** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Local/SSH file and text search with result actions. |
 | **lazygit** | brew → official release fallback (minimum 0.64.0) | stale PPA purge → brew detection → official system/user release (minimum 0.64.0) | lazyvim_deps |
+| **lazymermaid** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Mermaid repository workbench with optional Neovim and renderers. |
 | **lazymlflow** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — MLflow experiments, runs and artifact inspection. |
+| **lazypkg** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Software inventory and reviewed package-manager operations. |
 | **lazypueue** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Pueue task/queue dashboard. |
+| **lazyset** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Local/SSH TUI catalog and retained-session workspace. |
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libreoffice** (`soffice`) | brew cask | apt (`libreoffice-writer/calc/impress`, no-recommends) | devtools |

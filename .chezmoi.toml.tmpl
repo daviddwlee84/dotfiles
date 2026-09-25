@@ -51,7 +51,7 @@ agentSounds = {{ promptChoiceOnce . "agentSounds" "Agent completion feedback (no
 {{ else -}}
 agentSounds = "none"
 {{ end -}}
-# 是否安裝七件個人 CLI 套件；macOS 走 Homebrew，Linux 走驗證 checksum 的 release。
+# 是否安裝十三件個人 CLI；macOS 走 Homebrew，Linux 走驗證 checksum 的 release（不需 Go SDK）。
 # 只裝 CLI，不啟動後端、不建立 credentials，也不在首次呼叫時下載。
 installPersonalTools = {{ promptBoolOnce . "installPersonalTools" "Install personal CLI suite (dev, translate, exp and lazy tools)" true }}
 # 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)

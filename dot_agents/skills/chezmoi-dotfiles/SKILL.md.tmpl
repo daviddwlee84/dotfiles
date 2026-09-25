@@ -143,11 +143,11 @@ project's own Playwright Test for committed CI tests.
 
 ## Package-managed personal CLIs
 
-`installPersonalTools` groups dev, translate, exp and the four lazy CLIs. Full
+`installPersonalTools` groups dev, translate, exp and ten lazy CLIs. Full
 bundles default on; cloud-vm/minimal off. Missing keys preserve legacy selection;
 choose explicitly with `dotcfg --set installPersonalTools=true --yes --no-apply`.
 Apply installs CLIs only (no daemons/credentials or first-use shims). New macOS
-installs use the personal tap; Linux amd64/arm64 uses verified releases without
+binary installs use the personal tap; Linux amd64/arm64 uses verified releases without
 Go. `just upgrade-personal` preserves the active owner and skips missing/unknown
 binaries; generated Bash/Zsh completions follow successful changes. See
 `docs/tools/personal-tools.md`. `gopls` stays in generic `go_tools`.
@@ -160,6 +160,12 @@ binaries; generated Bash/Zsh completions follow successful changes. See
 - **`lazychezmoi`** — inspect/edit/apply dotfile state through chezmoi.
 - **`lazymlflow`** — experiment/run/artifact exploration; local stores may need MLflow separately.
 - **`lazypueue`** — task and queue dashboard; Pueue daemons are configured separately.
+- **`lazymermaid`** — Mermaid workbench; Neovim/termaid/Node runtime setup remains explicit.
+- **`lazyset`** — local/SSH TUI catalog and retained child sessions; underlying tools install independently.
+- **`lazyansible`** — personal Ansible workspace fork; existing Ansible runtime stays separately owned.
+- **`lazycrontab`** — local/SSH cron inspection, readable schedules and reviewed edits; no scheduler setup during apply.
+- **`lazyfind`** — local/SSH file/text search using fd/rg, with optional rga/zoxide.
+- **`lazypkg`** — software inventory and reviewed package operations; mpm setup is explicit. Its `upgrade` command updates a selected package, not lazypkg itself; use `lazypkg self upgrade` for verified Homebrew ownership or `just upgrade-personal` for this CLI.
 
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 
