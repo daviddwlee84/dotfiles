@@ -54,12 +54,12 @@ binary 可用，再將舊副本保存到 receipt 目錄的 `backups/`。未知 l
 
 | 工具 | Binary 基線 | 執行前置條件 |
 | --- | --- | --- |
-| [lazyansible](https://github.com/daviddwlee84/lazyansible/releases/tag/v0.1.0) | `v0.1.0` | 個人 fork；使用既有 Ansible，uv runtime setup 另行操作。 |
-| [lazycrontab](https://github.com/daviddwlee84/lazycrontab/releases/tag/v0.1.2) | `v0.1.2` | 目標端 cron 工具、遠端 SSH；apply 不建立 job。 |
-| [lazyfind](https://github.com/daviddwlee84/lazyfind/releases/tag/v0.1.2) | `v0.1.2` | 目標端 fd／rg；rga 及 converters、zoxide 可選。 |
-| [lazypkg](https://github.com/daviddwlee84/lazypkg/releases/tag/v0.1.3) | `v0.1.3` | mpm 8.0.1 與原生 manager；缺少時另走 lazypkg 的 Setup review。 |
-| [lazymermaid](https://github.com/daviddwlee84/lazymermaid/releases/tag/v0.1.0) | `v0.1.0` | Explorer／handbook 可獨立使用；Neovim、termaid、Node／Mermaid runtime 依需求另裝。 |
-| [lazyset](https://github.com/daviddwlee84/lazyset/releases/tag/v0.1.1) | `v0.1.1` | 子 TUI 需各自安裝；遠端主機使用系統 OpenSSH。 |
+| [lazyansible](https://github.com/daviddwlee84/lazyansible/releases/tag/v0.1.1) | `v0.1.1` | 個人 fork；使用既有 Ansible，uv runtime setup 另行操作。 |
+| [lazycrontab](https://github.com/daviddwlee84/lazycrontab/releases/tag/v0.1.3) | `v0.1.3` | 目標端 cron 工具、遠端 SSH；apply 不建立 job。 |
+| [lazyfind](https://github.com/daviddwlee84/lazyfind/releases/tag/v0.1.3) | `v0.1.3` | 目標端 fd／rg；rga 及 converters、zoxide 可選。 |
+| [lazypkg](https://github.com/daviddwlee84/lazypkg/releases/tag/v0.1.4) | `v0.1.4` | mpm 8.0.1 與原生 manager；缺少時另走 lazypkg 的 Setup review。 |
+| [lazymermaid](https://github.com/daviddwlee84/lazymermaid/releases/tag/v0.1.1) | `v0.1.1` | Explorer／handbook 可獨立使用；Neovim、termaid、Node／Mermaid runtime 依需求另裝。 |
+| [lazyset](https://github.com/daviddwlee84/lazyset/releases/tag/v0.1.2) | `v0.1.2` | 子 TUI 需各自安裝；遠端主機使用系統 OpenSSH。 |
 
 lazyansible 是個人 fork，不是 kocierik upstream 套件。同名 upstream 程式會
 保留並回報 unmanaged，切換前先處理其 owner。所有 backends、套件操作與 host

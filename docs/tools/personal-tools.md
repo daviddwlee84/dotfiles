@@ -81,12 +81,12 @@ chezmoi installation. New-install pins:
 
 | Tool | Binary baseline | Runtime prerequisites |
 | --- | --- | --- |
-| [lazyansible](https://github.com/daviddwlee84/lazyansible/releases/tag/v0.1.0) | `v0.1.0` | Existing Ansible; optional uv-based runtime setup remains a separate command. |
-| [lazycrontab](https://github.com/daviddwlee84/lazycrontab/releases/tag/v0.1.2) | `v0.1.2` | Target-side cron tools and SSH for remote hosts; apply creates no jobs. |
-| [lazyfind](https://github.com/daviddwlee84/lazyfind/releases/tag/v0.1.2) | `v0.1.2` | fd/rg on the searched host; rga/converters and zoxide are optional. |
-| [lazypkg](https://github.com/daviddwlee84/lazypkg/releases/tag/v0.1.3) | `v0.1.3` | mpm 8.0.1 and relevant native managers; use lazypkg's reviewed Setup if needed. |
-| [lazymermaid](https://github.com/daviddwlee84/lazymermaid/releases/tag/v0.1.0) | `v0.1.0` | Explorer/handbook work alone; Neovim, termaid and Node/Mermaid runtime are optional capabilities. |
-| [lazyset](https://github.com/daviddwlee84/lazyset/releases/tag/v0.1.1) | `v0.1.1` | Independently installed child TUIs; system OpenSSH for remote hosts. |
+| [lazyansible](https://github.com/daviddwlee84/lazyansible/releases/tag/v0.1.1) | `v0.1.1` | Existing Ansible; optional uv-based runtime setup remains a separate command. |
+| [lazycrontab](https://github.com/daviddwlee84/lazycrontab/releases/tag/v0.1.3) | `v0.1.3` | Target-side cron tools and SSH for remote hosts; apply creates no jobs. |
+| [lazyfind](https://github.com/daviddwlee84/lazyfind/releases/tag/v0.1.3) | `v0.1.3` | fd/rg on the searched host; rga/converters and zoxide are optional. |
+| [lazypkg](https://github.com/daviddwlee84/lazypkg/releases/tag/v0.1.4) | `v0.1.4` | mpm 8.0.1 and relevant native managers; use lazypkg's reviewed Setup if needed. |
+| [lazymermaid](https://github.com/daviddwlee84/lazymermaid/releases/tag/v0.1.1) | `v0.1.1` | Explorer/handbook work alone; Neovim, termaid and Node/Mermaid runtime are optional capabilities. |
+| [lazyset](https://github.com/daviddwlee84/lazyset/releases/tag/v0.1.2) | `v0.1.2` | Independently installed child TUIs; system OpenSSH for remote hosts. |
 
 lazyansible is the personal fork, not the upstream kocierik package. A same-name
 executable from the upstream fork is preserved as unmanaged; resolve its owner
