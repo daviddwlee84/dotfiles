@@ -378,7 +378,12 @@ fi
 # zsh; until the user switches shells, bash needs help finding them.
 BASHRC="$HOME/.bashrc"
 LOCAL_BIN_LINE='export PATH="$HOME/.local/bin:$PATH"'
-if [[ -f "$BASHRC" ]] || [[ "${SHELL##*/}" == "bash" ]]; then
+# Skip when this source state manages ~/.bashrc: the managed file already puts
+# ~/.local/bin on PATH (00_exports), and appending here would make the same
+# apply stop with ".bashrc has changed since chezmoi last wrote it".
+if [[ -e "{{ .chezmoi.sourceDir }}/dot_bashrc.tmpl" || -e "{{ .chezmoi.sourceDir }}/dot_bashrc" ]]; then
+    :
+elif [[ -f "$BASHRC" ]] || [[ "${SHELL##*/}" == "bash" ]]; then
     touch "$BASHRC"
     if ! grep -qF "$LOCAL_BIN_LINE" "$BASHRC"; then
         {
