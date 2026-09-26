@@ -119,3 +119,18 @@ ansible or Brewfile run.
   tap trust pre-flight
 - [`docs/this_repo/tool-managers.md`](../docs/this_repo/tool-managers.md) — tap/trust note
 - Sibling: [`brew-bundle-redownloads-manually-installed-cask`](brew-bundle-redownloads-manually-installed-cask.md)
+
+## Also blocks uninstall and unrelated installs
+
+The gate applies whenever Homebrew *loads* a tap formula or cask, not only on
+install. On a host with taps added before Homebrew 6:
+
+- `brew uninstall opencode` (a legacy `anomalyco/tap` formula) fails with
+  `Refusing to load formula anomalyco/tap/opencode from untrusted tap`, so the
+  `coding_agents` cleanup now trusts exactly the installed formula before
+  removing it.
+- Installing core formulae in `base` can fail with
+  `Refusing to load cask nikitabobko/tap/aerospace from untrusted tap` because an
+  already installed cask from that tap is loaded. Trust the taps you actually
+  use (the same list as your other machines' `~/.config/homebrew/trust.json`),
+  or untap the ones you no longer want.

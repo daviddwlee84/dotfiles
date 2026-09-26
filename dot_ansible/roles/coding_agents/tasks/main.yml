@@ -112,10 +112,19 @@
   failed_when: false
 
 - name: Remove the conflicting Homebrew opencode formula
+  # Legacy installs came from the anomalyco/tap third-party tap. Homebrew >= 6
+  # refuses to load (and so to uninstall) a formula from an untrusted tap, so
+  # trust exactly the installed formula first. It was installed from that tap
+  # before, so no new tap code is introduced. See
+  # pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
   when: opencode_brew_formula.rc == 0
-  community.general.homebrew:
-    name: opencode
-    state: absent
+  ansible.builtin.shell: |
+    full="$(brew list --full-name --formula 2>/dev/null | grep -E '(^|/)opencode$' | head -1)"
+    [ -n "$full" ] || exit 0
+    case "$full" in */*) brew trust --formula "$full" >/dev/null 2>&1 || true ;; esac
+    brew uninstall --formula "$full"
+  args:
+    executable: /bin/bash
   ignore_errors: true
 
 - name: Check if OpenCode is installed
