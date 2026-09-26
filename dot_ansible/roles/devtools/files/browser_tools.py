@@ -158,11 +158,26 @@ def sync_skills(env, *, terminal=True, playwright=True):
         atomic_text(receipt, json.dumps(links, indent=2) + "\n")
 
 
+def macos_major():
+    # Some Homebrew Python builds return an empty platform.mac_ver() on newer
+    # macOS releases; sw_vers is authoritative.
+    release = platform.mac_ver()[0]
+    if not release:
+        try:
+            release = subprocess.run(["/usr/bin/sw_vers", "-productVersion"], capture_output=True, text=True, timeout=10).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            release = ""
+    try:
+        return int(release.split(".")[0])
+    except ValueError:
+        return 0
+
+
 def browser_supported():
     if platform.machine() not in ("arm64", "aarch64", "x86_64", "amd64"):
         return False
     if sys.platform == "darwin":
-        return int(platform.mac_ver()[0].split(".")[0]) >= 14
+        return macos_major() >= 14
     if sys.platform != "linux":
         return False
     values = {}
