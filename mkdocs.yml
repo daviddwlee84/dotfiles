@@ -334,6 +334,7 @@ nav:
           - SpecStory: tools/specstory.md
           - SpecStory internals: tools/specstory-internals.md
           - Codexbar: tools/codexbar.md
+          - tokens (tokens.ci usage tracker): tools/tokens.md
           - LLM: tools/llm.md
           - "summarize (YouTube/web/PDF → LLM summary)": tools/summarize.md
       - Git & DevOps:

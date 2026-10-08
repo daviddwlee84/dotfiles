@@ -996,6 +996,142 @@
         - /tmp/codexbar.tar.gz
         - /tmp/codexbar
 
+# === tokens (tokens.ci) ===
+# AI coding-assistant token-usage tracker (github.com/missuo/tokens, a tokscale
+# fork). BINARY ONLY, on purpose: `tokens serve` uploads usage to the public
+# tokens.ci leaderboard, so `tokens login` and the background service
+# (`brew services start tokens` / a systemd user unit) stay manual opt-ins —
+# never auto-enable them across fleet hosts. See docs/tools/tokens.md.
+#
+# Linux deliberately does NOT use upstream's `install.sh`: it is a bash script
+# (`set -euo pipefail`) that the docs pipe to `| sh`, which dies on dash with
+# `set: Illegal option -o pipefail`, and it also writes
+# ~/.config/systemd/user/tokens.service. We fetch the release tarball directly.
+# The `-unknown-linux-gnu` build needs only GLIBC_2.28 (checked with
+# `objdump -T` on v27.1.1) — the same floor as Linuxbrew — so no musl switch.
+# Upstream publishes no `.sha256` sidecars for the tarballs (404), hence no
+# `checksum:`.
+
+- name: Check if Homebrew is available (tokens, macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  # Probe brew by OUTPUT, not exit status — a stub `brew` returns 0 for every
+  # subcommand. See pitfalls/ansible-homebrew-expecting-value-line-1-column-1.md
+  ansible.builtin.shell: '[ -n "$(brew --prefix 2>/dev/null)" ]'
+  args:
+    executable: /bin/bash
+  register: tokens_macos_brew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install tokens via owo-network/brew (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - tokens_macos_brew_check.rc == 0
+  block:
+    - name: Tap owo-network/brew for tokens (macOS)
+      community.general.homebrew_tap:
+        name: owo-network/brew
+        state: present
+
+    # Homebrew 6.0 formula-trust gate. See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
+    - name: Check trust state of the owo-network tap (macOS)
+      ansible.builtin.command: "brew tap-info owo-network/brew"
+      register: coding_agents_owo_tap_info
+      changed_when: false
+      failed_when: false
+
+    - name: Trust the owo-network tap (macOS)
+      when: "'Untrusted' in (coding_agents_owo_tap_info.stdout | default(''))"
+      ansible.builtin.command: "brew trust owo-network/brew"
+      changed_when: true
+
+    - name: Install tokens (macOS)
+      community.general.homebrew:
+        name: owo-network/brew/tokens
+        state: present
+  rescue:
+    - name: Warn tokens installation failed (macOS)
+      ansible.builtin.debug:
+        msg: "tokens (owo-network/brew/tokens) install failed - skipping"
+
+- name: Check if tokens is installed (Linux)
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  ansible.builtin.shell: 'command -v tokens >/dev/null 2>&1 || [ -x "$HOME/.local/bin/tokens" ]'
+  args:
+    executable: /bin/bash
+  register: tokens_linux_check
+  changed_when: false
+  failed_when: false
+
+- name: Skip tokens on unsupported architecture (Linux)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - tokens_linux_check.rc != 0
+    - target_architecture not in ['x86_64', 'aarch64']
+  ansible.builtin.debug:
+    msg: "tokens skipped: no upstream Linux build for {{ target_architecture }}"
+
+- name: Install tokens from GitHub releases (Linux)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - tokens_linux_check.rc != 0
+    - target_architecture in ['x86_64', 'aarch64']
+  block:
+    - name: Get latest tokens release (Linux)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/missuo/tokens/releases/latest
+        return_content: true
+      register: tokens_release
+
+    - name: Compute tokens release asset (Linux)
+      ansible.builtin.set_fact:
+        tokens_asset: "tokens-{{ tokens_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu.tar.gz"
+
+    - name: Ensure ~/.local/bin exists (tokens)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Create temp directory for tokens extraction (Linux)
+      ansible.builtin.file:
+        path: /tmp/tokens-install
+        state: directory
+        mode: '0755'
+
+    - name: Download tokens release (Linux)
+      ansible.builtin.get_url:
+        url: "https://github.com/missuo/tokens/releases/download/{{ tokens_release.json.tag_name }}/{{ tokens_asset }}"
+        dest: /tmp/tokens-install/tokens.tar.gz
+        mode: '0644'
+        timeout: 300
+      retries: 3
+      delay: 5
+      register: tokens_download
+      until: tokens_download is succeeded
+
+    - name: Extract tokens release (Linux)
+      ansible.builtin.unarchive:
+        src: /tmp/tokens-install/tokens.tar.gz
+        dest: /tmp/tokens-install
+        remote_src: true
+
+    - name: Install tokens to ~/.local/bin (Linux)
+      ansible.builtin.copy:
+        src: /tmp/tokens-install/tokens
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/tokens"
+        mode: '0755'
+        remote_src: true
+  rescue:
+    - name: Warn tokens installation failed (Linux)
+      ansible.builtin.debug:
+        msg: "tokens installation failed (likely network timeout) - skipping"
+  always:
+    - name: Clean up tokens temp files (Linux)
+      ansible.builtin.file:
+        path: /tmp/tokens-install
+        state: absent
+
 # === td ===
 
 - name: Check if td is installed (macOS)

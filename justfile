@@ -501,7 +501,7 @@ upgrade-herdr:
 upgrade-terminal-browser:
     ./scripts/upgrade_tools.sh terminal-browser
 
-# Self-managed agents: Claude Code, OpenCode, Pi, OMP, Cursor CLI, Ollama, llmfit, RTK
+# Self-managed agents: Claude Code, OpenCode, Pi, OMP, Cursor CLI, Ollama, llmfit, RTK, tokens (Linux)
 upgrade-agents:
     ./scripts/upgrade_tools.sh agents
 

@@ -1289,6 +1289,7 @@ list.
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
+| **tokens** | brew tap `owo-network/brew` (trusted) | GitHub release → `~/.local/bin` (no systemd unit) | coding_agents |
 | **trafilatura** | uv tool | uv tool | python_uv_tools |
 | **translate** | brew (`daviddwlee84/tap`) | Verified GitHub release; legacy Go preserved | `personal_tools` — Terminal translation CLI/TUI. |
 | **tree** | brew | apt/yum | base |

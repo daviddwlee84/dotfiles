@@ -1084,6 +1084,17 @@ cat_agents() {
     ran_any=1
   fi
 
+  # tokens (tokens.ci) — Linux release binary in ~/.local/bin (macOS is the
+  # owo-network/brew formula, bumped by upgrade-brew). No self-update
+  # subcommand. The installer is bash-only (`| sh` dies on dash with
+  # `set: Illegal option -o pipefail`); TOKENS_NO_SERVICE keeps it from
+  # writing a systemd unit — the background submitter is a manual opt-in.
+  if [[ "$(uname -s)" == "Linux" && -x "$HOME/.local/bin/tokens" ]]; then
+    info "Upgrading tokens (Linux installer, binary only)"
+    _run_sh "curl -fsSL https://tokens.ci/install.sh | TOKENS_NO_SERVICE=1 TOKENS_INSTALL_DIR=\"$HOME/.local/bin\" bash" || any_fail=1
+    ran_any=1
+  fi
+
   # RTK — official installer (no self-update subcommand)
   if command -v rtk >/dev/null 2>&1; then
     info "Upgrading RTK"

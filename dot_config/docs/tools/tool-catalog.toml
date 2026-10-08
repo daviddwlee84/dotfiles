@@ -2157,6 +2157,16 @@ mac = "brew"
 linux = "(apt)"
 
 [[tool]]
+id = "tokens"
+category = "AI / Coding Agents"
+desc = "AI coding-assistant token usage tracker (tokens.ci)"
+role = "coding_agents"
+docs = "docs/tools/tokens.md"
+mac = "brew tap `owo-network/brew` (trusted)"
+linux = "GitHub release → `~/.local/bin` (no systemd unit)"
+upgrade = "`just upgrade-brew` (macOS) / `just upgrade-agents` (Linux)"
+
+[[tool]]
 id = "trafilatura"
 category = "Data & Docs"
 desc = "Web page text / metadata extraction"
