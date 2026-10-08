@@ -52,7 +52,9 @@ This repo links the complete skill directory from the **installed package**,
 including references, into `~/.agents/skills/` and existing agent directories.
 terminal-browser retains its specialized `~/.codex/skills/` variant. Playwright's
 skill comes from the CLI's resolved `playwright-core` dependency, not a floating
-GitHub branch. Herdr's skill is separate and does not teach browser commands.
+GitHub branch. The sync helper accepts both upstream skill layouts (current
+`lib/tools/cli-client/skill` and older `lib/tools/skills/playwright-cli`). Herdr's
+skill is separate and does not teach browser commands.
 
 The every-apply `run_after_43_refresh_browser_tools.sh.tmpl` repairs package-owned
 symlinks after upgrades, and missing Chromium caches only when preloading is

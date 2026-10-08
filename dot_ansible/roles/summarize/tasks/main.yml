@@ -1,7 +1,7 @@
 ---
 # Install the summarize CLI.
-# - macOS: homebrew-core formula (deps ffmpeg / node / tesseract / yt-dlp)
-# - Linux: npm global via mise (no formula exists; needs Node 24+)
+# - Apple Silicon: homebrew-core formula (deps ffmpeg / node / tesseract / yt-dlp)
+# - Intel macOS and Linux: npm global via mise (needs Node 24+)
 #
 # The zh-TW output defaults live in dot_summarize/modify_config.json, not here —
 # this role only puts the binary on PATH.
@@ -15,30 +15,31 @@
 - name: Install summarize via Homebrew (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
+    - target_architecture in ["arm64", "aarch64"]
     - summarize_presence.rc != 0
   community.general.homebrew:
     name: summarize
     state: present
 
-# --- Linux: npm global, preferring mise's user-level Node prefix ------------
+# --- Intel macOS/Linux: npm global, preferring mise's user-level Node prefix -
 # Mirrors the js_cli_tools idiom: system npm on noRoot hosts has its prefix at
 # /usr/local (unwritable without sudo), mise's prefix works for both OSes.
 - name: Locate user-installed mise (summarize)
-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  when: ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
   ansible.builtin.stat:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
   register: summarize_mise_user_bin
 
 - name: Set mise binary path (user install)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - summarize_mise_user_bin.stat.exists | default(false)
   ansible.builtin.set_fact:
     summarize_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
 
 - name: Detect system-installed mise (summarize)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - summarize_mise_bin is not defined
   ansible.builtin.command: mise --version
   register: summarize_mise_system_check
@@ -47,17 +48,18 @@
 
 - name: Set mise binary path (system install)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat", "Darwin"]
     - summarize_mise_bin is not defined
     - summarize_mise_system_check.rc | default(1) == 0
   ansible.builtin.set_fact:
     summarize_mise_bin: mise
 
-# oldEL (CentOS/RHEL 7, glibc 2.17) cannot run Node 18+, let alone the Node 24
-# summarize requires. Mirrors the mise [tools] exclusion — see linux.yml.
-- name: Install summarize via mise npm (Linux)
+# Intel Homebrew is Tier 3 and the formula forces an upgrade of pinned brew
+# Node. Use the already-managed mise Node instead, without changing the pin.
+# oldEL cannot run Node 24; mirrors the mise [tools] exclusion in linux.yml.
+- name: Install summarize via mise npm (Linux and Intel macOS)
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat"] or (ansible_facts["os_family"] == "Darwin" and target_architecture in ["x86_64", "amd64"])
     - not (oldEL | default(false))
     - summarize_presence.rc != 0
     - summarize_mise_bin is defined
@@ -80,9 +82,9 @@
   ansible.builtin.debug:
     msg: "summarize installation failed (likely network timeout or Node < 24) - skipping"
 
-- name: Warn when Linux has no mise/Node to install summarize with
+- name: Warn when npm installation needs mise/Node
   when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - ansible_facts["os_family"] in ["Debian", "RedHat"] or (ansible_facts["os_family"] == "Darwin" and target_architecture in ["x86_64", "amd64"])
     - not (oldEL | default(false))
     - summarize_presence.rc != 0
     - summarize_mise_bin is not defined

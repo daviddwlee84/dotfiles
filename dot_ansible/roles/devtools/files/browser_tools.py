@@ -93,6 +93,16 @@ browser:r('playwright').chromium.executablePath()}));"""
     return json.loads(run(["node", "-e", script, package], env=env).stdout)
 
 
+def playwright_skill(core):
+    # playwright-core moved the CLI skill in newer releases. Keep the older layout
+    # for installations that have not upgraded yet.
+    for relative in ("lib/tools/cli-client/skill", "lib/tools/skills/playwright-cli"):
+        source = Path(core) / relative
+        if (source / "SKILL.md").is_file():
+            return source
+    raise RuntimeError("Missing packaged playwright-cli skill in " + str(core))
+
+
 def safe_link(source, destination, old_links):
     """Only replace our recorded links or links to a packaged skill of this tool."""
     source = source.resolve()
@@ -146,7 +156,7 @@ def sync_skills(env, *, terminal=True, playwright=True):
                     pairs.append((root / "skills" / variant / "terminal-browser", destination / "terminal-browser"))
     package = playwright_package(env) if playwright else None
     if package:
-        source = Path(core_paths(package, env)["core"]) / "lib/tools/skills/playwright-cli"
+        source = playwright_skill(core_paths(package, env)["core"])
         for target in (".agents", ".claude", ".codex", ".cursor", ".gemini"):
             if target == ".agents" or (Path.home() / target).exists():
                 pairs.append((source, Path.home() / target / "skills/playwright-cli"))

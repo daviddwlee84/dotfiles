@@ -397,7 +397,7 @@ Wrappers around language-specific package managers. All consume a
 | `python_uv_tools` | `uv tool install` | 13 | `installPythonUvTools` |
 | `llm_tools` | `uv tool install` + brew + cargo + curl-installer | 4 (litellm, llmfit, models, ollama) | `installLlmTools` |
 | `js_cli_tools` | `mise exec -- npm install -g` / system npm | 1 (`readability-cli`) | `installJsCliTools` |
-| `summarize` | brew (macOS) / `mise exec -- npm install -g` (Linux) | 1 (`summarize`) | `installSummarize` |
+| `summarize` | brew (macOS arm64) / `mise exec -- npm install -g` (macOS Intel/Linux) | 1 (`summarize`) | `installSummarize` |
 | `rust_cargo_tools` | `cargo install` (after `mise install rust@stable`) | `[]` in defaults + 2 hardcoded (`recon`, `pueue`) | (no gate; rust runtime always installed via mise) |
 | `ruby_gem_tools` | `gem install` (after `mise install ruby@3`) | 2 (`try-cli`, `tmuxinator`) | (no gate; gated by `mise install ruby` skip on noRoot Linux) |
 | `dotnet_tools` | `dotnet tool install --global` (after `mise install --yes dotnet@10`) | 1 (`azure-cost-cli`) | `installDotnetTools` |

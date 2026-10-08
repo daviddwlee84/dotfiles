@@ -26,7 +26,8 @@ Gemini API 的 YouTube URL input——比較表在 superproject 的 `docs/summar
 
 | 平台 | 方式 | 說明 |
 |---|---|---|
-| macOS | `brew install summarize`（homebrew-core） | Homebrew 會一併拉 `ffmpeg`、`node`、`tesseract`、`yt-dlp` 這些 formula 相依 |
+| macOS arm64 | `brew install summarize`（homebrew-core） | Homebrew 會一併拉 `ffmpeg`、`node`、`tesseract`、`yt-dlp` 這些 formula 相依 |
+| macOS Intel | `mise exec -- npm install -g @steipete/summarize` | 避開 Homebrew pinned Node 衝突及 Tier 3 原始碼編譯。需要 mise Node 24+；媒體功能可另外使用 `ffmpeg`、`tesseract`、`yt-dlp` |
 | Linux | `mise exec -- npm install -g @steipete/summarize` | 沒有 formula。需要 **Node 24+**，由 mise 的 `node@lts` 提供。CentOS/RHEL 7 baseline (`oldEL`) 會跳過 |
 | Windows | `npm i -g @steipete/summarize` 加上 scoop 的 `ffmpeg` / `yt-dlp` / `tesseract` | 見 `dotfiles-windows` 的 [summarize 頁面](https://github.com/daviddwlee84/dotfiles-windows/blob/main/docs/summarize.zh-TW.md) |
 
@@ -120,5 +121,5 @@ yt-dlp 音訊 → Whisper
 
 ## 升級
 
-沒有工具專屬的路徑：macOS formula 由 `just upgrade-brew` 處理，Linux/Windows 的全域套件
-由 `just upgrade-npm` 處理。見[升級](../this_repo/upgrades.md)。
+沒有工具專屬的路徑：Apple Silicon 的 formula 由 `just upgrade-brew` 處理，Intel
+macOS/Linux 的全域套件由 `just upgrade-npm` 處理。見[升級](../this_repo/upgrades.md)。

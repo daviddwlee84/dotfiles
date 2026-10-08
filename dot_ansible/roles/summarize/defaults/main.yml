@@ -2,9 +2,10 @@
 # summarize — multi-modal AI summarizer (YouTube / podcast / web / PDF / media).
 # https://github.com/steipete/summarize
 #
-# macOS installs the homebrew-core formula (which pulls ffmpeg, node, tesseract
-# and yt-dlp itself). Linux has no formula, so it goes through npm — the package
-# needs Node 24+, which mise's `node@lts` provides.
+# Apple Silicon installs the homebrew-core formula (which pulls ffmpeg, node,
+# tesseract and yt-dlp). Intel macOS avoids Homebrew's pinned-Node dependency
+# conflict and Tier 3 builds by using the same mise npm route as Linux.
+# The npm package needs Node 24+, which mise's `node@lts` provides.
 
 summarize_npm_package: "@steipete/summarize"
 summarize_binary: summarize

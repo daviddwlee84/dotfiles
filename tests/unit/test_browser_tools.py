@@ -87,6 +87,15 @@ class BrowserToolsTest(unittest.TestCase):
         self.assertEqual(run.call_args.args[0], ["playwright-cli", "--version"])
         self.assertEqual(run.call_count, 1)
 
+    def test_playwright_skill_supports_current_and_previous_package_layouts(self):
+        core = self.home / "playwright-core"
+        old = self.skill(core / "lib/tools/skills/playwright-cli")
+        self.assertEqual(bt.playwright_skill(core), old)
+        current = self.skill(core / "lib/tools/cli-client/skill")
+        self.assertEqual(bt.playwright_skill(core), current)
+        (current / "SKILL.md").unlink()
+        self.assertEqual(bt.playwright_skill(core), old)
+
     def test_matching_browser_is_repaired_after_cache_deletion(self):
         package = self.home / "package"
         package.mkdir()

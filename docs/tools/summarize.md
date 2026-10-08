@@ -25,7 +25,8 @@ are compared in the superproject's `docs/summarization-tooling.md`.
 
 | Platform | How | Notes |
 |---|---|---|
-| macOS | `brew install summarize` (homebrew-core) | Homebrew pulls `ffmpeg`, `node`, `tesseract`, `yt-dlp` as formula dependencies |
+| macOS arm64 | `brew install summarize` (homebrew-core) | Homebrew pulls `ffmpeg`, `node`, `tesseract`, `yt-dlp` as formula dependencies |
+| macOS Intel | `mise exec -- npm install -g @steipete/summarize` | Avoids Homebrew's pinned-Node conflict and Tier 3 source builds. Needs mise Node 24+; `ffmpeg`, `tesseract`, and `yt-dlp` remain optional external tools for media features |
 | Linux | `mise exec -- npm install -g @steipete/summarize` | No formula exists. Needs **Node 24+**, which mise's `node@lts` provides. Skipped on the CentOS/RHEL 7 baseline (`oldEL`) |
 | Windows | `npm i -g @steipete/summarize` + scoop `ffmpeg` / `yt-dlp` / `tesseract` | See `dotfiles-windows`' [summarize page](https://github.com/daviddwlee84/dotfiles-windows/blob/main/docs/summarize.md) |
 
@@ -128,5 +129,5 @@ the cleaned source text.
 
 ## Upgrades
 
-Nothing tool-specific: `just upgrade-brew` covers the macOS formula and
-`just upgrade-npm` covers the Linux/Windows global. See [upgrades](../this_repo/upgrades.md).
+Nothing tool-specific: `just upgrade-brew` covers the Apple Silicon formula and
+`just upgrade-npm` covers the Intel macOS/Linux global. See [upgrades](../this_repo/upgrades.md).
