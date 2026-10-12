@@ -687,6 +687,43 @@ class WatchCmd:
             clear_cache()  # so `sms` / `tv sms` see it immediately
 
 
+@dataclass
+class NotifyTestCmd:
+    """Send one test push through the same apprise targets `watch` uses."""
+    latest: bool = False
+    """Push the newest real SMS (formatted like `watch`) instead of a canned message."""
+    dry_run: bool = False
+    """Only show which services apprise would notify; send nothing."""
+
+    def run(self) -> int:
+        urls, tag = notify_targets(read_config_file().get("watch") or {})
+        if not urls and not tag:
+            die("no notify target: set SMS_NOTIFY_URLS, or [watch] notify_urls / "
+                "notify_tag in ~/.config/sms/config.toml", 2)
+        if self.dry_run:
+            env = dict(os.environ)
+            cmd = ["apprise", "--dry-run", "-b", "x"]
+            if urls:
+                env["APPRISE_URLS"] = " ".join(urls)
+            else:
+                cmd += ["--tag", str(tag)]
+            return subprocess.run(cmd, env=env).returncode
+        if self.latest:
+            msgs = get_messages(load_config())
+            if not msgs:
+                die("inbox is empty", 3)
+            title, body = format_push(msgs[0])
+        else:
+            import socket
+            title = "sms notify-test"
+            body = f"[code 123456] Test push from `sms` on {socket.gethostname()}\n— {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        if notify(title, body, urls, tag):
+            print("sent")
+            return 0
+        print(f"failed — see {NOTIFY_LOG}", file=sys.stderr)
+        return 1
+
+
 # ---------- systemd user service (Linux) -------------------------------------
 
 UNIT_TEMPLATE = """\
@@ -765,6 +802,7 @@ Command = Union[
     Annotated[CountCmd, tyro.conf.subcommand("count")],
     Annotated[PruneCmd, tyro.conf.subcommand("prune")],
     Annotated[WatchCmd, tyro.conf.subcommand("watch")],
+    Annotated[NotifyTestCmd, tyro.conf.subcommand("notify-test")],
     Annotated[ServiceCmd, tyro.conf.subcommand("service")],
 ]
 

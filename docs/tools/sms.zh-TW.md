@@ -61,6 +61,7 @@ sms login-test              # 驗證帳密 / 連線
 sms count [--json]          # 收件匣總數 / 上限 / 未讀（B525s 不需登入）
 sms prune --keep N [--include-unread] [--yes]   # 刪除最舊、超出 N 則的訊息（預設只刪已讀）
 sms watch [--interval 10] [--once] [--json] [--no-notify] [--mark-read]
+sms notify-test [--latest] [--dry-run]          # 透過與 watch 相同的目標送一則測試推播
 sms service install|uninstall|status            # `sms watch` 的 systemd --user unit（Linux）
 ```
 
@@ -117,9 +118,16 @@ Token 絕不進 chezmoi——只管理 `.example`。
 快速測試：
 
 ```bash
+sms notify-test --dry-run                       # 列出 apprise 會通知哪些服務（不實際發送）
+sms notify-test                                 # 固定內容的測試推播
+sms notify-test --latest                        # 最新一則真實簡訊，格式與 watch 完全相同
 sms watch --once --no-notify                    # 建立 state
 SMS_NOTIFY_URLS='macosx://' sms watch           # 桌面橫幅，前景執行
 ```
+
+Discord webhook 可直接使用：apprise 接受原生的
+`https://discord.com/api/webhooks/<id>/<token>` 格式（等同 `discord://<id>/<token>`）。
+請寫在 `[watch] notify_urls`，不要放在命令列——`SMS_NOTIFY_URLS=…` 前綴會留在 shell history。
 
 ## 以服務方式執行
 

@@ -63,6 +63,7 @@ sms login-test              # verify credentials/connectivity
 sms count [--json]          # inbox total / max / unread (no login needed on B525s)
 sms prune --keep N [--include-unread] [--yes]   # delete oldest beyond N (read-only by default)
 sms watch [--interval 10] [--once] [--json] [--no-notify] [--mark-read]
+sms notify-test [--latest] [--dry-run]          # one test push via the same targets as watch
 sms service install|uninstall|status            # systemd --user unit for `sms watch` (Linux)
 ```
 
@@ -125,9 +126,17 @@ exponentially (cap 5 min) instead of exiting.
 Quick test:
 
 ```bash
+sms notify-test --dry-run                       # which services apprise would hit (sends nothing)
+sms notify-test                                 # canned test push
+sms notify-test --latest                        # newest real SMS, formatted exactly like watch
 sms watch --once --no-notify                    # seed state
 SMS_NOTIFY_URLS='macosx://' sms watch           # desktop banners, foreground
 ```
+
+Discord webhooks work as-is: apprise accepts the native
+`https://discord.com/api/webhooks/<id>/<token>` form (= `discord://<id>/<token>`).
+Put it in `[watch] notify_urls` rather than on the command line — an
+`SMS_NOTIFY_URLS=…` prefix lands in shell history.
 
 ## Running as a service
 
