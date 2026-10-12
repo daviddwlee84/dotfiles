@@ -1702,7 +1702,7 @@ _**Agent (gpt-5.3-codex 2026-02-06 14:03:17Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '80,120p' README.md`</summary>
-```
+````
 Chunk ID: ee6499
 Wall time: 0.0521 seconds
 Process exited with code 0
@@ -1749,7 +1749,7 @@ Output:
 ## Manual Commands
 
 ```bash
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-06 14:03:22Z)**_

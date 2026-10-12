@@ -947,7 +947,7 @@ _**Agent (gpt-5.3-codex 2026-02-13 13:50:44Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,260p' README.md`</summary>
-```
+````
 Chunk ID: a2a235
 Wall time: 0.0523 seconds
 Process exited with code 0
@@ -1072,7 +1072,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
 - **Coding Agents** (optional): Claude Code, C
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-13 13:50:52Z)**_
@@ -2852,7 +2852,7 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:28:14Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `nl -ba /Users/zhouhanru/.local/share/chezmoi/README.md | sed -n '1,220p'`</summary>
-```
+````
 Chunk ID: a8875e
 Wall time: 0.0515 seconds
 Process exited with code 0
@@ -2965,7 +2965,7 @@ Output:
    105	- `~/.config/tmuxp/claude-sidecar.yaml` - tmuxp workspace for Claude + Sidecar
    106	- `~/.config/zellij/layou
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:28:14Z)**_
@@ -3538,7 +3538,7 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:30:25Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `nl -ba /Users/zhouhanru/.local/share/chezmoi/README.md | sed -n '108,180p'`</summary>
-```
+````
 Chunk ID: ff25f7
 Wall time: 0.0511 seconds
 Process exited with code 0
@@ -3617,7 +3617,7 @@ Output:
    178	just docker-run
    179	
    180	# Build specific profiles
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:30:25Z)**_

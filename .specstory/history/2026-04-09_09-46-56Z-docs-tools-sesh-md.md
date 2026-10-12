@@ -70,7 +70,7 @@ _**Agent (gpt-5.4 2026-04-09 09:48:44Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,240p' docs/tools/sesh.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '1,240p' docs/tools/sesh.md"
 Chunk ID: fb7185
 Wall time: 0.0000 seconds
@@ -251,7 +251,7 @@ requirements = ["sesh", "fd"]
 [source]
 command = ["sesh list --icons", "sesh list -t --icons", "sesh list -c --icons", "sesh list -z --icons", "fd -H -d 2 -t d
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 09:48:44Z)**_
@@ -729,7 +729,7 @@ _**Agent (gpt-5.4 2026-04-09 09:50:20Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,240p' README.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '1,240p' README.md"
 Chunk ID: b843f3
 Wall time: 0.0000 seconds
@@ -848,7 +848,7 @@ To change options later: `chezmoi init --force`
 - `~/.local/bin/x` - Cross-platform terminal wrapper for `copy` / `paste` / `open`
 - `~/.config/sesh/sesh.toml` - Sesh sessi
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 09:50:41Z)**_
@@ -1273,7 +1273,7 @@ _**Agent (gpt-5.4 2026-04-09 10:08:29Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '20,60p' docs/tools/sesh.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '20,60p' docs/tools/sesh.md"
 Chunk ID: 5bba62
 Wall time: 0.0000 seconds
@@ -1320,7 +1320,7 @@ rm -f ~/.zcompdump && compinit
 ## Configuration
 
 Config file: `~/.config/sesh/sesh.toml` (managed by chezmoi)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:08:29Z)**_
@@ -2083,7 +2083,7 @@ _**Agent (gpt-5.4 2026-04-09 10:23:30Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,220p' docs/tools/specstory.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '1,220p' docs/tools/specstory.md"
 Chunk ID: 0a3b61
 Wall time: 0.0000 seconds
@@ -2150,7 +2150,7 @@ chezmoi diff
 
 - [SpecStory CLI usage docs](https://docs.specstory.com/integrations/terminal-coding-agents/usage#configuration)
 - [SpecStory CLI releases](https://github.com/specstoryai/getspecstory/releases)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:23:30Z)**_
@@ -2652,7 +2652,7 @@ _**Agent (gpt-5.4 2026-04-09 10:24:02Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `tail -n 30 README.md`</summary>
-```
+````
 Command: /bin/zsh -lc 'tail -n 30 README.md'
 Chunk ID: 737c03
 Wall time: 0.0000 seconds
@@ -2689,7 +2689,7 @@ just info             # Show system info
 ## Customization
 
 See [CLAUDE.md](CLAUDE.md) for development guide, [docs/ansible.md](docs/ansible.md) for ansible customization, [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/git_diff_workflow.md](docs/tools/git_diff_workflow.md) for the managed Git diff stack, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, [docs/tools/llm.md](docs/tools/llm.md) for local LLM tools, and [docs/tools/networking.md](docs/tools/networking.md) for networking tools.
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:24:02Z)**_
@@ -2793,7 +2793,7 @@ _**Agent (gpt-5.4 2026-04-09 10:24:45Z)**_
 
 **Add: `/Users/zhouhanru/.local/share/chezmoi/docs/tools/tmux.md`**
 
-```diff
+````diff
 +# tmux
 +
 +Managed tmux config lives at `~/.tmux.conf` and is sourced from [`dot_tmux.conf`](../../dot_tmux.conf) in this repo.
@@ -2929,7 +2929,7 @@ _**Agent (gpt-5.4 2026-04-09 10:24:45Z)**_
 +
 +- [Sesh](./sesh.md)
 +- [Starship](./starship.md)
-```
+````
 
 **Update: `/Users/zhouhanru/.local/share/chezmoi/README.md`**
 
@@ -2951,7 +2951,7 @@ _**Agent (gpt-5.4 2026-04-09 10:24:52Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,240p' docs/tools/tmux.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '1,240p' docs/tools/tmux.md"
 Chunk ID: 8bcabe
 Wall time: 0.0000 seconds
@@ -3093,7 +3093,7 @@ tmux show-options -g | rg 'status|focus-events'
 
 - [Sesh](./sesh.md)
 - [Starship](./starship.md)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:24:52Z)**_
@@ -3944,7 +3944,7 @@ _**Agent (gpt-5.4 2026-04-09 10:31:02Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,240p' ~/.tmux/plugins/tmux-which-key/README.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '1,240p' ~/.tmux/plugins/tmux-which-key/README.md"
 Chunk ID: 967ac9
 Wall time: 0.0000 seconds
@@ -4166,7 +4166,7 @@ structure:
 ```yaml
 # The starting
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:31:02Z)**_
@@ -5560,7 +5560,7 @@ _**Agent (gpt-5.4 2026-04-09 10:34:55Z)**_
 
 **Update: `/Users/zhouhanru/.local/share/chezmoi/docs/tools/tmux.md`**
 
-```diff
+````diff
 @@
  This setup is tuned for coding-agent and Neovim workflows:
  
@@ -5615,7 +5615,7 @@ _**Agent (gpt-5.4 2026-04-09 10:34:55Z)**_
 +- The managed Alacritty config also sends `Ctrl+/` as `\u001f`, which matches LazyVim's built-in `<C-_>` fallback for terminal toggle.
  - `set-clipboard on` enables OSC 52 clipboard copy over SSH.
  - `allow-passthrough on` helps terminal image protocols and similar passthrough features.
-```
+````
 
 **Delete: `/Users/zhouhanru/.local/share/chezmoi/dot_config/tmux/plugins/tmux-which-key/config.yaml`**
 </details></tool-use>
@@ -6209,7 +6209,7 @@ _**Agent (gpt-5.4 2026-04-09 10:36:10Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '88,140p' docs/tools/tmux.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '88,140p' docs/tools/tmux.md"
 Chunk ID: ed157e
 Wall time: 0.0000 seconds
@@ -6262,7 +6262,7 @@ tmux show-options -g | rg 'status|focus-events'
 
 - [Sesh](./sesh.md)
 - [Starship](./starship.md)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:36:10Z)**_
@@ -6393,7 +6393,7 @@ _**Agent (gpt-5.4 2026-04-09 10:36:30Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `git diff -- dot_tmux.conf dot_config/alacritty/alacritty.toml README.md docs/tools/tmux.md dot_config/tmux/plugins/tmux-which-key/config.yaml`</summary>
-```
+````
 Command: /bin/zsh -lc 'git diff -- dot_tmux.conf dot_config/alacritty/alacritty.toml README.md docs/tools/tmux.md dot_config/tmux/plugins/tmux-which-key/config.yaml'
 Chunk ID: 74f3e1
 Wall time: 0.0000 seconds
@@ -6502,7 +6502,7 @@ index 8e795b4..0693cc1 100644
  # https://www.youtube.com/watch?v=uOnL4fEnldA
  # https://www.josean.com/posts/how
 ... (truncated)
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:36:49Z)**_
@@ -7203,7 +7203,7 @@ _**Agent (gpt-5.4 2026-04-09 10:52:50Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command** `sed -n '1,120p' docs/tools/sesh.md`</summary>
-```
+````
 Command: /bin/zsh -lc "sed -n '1,120p' docs/tools/sesh.md"
 Chunk ID: 90f609
 Wall time: 0.0000 seconds
@@ -7330,7 +7330,7 @@ startup_command = "nvim"
 ```
 
 - `*` matches one level, `**` matches recursively
-```
+````
 </details></tool-use>
 
 _**Agent (gpt-5.4 2026-04-09 10:52:50Z)**_

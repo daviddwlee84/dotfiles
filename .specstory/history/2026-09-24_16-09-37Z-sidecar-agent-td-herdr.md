@@ -3241,4 +3241,151 @@ Input:
 text(await tools.exec_command({cmd:"python3 - <<'PY'\nimport hashlib, json, subprocess, tempfile\nfrom pathlib import Path\nroot=Path.cwd()\npaths=[\n '.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl',\n 'README.md','TODO.md','backlog/agent-session-dashboard-tui.md',\n 'docs/this_repo/tool-managers.md','docs/this_repo/tool-managers.zh-TW.md',\n 'docs/this_repo/upgrades.md','docs/this_repo/upgrades.zh-TW.md',\n 'docs/tools/tasks.md','docs/tools/tasks.zh-TW.md',\n 'docs/tools/td_sidecar.md','docs/tools/td_sidecar.zh-TW.md',\n 'dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl',\n 'dot_ansible/roles/coding_agents/tasks/main.yml',\n 'dot_ansible/roles/coding_agents/tasks/tasks.yml',\n 'dot_ansible/roles/coding_agents/tasks/tasks-config.yml',\n 'dot_config/docs/tools/tool-catalog.toml','mkdocs.yml',\n 'tests/unit/test_tasks_config.py','tests/unit/test_tasks_installer.py',\n '.specstory/history/2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md',\n]\nassert not subprocess.check_output(['git','diff','--cached','--name-only']), 'Index is no longer empty'\nbase=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()\nsnapshots={p:(root/p).read_bytes() for p in paths}\nparent=Path(tempfile.mkdtemp(prefix='tasks-commit-'))\ncheckout=parent/'checkout'\nsubprocess.run(['git','worktree','add','--detach',str(checkout),base],check=True,stdout=subprocess.DEVNULL)\nrecords={}\nfor path,contents in snapshots.items():\n    tracked=subprocess.check_output(['git','ls-files','--stage','--',path],text=True).split()\n    mode=tracked[0] if tracked else ('100755' if (root/path).stat().st_mode & 0o111 else '100644')\n    target=checkout/path\n    target.parent.mkdir(parents=True,exist_ok=True)\n    target.write_bytes(contents)\n    target.chmod(0o755 if mode=='100755' else 0o644)\n    records[path]={'mode':mode,'sha256':hashlib.sha256(contents).hexdigest()}\nsubprocess.run(['git','add','--',*paths],cwd=checkout,check=True)\nmanifest=parent/'manifest.json'\nmanifest.write_text(json.dumps({'root':str(root),'base':base,'checkout':str(checkout),'records':records},indent=2))\nmanifest.chmod(0o600)\nprint('Snapshot manifest:',manifest)\nprint('Product files:',len(paths)-1,'plus current conversation transcript')\nPY","yield_time_ms":1000,"max_output_tokens":800}));
 
 ```
+
+```
+Script completed
+Wall time 1.2 seconds
+Output:
+
+{"chunk_id":"3d620c","wall_time_seconds":1.001517917,"session_id":85779,"original_token_count":11,"output":"Preparing worktree (detached HEAD 8c04a8d)\n"}
+```
 </details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:54:24Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.write_stdin({session_id:85779,chars:"",yield_time_ms:1000,max_output_tokens:800}));
+
+```
+
+```
+Script completed
+Wall time 0.0 seconds
+Output:
+
+{"chunk_id":"3de952","wall_time_seconds":0.000008084,"exit_code":0,"original_token_count":582,"output":"Updating files:  36% (709/1929)\rUpdating files:  37% (714/1929)\rUpdating files:  38% (734/1929)\rUpdating files:  39% (753/1929)\rUpdating files:  40% (772/1929)\rUpdating files:  41% (791/1929)\rUpdating files:  42% (811/1929)\rUpdating files:  43% (830/1929)\rUpdating files:  44% (849/1929)\rUpdating files:  45% (869/1929)\rUpdating files:  46% (888/1929)\rUpdating files:  47% (907/1929)\rUpdating files:  48% (926/1929)\rUpdating files:  49% (946/1929)\rUpdating files:  50% (965/1929)\rUpdating files:  51% (984/1929)\rUpdating files:  52% (1004/1929)\rUpdating files:  53% (1023/1929)\rUpdating files:  54% (1042/1929)\rUpdating files:  55% (1061/1929)\rUpdating files:  56% (1081/1929)\rUpdating files:  57% (1100/1929)\rUpdating files:  58% (1119/1929)\rUpdating files:  59% (1139/1929)\rUpdating files:  60% (1158/1929)\rUpdating files:  61% (1177/1929)\rUpdating files:  62% (1196/1929)\rUpdating files:  63% (1216/1929)\rUpdating files:  64% (1235/1929)\rUpdating files:  65% (1254/1929)\rUpdating files:  66% (1274/1929)\rUpdating files:  67% (1293/1929)\rUpdating files:  68% (1312/1929)\rUpdating files:  69% (1332/1929)\rUpdating files:  70% (1351/1929)\rUpdating files:  71% (1370/1929)\rUpdating files:  72% (1389/1929)\rUpdating files:  73% (1409/1929)\rUpdating files:  74% (1428/1929)\rUpdating files:  75% (1447/1929)\rUpdating files:  76% (1467/1929)\rUpdating files:  77% (1486/1929)\rUpdating files:  78% (1505/1929)\rUpdating files:  79% (1524/1929)\rUpdating files:  80% (1544/1929)\rUpdating files:  81% (1563/1929)\rUpdating files:  82% (1582/1929)\rUpdating files:  83% (1602/1929)\rUpdating files:  84% (1621/1929)\rUpdating files:  85% (1640/1929)\rUpdating files:  86% (1659/1929)\rUpdating files:  87% (1679/1929)\rUpdating files:  88% (1698/1929)\rUpdating files:  89% (1717/1929)\rUpdating files:  90% (1737/1929)\rUpdating files:  91% (1756/1929)\rUpdating files:  92% (1775/1929)\rUpdating files:  93% (1794/1929)\rUpdating files:  94% (1814/1929)\rUpdating files:  95% (1833/1929)\rUpdating files:  96% (1852/1929)\rUpdating files:  97% (1872/1929)\rUpdating files:  98% (1891/1929)\rUpdating files:  99% (1910/1929)\rUpdating files: 100% (1929/1929)\rUpdating files: 100% (1929/1929), done.\nSnapshot manifest: /var/folders/xz/b1n4y0mn3lj6qs5ydgypj2r80000gn/T/tasks-commit-07crofq9/manifest.json\nProduct files: 20 plus current conversation transcript\n"}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:55:01Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"bash /Users/zhouhanru/.local/share/chezmoi/.agents/skills/agent-history-hygiene/scripts/scan-staged.sh --redact && python3 scripts/redact_secrets.py --fix --paths .specstory/history && git diff --cached --check -- . ':!.specstory' && git diff --cached --stat && git commit -m \"feat(tasks): install suite and seed XDG data configuration\" -m \"Add checksum-verified Linux fallback, preserve existing Tasks settings, and document the Sidecar/td/Tasks workflow. Capture Herdr Activity dashboard research and validate configuration and installer behavior.\"","workdir":"/var/folders/xz/b1n4y0mn3lj6qs5ydgypj2r80000gn/T/tasks-commit-07crofq9/checkout","yield_time_ms":1000,"max_output_tokens":2200}));
+
+```
+
+```
+Script completed
+Wall time 1.2 seconds
+Output:
+
+{"chunk_id":"10e6e7","wall_time_seconds":1.002279333,"session_id":65183,"original_token_count":0,"output":""}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:55:24Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.write_stdin({session_id:65183,chars:"",yield_time_ms:1000,max_output_tokens:2800}));
+
+```
+
+```
+Script completed
+Wall time 0.0 seconds
+Output:
+
+{"chunk_id":"973af1","wall_time_seconds":0.000015458,"exit_code":1,"original_token_count":1115,"output":"Scanning staged files under: .specstory/history/\nFound private key pattern(s) in 1 file(s):\n\n  .specstory/history/2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md:\n    14 \"PRIV***KEY\" mention(s)\n\nRedacting secrets...\n  Redacted: .specstory/history/2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md\n\nSuccessfully redacted 1 file(s)\nReview changes with: git diff\nThen stage with: git add .specstory/history/\n .../run_onchange_after_20_ansible_roles.sh.tmpl    |    2 +\n .../2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md | 1290 +++++++++++++++++++-\n README.md                                          |    9 +-\n TODO.md                                            |    2 +-\n backlog/agent-session-dashboard-tui.md             |  115 +-\n docs/this_repo/tool-managers.md                    |    9 +-\n docs/this_repo/tool-managers.zh-TW.md              |    9 +-\n docs/this_repo/upgrades.md                         |   19 +\n docs/this_repo/upgrades.zh-TW.md                   |   15 +\n docs/tools/tasks.md                                |   97 ++\n docs/tools/tasks.zh-TW.md                          |   91 ++\n docs/tools/td_sidecar.md                           |   15 +-\n docs/tools/td_sidecar.zh-TW.md                     |   13 +-\n dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl   |    2 +-\n dot_ansible/roles/coding_agents/tasks/main.yml     |    6 +\n .../roles/coding_agents/tasks/tasks-config.yml     |   81 ++\n dot_ansible/roles/coding_agents/tasks/tasks.yml    |  208 ++++\n dot_config/docs/tools/tool-catalog.toml            |   12 +\n mkdocs.yml                                         |    2 +\n tests/unit/test_tasks_config.py                    |  140 +++\n tests/unit/test_tasks_installer.py                 |  260 ++++\n 21 files changed, 2383 insertions(+), 14 deletions(-)\n[WARNING] Unstaged files detected.\n[INFO] Stashing unstaged files to /Users/zhouhanru/.cache/pre-commit/patch1790283304-66379.\nAuto-redact secrets in agent artifacts..................................................Failed\n- hook id: redact-agent-secrets\n- files were modified by this hook\n\nSkipping missing path: .cursor/rules/\nSkipping missing path: .opencode/plans/\nSkipping missing path: .specify/\nSkipping missing path: .codex/\nScanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/\nFound private key pattern(s) in 1 file(s):\n\n  .specstory/history/2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md:\n    14 \"PRIV***KEY\" mention(s)\n\nRedacting secrets...\n  Redacted: .specstory/history/2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md\n\nSuccessfully redacted 1 file(s)\nReview changes with: git diff\nThen stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/\n\nchezmoi prompts in sync (dotfiles_init.py gen --check)..................................Passed\ntool-managers.md Tool index in sync with tool-catalog.toml..............................Passed\nansible facts via ansible_facts[...] (inject_facts_as_vars=False).......................Passed\nDetect hardcoded secrets................................................................Passed\ndetect private key......................................................................Passed\ncheck for added large files.............................................................Passed\ncheck for merge conflicts...............................................................Passed\nfix end of files........................................................................Passed\ntrim trailing whitespace................................................................Passed\ncheck yaml..............................................................................Passed\ncheck toml..............................................................................Passed\ncheck json..........................................................(no files to check)Skipped\ncheck that executables have shebangs................................(no files to check)Skipped\nshellcheck (scripts/**/*.sh)........................................(no files to check)Skipped\nshellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped\nshfmt...............................................................(no files to check)Skipped\nLint GitHub Actions workflow files..................................(no files to check)Skipped\n[WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...\n[INFO] Restored changes from /Users/zhouhanru/.cache/pre-commit/patch1790283304-66379.\n"}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:55:45Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"python3 scripts/redact_secrets.py --fix --paths .specstory/history && git add -- .specstory/history/2026-09-24_16-09-37Z-sidecar-agent-td-herdr.md && bash /Users/zhouhanru/.local/share/chezmoi/.agents/skills/agent-history-hygiene/scripts/scan-staged.sh --redact && git commit -m \"feat(tasks): install suite and seed XDG data configuration\" -m \"Add checksum-verified Linux fallback, preserve existing Tasks settings, and document the Sidecar/td/Tasks workflow. Capture Herdr Activity dashboard research and validate configuration and installer behavior.\"","workdir":"/var/folders/xz/b1n4y0mn3lj6qs5ydgypj2r80000gn/T/tasks-commit-07crofq9/checkout","yield_time_ms":1000,"max_output_tokens":1700}));
+
+```
+
+```
+Script completed
+Wall time 1.2 seconds
+Output:
+
+{"chunk_id":"86acf0","wall_time_seconds":1.003427167,"session_id":72256,"original_token_count":23,"output":"Scanning staged files under: .specstory/history/\nNo secrets found in: .specstory/history/\n"}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:55:53Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.write_stdin({session_id:72256,chars:"",yield_time_ms:1000,max_output_tokens:2200}));
+
+```
+
+```
+Script completed
+Wall time 0.0 seconds
+Output:
+
+{"chunk_id":"ec8d92","wall_time_seconds":0.00000875,"exit_code":0,"original_token_count":546,"output":"Auto-redact secrets in agent artifacts..................................................Passed\nchezmoi prompts in sync (dotfiles_init.py gen --check)..................................Passed\ntool-managers.md Tool index in sync with tool-catalog.toml..............................Passed\nansible facts via ansible_facts[...] (inject_facts_as_vars=False).......................Passed\nDetect hardcoded secrets................................................................Passed\ndetect private key......................................................................Passed\ncheck for added large files.............................................................Passed\ncheck for merge conflicts...............................................................Passed\nfix end of files........................................................................Passed\ntrim trailing whitespace................................................................Passed\ncheck yaml..............................................................................Passed\ncheck toml..............................................................................Passed\ncheck json..........................................................(no files to check)Skipped\ncheck that executables have shebangs................................(no files to check)Skipped\nshellcheck (scripts/**/*.sh)........................................(no files to check)Skipped\nshellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped\nshfmt...............................................................(no files to check)Skipped\nLint GitHub Actions workflow files..................................(no files to check)Skipped\n[detached HEAD 3b1954a] feat(tasks): install suite and seed XDG data configuration\n 21 files changed, 2382 insertions(+), 13 deletions(-)\n create mode 100644 docs/tools/tasks.md\n create mode 100644 docs/tools/tasks.zh-TW.md\n create mode 100644 dot_ansible/roles/coding_agents/tasks/tasks-config.yml\n create mode 100644 dot_ansible/roles/coding_agents/tasks/tasks.yml\n create mode 100644 tests/unit/test_tasks_config.py\n create mode 100644 tests/unit/test_tasks_installer.py\n"}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:56:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.exec_command({cmd:"python3 - <<'PY'\nimport hashlib, json, subprocess\nfrom pathlib import Path\nmanifest=Path('/var/folders/xz/b1n4y0mn3lj6qs5ydgypj2r80000gn/T/tasks-commit-07crofq9/manifest.json')\nd=json.loads(manifest.read_text())\nroot=Path(d['root']); checkout=Path(d['checkout']); records=d['records']\ndef git(*args,cwd=root):\n    return subprocess.check_output(['git',*args],cwd=cwd,text=True).strip()\nassert git('rev-parse','HEAD')==d['base'], 'Main HEAD moved; stop before integration'\nassert not git('diff','--cached','--name-only'), 'Shared index is no longer empty'\ncommit=git('rev-parse','HEAD',cwd=checkout)\nassert git('rev-parse',commit+'^')==d['base'], 'Unexpected parent'\nassert set(git('diff-tree','--no-commit-id','--name-only','-r',commit).splitlines())==set(records), 'Commit scope mismatch'\nfor path,r in records.items():\n    if not path.startswith('.specstory/'):\n        assert hashlib.sha256((root/path).read_bytes()).hexdigest()==r['sha256'], f'Product file changed during commit: {path}'\nsubprocess.run(['git','update-ref','-m','commit: feat(tasks): install suite and seed XDG data configuration','HEAD',commit,d['base']],cwd=root,check=True)\nsubprocess.run(['git','reset','-q','HEAD','--',*records],cwd=root,check=True)\nfor path,r in records.items():\n    if not path.startswith('.specstory/'):\n        assert hashlib.sha256((root/path).read_bytes()).hexdigest()==r['sha256'], f'Working file changed: {path}'\nassert not git('diff','--cached','--name-only')\nsubprocess.run(['git','worktree','remove',str(checkout)],cwd=root,check=True)\nprint('Committed on current branch:',commit)\nprint('Working files preserved; index empty; temporary checkout removed.')\nPY\ngit log -1 --oneline\ngit status --short | python3 -c 'import sys; print(\"\".join(s for s in sys.stdin if \".specstory/\" not in s),end=\"\")'","yield_time_ms":1000,"max_output_tokens":700}));
+
+```
+
+```
+Script completed
+Wall time 1.3 seconds
+Output:
+
+{"chunk_id":"264441","wall_time_seconds":1.002230292,"session_id":72247,"original_token_count":0,"output":""}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:56:36Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec"><details>
+<summary>Tool use: **exec**</summary>
+Input:
+```
+text(await tools.write_stdin({session_id:72247,chars:"",yield_time_ms:1000,max_output_tokens:700}));
+
+```
+
+```
+Script completed
+Wall time 0.0 seconds
+Output:
+
+{"chunk_id":"139a36","wall_time_seconds":0.000012084,"exit_code":0,"original_token_count":51,"output":"Committed on current branch: 3b1954ab3e0ed571ca7b587892e7acc1c5ea92ff\nWorking files preserved; index empty; temporary checkout removed.\n3b1954a feat(tasks): install suite and seed XDG data configuration\n"}
+```
+</details></tool-use>
+
+_**Agent (gpt-6-astra 2026-09-24 20:56:44Z)**_
+
+已提交 `3b1954a` — `feat(tasks): install suite and seed XDG data configuration`
+
+包含 Tasks 實作、測試、文件、Activity 研究與本次對話紀錄。所有 pre-commit 檢查通過；其他歷史紀錄變更保留未提交。
