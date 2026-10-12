@@ -62,6 +62,8 @@ sms count [--json]          # 收件匣總數 / 上限 / 未讀（B525s 不需�
 sms prune --keep N [--include-unread] [--yes]   # 刪除最舊、超出 N 則的訊息（預設只刪已讀）
 sms watch [--interval 10] [--once] [--json] [--no-notify] [--mark-read]
 sms notify-test [--latest] [--dry-run]          # 透過與 watch 相同的目標送一則測試推播
+sms archive                                     # 把收件匣所有訊息複製到本機 SQLite 封存
+sms export [--format sbr|mbox|jsonl] [-o FILE] [--refresh]
 sms service install|uninstall|status            # `sms watch` 的 systemd --user unit（Linux）
 ```
 
@@ -160,6 +162,44 @@ B525s 可存 500 則）。收件匣滿了路由器會丟棄新簡訊，所以 `w
 sms prune --keep 200                 # 刪除最新 200 則以外、最舊的已讀訊息
 sms prune --keep 200 --include-unread --yes
 ```
+
+`prune` 會**先封存 (archive) 再刪除**（見下節）；`--no-archive` 則為有損刪除。
+想完全自動，可讓 `watch` 處理（需主動開啟）：
+
+```toml
+[watch]
+archive = true
+auto_prune_keep = 300                # 路由器最多只保留 300 則
+auto_prune_include_unread = true     # 推播送達後，路由器上的「未讀」已無意義
+```
+
+`auto_prune_keep` 在沒有 `archive = true`、或小於 50（`watch` 的比對視窗）時會拒絕執行，
+所以自動清理永遠不會遺失訊息，也不會刪掉尚未推播的訊息。
+
+## 封存與匯出
+
+簡訊沒有像 email 那樣的標準（沒有對應 RFC 5322 / mbox / IMAP 的東西），所以封存用單純的
+SQLite 檔，匯出則選兩種真的有工具生態的格式：
+
+```bash
+sms archive                                  # 冪等 (idempotent)：路由器上 M 則中新增 N 則
+sms export -o sms.xml                        # SMS Backup & Restore XML（預設）
+sms export --format mbox -o sms.mbox         # 一則簡訊 = 一封信
+sms export --format jsonl | jq …             # 給腳本用
+sms export --refresh -o sms.xml              # 先封存再匯出
+sqlite3 ~/.local/share/sms/archive.sqlite 'select date, phone, content from sms order by date desc limit 5'
+```
+
+| 格式 | 用什麼讀 |
+|------|----------|
+| `sbr` | Android app *SMS Backup & Restore*（SyncTech）——可還原到手機簡訊資料庫；也有網頁檢視器與許多轉換工具。事實上的簡訊封存格式。 |
+| `mbox` | 任何郵件程式（Apple Mail / Thunderbird 匯入）、`mutt -f`、`notmuch`。主旨 = 前 70 字；`Message-ID` 固定，重複匯入會去重。 |
+| `jsonl` | `jq`、腳本。 |
+
+封存檔位於 platformdirs 的 **data** 目錄（Linux 為 `~/.local/share/sms/archive.sqlite`，
+或 `XDG_DATA_HOME` 指向處），權限 600。每列的 key 與 `watch` 的 seen-state 相同
+（`index|phone|date`）；`unread` 欄位記錄最後一次封存時路由器上的已讀狀態。
+路由器時間戳是不帶時區的本地時間，匯出時假設為**本機時區**。
 
 ## 剪貼簿
 

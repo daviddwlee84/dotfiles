@@ -22,6 +22,7 @@ import os
 import re
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
@@ -32,7 +33,7 @@ from pathlib import Path
 from typing import Annotated, Any, Iterator, Literal, Union
 
 import tyro
-from platformdirs import user_cache_dir, user_config_dir, user_state_dir
+from platformdirs import user_cache_dir, user_config_dir, user_data_dir, user_state_dir
 
 APP = "sms"
 DEFAULT_HOST = "192.168.168.1"
@@ -55,6 +56,9 @@ INBOX_CACHE = CACHE_DIR / "inbox.json"
 STATE_DIR = Path(user_state_dir(APP))
 SEEN_FILE = STATE_DIR / "seen.json"
 NOTIFY_LOG = STATE_DIR / "notify.log"
+DATA_DIR = Path(user_data_dir(APP))
+ARCHIVE_DB = DATA_DIR / "archive.sqlite"
+PAGE_SIZE = 50  # router max per sms-list page
 UNIT_NAME = "sms-watch.service"
 UNIT_FILE = Path.home() / ".config" / "systemd" / "user" / UNIT_NAME
 
@@ -204,6 +208,47 @@ def list_page(client: Any, page: int = 1, count: int = 50, ascending: bool = Fal
     ))
 
 
+def list_all(client: Any, ascending: bool = False) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    page = 1
+    while True:
+        batch = list_page(client, page=page, count=PAGE_SIZE, ascending=ascending)
+        out.extend(batch)
+        if len(batch) < PAGE_SIZE:
+            return out
+        page += 1
+
+
+def pick_victims(client: Any, total: int, keep: int, include_unread: bool) -> tuple[int, list[dict[str, Any]]]:
+    """(excess, victims): the oldest `total - keep` messages, minus unread
+    ones unless `include_unread`. The newest `keep` are never touched."""
+    excess = total - keep
+    victims: list[dict[str, Any]] = []
+    seen = 0
+    page = 1
+    while seen < excess:
+        batch = list_page(client, page=page, count=PAGE_SIZE, ascending=True)
+        if not batch:
+            break
+        for m in batch[: excess - seen]:
+            if include_unread or not m["unread"]:
+                victims.append(m)
+        seen += min(len(batch), excess - seen)
+        page += 1
+    return max(excess, 0), victims
+
+
+def delete_messages(client: Any, cfg: dict[str, str], victims: list[dict[str, Any]], archive: bool) -> None:
+    """Delete victims; when `archive`, they are written to the archive FIRST,
+    so a failed archive write aborts before anything is lost."""
+    if archive:
+        with archive_open() as db:
+            archive_upsert(db, victims, cfg["host"])
+    for m in victims:
+        client.sms.delete_sms(int(m["index"]))
+    clear_cache()
+
+
 def fetch_inbox(cfg: dict[str, str], count: int = 50) -> list[dict[str, Any]]:
     try:
         with open_client(cfg) as client:
@@ -238,6 +283,64 @@ def sms_count(cfg: dict[str, str]) -> dict[str, int]:
     else:
         raw = {el.tag: (el.text or "").strip() for el in root}
     return {k: int(v) for k, v in (raw or {}).items() if str(v).lstrip("-").isdigit()}
+
+
+# ---------- archive (SQLite) ------------------------------------------------
+
+ARCHIVE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS sms (
+    key          TEXT PRIMARY KEY,   -- msg_key(): sha1(index|phone|date)
+    router_index INTEGER,
+    phone        TEXT NOT NULL,
+    date         TEXT NOT NULL,      -- router local time, 'YYYY-MM-DD HH:MM:SS'
+    content      TEXT NOT NULL,
+    unread       INTEGER NOT NULL,   -- read state on the router when last archived
+    host         TEXT NOT NULL,
+    archived_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sms_date ON sms(date);
+"""
+
+
+@contextmanager
+def archive_open() -> Iterator[sqlite3.Connection]:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(ARCHIVE_DB)
+    try:
+        db.executescript(ARCHIVE_SCHEMA)
+        with db:  # one transaction
+            yield db
+    finally:
+        db.close()
+    ARCHIVE_DB.chmod(0o600)
+
+
+def archive_upsert(db: sqlite3.Connection, msgs: list[dict[str, Any]], host: str) -> int:
+    """Insert unseen messages (refresh read state of known ones). Returns # new."""
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    new = 0
+    for m in msgs:
+        cur = db.execute(
+            "INSERT OR IGNORE INTO sms VALUES (?,?,?,?,?,?,?,?)",
+            (msg_key(m), int(m["index"] or 0), m["phone"], m["date"], m["content"],
+             int(m["unread"]), host, now),
+        )
+        if cur.rowcount:
+            new += 1
+        else:
+            db.execute("UPDATE sms SET unread=? WHERE key=?", (int(m["unread"]), msg_key(m)))
+    return new
+
+
+def archive_rows() -> list[dict[str, Any]]:
+    if not ARCHIVE_DB.exists():
+        return []
+    db = sqlite3.connect(ARCHIVE_DB)
+    db.row_factory = sqlite3.Row
+    try:
+        return [dict(r) for r in db.execute("SELECT * FROM sms ORDER BY date, router_index")]
+    finally:
+        db.close()
 
 
 def get_messages(cfg: dict[str, str], use_cache: bool = True, count: int = 50) -> list[dict[str, Any]]:
@@ -475,30 +578,18 @@ class PruneCmd:
     """Also delete unread messages (default: only read ones are eligible)."""
     yes: bool = False
     """Skip the confirmation prompt."""
+    no_archive: bool = False
+    """Don't save victims to the local archive before deleting (lossy)."""
 
     def run(self) -> int:
         cfg = load_config()
         try:
             total = sms_count(cfg).get("LocalInbox", 0)
-            excess = total - self.keep
-            if excess <= 0:
+            if total <= self.keep:
                 print(f"inbox has {total} ≤ {self.keep}; nothing to prune")
                 return 0
-            # Walk oldest-first and stop once `excess` messages have passed;
-            # the rest are the newest `keep`, which are never touched.
-            victims: list[dict[str, Any]] = []
-            seen = 0
             with open_client(cfg) as client:
-                page = 1
-                while seen < excess:
-                    batch = list_page(client, page=page, ascending=True)
-                    if not batch:
-                        break
-                    for m in batch[: excess - seen]:
-                        if self.include_unread or not m["unread"]:
-                            victims.append(m)
-                    seen += min(len(batch), excess - seen)
-                    page += 1
+                excess, victims = pick_victims(client, total, self.keep, self.include_unread)
                 if not victims:
                     print(f"{excess} oldest messages are all unread; use --include-unread")
                     return 0
@@ -509,12 +600,120 @@ class PruneCmd:
                         die("refusing to prune without --yes on a non-TTY", 2)
                     if input("Proceed? [y/N] ").strip().lower() not in ("y", "yes"):
                         return 1
-                for m in victims:
-                    client.sms.delete_sms(int(m["index"]))
+                delete_messages(client, cfg, victims, archive=not self.no_archive)
         except Exception as e:
             die(f"router error: {e}")
-        clear_cache()
-        print(f"deleted {len(victims)}")
+        where = "" if self.no_archive else f" (archived to {ARCHIVE_DB})"
+        print(f"deleted {len(victims)}{where}")
+        return 0
+
+
+@dataclass
+class ArchiveCmd:
+    """Copy every inbox message into the local SQLite archive (idempotent)."""
+
+    def run(self) -> int:
+        cfg = load_config()
+        try:
+            with open_client(cfg) as client:
+                msgs = list_all(client)
+        except Exception as e:
+            die(f"router error: {e}")
+        with archive_open() as db:
+            new = archive_upsert(db, msgs, cfg["host"])
+            total = db.execute("SELECT COUNT(*) FROM sms").fetchone()[0]
+        print(f"archived {new} new of {len(msgs)} on router; archive holds {total} → {ARCHIVE_DB}")
+        return 0
+
+
+def _router_dt(date: str) -> Any:
+    """Router dates are naive local time; assume this machine's timezone."""
+    from datetime import datetime
+    try:
+        return datetime.strptime(date, "%Y-%m-%d %H:%M:%S").astimezone()
+    except ValueError:
+        return None
+
+
+def export_sbr(rows: list[dict[str, Any]]) -> str:
+    """'SMS Backup & Restore' (SyncTech) XML — importable into Android's SMS
+    store by that app, viewable in its web viewer, widely converted."""
+    from xml.sax.saxutils import quoteattr as q
+
+    out = ["<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+           f'<smses count="{len(rows)}">']
+    for r in rows:
+        dt = _router_dt(r["date"])
+        ms = int(dt.timestamp() * 1000) if dt else 0
+        readable = dt.strftime("%b %d, %Y %I:%M:%S %p") if dt else r["date"]
+        out.append(
+            f'  <sms protocol="0" address={q(r["phone"])} date="{ms}" type="1" subject="null" '
+            f'body={q(r["content"], {chr(10): "&#10;", chr(13): "&#13;"})} toa="null" sc_toa="null" '
+            f'service_center="null" read="{0 if r["unread"] else 1}" status="-1" locked="0" '
+            f'date_sent="0" readable_date={q(readable)} contact_name="(Unknown)" />'
+        )
+    out.append("</smses>")
+    return "\n".join(out) + "\n"
+
+
+def export_mbox(rows: list[dict[str, Any]], path: Path) -> None:
+    """One SMS = one RFC 5322 message, so any mail client / notmuch can read it."""
+    import mailbox
+    from email.message import EmailMessage
+    from email.utils import format_datetime
+
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.unlink(missing_ok=True)
+    box = mailbox.mbox(tmp)
+    try:
+        for r in rows:
+            local = re.sub(r"[^0-9A-Za-z+._-]", "_", r["phone"]) or "unknown"
+            msg = EmailMessage()
+            msg["From"] = f'"{r["phone"]}" <{local}@sms.invalid>'
+            msg["To"] = f"<sms@{r['host']}.invalid>"
+            first = r["content"].replace("\n", " ").strip()
+            msg["Subject"] = (first[:70] + "…") if len(first) > 70 else (first or "(empty)")
+            dt = _router_dt(r["date"])
+            if dt:
+                msg["Date"] = format_datetime(dt)
+            msg["Message-ID"] = f"<{r['key']}@sms.invalid>"
+            msg["X-SMS-Unread"] = str(r["unread"])
+            msg.set_content(r["content"])
+            box.add(mailbox.mboxMessage(msg))
+        box.flush()
+    finally:
+        box.close()
+    tmp.replace(path)
+
+
+@dataclass
+class ExportCmd:
+    """Export the local archive as SMS Backup & Restore XML, mbox, or JSONL."""
+    format: Literal["sbr", "mbox", "jsonl"] = "sbr"
+    """sbr = Android 'SMS Backup & Restore' XML; mbox = mail clients; jsonl = scripts."""
+    output: Annotated[str, tyro.conf.arg(aliases=["-o"])] = "-"
+    """Output file ('-' = stdout; mbox needs a real file)."""
+    refresh: bool = False
+    """Run `sms archive` first so the export includes the router's current inbox."""
+
+    def run(self) -> int:
+        if self.refresh:
+            ArchiveCmd().run()
+        rows = archive_rows()
+        if not rows:
+            die(f"archive is empty ({ARCHIVE_DB}); run `sms archive` first", 3)
+        if self.format == "mbox":
+            if self.output == "-":
+                die("mbox needs a file: sms export --format mbox -o sms.mbox", 2)
+            export_mbox(rows, Path(self.output))
+        else:
+            text = (export_sbr(rows) if self.format == "sbr"
+                    else "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+            if self.output == "-":
+                sys.stdout.write(text)
+                return 0
+            Path(self.output).write_text(text, encoding="utf-8")
+        print(f"exported {len(rows)} message(s) → {self.output}", file=sys.stderr)
         return 0
 
 
@@ -613,6 +812,14 @@ class WatchCmd:
         full_sync = self.full_sync or float(wcfg.get("full_sync", DEFAULT_FULL_SYNC))
         cap_warn = float(wcfg.get("capacity_warn", DEFAULT_CAPACITY_WARN))
         mark_read = self.mark_read or bool(wcfg.get("mark_read", False))
+        self._archive = bool(wcfg.get("archive", False))
+        self._prune_keep = int(wcfg.get("auto_prune_keep", 0))
+        self._prune_unread = bool(wcfg.get("auto_prune_include_unread", False))
+        self._backfilled = self._prune_warned = False
+        if self._prune_keep and not self._archive:
+            die("[watch] auto_prune_keep needs archive = true (pruning must be lossless)", 2)
+        if 0 < self._prune_keep < PAGE_SIZE:
+            die(f"[watch] auto_prune_keep must be ≥ {PAGE_SIZE} (the diff window)", 2)
         urls, tag = notify_targets(wcfg)
         if not self.no_notify and not urls and not tag:
             die("no notify target: set SMS_NOTIFY_URLS, or [watch] notify_urls / "
@@ -626,7 +833,9 @@ class WatchCmd:
         signal.signal(signal.SIGTERM, _term)
 
         target = "stdout only" if self.no_notify else (f"tag={tag}" if tag else f"{len(urls)} apprise URL(s)")
-        log(f"watching {cfg['host']} every {interval:g}s ({target})")
+        extras = (" + archive" if self._archive else "") + (
+            f" + auto-prune >{self._prune_keep}" if self._prune_keep else "")
+        log(f"watching {cfg['host']} every {interval:g}s ({target}{extras})")
 
         last_sig: tuple[int, int] | None = None
         last_full = 0.0
@@ -650,7 +859,7 @@ class WatchCmd:
                 sig = (inbox, c.get("LocalUnread", 0))
                 now = time.monotonic()
                 if sig != last_sig or now - last_full >= full_sync:
-                    self._sync(cfg, urls, tag, mark_read)
+                    self._sync(cfg, urls, tag, mark_read, inbox)
                     last_sig, last_full = sig, now
                 if failures > 1:
                     log(f"router reachable again after {failures} failed attempt(s)")
@@ -672,9 +881,18 @@ class WatchCmd:
                 return 0
             time.sleep(interval)
 
-    def _sync(self, cfg: dict[str, str], urls: list[str], tag: str | None, mark_read: bool) -> None:
+    def _sync(self, cfg: dict[str, str], urls: list[str], tag: str | None, mark_read: bool,
+              inbox: int) -> None:
         with open_client(cfg) as client:
             msgs = list_page(client)
+            if self._archive:
+                # First sync archives the whole inbox; later ones the newest page.
+                batch = msgs if self._backfilled else list_all(client)
+                with archive_open() as db:
+                    n = archive_upsert(db, batch, cfg["host"])
+                if not self._backfilled and n:
+                    log(f"archived {n} message(s) → {ARCHIVE_DB}")
+                self._backfilled = True
             state = load_seen()
             first = state is None
             if first:
@@ -704,6 +922,16 @@ class WatchCmd:
 
             state["keys"].extend(msg_key(m) for m in fresh)
             save_seen(state)
+
+            if self._prune_keep and inbox > self._prune_keep:
+                excess, victims = pick_victims(client, inbox, self._prune_keep, self._prune_unread)
+                if victims:
+                    delete_messages(client, cfg, victims, archive=True)
+                    log(f"auto-pruned {len(victims)} oldest message(s) (archived first)")
+                elif not self._prune_warned:
+                    self._prune_warned = True
+                    log(f"auto-prune: {excess} oldest message(s) are unread; "
+                        f"set [watch] auto_prune_include_unread = true to prune them")
         if new:
             clear_cache()  # so `sms` / `tv sms` see it immediately
 
@@ -822,6 +1050,8 @@ Command = Union[
     Annotated[LoginTestCmd, tyro.conf.subcommand("login-test")],
     Annotated[CountCmd, tyro.conf.subcommand("count")],
     Annotated[PruneCmd, tyro.conf.subcommand("prune")],
+    Annotated[ArchiveCmd, tyro.conf.subcommand("archive")],
+    Annotated[ExportCmd, tyro.conf.subcommand("export")],
     Annotated[WatchCmd, tyro.conf.subcommand("watch")],
     Annotated[NotifyTestCmd, tyro.conf.subcommand("notify-test")],
     Annotated[ServiceCmd, tyro.conf.subcommand("service")],

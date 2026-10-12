@@ -64,6 +64,8 @@ sms count [--json]          # inbox total / max / unread (no login needed on B52
 sms prune --keep N [--include-unread] [--yes]   # delete oldest beyond N (read-only by default)
 sms watch [--interval 10] [--once] [--json] [--no-notify] [--mark-read]
 sms notify-test [--latest] [--dry-run]          # one test push via the same targets as watch
+sms archive                                     # copy every inbox message into the local SQLite archive
+sms export [--format sbr|mbox|jsonl] [-o FILE] [--refresh]
 sms service install|uninstall|status            # systemd --user unit for `sms watch` (Linux)
 ```
 
@@ -173,6 +175,47 @@ the router drops new SMS, so `watch` pushes a one-time alert at
 sms prune --keep 200                 # oldest read messages beyond the newest 200
 sms prune --keep 200 --include-unread --yes
 ```
+
+`prune` **archives victims before deleting** (see below); `--no-archive` makes
+it lossy. For hands-off operation let `watch` do it (opt-in):
+
+```toml
+[watch]
+archive = true
+auto_prune_keep = 300                # never let the router hold more than 300
+auto_prune_include_unread = true     # router "unread" is meaningless once pushed
+```
+
+`auto_prune_keep` refuses to run without `archive = true` or below 50 (the
+`watch` diff window), so auto-pruning can never lose a message or delete one
+before it was pushed.
+
+## Archive & export
+
+There's no email-style standard for SMS (no RFC 5322 / mbox / IMAP
+equivalent), so the archive is a plain SQLite file and exports target the two
+formats with real tooling:
+
+```bash
+sms archive                                  # idempotent: N new of M on router
+sms export -o sms.xml                        # SMS Backup & Restore XML (default)
+sms export --format mbox -o sms.mbox         # one SMS = one email
+sms export --format jsonl | jq …             # scripts
+sms export --refresh -o sms.xml              # archive first, then export
+sqlite3 ~/.local/share/sms/archive.sqlite 'select date, phone, content from sms order by date desc limit 5'
+```
+
+| Format | Read it with |
+|--------|--------------|
+| `sbr` | Android app *SMS Backup & Restore* (SyncTech) — restores into the phone's SMS store; its web viewer; many converters. The de-facto SMS archive format. |
+| `mbox` | Any mail client (Apple Mail / Thunderbird import), `mutt -f`, `notmuch`. Subject = first 70 chars; `Message-ID` is stable, so re-imports dedupe. |
+| `jsonl` | `jq`, scripts. |
+
+The archive lives in the platformdirs **data** dir (`~/.local/share/sms/archive.sqlite`
+on Linux, or wherever `XDG_DATA_HOME` points), chmod 600. Rows are keyed like
+`watch`'s seen-state (`index|phone|date`); the `unread` column tracks the
+router's read flag at the last archive. Router timestamps are naive local
+time and are exported assuming **this machine's timezone**.
 
 ## Clipboard
 

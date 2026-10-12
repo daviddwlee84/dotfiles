@@ -27,3 +27,9 @@ password = ""
 # full_sync = 300        # force an inbox diff at least this often
 # capacity_warn = 0.95   # alert once when inbox/LocalMax crosses this
 # mark_read = false      # mark pushed messages read on the router
+#
+# Optional local archive (SQLite, platformdirs data dir) — `sms export` reads it.
+# archive = false                    # copy every message into the archive
+# auto_prune_keep = 0                # >0: keep only the newest N on the router
+#                                    #     (needs archive = true, N >= 50)
+# auto_prune_include_unread = false  # also prune unread (push already delivered them)
