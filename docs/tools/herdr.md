@@ -92,7 +92,7 @@ Inside Herdr, **`prefix+Alt+F`** runs `herdr-grep --pick --visible`: type the gr
 
 The search is bounded by what the live Herdr server still retains: closed panes, output older than the history limit, and alternate-screen content already discarded cannot be recovered. The command runs where the Unix socket is accessible. For a remote server, run the deployed CLI through SSH, for example `ssh server 'herdr-grep --all-sessions -F -- "connection refused"'`; **`herdr --remote` is an interactive thin-client attach, not an RPC prefix for pane subcommands**.
 
-`tv herdr-agent-panes` and `tv herdr-review` still fuzzy-search metadata only (pane/session identifiers, state, cwd). Their visible pane text is a preview and is not part of Television's searchable source. Television runs its source before—and cannot receive—the live query, so content selection deliberately uses `herdr-grep --pick` → fzf instead of a `tv herdr-grep` channel.
+`tv herdr-panes` and `tv herdr-review` still fuzzy-search metadata only (pane/session identifiers, state, cwd). Their visible pane text is a preview and is not part of Television's searchable source. Television runs its source before—and cannot receive—the live query, so content selection deliberately uses `herdr-grep --pick` → fzf instead of a `tv herdr-grep` channel.
 
 ## cwd & workspace-naming model
 
@@ -174,13 +174,14 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` / `Alt + g` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
+| `prefix + S` | [Sidecar](td_sidecar.md) to the right of the focused pane, 50/50, in its current directory; focus moves to Sidecar | command pane |
 | `prefix + Y` | [Yazi](yazi.md) file manager rooted at the focused pane cwd; `q` returns to the unchanged layout | 90% × 85% popup |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
 | `prefix + U` | `tv tools` (CLI launcher) | command pane |
 | `` prefix + u `` | **URL picker** — fzf-pick a URL from the pane and open it (`x open`); tmux-fzf-url analog. `--source recent` = full scrollback | command pane |
 | `prefix + T` | `tv herdr-sesh` (workspace/dir switcher) | command pane |
-| `prefix + a` | `tv herdr-agent-panes` (live agent panes) | command pane |
+| `prefix + a` | `tv herdr-panes` (non-shell / agent / process / shell panes) | command pane |
 | `prefix + Alt + A` | `tv agent-wakeup` (dual-backend quota waits + scheduled continue) | command pane |
 | `prefix + f` | `tv fleet-hosts` (SSH picker) | command pane |
 | `prefix + Alt + F` | prompt for pane-content pattern → `herdr-grep --pick --visible` → fzf exact jump; Alt+S = scrollback, Alt+V = visible | command pane |
@@ -196,6 +197,24 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 > Uppercase letters resolve to `prefix+shift+<letter>`; many are built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above, while `prefix+Y` is unused upstream; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
 
 The direct lazygit shortcut uses lowercase `alt+g` (no prefix); `alt+G` would require `Alt+Shift+g`. Ghostty/cmux sends the configured Meta key from **Left Option** (`macos-option-as-alt = left`).
+
+`prefix+S` (`Ctrl+b`, then `Shift+s`) uses Herdr's native temporary-pane lifecycle
+and `~/.config/herdr/sidecar.sh`. The helper removes the command pane's initial
+zoom to expose a 50/50 split beside the source pane; focus stays on Sidecar.
+Exiting Sidecar closes the temporary pane and restores the previous layout.
+Repeated presses open additional panes. Sidecar and `td` are installed together
+under `installCodingAgents`; the launcher reports a missing Sidecar rather than
+installing it or initializing a task database. This keeps the agent in Herdr's
+original pane; see [Sidecar's companion and integrated workflows](td_sidecar.md#ux-evolution)
+for how that differs from starting agents inside Sidecar Workspaces. See the
+[Windows/WSL compatibility audit](td_sidecar.md#windows-compatibility) before
+trying this workflow in the separate Windows dotfiles repo.
+
+Sidecar **0.71.1** requires **80 columns × 24 rows inside its pane**; **1.14.0**
+requires **60×24**. On a phone, keep this binding and press `prefix+z` to zoom
+Sidecar; press it again to restore the split. If even the full pane is too small,
+reduce font size or change orientation. Herdr's mobile layout does not remove
+tiled splits. See [Sidecar's size guard and upgrade caveat](td_sidecar.md#open-sidecar-beside-an-agent-in-herdr).
 
 `prefix+Y` is deliberately session-modal because it is for quick filesystem
 operations while reading an agent pane. It starts in the focused pane's cwd,
@@ -270,12 +289,12 @@ Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/clo
 Most `tv` channels (`tools`, `fleet-hosts`, `mlflow`, `kill-process`, `ssh-config`) have **non-tmux-coupled actions**, so they run unchanged in a herdr command pane — just bind a key to `tv <channel>`. Only the channels whose actions call `tmux …` need herdr-aware variants. Three ship here:
 
 - `herdr-sesh` (`dot_config/television/cable/herdr-sesh.toml`) — lists herdr sessions/workspaces + zoxide dirs; Enter dispatches `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd` instead of `sesh connect` / `tmux switch-client`. `Ctrl+D` closes the selected workspace; **`Alt+Y` copies its directory** (works on workspace *and* zoxide-dir rows — see [`dir` vs `cwd`](#space-dir)). The preview shows that derived dir above the raw `workspace get` JSON, so you can see what `Alt+Y` will hand you.
-- `herdr-agent-panes` (`dot_config/television/cable/herdr-agent-panes.toml`) — same source as `agent-panes`, but switch/kill use `herdr pane focus` / `herdr pane close`.
+- `herdr-panes` (`dot_config/television/cable/herdr-panes.toml`) — general pane picker, renamed from `herdr-agent-panes`. `Ctrl+S` cycles **non-shell → agent → process → shell**; `Ctrl+R` rescans the current session. Rows show type, workspace/tab/pane, foreground programs, agent state, and title or cwd. **Enter / Alt+T** exits the picker and jumps to the exact pane, including split panes, through the shared `focus-pane.py` helper. **Alt+K** confirms before closing one pane and exits; **Ctrl+Y / Alt+P** copy its ID / current directory. See [TV pane picker](tv.md#herdr-panes-channel).
 - `herdr-review` (`dot_config/television/cable/herdr-review.toml`) — the **review-pending inbox**: lists only panes carrying the ⭐ flag (a non-empty `tokens.review`). Enter focuses the pane's workspace/tab and **keeps** the flag; `Alt+C` focuses **and** clears it ("mark read"). Bound to `prefix+i`. See the **Review-pending flag** section below.
 
 The original tmux-bound `sesh` / `agent-panes` channels are left intact for coexistence.
 
-> **`mode = "execute"`, not `"fork"`, for the Enter action of a channel bound to a command pane.** A `type = "pane"` binding only vanishes when its command exits, and tv exits after an `execute` action but stays alive after a `fork` one — so a `fork` Enter leaves the picker pane hovering over the workspace you just focused. `herdr-sesh`'s `[actions.open]` is `execute` for exactly this reason; its `ctrl-d` (`close_ws`) keeps `fork` because it pairs with `reload_source` and tv must survive to redraw the list. Same trade-off applies to `herdr-agent-panes` / `herdr-review`, which are still `fork` (their Enter re-focuses without leaving the picker — deliberate for triage, change it if you want one-shot jumps).
+> **`mode = "execute"`, not `"fork"`, for the Enter action of a channel bound to a command pane.** A `type = "pane"` binding only vanishes when its command exits, and tv exits after an `execute` action but stays alive after a `fork` one — so a `fork` Enter leaves the picker pane hovering over the workspace you just focused. `herdr-sesh`'s `[actions.open]` is `execute` for exactly this reason; its `ctrl-d` (`close_ws`) keeps `fork` because it pairs with `reload_source` and tv must survive to redraw the list. `herdr-panes` also uses `execute` for Enter / Alt+T and confirmed close. `herdr-review` retains its existing `fork` focus behavior for triage.
 
 ## Agent state (replaces the 6-file workmux integration)
 

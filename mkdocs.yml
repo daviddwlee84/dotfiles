@@ -151,6 +151,7 @@ plugins:
             Resilio Sync (P2P file sync): Resilio Sync（P2P 檔案同步）
             dotnet tools: dotnet 工具
             td / sidecar: td / sidecar
+            Tasks (personal planning): Tasks（個人任務規劃）
             Web reader: 網頁讀取器
             Office viewers (doxx / markitdown): Office 文件檢視 (doxx / markitdown)
             Data viewers (duckdb.yazi / VisiData): 資料檔檢視 (duckdb.yazi / VisiData)
@@ -279,6 +280,7 @@ nav:
       - Random hard power-offs: playbooks/random-hard-poweroff.md
   - Tools:
       - Personal CLI suite: tools/personal-tools.md
+      - Shared repo navigation (dev-projects): tools/dev-projects.md
       - tools/aicapture.md
       - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
       - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
@@ -357,6 +359,7 @@ nav:
           - dotnet tools: tools/dotnet-tools.md
       - Productivity:
           - td / sidecar: tools/td_sidecar.md
+          - Tasks (personal planning): tools/tasks.md
           - Super Productivity: tools/super-productivity.md
           - Web reader: tools/web-reader.md
           - Office viewers (doxx / markitdown): tools/office-viewers.md

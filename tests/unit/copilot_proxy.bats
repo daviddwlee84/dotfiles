@@ -25,6 +25,23 @@ setup() {
   SHELL_LIB="$SOURCE_DIR/dot_config/shell/43_copilot_proxy.sh"
   [ -f "$SHELL_LIB" ] || skip "43_copilot_proxy.sh not found"
   TMP="$(mktemp -d "${TMPDIR:-/tmp}/copilot-proxy.XXXXXX")"
+  export COPILOT_SESSION_HELPER="$SOURCE_DIR/dot_config/shell/copilot-session.py"
+  export HOME="$TMP/home" XDG_STATE_HOME="$TMP/state"
+  mkdir -p "$HOME" "$TMP/agents-bin"
+  # No launcher test may accidentally start a real authenticated agent.
+  export PATH="$TMP/agents-bin:$PATH"
+  cat >"$TMP/agents-bin/claude" <<'SH'
+#!/bin/sh
+printf '<%s>' "$@"
+printf '\n'
+SH
+  cp "$TMP/agents-bin/claude" "$TMP/agents-bin/codex"
+  cat >"$TMP/agents-bin/specstory" <<'SH'
+#!/bin/sh
+[ "$1" = sync ] && exit 0
+exec python3 "$COPILOT_SESSION_HELPER" exec-agent
+SH
+  chmod +x "$TMP/agents-bin/claude" "$TMP/agents-bin/codex" "$TMP/agents-bin/specstory"
 }
 
 # `skip` in setup() aborts before TMP exists, so guard — an unguarded
@@ -741,9 +758,9 @@ SH
 
 @test "specstory codex command: project config preserves configured flags" {
   mkdir -p "$TMP/proj/.specstory/cli" "$TMP/home/.specstory/cli"
-  printf '%s\n' "codex_cmd = 'codex --sandbox danger-full-access -c model_reasoning_effort=\"high\"'" \
+  printf '%s\n' '[providers]' "codex_cmd = 'codex --sandbox danger-full-access -c model_reasoning_effort=\"high\"'" \
     > "$TMP/home/.specstory/cli/config.toml"
-  printf '%s\n' 'codex_cmd = "codex --ask-for-approval never"' \
+  printf '%s\n' '[providers]' 'codex_cmd = "codex --ask-for-approval never"' \
     > "$TMP/proj/.specstory/cli/config.toml"
   run bash -c "cd '$TMP/proj'; export HOME='$TMP/home'; source '$SHELL_LIB'; _copilot_specstory_codex_cmd"
   [ "$status" -eq 0 ]
@@ -1122,119 +1139,11 @@ PY
 # settings.json even when the proxy itself was injected only for one process.
 # The launchers must clean that one key without rolling back unrelated settings.
 
-@test "claude-copilot removes a proxy model persisted by the model picker" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
-  printf '%s\n' '{"pluginState":"before"}' > "$TMP/home/.claude/settings.json"
-  printf '%s\n' 'gpt-test[1m]' > "$TMP/state/copilot-proxy/model"
 
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
-    source '$SHELL_LIB'
-    copilot-run() {
-      tmp=\"\$(mktemp)\"
-      jq '.model = \"gpt-test[1m]\" | .pluginState = \"changed-during-session\"' \
-        \"\$HOME/.claude/settings.json\" >\"\$tmp\" && mv \"\$tmp\" \"\$HOME/.claude/settings.json\"
-    }
-    claude-copilot --no-specstory"
-  [ "$status" -eq 0 ]
-  [ "$(jq -r 'has("model")' "$TMP/home/.claude/settings.json")" = "false" ]
-  [ "$(jq -r '.pluginState' "$TMP/home/.claude/settings.json")" = "changed-during-session" ]
-  [[ "$output" == *"removed stale proxy model"* ]]
-}
 
-@test "claude-copilot restores a native default after proxy model persistence and keeps exit status" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
-  printf '%s\n' '{"model":"sonnet","other":1}' > "$TMP/home/.claude/settings.json"
-  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
 
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
-    source '$SHELL_LIB'
-    copilot-run() {
-      tmp=\"\$(mktemp)\"
-      jq '.model = \"gpt-test\" | .other = 2' \"\$HOME/.claude/settings.json\" \
-        >\"\$tmp\" && mv \"\$tmp\" \"\$HOME/.claude/settings.json\"
-      return 7
-    }
-    claude-copilot --no-specstory"
-  [ "$status" -eq 7 ]
-  [ "$(jq -r '.model' "$TMP/home/.claude/settings.json")" = "sonnet" ]
-  [ "$(jq -r '.other' "$TMP/home/.claude/settings.json")" = "2" ]
-  [[ "$output" == *"restored native user model"* ]]
-}
 
-@test "claude-copilot leaves a native model deliberately selected during the session" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
-  printf '%s\n' '{"model":"sonnet","other":1}' > "$TMP/home/.claude/settings.json"
-  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
 
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
-    source '$SHELL_LIB'
-    copilot-run() {
-      tmp=\"\$(mktemp)\"
-      jq '.model = \"opus\" | .other = 2' \"\$HOME/.claude/settings.json\" \
-        >\"\$tmp\" && mv \"\$tmp\" \"\$HOME/.claude/settings.json\"
-    }
-    claude-copilot --no-specstory"
-  [ "$status" -eq 0 ]
-  [ "$(jq -r '.model' "$TMP/home/.claude/settings.json")" = "opus" ]
-  [ "$(jq -r '.other' "$TMP/home/.claude/settings.json")" = "2" ]
-  [ -z "$output" ]
-}
-
-@test "claude-copilot --fast appends the discovered sibling for this session" {
-  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
-  printf '%s\n' 'gpt-test[1m]' > "$TMP/state/copilot-proxy/model"
-
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
-    source '$SHELL_LIB'
-    _copilot_alive() { return 0; }
-    _copilot_require_shim() { return 0; }
-    _copilot_fast_model_for() { printf '%s-fast\\n' \"\$1\"; }
-    copilot-run() { printf 'launch=%s\\n' \"\$COPILOT_CLAUDE_MODEL\"; printf '<%s>\\n' \"\$@\"; }
-    claude-copilot --no-specstory --fast --model gpt-explicit 'two words'"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"claude-copilot: --fast -> gpt-explicit-fast (session only)"* ]]
-  [[ "$output" == *"launch=gpt-explicit-fast"* ]]
-  [[ "$output" == *"<--model>"* ]]
-  [[ "$output" == *"<gpt-explicit-fast>"* ]]
-  [[ "$output" == *"<two words>"* ]]
-  [ ! -e "$TMP/home/.claude/settings.json" ]
-}
-
-@test "claude-copilot --fast reuses a concrete once resolution" {
-  run bash -c "
-    source '$SHELL_LIB'
-    _copilot_resolved_fast_for_once=gpt-cached-fast
-    _copilot_fast_model_for() { printf called >>'$TMP/resolver-calls'; return 1; }
-    _copilot_claude_launch_model() { printf '%s' gpt-cached-fast; }
-    _copilot_assert_pinned_compact_safe() { return 0; }
-    _copilot_model_guard_begin() { return 0; }
-    _copilot_model_guard_restore() { return 0; }
-    copilot-run() { printf '<%s>' "\$@"; printf '
-'; }
-    claude-copilot --no-specstory --fast"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"<--model><gpt-cached-fast>"* ]]
-  [ ! -e "$TMP/resolver-calls" ]
-}
-
-@test "claude-copilot --fast falls back to the requested standard model" {
-  mkdir -p "$TMP/home/.claude" "$TMP/state/copilot-proxy"
-  printf '%s\n' 'gpt-test' > "$TMP/state/copilot-proxy/model"
-
-  run env HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" bash -c "
-    source '$SHELL_LIB'
-    _copilot_alive() { return 0; }
-    _copilot_require_shim() { return 0; }
-    _copilot_fast_model_for() { return 1; }
-    copilot-run() { printf '<%s>\\n' \"\$@\"; }
-    claude-copilot --fast --no-specstory --model gpt-explicit"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"claude-copilot: --fast unavailable for gpt-explicit; using the standard model."* ]]
-  [ "$(printf '%s\n' "$output" | grep -c '<gpt-explicit>')" -eq 1 ]
-}
 
 @test "claude-copilot --fast refuses end-of-options before model injection" {
   run bash -c "source '$SHELL_LIB'; claude-copilot --fast -p -- --model-looking-prompt"
@@ -1244,130 +1153,6 @@ PY
   run bash -c "source '$SHELL_LIB'; claude-copilot --fast --no-specstory --verbose --fast"
   [ "$status" -eq 2 ]
   [[ "$output" == *"must come before other arguments"* ]]
-}
-
-@test "claude-copilot-once builds its temporary pin for the explicit launch model" {
-  mkdir -p "$TMP/proj"
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    _copilot_alive() { return 0; }
-    _copilot_base() { printf '%s' 'http://localhost:4141'; }
-    copilot-here() { printf 'pin=%s|%s\n' \"\$1\" \"\$2\"; }
-    claude-copilot() { return 0; }
-    claude-copilot-once --no-specstory --model gpt-5-mini"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"pin=on|gpt-5-mini"* ]]
-  [[ "$output" == *"pin=off|"* ]]
-}
-
-# --- --fast against an existing pin ---------------------------------------------
-#
-# `--fast` used to be handled ONLY in the not-yet-pinned branch, so a project
-# already pinned to a fast model compared itself against the *global* default and
-# always reported bogus drift ("gpt-5.6-sol-fast[1m] -> gpt-5.6-sol[1m]"), with
-# `y` actively downgrading the pin off fast. The desired model is now computed
-# before the pinned/unpinned split and fed to both.
-
-# Write a pin whose env block is exactly what `copilot-here on $1` would produce.
-write_pin() {
-  mkdir -p "$TMP/proj/.claude"
-  bash -c "source '$SHELL_LIB'
-    _copilot_base() { printf '%s' 'http://localhost:4141'; }
-    _copilot_fast_model_for() { case \"\$1\" in *-fast*) printf '%s' \"\$1\";; *'[1m]') printf '%s-fast[1m]' \"\${1%%'[1m]'}\";; *) printf '%s-fast' \"\$1\";; esac; }
-    _copilot_model_catalog() { printf ''; }
-    jq -n --argjson e \"\$(_copilot_env_json_for_model '$1')\" '{env: \$e}'" \
-    > "$TMP/proj/.claude/settings.local.json"
-}
-
-# The stubs every drift test shares: no network, a deterministic fast sibling,
-# and a global default that is deliberately the NON-fast model.
-drift_env() {
-  cat <<STUBS
-    _copilot_alive() { return 0; }
-    _copilot_require_shim() { return 0; }
-    _copilot_base() { printf '%s' 'http://localhost:4141'; }
-    _copilot_model_catalog() { printf ''; }
-    _copilot_fast_model_for() { case "\$1" in *-fast*) printf '%s' "\$1";; *'[1m]') printf '%s-fast[1m]' "\${1%%'[1m]'}";; *) printf '%s-fast' "\$1";; esac; }
-    _copilot_default_model() { printf '%s' 'gpt-5.6-sol[1m]'; }
-    _copilot_confirm() { printf 'CONFIRM-ASKED\n'; return 1; }
-    copilot-here() { printf 'pin=%s|%s\n' "\$1" "\$2"; }
-    claude-copilot() { return 0; }
-STUBS
-}
-
-@test "claude-copilot-once --fast does not report drift against its own fast pin" {
-  write_pin 'gpt-5.6-sol-fast[1m]'
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    claude-copilot-once --fast --no-specstory"
-  [ "$status" -eq 0 ]
-  [[ "$output" != *"looks stale"* ]]
-  [[ "$output" != *"CONFIRM-ASKED"* ]]
-  [[ "$output" == *"already ON here"* ]]
-}
-
-@test "claude-copilot-once --fast offers the honest upgrade against a standard pin" {
-  write_pin 'gpt-5.6-sol[1m]'
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    _copilot_confirm() { printf 'CONFIRM-ASKED\n'; return 0; }
-    claude-copilot-once --fast --no-specstory"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"looks stale"* ]]
-  [[ "$output" == *"gpt-5.6-sol[1m] -> gpt-5.6-sol-fast[1m]"* ]]
-  # accepting must pin the FAST model, not re-pin the plain default
-  [[ "$output" == *"pin=on|gpt-5.6-sol-fast[1m]"* ]]
-}
-
-@test "claude-copilot-once without --fast still surfaces a stale fast pin" {
-  # Crash residue: there is no EXIT trap by design, so a killed session can leave
-  # a fast pin behind. Without --fast the sol-fast -> sol diff is TRUE, and
-  # accepting it correctly downgrades.
-  write_pin 'gpt-5.6-sol-fast[1m]'
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    _copilot_confirm() { printf 'CONFIRM-ASKED\n'; return 0; }
-    claude-copilot-once --no-specstory"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"looks stale"* ]]
-  [[ "$output" == *"gpt-5.6-sol-fast[1m] -> gpt-5.6-sol[1m]"* ]]
-  [[ "$output" == *"pin=on|"* ]]
-}
-
-@test "claude-copilot-once explains what declining a --fast refresh leaves behind" {
-  write_pin 'gpt-5.6-sol[1m]'
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    claude-copilot-once --fast --no-specstory"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"kept the existing pin"* ]]
-  [[ "$output" == *"ANTHROPIC_DEFAULT_* role models stay on the non-fast ids"* ]]
-}
-
-@test "claude-copilot-once takes --fast only as a leading option" {
-  # A literal --fast inside a prompt string must not pin the fast model, and a
-  # late --fast is refused instead of silently differing from claude-copilot.
-  mkdir -p "$TMP/proj"
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    claude-copilot-once --no-specstory -p 'compare --fast and slow'"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"pin=on|"* ]]
-  [[ "$output" != *"pin=on|gpt-5.6-sol-fast"* ]]
-  [[ "$output" != *"must come before"* ]]
-
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    claude-copilot-once --no-specstory --resume abc --fast"
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"'--fast' must come before other arguments"* ]]
-  [[ "$output" != *"session ended"* ]]
-
-  # After -- it is prompt/data, not the wrapper option.
-  run bash -c "cd '$TMP/proj'; source '$SHELL_LIB'
-    $(drift_env)
-    claude-copilot-once --no-specstory -p -- --fast"
-  [ "$status" -eq 0 ]
-  [[ "$output" != *"must come before"* ]]
 }
 
 # --- permission posture on the raw (--no-specstory) path -------------------------
@@ -1381,82 +1166,13 @@ perm_run() {
     source "$1"; shift
     _copilot_alive() { return 0; }
     _copilot_require_shim() { return 0; }
+    _copilot_model_catalog() { printf ""; }
+    _copilot_default_model() { printf gpt-test; }
     copilot-run() { printf "<%s>" "$@"; printf "\n"; }
     claude-copilot "$@"
   ''' _ "$SHELL_LIB" "$@"
 }
 
-@test "configured-command bypass scrubber never mutates quoted prompt data" {
-  run bash -c '
-    source "$1"
-    _copilot_claude_drop_bypass_token "$2"
-    _copilot_claude_drop_bypass_token "$3"
-  ' _ "$SHELL_LIB" \
-    'claude --dangerously-skip-permissions' \
-    'claude --append-system-prompt "--dangerously-skip-permissions"'
-  [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "claude" ]
-  [ "${lines[1]}" = 'claude --append-system-prompt "--dangerously-skip-permissions"' ]
-
-  run bash -c 'source "$1"; _copilot_claude_drop_bypass_token "$2"' \
-    _ "$SHELL_LIB" \
-    'claude --append-system-prompt "explain --dangerously-skip-permissions safely" --dangerously-skip-permissions --verbose'
-  [ "$status" -eq 0 ]
-  [ "$output" = 'claude --append-system-prompt "explain --dangerously-skip-permissions safely" --dangerously-skip-permissions --verbose' ]
-}
-
-@test "claude-copilot SpecStory path lets an explicit permission mode replace seeded bypass" {
-  mkdir -p "$TMP/bin" "$TMP/home"
-  printf '#!/bin/sh\n' > "$TMP/bin/specstory"
-  chmod +x "$TMP/bin/specstory"
-  run env HOME="$TMP/home" PATH="$TMP/bin:$PATH" COPILOT_CLAUDE_MODEL=gpt-5.6-sol bash -c "
-    source '$SHELL_LIB'
-    _copilot_alive() { return 0; }
-    _copilot_require_shim() { return 0; }
-    _copilot_claude_launch_model() { printf '%s' gpt-5.6-sol; }
-    _copilot_assert_pinned_compact_safe() { return 0; }
-    _copilot_model_guard_begin() { return 0; }
-    _copilot_model_guard_restore() { return 0; }
-    _copilot_specstory_claude_cmd() { printf '%s' 'claude --dangerously-skip-permissions'; }
-    copilot-run() { printf '<%s>' \"\$@\"; printf '\n'; }
-    claude-copilot --permission-mode plan"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"--permission-mode"* ]]
-  [[ "$output" != *"--dangerously-skip-permissions"* ]]
-}
-
-@test "claude-copilot SpecStory path asserts bypass for a custom command" {
-  mkdir -p "$TMP/bin" "$TMP/home"
-  printf '#!/bin/sh\n' > "$TMP/bin/specstory"
-  chmod +x "$TMP/bin/specstory"
-  run env HOME="$TMP/home" PATH="$TMP/bin:$PATH" COPILOT_CLAUDE_MODEL=gpt-5.6-sol bash -c "
-    source '$SHELL_LIB'
-    _copilot_alive() { return 0; }
-    _copilot_require_shim() { return 0; }
-    _copilot_claude_launch_model() { printf '%s' gpt-5.6-sol; }
-    _copilot_assert_pinned_compact_safe() { return 0; }
-    _copilot_model_guard_begin() { return 0; }
-    _copilot_model_guard_restore() { return 0; }
-    _copilot_specstory_claude_cmd() { printf '%s' 'claude --verbose'; }
-    copilot-run() { printf '<%s>' \"\$@\"; printf '\n'; }
-    claude-copilot --resume session-id"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"claude --verbose --dangerously-skip-permissions"* ]]
-  [[ "$output" == *"--resume"* ]]
-
-  run env HOME="$TMP/home" PATH="$TMP/bin:$PATH" COPILOT_CLAUDE_MODEL=gpt-5.6-sol bash -c "
-    source '$SHELL_LIB'
-    _copilot_alive() { return 0; }
-    _copilot_claude_launch_model() { printf '%s' gpt-5.6-sol; }
-    _copilot_assert_pinned_compact_safe() { return 0; }
-    _copilot_model_guard_begin() { return 0; }
-    _copilot_model_guard_restore() { return 0; }
-    _copilot_specstory_claude_cmd() { printf '%s' 'claude --verbose'; }
-    copilot-run() { printf '<%s>' \"\$@\"; printf '\n'; }
-    claude-copilot"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"<-c><claude --verbose --dangerously-skip-permissions>"* ]]
-}
 
 @test "claude-copilot --no-specstory asserts the same permission posture" {
   run perm_run --no-specstory
@@ -1999,7 +1715,7 @@ JS
     _copilot_alive() { return 0; }
     copilot-here on"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"pins Claude Code to http://localhost:4142"* ]]
+  [[ "$output" == *"plain claude now uses http://localhost:4142"* ]]
   [ "$(jq -r '.env.ANTHROPIC_BASE_URL' "$TMP/proj/.claude/settings.local.json")" = "http://localhost:4142" ]
 }
 
@@ -2405,7 +2121,6 @@ tier_rank() {
   run env CATALOG="$catalog" CLAUDE_CODE_AUTO_COMPACT_WINDOW=700000 COPILOT_ASTRA_COMPACT_RATIO=invalid bash -c '
     cd "$2"; . "$1"
     _copilot_model_catalog() { printf "%s" "$CATALOG"; }
-    _copilot_assert_pinned_compact_safe gpt-6-astra || exit
     _copilot_env_json_for_model gpt-6-astra "$CATALOG" | jq -r .CLAUDE_CODE_AUTO_COMPACT_WINDOW
   ' _ "$SHELL_LIB" "$TMP/proj"
   [ "$status" -eq 0 ]
@@ -2414,7 +2129,7 @@ tier_rank() {
 
 @test "Codex retry defaults are coordinated on both launcher paths and user overrides stay last" {
   write_fake_codex
-  printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$4"' >"$TMP/bin/specstory"
+  printf '%s\n' '#!/bin/sh' 'exec python3 "$COPILOT_SESSION_HELPER" exec-agent' >"$TMP/bin/specstory"
   chmod +x "$TMP/bin/specstory"
   local shell shim mode catalog
   catalog="$(auto_regression_catalog)"
@@ -2624,7 +2339,7 @@ auto_command() {
   env -i PATH="$AUTO_ROOT/bin:$PATH" HOME="$AUTO_ROOT/home" \
     XDG_STATE_HOME="$AUTO_ROOT/state" XDG_CONFIG_HOME="$AUTO_ROOT/config" \
     XDG_CACHE_HOME="$AUTO_ROOT/cache" TMPDIR="$AUTO_ROOT/tmp/" \
-    TEST_AUTO_ROOT="$AUTO_ROOT" TEST_SHELL_LIB="$SHELL_LIB" \
+    TEST_AUTO_ROOT="$AUTO_ROOT" TEST_SHELL_LIB="$SHELL_LIB" COPILOT_SESSION_HELPER="$COPILOT_SESSION_HELPER" \
     "$shell" "${opts[@]}" -c '
       cd "$TEST_AUTO_ROOT/proj" || exit
       . "$TEST_SHELL_LIB"

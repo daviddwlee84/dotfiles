@@ -1543,6 +1543,12 @@
         - /tmp/sidecar.tar.gz
         - /tmp/sidecar
 
+# === Tasks (Sidecar personal task companion) ===
+
+- name: Install and configure the Tasks suite
+  ansible.builtin.import_tasks: tasks.yml
+  tags: [coding_agents_tasks]
+
 # === Specify CLI ===
 
 - name: Check if uv is available

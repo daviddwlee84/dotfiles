@@ -48,6 +48,8 @@ once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
 .config/zsh/tools/96_ssh_setup.zsh
 .config/zsh/tools/52_agent_warmup_completion.zsh
 .config/bash/52_agent_warmup_completion.bash
+# Renamed to the general herdr-panes channel; do not leave duplicate TV entries.
+.config/television/cable/herdr-agent-panes.toml
 {{- /*
 Legacy AeroSpace config at $HOME root. We manage the XDG copy
 (~/.config/aerospace/aerospace.toml); AeroSpace errors if BOTH it and

@@ -37,11 +37,11 @@ copilot-proxy auth      # 一次性：GitHub 裝置登入 (device login)（儲�
 copilot-proxy start
 copilot-model --auto    # 有 Claude 就用 Claude，否則按 Sol/Terra/Luna 角色配置
 
-claude-copilot          # 一次性 session 走代理（自動啟動代理；不寫任何檔案）
+claude-copilot-once     # 單次 CLI 設定；自動啟動 proxy
 claude-copilot --fast   # 同上；catalog 有 fast sibling 時改走該模型
-claude-copilot-once     # 釘住「這個專案」跑一次 session，結束自動解除（代理需已啟動）
-codex-copilot           # 一次性 Codex session；auto 優先選 OpenAI
-codex-copilot-once      # 完全相同的 alias；兩者都不寫 Codex config
+claude-copilot-once --specstory-mode exit  # agent 退出後才匯出 history
+codex-copilot-once      # 單次 Codex session；auto 優先選 OpenAI
+# claude-copilot / codex-copilot 都是相同的單次注入名稱
 
 # 單次 planning preset。Codex TUI 開啟後仍需輸入 `/plan`；
 # Codex 0.151.0 沒有啟動時指定 collaboration mode 的公開 flag。
@@ -74,42 +74,18 @@ Codex ──OpenAI /v1/responses──────────▶ 同一個 :414
   request 轉成 **Responses API**。自 `2.3.4` 起會把 `output_config.effort` 正確轉成
   `reasoning.effort`，並支援 GPT-5.6 request shape 與 reasoning state。
 - Claude Code 透過 `ANTHROPIC_BASE_URL` 被指向代理 —— 注入方式有兩種：
-  per-process 環境變數（`claude-copilot`），或 gitignore 掉的
+  合併後的 CLI `--settings`（兩個 Claude launcher），或 gitignore 掉的
   `./.claude/settings.local.json`（`copilot-here on`）。見「設定分層設計」。
 
-## 設定分層設計（代理設定該放哪一層、為什麼）
+## 設定分層
 
-Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
-`./.claude/settings.json`（project，會 commit）→ `./.claude/settings.local.json`
-（local，gitignored）→ CLI flags。實測中 `settings.local.json` 的 `env` 可以蓋過繼承的
-shell env，所以已開 `copilot-here` 時，`claude-copilot` 不會強行覆蓋它。
+Claude 設定優先序：user → project → local → CLI（managed policy 仍優先）。
+兩個 Claude launcher 使用單一合併後的 CLI `--settings`；兩個 Codex launcher 使用
+單次 `-c`。只有 `copilot-here on` 寫入 Claude local pin。泛用 `copilot-run` 仍是
+環境注入，可能被 local settings 覆蓋。
 
-其中兩層已有其他工具負責，必須保持乾淨：
-
-| 層 | 擁有者 | 為什麼代理設定「不能」放這裡 |
-|---|---|---|
-| `~/.claude/settings.json` | chezmoi（`dot_claude/modify_settings.json.tmpl`） | 會讓 *每個* 專案永遠走代理；還會跟 chezmoi 的合併打架。頂層 `model` 不得保留只供代理使用的 GPT/Gemini id。 |
-| `./.claude/settings.json` | `claude-plans-here`（`plansDirectory`） | 會 commit 進 git —— 代理設定會外洩給整個團隊 |
-
-所以代理使用沒人佔用的兩層：
-
-| 啟用 | 機制 | 範圍 | 停用 |
-|---|---|---|---|
-| `claude-copilot` / `copilot-run` | per-process 環境變數 | 單一 session | 下次直接跑 `claude` 即可 |
-| `claude-copilot-once` | 暫時 `settings.local.json` pin | 單一 session | session 結束自動還原 |
-| `copilot-here on` | `./.claude/settings.local.json`（gitignored） | 這個專案、持續生效 | `copilot-here off` |
-
-```
-~/.claude/settings.json          .claude/settings.json         .claude/settings.local.json      shell env
-(chezmoi: hooks/plugins)    <    (git: plansDirectory)     <   (copilot-here on/off)        <   (claude-copilot)
-```
-
-上游有一個 UI 動作會跨越這個 ownership：在 Claude Code `/model` 選單按 **Enter**
-代表「設為預設」，會把 custom id 寫進 `~/.claude/settings.json`。這個寫入不會隨
-per-process launcher 結束，也不會被原本的 `copilot-here off` 移除。因此 launcher 現在只
-guard 頂層 `model`：結束時移除 proxy-only 值，或還原原本的 native 值；hooks/plugins/
-permissions 與 session 中其他合法設定變更全部保留。即使 local pin 檔本來就不存在，
-`copilot-here off` 也會清除殘留的 proxy-only user model。
+Claude `/model` 的 Enter 可能寫入使用者頂層 model，因此 launcher 保留只針對
+proxy-only model 的還原保護，其他設定改動保留。
 
 ## Shell helpers
 
@@ -237,7 +213,7 @@ selection JSON 仍在 `$XDG_STATE_HOME/copilot-proxy/package.json`，旁邊的 `
 `copilot-proxy rollback` 可離線執行，還原套件、selection 及原本的
 `responsesTransport`/`upstreamTransport` 欄位，保留其他目前設定、新憑證與更新後用量。
 被撤回的套件及更新後 config 會留作診斷；SQLite 快照**不會**自動蓋回目前資料庫。
-指令會印出 deployment 快照位置，matching wrapper/shim 與啟動設定須另外還原並 reload
+指令會印出 deployment 快照位置，matching wrapper/shim/session backend 與啟動設定須另外還原並 reload
 shell。快照是 update 當下磁碟上的檔案；若要回到更早的 shim，須在部署新版 wrapper
 之前先保留舊檔。
 
@@ -306,67 +282,48 @@ localhost Copilot 路由拆開診斷。任何真實 HTTP status（包含 auth re
 網路可達；timeout 與 TLS certificate failure 會分開顯示。`codex_apps` 是遠端
 ChatGPT MCP，不是只供 Apple Silicon Codex Desktop 使用的 bridge。
 
-### `claude-copilot [--fast] [--no-specstory] [claude args...]` —— 一次性 session
+### `claude-copilot-once` / `claude-copilot` —— 單次啟動
 
-第一層：跑一次走代理的 Claude Code session，**完全不寫檔案**。代理沒回應時會自動
-啟動它，然後以 per-process 的 `ANTHROPIC_*` 環境變數啟動 `claude`（shell 環境變數
-蓋過所有 settings 檔的 `env` 區塊，所以即使專案沒開 `copilot-here` 也會生效）。
+兩個名稱完全相同：自動啟動 proxy，透過單一 CLI `--settings` 注入 role profile
+與 live compact ceiling。需要 `jq`、Python 3.11+（或 `uv`）。既有專案 pin 只會在
+本次程序被覆蓋，檔案不改寫，也不詢問更新；持久更新另用 `copilot-here on`。
 
-- 有安裝 specstory 時自動包成 `specstory run claude`（markdown 自動存檔 ——
-  跟 `scode`/`svibe` 同一套慣例）；用 `--no-specstory` 退出。額外參數透過
-  specstory 的 `-c "custom command"` 傳給 claude CLI：`claude-copilot -c`
-  → 繼續上一個 session。
-- **傳參數時會保留你設定的 `claude_cmd`。** specstory 的 `-c` 是「**取代**」
-  provider 指令而不是「附加」，所以這裡會先取出 specstory 設定檔中生效的
-  `claude_cmd`（專案 `./.specstory/cli/config.toml` > 使用者
-  `~/.specstory/cli/config.toml` > 裸 `claude`），再把參數接在後面。這正是讓
-  `claude_cmd = "claude --dangerously-skip-permissions"` 對
-  `claude-copilot --resume <id>` 也生效、而不是只對沒帶參數的 `claude-copilot`
-  生效的原因 —— 這兩者以前行為並不一致，詳見
-  [`pitfalls/specstory-custom-command-drops-configured-flags.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-custom-command-drops-configured-flags.md)。
-  `--no-specstory` 仍**完全不繼承那條 command**（不帶 alternate binary、resume flag 或
-  額外 prompt），但 raw path 會自行維持相同的 trusted
-  `--dangerously-skip-permissions` posture。使用者明確指定 `--permission-mode` / `--permission-prompts` / `--restricted` 時會取代 repo
-  seeded bypass。自訂 project/user `claude_cmd` 不會被重寫：沒有 alternate mode 時 wrapper
-  會在後面追加預設 bypass；custom command 內既有的 permission flags 由該 command 自行負責。
-  這與 Windows wrapper 一致。
-- 還原 = 不用手動還原；下次直接跑 `claude` 完全不受影響。Claude Code 自己仍可能在
-  `/model` + **Enter** 時寫入一個全域 key；EXIT guard 會在正常、非零或 Ctrl-C 結束時
-  移除 proxy-only 值或還原先前的 native default，session 中其他設定變更不回滾。
+Claude 2.1.281 實測重複 `--settings` 只採用最後一次，因此 helper 先讀取有效的
+使用者 JSON／檔案，再與 proxy defaults 合併成一份 JSON。明確使用者值優先，
+`ultracode` 等其他欄位保留；model／permission 先解析，再計算 context 與 bypass。
+`--fast` 用 live fast sibling，找不到就警告並保留標準模型。Wrapper flags 必須
+放在 agent 參數之前；`--fast` 與 `--` 邊界不能合用。使用者 `/model` 防汙染保護仍在。
 
-`claude-copilot --fast` 會用 shim 的 live fast-routing map 對應明確指定或預設模型，
-只為這次 invocation 在最後加上 sibling model，不寫 Claude settings。若 Copilot 沒有
-advertise eligible sibling，launcher 會警告並繼續使用 standard model。
+### 錄製方式：`--specstory-mode run|exit|off`
 
-### `claude-copilot-once [--fast] [--no-specstory] [claude args...]` —— 一次性釘選 session
+四個 Claude／Codex 啟動名稱都支援：
 
-第一層的用完即丟 + 第二層的可靠度：用 `copilot-here on` 釘住 **這個專案**，跑一個
-`claude-copilot` session，結束時 `copilot-here off` —— 連 Ctrl-C 也會還原。當純環境變數
-注入不夠力（因為 `settings.local.json` 位階高於 shell env，見陷阱章節）、但你又不想留下
-一個黏著的 pin 時就用它。
+| 模式 | 行為 |
+|---|---|
+| `run`（預設；`--specstory`） | `specstory run` 即時錄製；未安裝時 raw fallback |
+| `exit` | agent 原生 terminal；真正退出後執行同專案、同 provider 的 sync |
+| `off`（`--no-specstory`） | 原生 provider command，不新增錄製要求 |
 
-- **前提條件：** 代理必須**已經**在跑 —— 跟 `claude-copilot` 不同，它**不會**自動啟動；
-  代理沒回應時它只印出 `copilot-proxy start` 提示並回傳非零。
-- **不動既有 pin：** 如果這個專案的 `copilot-here` 本來就是 `on`，結束時會原樣保留
-  （不會去解除你沒要求解除的 pin）。如果那個 pin **過期了** —— 跟這次啟動實際會用的
-  `copilot-here on <model>` 不一致，例如帳號已改走 OpenAI fallback、pin 還停在不可用的
-  Claude id，或 pin 建立時還沒有 Fable key —— 它會印出差異，並詢問要就地更新還是保留。
-  `--fast` 會在比較前先解析，所以 fast pin 不再提議把自己降回 standard sibling；standard
-  pin 則顯示正確的 standard → fast 升級。預設答案是**保留**（stdin 非互動時自動保留）。
-  差異的計算方式是拿現檔去 diff `copilot-here on` 會合併的那份 env 區塊
-  （`_copilot_env_json`，兩邊共用的唯一來源），所以它精確等於「`on` 會改動的 key」——
-  不是一份會默默落後的手挑清單。檔案裡有、但不在那份區塊裡的 key **不算**差異：
-  `on` 只合併、從不移除（只有 `off` 會移除）。`copilot-here status` 顯示以 global default
-  為基準的同類差異。若拒絕 `--fast` refresh，本 session 的 main 仍走 fast，但
-  `settings.local.json` 位階較高，所以 pinned `ANTHROPIC_DEFAULT_*` role ids 不變。
-- session 本身就是 `claude-copilot "$@"`，所以 specstory 自動存檔、`--no-specstory`、
-  `-c`（繼續）的行為完全一致。`--fast` 等 wrapper flags 必須放在 Claude arguments 前；
-  後面的 token 會被拒絕並顯示修正提示，避免吃掉 prompt 文字裡的 `--fast`。
-- 結束時會提醒你代理還開著，以及怎麼 `copilot-proxy stop`。
+`exit` 避免本 launcher 在 agent commit 時持續改寫 history。第一版匯出同專案、
+同 provider 的所有已保存 session，不猜最新 session。同組的受管理 launcher 還在
+執行時，延後到最後一個退出；同專案 sync 序列化。其他獨立 recorder 仍可能寫入。
+
+正常退出、錯誤退出、Ctrl+C 都先等 agent 結束。Sync 不受連按 Ctrl+C 中斷，
+最多等待 30 秒；失敗時留下私人 XDG state 待辦，下次同專案啟動、沒有同 provider
+程序仍在執行時補做。因此 `off` 也可能補做先前的 pending export。Agent exit status
+保留，sync 結果另外顯示。Wrapper 被 SIGKILL／主機斷電無法立即收尾，未落盤的
+native history 無法補回。`exit` 需要 SpecStory，拒絕背景／detach、新 worktree 與
+不保存 session 的參數。這些模式都不自動 commit。
+
+`run`／`exit` 讀取專案優先、使用者其次的 SpecStory provider command；完整保留
+argv、引號、空字串及 prompt 邊界。明確本次 permission 優先於 provider command，
+再補齊缺少的 bypass 預設。`off` 不繼承 command。Sync 沿用輸出路徑、redaction
+與 cloud 偏好。持久 pin 或 resume 舊 Copilot session 仍可能使用 proxy；普通新開
+`specstory run` 在沒有 pin 時沿用原本 provider。
 
 ### `copilot-run <cmd...>` —— 泛用環境變數注入器
 
-`claude-copilot` 底下的積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令。
+泛用環境注入：自動啟動代理，然後帶著代理 env 執行 *任意* 指令。
 適合其他 Anthropic 相容工具或自訂的 specstory 呼叫：
 
 注入的 env 區塊來自 `_copilot_env_json_for_model --live` —— 和 `copilot-here on` 寫入、
@@ -375,7 +332,7 @@ advertise eligible sibling，launcher 會警告並繼續使用 standard model。
 解析 `ANTHROPIC_BASE_URL`，而不是設定檔會記錄的 pinned base。
 
 ```sh
-copilot-run specstory run claude    # 等同 claude-copilot 做的事
+copilot-run specstory run claude    # 環境注入；local pin 仍可覆蓋它
 copilot-run claude --resume         # 裸 claude，不經 specstory
 ```
 
@@ -468,23 +425,24 @@ exchange 回 `403`；`copilot-proxy auth` 保存的 token 經正常短效 Copilo
 exchange 則可用。Endpoint 也由 exchange 結果決定，hard-code personal/enterprise
 host 不具可攜性。因此正式 helper 沿用已認證的 localhost gateway。
 
-### `copilot-here [on|off|status]` —— 專案級持續開關
+### `copilot-here [claude] [on [MODEL] [--yes]|off|status]`
 
-第二層：透過 `./.claude/settings.local.json` 把 **這個專案** 釘在代理上 ——
-之後直接跑 `claude`（以及 `scode`/`svibe` 的窗格，它們就是跑
-`specstory run claude`）都走代理，直到你關掉。需要 `jq`。
+明確的持久 Claude 專案 pin，會影響後續普通 `claude`／`specstory run claude`。
 
-- `on` —— 用 jq 把代理的 `env` 區塊合併進 `settings.local.json`（不存在就建立），
-  並確保 git 忽略該檔（寫入 `.git/info/exclude`；Claude Code 只會自動 gitignore
-  *它自己* 建立的檔案）。會 commit 的 `.claude/settings.json`（`plansDirectory`
-  等）完全不碰。
-- `off` —— 只移除 `on` 加入的那些 env key；你自己放進 `settings.local.json`
-  的其他內容會保留，檔案清空時才刪除。也會清掉 `~/.claude/settings.json` 中意外持久化的
-  proxy-only 頂層 `model`，包含「local pin 本來就已經 off」的情況。
-- `status` —— 有沒有釘選？base URL / 模型是什麼？代理沒在跑時會警告；接著列出唯讀的
-  **plain Claude launch audit**：user/project/local settings、繼承的 model/base env，以及現在
-  啟動會採用的 backend/model；也會列出仍在跑、必須重啟才會重讀磁碟設定的 Claude PID。
-  若是 native Anthropic backend 搭配 proxy-only user model，會直接標出問題與清理指令。
+- `on`：全新無衝突就建立，相同設定不改寫；已有 pin 不同時先顯示差異，詢問更新，
+  預設保留。`--yes` 可供腳本明確更新；非互動且未指定時保留原檔並回傳非零。
+  憑證值不會出現在預覽。
+- 已 tracked／staged 的檔案一律拒絕寫入。既有未忽略檔案需要確認整份檔案會被
+  本機忽略；使用 Git 查詢 `info/exclude`，支援 worktree 與巢狀專案。
+- 新 pin 私下保存受管理欄位的原值；`off` 只還原仍符合上次寫入值的欄位，保留
+  其他與後續手動修改。舊 pin 沒有 journal 時沿用移除 managed keys 的語意。
+- `status` 顯示 drift 與 plain-Claude launch audit；保留 `plansDirectory` 等欄位。
+
+Codex 0.156.1 實際啟動會忽略 project-local `model_provider`／`model_providers`，
+所以 `copilot-here codex on` 只說明限制，不寫無效設定。這是版本相關的限制，
+[原始警告與升級後重測方法](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/codex-project-config-provider-ignored.md)
+已記為 pitfall。
+
 
 ### `copilot-model [<id>|-l|-L|-c|--auto|--why|--json]`
 
@@ -558,8 +516,8 @@ copilot-model -c            # 檢查完整角色組
 copilot-here on             # 黏著本專案，或改用 claude-copilot-once
 ```
 
-`claude-copilot-once` 會暫時寫入同一組 profile，session 後還原。已存在的
-`copilot-here` pin 仍會蓋過 shell env；用 `copilot-model --auto` 或 `copilot-here on`
+`claude-copilot-once` 透過 CLI 注入同一組 profile，不改寫既有 pin；用
+`copilot-model --auto` 或 `copilot-here on`
 更新它。
 
 ## 注入的 env（兩層設定的內容相同）
@@ -702,15 +660,12 @@ TLS 驗證仍保持開啟，這是在繞過已觀察到的 Bun/Node CA-store 差
 避免再把 geo-filter 誤判成「組織停用 Claude」。完整說明：
 [`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-api-caches-degraded-model-list-at-startup.md)。
 
-### `settings.local.json` 的 env 蓋過 shell env（官方文件說法相反）
+### `settings.local.json` 的 env 蓋過 shell env
 
-實測確認（2026-07）：目前版本的 Claude Code 會讓 `./.claude/settings.local.json` 的
-`env` 區塊 **蓋過繼承而來的 shell 環境變數** —— 跟官方 settings 文件暗示的順序相反。
-後果：
+泛用 `copilot-run` 只有繼承的環境變數，因此可能被 Claude local settings 覆蓋。
+兩個 Claude launcher 改用單一 CLI `--settings`（Claude 2.1.281 已驗證），可以
+只對本次程序覆蓋 pin。持久設定更新另用 `copilot-here on`。
 
-- `claude-copilot` / `copilot-run` **無法**改寫一個已經 `copilot-here on` 的專案
-  （兩邊指向同一個代理時無害，指向不同時就會靜默地用錯設定）。
-- 想透過 wrapper 試另一個代理／port，必須先 `copilot-here off`。
 
 ### OpenAI 模型思考時整條線是靜默的 —— shim 用心跳把 socket 撐住
 
@@ -878,7 +833,7 @@ Claude Code 現在有 Fable、Opus、Sonnet、Haiku 角色；`copilot-model --au
 
 ```sh
 claude-copilot                       # 一次性代理 session（specstory 包裝）
-claude-copilot-once                  # 透過 settings.local.json pin 跑一次 session（自動還原）
+claude-copilot-once                  # 合併 CLI 設定，單次生效
 copilot-here status                  # 這個專案有釘在代理上嗎？
 copilot-model -c                     # 目前模型 + 來自哪一層
 copilot-proxy status                 # 有沒有在跑？提供哪些 Claude 模型？

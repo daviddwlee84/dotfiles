@@ -37,3 +37,23 @@ _copilot_proxy_completion() {
 }
 
 complete -F _copilot_proxy_completion copilot-proxy
+
+_copilot_agent_launch_completion() {
+  local cur prev words cword
+  _init_completion || return
+  if [ "$prev" = --specstory-mode ]; then
+    COMPREPLY=( $(compgen -W 'run exit off' -- "$cur") )
+  else
+    local flags='--specstory-mode --specstory --no-specstory --help'
+    case "${words[0]}" in claude-*) flags="$flags --fast" ;; esac
+    COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+  fi
+}
+complete -F _copilot_agent_launch_completion claude-copilot claude-copilot-once codex-copilot codex-copilot-once
+
+_copilot_here_completion() {
+  local cur prev words cword
+  _init_completion || return
+  COMPREPLY=( $(compgen -W 'claude on off status --yes --help' -- "$cur") )
+}
+complete -F _copilot_here_completion copilot-here

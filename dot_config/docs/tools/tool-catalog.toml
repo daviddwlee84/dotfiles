@@ -590,6 +590,15 @@ linux = "Verified GitHub release; legacy Go preserved"
 role_md = "`personal_tools` — Repository/task/worktree dashboard; binary `dev`."
 
 [[tool]]
+id = "dev-projects"
+category = "Navigation & Shell"
+desc = "Shared dev REPOS candidates and explicit add-only Sidecar project import"
+role = "in-house"
+docs = "docs/tools/dev-projects.md"
+mac = "chezmoi (`dot_dotfiles/bin/executable_dev-projects`, Python stdlib)"
+linux = "same"
+
+[[tool]]
 id = "diffnav"
 category = "Git & Diff"
 desc = "TUI diff navigator (file tree + delta)"
@@ -2041,6 +2050,18 @@ desc = "TOML toolkit (format / lint / LSP)"
 role = "devtools"
 mac = "brew"
 linux = "apt+release"
+
+[[tool]]
+id = "tasks"
+label = "**Tasks** (`tasks` / `tasks-tui` / `tasks-api`)"
+bins = ["tasks", "tasks-tui", "tasks-api"]
+category = "AI / Coding Agents"
+desc = "Personal task planning: CLI, TUI, and local API"
+role = "coding_agents"
+docs = "docs/tools/tasks.md"
+mac = "brew (`marcus/tap/tasks`)"
+linux = "Linuxbrew → verified GitHub release"
+role_md = "coding_agents — all three binaries; user-owned XDG data/config. See [tasks.md](../tools/tasks.md)"
 
 [[tool]]
 id = "td"

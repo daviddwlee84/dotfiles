@@ -1,0 +1,81 @@
+---
+# Tasks owns its plain key=value config after the first seed. Its data is
+# user-owned too: never seed task records or move/replace an existing store.
+- name: Resolve Tasks XDG paths and explicit user overrides
+  ansible.builtin.set_fact:
+    tasks_config_home: "{{ ansible_facts['env'].get('XDG_CONFIG_HOME') or (ansible_facts['env']['HOME'] ~ '/.config') }}"
+    tasks_data_home: "{{ ansible_facts['env'].get('XDG_DATA_HOME') or (ansible_facts['env']['HOME'] ~ '/.local/share') }}"
+    tasks_has_path_overrides: >-
+      {{ (ansible_facts['env'].get('TASKS_DIR', '') | length > 0)
+         or (ansible_facts['env'].get('TASKS_FILE', '') | length > 0)
+         or (ansible_facts['env'].get('TASKS_ARCHIVE', '') | length > 0)
+         or (ansible_facts['env'].get('TASKS_MEMORY', '') | length > 0) }}
+
+- name: Inspect existing Tasks config without following symlinks
+  ansible.builtin.stat:
+    path: "{{ tasks_config_home }}/tasks/config"
+    follow: false
+  register: tasks_config_stat
+
+- name: Seed Tasks local data configuration on first use
+  when:
+    - not tasks_config_stat.stat.exists
+    - not tasks_has_path_overrides
+  block:
+    - name: Validate paths for the plain Tasks config format
+      ansible.builtin.assert:
+        that:
+          - tasks_config_home is match('^/')
+          - tasks_data_home is match('^/')
+          - "'\n' not in tasks_data_home"
+          - "'\r' not in tasks_data_home"
+        fail_msg: Tasks needs absolute XDG paths and a data path without line breaks.
+
+    # Even an empty store needs its parent directory for the advisory lock.
+    - name: Create initial Tasks config and data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0700"
+      loop:
+        - "{{ tasks_config_home }}/tasks"
+        - "{{ tasks_data_home }}/tasks"
+
+    - name: Write initial Tasks config without replacing user settings
+      ansible.builtin.copy:
+        dest: "{{ tasks_config_home }}/tasks/config"
+        mode: "0600"
+        force: false
+        content: |
+          # Seeded once by dotfiles; edit this file to choose another data store.
+          # Tasks uses plain key = value lines, not TOML: do not quote the path.
+          dir = {{ tasks_data_home }}/tasks
+
+- name: Validate Tasks configuration with the installed CLI
+  ansible.builtin.command:
+    argv:
+      - "{{ tasks_cli_path }}"
+      - config
+      - --json
+  environment:
+    HOME: "{{ ansible_facts['env']['HOME'] }}"
+    XDG_CONFIG_HOME: "{{ tasks_config_home }}"
+    XDG_DATA_HOME: "{{ tasks_data_home }}"
+    TASKS_DIR: "{{ ansible_facts['env'].get('TASKS_DIR', '') }}"
+    TASKS_FILE: "{{ ansible_facts['env'].get('TASKS_FILE', '') }}"
+    TASKS_ARCHIVE: "{{ ansible_facts['env'].get('TASKS_ARCHIVE', '') }}"
+    TASKS_MEMORY: "{{ ansible_facts['env'].get('TASKS_MEMORY', '') }}"
+  register: tasks_config_check
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Explain an incomplete existing Tasks configuration
+  ansible.builtin.debug:
+    msg: >-
+      Tasks is installed, but its existing config or path environment is incomplete.
+      Existing settings were preserved. Run tasks config --json to inspect the
+      source of each path, then set dir in {{ tasks_config_home }}/tasks/config
+      or supply both TASKS_FILE and TASKS_ARCHIVE.
+  when:
+    - not ansible_check_mode
+    - not (tasks_config_check.stdout | from_json).configured

@@ -21,6 +21,8 @@
 # docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
 # nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
 # coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+# coding_agents Tasks suite: {{ include "dot_ansible/roles/coding_agents/tasks/tasks.yml" | sha256sum }}
+# coding_agents Tasks config: {{ include "dot_ansible/roles/coding_agents/tasks/tasks-config.yml" | sha256sum }}
 # coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
 # coding_agents Pi/OMP cleanup: {{ include "dot_ansible/roles/coding_agents/files/pi_omp_package_cleanup.sh" | sha256sum }}
 # bitwarden tasks: {{ include "dot_ansible/roles/bitwarden/tasks/main.yml" | sha256sum }}

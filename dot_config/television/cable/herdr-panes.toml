@@ -1,0 +1,58 @@
+# General Herdr pane picker. Ctrl+S cycles non-shell / agent / process / shell.
+# TSV: 0 = URL-safe route token, 1 = printable display, 2 = pane ID.
+# Only the encoded token enters commands; titles/cwd never become shell code.
+[metadata]
+name = "herdr-panes"
+description = "Herdr panes by foreground type — preview, jump, or close with confirmation"
+requirements = ["herdr", "python3"]
+
+[source]
+command = [
+  '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" list non-shell''',
+  '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" list agent''',
+  '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" list process''',
+  '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" list shell''',
+]
+display = "{split:\t:1}"
+output = "{split:\t:2}"
+no_sort = true
+frecency = false
+
+[preview]
+command = '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" preview '{split:\t:0}' '''
+cached = false
+
+[ui.input_bar]
+header = "Herdr panes · Ctrl+S: filter · Ctrl+R: reload"
+
+[ui.preview_panel]
+size = 50
+
+[keybindings]
+enter = "actions:focus"
+alt-t = "actions:focus"
+alt-k = "actions:close_pane"
+ctrl-y = "actions:copy_id"
+alt-p = "actions:copy_dir"
+ctrl-s = "cycle_sources"
+ctrl-r = "reload_source"
+
+[actions.focus]
+description = "Jump to this exact pane and exit"
+command = '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" focus '{split:\t:0}' '''
+mode = "execute"
+
+[actions.close_pane]
+description = "Close this pane after confirmation and exit"
+command = '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" close '{split:\t:0}' '''
+mode = "execute"
+
+[actions.copy_id]
+description = "Copy pane ID"
+command = '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" copy-id '{split:\t:0}' '''
+mode = "fork"
+
+[actions.copy_dir]
+description = "Copy current directory"
+command = '''python3 "${XDG_CONFIG_HOME:-$HOME/.config}/television/herdr-panes.py" copy-dir '{split:\t:0}' '''
+mode = "fork"

@@ -39,6 +39,15 @@ Notable community channels: `sesh`, `git-branch`, `git-log`, `git-stash`, `git-d
 
 ## Custom Channels
 
+### `dev-repos` channel
+
+`tv dev-repos` reads the on-demand `dev-projects list --json` projection of
+local dev REPOS. Enter returns one full path; it never opens a session or
+registers a project. Requires `dev-projects`, `dev`, `jq`, and bash. See
+[shared repo navigation](dev-projects.md) for a quoted Sidecar launcher example.
+This source is separate from zoxide frequency, Herdr live workspaces and the
+remote forge clone channels.
+
 ### `tools` channel
 
 Parses `~/.config/docs/tools/cli-tools.md` at runtime (deployed via chezmoi from `dot_config/docs/tools/`). The markdown file is the single source of truth — edit it to add or update tools.
@@ -87,6 +96,41 @@ tool to the repo = add a `[[tool]]` entry to the catalog, then `just gen-tool-in
 (regenerates the [Tool index](../this_repo/tool-managers.md#tool-index-az)); the
 `test_tool_catalog.py` coverage test fails if a role list / Brewfile names a tool the
 catalog lacks.
+
+---
+
+### `herdr-panes` channel {#herdr-panes-channel}
+
+Open `tv herdr-panes` inside Herdr, or press `prefix+a`. This replaces the old
+`herdr-agent-panes` name; chezmoi removes the old channel file during migration.
+
+`Ctrl+S` cycles **non-shell → agent → process → shell**. The first view combines
+agents, ordinary foreground programs, and unknown results. Rows show type,
+workspace/tab/pane, program names and agent state, plus the terminal title or cwd.
+Search this metadata; the pane's visible text is a live preview, not searchable
+source content. Use `herdr-grep --pick` for content search.
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+S` | Next view |
+| `Ctrl+R` | Rescan the current session |
+| `Enter` / `Alt+T` | Exit picker and jump to the exact pane, including splits |
+| `Alt+K` | Confirm closing one pane and exit; default answer is No |
+| `Ctrl+Y` / `Alt+P` | Copy pane ID / current directory |
+
+Classification reads live `pane process-info`: recognized agents are **agent**,
+only known shell executables in the foreground group means **shell**, and other
+programs are **process**. Shell PID alone is insufficient after `exec nvim`.
+Failed or missing process information stays **unknown** in the non-shell view;
+server failures appear as non-actionable error rows. The picker excludes itself.
+**Shell does not mean safe to close:** background jobs are not inspected.
+
+The stdlib-only `~/.config/television/herdr-panes.py` helper scans the current
+inherited session socket with at most four concurrent process queries, each with
+a five-second timeout. Source cycling and reload rescan; previews are uncached.
+Encoded routes feed the existing `~/.config/herdr/focus-pane.py` helper without
+interpolating titles or paths into shell commands. No cross-session aggregation
+or bulk cleanup is performed. [Herdr integration](herdr.md#television-integration).
 
 ---
 

@@ -56,6 +56,7 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 (Rendered from this host's selections. For live truth: `chezmoi data | jq`.)
 {{- if dig "installCodingAgents" false . }}
 - **Coding agents** — Claude Code, Pi (`pi`), Oh My Pi (`omp`), the `pia` Git-managed harness-combo manager, OpenCode, Cursor, Codex, Gemini, Copilot (configs + CLIs). `pia doctor` checks the stack; `pia list --tree` / `pia use pi/base` select presets. The external checkout is `~/.local/share/pi-agents`; `08_pi_agents.sh` makes its canonical commands beat mise/Bun shadows, while runtime state and credentials stay elsewhere. Token-usage tracking: `tokens` (tokens.ci; binary only — `tokens login` / `tokens serve` are manual opt-ins, see `docs/tools/tokens.md`). See `docs/tools/pi-agents.md`, `docs/tools/agent-overlays.md`, `docs/tools/agent-skills.md`.
+- **Sidecar + `td` + Tasks** — `coding_agents` installs all three under `installCodingAgents`. Sidecar offers a companion dashboard or integrated workspace; `td` tracks agent issues; Tasks handles personal planning through `tasks` / `tasks-tui` / `tasks-api`. Tasks first-seeds user-owned XDG config/data paths; it preserves existing configuration and does not start its API. Herdr `prefix+S` opens a right companion pane, keeping the existing agent external. See `docs/tools/td_sidecar.md` (`#ux-evolution`) and `docs/tools/tasks.md`.
 {{- end }}
 {{- if dig "installPythonUvTools" false . }}
 - **Python uv tools** — mlflow, marimo, jupyter, etc. (powers the `mlf` CLI). See `docs/this_repo/uv-bootstrap.md`.
@@ -167,6 +168,20 @@ binaries; generated Bash/Zsh completions follow successful changes. See
 - **`lazyfind`** — local/SSH file/text search using fd/rg, with optional rga/zoxide.
 - **`lazypkg`** — software inventory and reviewed package operations; mpm setup is explicit. Its `upgrade` command updates a selected package, not lazypkg itself; use `lazypkg self upgrade` for verified Homebrew ownership or `just upgrade-personal` for this CLI.
 
+## Copilot agent launchers
+
+`claude-copilot-once` / `codex-copilot-once` (and the identical names without
+`-once`) auto-start the local proxy and inject single-session CLI settings.
+`--specstory-mode run|exit|off` defaults to live recording; `exit` exports saved
+history after the agent exits and retries pending sync next launch. Wrapper
+flags precede agent arguments. Claude merges the effective user `--settings`
+JSON/file into one CLI object; no temporary project pin. `copilot-here on`
+explicitly pins Claude, previews changed settings (default keep; `--yes` for
+scripts), and refuses tracked targets. `off` restores owned settings while
+preserving later edits. Codex 0.156.1 ignores project-local provider settings;
+use its single-session launcher. `copilot-run` remains a generic environment
+injector. See `docs/tools/copilot-claude-proxy.md`.
+
 ## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
 
 Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, but not all (`x` → `clipboard.md`, `view-ebook` → `yazi-previews.md`, `fleet` → `this_repo/fleet-apply.md`); grep `docs/` if the obvious path 404s. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.
@@ -190,9 +205,10 @@ Each works from any cwd. Run with `--help`. Most have `docs/tools/<name>.md`, bu
 - **`appsrc`** — detect how an installed app / CLI was installed & managed (cask / App Store / direct-download / apt / snap / flatpak / AppImage / cargo/npm/pipx/uv/mise/go/gem / manual): `appsrc which <cmd-or-app>` (live), `appsrc size <app>` (footprint + associated cache/data/containers), `appsrc tui` (interactive dashboard — sort by size, filter), bare `appsrc` / `appsrc scan` (cached inventory, `--json`/`--tsv`/`--size`/`--sort`). Picker twins: `tv appsrc` (by source) / `tv appsrc-size` (by footprint). See `docs/tools/appsrc.md`.
 - **`herdr-grep`** — search visible or retained content across panes in the current, one named, or all running local Herdr sessions; reports exact session/workspace/tab/pane coordinates, supports `--json`, and `--pick` pipes matches to fzf then exact-focuses/attaches the selection. Inside Herdr, `prefix+Alt+F` opens a visible-content picker (Alt+S = scrollback, Alt+V = visible). Remote use runs the CLI through SSH. See `docs/tools/herdr.md`.
 - **`dotcfg`** — reconfigure dotfiles prompts (above).
+- **`dev-projects`** — on-demand local REPOS candidates from `dev repo list --json`; `open PATH --tool sidecar|nvim` revalidates before launch, and `sidecar-import` previews add-only registration (`--apply --yes` is explicit). `:DevRepositories` and `tv dev-repos` keep native histories/sessions separate. Read `docs/tools/dev-projects.md` before import; the Sidecar config API has no concurrent-writer transaction.
 - **`sesh-preview`** — preview helper for the sesh picker.
 
-**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, binary-matched global skill from `herdr --skill`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with `prefix+d` for the interactive `dev` dashboard, `prefix+G` / `Alt+g` lazygit temporary pane, `prefix+Y` for a Yazi filesystem popup rooted at the focused pane cwd, low-frequency copy helpers under `prefix+y` Quick Actions, `prefix+t` for the interactive `translate` TUI popup, and `prefix+y` Quick Actions for bilingual pane translation (current page / last 200-1000 lines; an alternate-screen agent pane has NO scrollback and `pane read` caps at 1000 lines), three metadata pickers (`tv herdr-agent-panes`, `tv herdr-review`, `tv herdr-sesh`), and `herdr-grep` for pane-content search. Yazi itself displays guarded `git.yazi` status signs on Yazi 26.8.15+. See `docs/tools/{herdr,yazi}.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
+**`herdr`** is a first-class managed surface too (config in `dot_config/herdr/`, binary-matched global skill from `herdr --skill`, upgrade via `just upgrade-herdr` — which must NOT be run from inside a herdr pane): a remote pane/workspace server with `prefix+d` for the interactive `dev` dashboard, `prefix+G` / `Alt+g` lazygit temporary pane, `prefix+S` for a 50/50 Sidecar pane on the right (Sidecar/td install gate: `installCodingAgents`; exit restores the layout), `prefix+Y` for a Yazi filesystem popup rooted at the focused pane cwd, low-frequency copy helpers under `prefix+y` Quick Actions, `prefix+t` for the interactive `translate` TUI popup, and `prefix+y` Quick Actions for bilingual pane translation (current page / last 200-1000 lines; an alternate-screen agent pane has NO scrollback and `pane read` caps at 1000 lines), three metadata pickers (`tv herdr-panes` / `prefix+a` cycles non-shell, agent, process, shell with exact-pane jump, `tv herdr-review`, `tv herdr-sesh`), and `herdr-grep` for pane-content search. Yazi itself displays guarded `git.yazi` status signs on Yazi 26.8.15+. See `docs/tools/{herdr,yazi}.md` and the herdr entries in `pitfalls/`. Distinct from `wt` (worktrunk) and `wm` (workmux).
 
 `prefix+Alt+e` edits only `$HERDR_CONFIG_PATH` (or `~/.config/herdr/config.toml`), validates that exact live target, and reloads; it never invokes chezmoi. Editor/validation failure preserves the rejected candidate and atomically restores the previous valid config; reload failure keeps the valid edit and backup. A later `chezmoi apply` reasserts canonical `[theme]`, `[ui]`, `[terminal]`, and `[keys]`. Persist selectively by manually editing `.chezmoitemplates/herdr/config.toml`; never `chezmoi add` or `chezmoi re-add` this `modify_` target.
 

@@ -404,11 +404,15 @@ Sesh 使用 zoxide 的 frecency 資料庫建議目錄。任何你 `cd` 過的目
 
 `_ZO_RESOLVE_SYMLINKS=1`（在 [`zsh/tools/20_zoxide.zsh`](../../dot_config/zsh/tools/20_zoxide.zsh) 中設定）讓 zoxide 在儲存路徑前先標準化它們，因此符號連結 (symlink) 密集的設定（例如 `~/Documents/Program -> /Volumes/Data/Program`）不會把單一實體目錄的 frecency 切分到兩個幻影項目之間。Sesh 萬用字元應該針對標準樣式 (`/Volumes/Data/Program/*/*`)，而非表面的 symlink。
 
-要為一個全新的資料庫播種 (bootstrap)、讓 sesh 立刻能呈現你想要的目錄（不必等待自然的 `cd` 流量），最簡單的做法是寫一個一次性的 Python 腳本，讀取二進位 `db.zo`（version 3 格式：`u32 ver, u64 count, then per-entry: u64 path_len, path bytes, f64 rank, u64 ts`），以 `rank=1.0` 插入新項目，再寫回去。分數較高的既存項目會被保留。範例工作流程如果之後該 pitfall 文件被建立，會放在 [pitfalls/zoxide-symlink-fragmentation.md](../../pitfalls/zoxide-symlink-fragmentation.md)。
+完整 repo inventory 使用 [dev 共用候選](dev-projects.zh-TW.md)，不要灌入
+使用歷史，也不要直接修改 zoxide binary DB。若明確需要一次性 seed，只對
+選定的缺少路徑使用原生 `zoxide add`；它會更新 frequency 與 timestamps，
+不適合週期重播當成中立同步。Sesh 2.22 支援 import 獨立的具名 session
+設定片段，比修改 history 或預先建立 live session 更適合未來可選 catalog export。
 
 ### Neovim（編輯器內 zoxide 選擇器）
 
-要在不離開 Neovim 的情況下在儲存庫之間跳轉，[`nvim/lua/plugins/zoxide-picker.lua`](../../dot_config/nvim/exact_plugins/zoxide-picker.lua) 在 `zoxide query --list --score` 之上加上一個 snacks.picker：
+要在不離開 Neovim 的情況下在儲存庫之間跳轉，[`nvim/lua/plugins/zoxide-picker.lua`](../../dot_config/nvim/lua/exact_plugins/zoxide-picker.lua) 在 `zoxide query --list --score` 之上加上一個 snacks.picker：
 
 | Keymap | 動作 |
 |--------|--------|
@@ -417,29 +421,24 @@ Sesh 使用 zoxide 的 frecency 資料庫建議目錄。任何你 `cd` 過的目
 
 預設使用 `:tcd`（分頁本地）以避免在你開著多個專案的緩衝區時，把 LazyVim 的專案根偵測搞混。當你真的想讓整個 nvim 會話跟著切換時，再用 `:cd`（`<leader>fZ`）。
 
-### 三個專案選擇器比較
+### Project 入口比較
 
-LazyVim 最終會有**三個重疊但不同**的專案跳轉進入點。挑選符合你意圖的那一個：
+| 位置 | 入口 | 資料來源 | 行為 |
+|---|---|---|---|
+| Neovim | `:DevRepositories` | 按需 dev REPOS | 瀏覽選定 files，不改 cwd/session |
+| Neovim | `<leader>fp`／dashboard `p` | 選定 LazyVim util.project backend | 原生 project 導航 |
+| Neovim | `Snacks.picker.projects()` | oldfiles Git roots + fd roots | 原生 load-session action |
+| Neovim | `<leader>fz`／`<leader>fZ` | zoxide frequency | 明確改 tab-local／global cwd |
+| tmux | `prefix+g` | live tmux + sesh config + zoxide | switch/create session |
 
-| 位置 | 觸發 | 來源 | 作用 |
-|-------|---------|--------|--------------|
-| nvim 內 | `<leader>fp`（或 dashboard `p`） | `snacks.picker.projects` — oldfiles 的 git 根 + 在 `dev` 目錄上跑 `fd` | `:tcd` + `persistence.nvim` 還原（該 cwd 上次的 buffer/視窗） |
-| nvim 內 | `<leader>fz` / `<leader>fZ` | 完整的 zoxide 資料庫（frecency，100+ 項目） | 純 `:tcd` / `:cd`，不還原會話 |
-| tmux 內 | `prefix + g`（sesh fzf） | tmux + sesh.toml + zoxide | 切換/建立 tmux 會話，重新開啟 nvim + lazygit |
-
-粗略的判斷準則：
-
-- **已在 nvim 中、想瞄一下另一個儲存庫的檔案** → `<leader>fz`
-  （便宜、不需要會話儀式）
-- **已在 nvim 中、想完整恢復另一個儲存庫的工作** →
-  `<leader>fp`（還原你上次擁有的 buffer/視窗）
-- **在 nvim 之外、想要乾淨的逐儲存庫工作空間** → 從 tmux 用 `prefix+g`
-  （取得 `~/.config/tmuxp/project.yaml` 中定義的排版）
+目前安裝沿用較早的 LazyVim fzf 預設，util.project 讀 project.nvim history；
+下方 Snacks source 設定未必影響 dashboard `p`。修改前核對實際 keymap。
+Session restore 保持明確操作，列出 dev 候選不填入 project.nvim 或 persistence。
 
 ### 設定 snacks projects 選擇器
 
-預設值會看 `~/dev` 與 `~/projects`（你的機器上大概不存在），加上從 oldfiles 推導出的 git 根。要讓 `<leader>fp` 呈現你的專案首頁下的每一個儲存庫，把它加入 `dev`——
-[`projects.lua`](../../dot_config/nvim/exact_plugins/projects.lua) 為 `/Volumes/Data/Program` 做了這件事：
+預設值會看 `~/dev` 與 `~/projects`（你的機器上大概不存在），加上從 oldfiles 推導出的 git 根。要讓明確呼叫的 `Snacks.picker.projects()` 呈現你的專案首頁下的每一個儲存庫，把它加入 `dev`——
+[`projects.lua`](../../dot_config/nvim/lua/exact_plugins/projects.lua) 為 `/Volumes/Data/Program` 做了這件事：
 
 ```lua
 {
@@ -469,7 +468,7 @@ projects = {
 
 `dev`（透過 `fd` 自動探索）與 `projects`（手動清單）兩者都會在 fzf 渲染前與 oldfiles 項目合併。Snacks 會依路徑去重。
 
-`confirm = "load_session"` 預設委派給 `persistence.nvim`（同樣在 `projects.lua` 中接好）；它會還原該 cwd 上次的 buffer/視窗排版。如果未安裝 `persistence.nvim`，`load_session` 會靜默退回到 `:tcd` 之後開啟檔案選擇器。
+`confirm = "load_session"` 預設委派給 `persistence.nvim`（同樣在 `projects.lua` 中接好）；它會還原該 cwd 上次的 buffer/視窗排版。沒有 session 可還原時，會在原生 cwd 變更後開 file picker。已安裝的 Snacks action 使用 `vim.fn.chdir`，不能假設是 tab-local；要保持 editor cwd 瀏覽另一個 repo，可用 `:DevRepositories`。
 
 ### Television (tv)
 

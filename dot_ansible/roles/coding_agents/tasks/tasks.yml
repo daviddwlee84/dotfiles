@@ -1,0 +1,208 @@
+---
+# Tasks is a three-command suite. Presence of `tasks` alone is not sufficient.
+# Keep this include self-contained so --tags coding_agents_tasks is safe.
+- name: Check the installed Tasks suite
+  ansible.builtin.command: &tasks_suite_probe
+    argv:
+      - "{{ ansible_facts['python']['executable'] | default('python3') }}"
+      - -c
+      - |
+        import json, shutil, subprocess, sys
+        paths, ready = {}, []
+        for name in sys.argv[1:]:
+            path = shutil.which(name)
+            paths[name] = path or ""
+            if not path:
+                continue
+            try:
+                result = subprocess.run([path, "--version"], capture_output=True,
+                                        text=True, timeout=10)
+                if result.returncode == 0 and result.stdout.startswith(name + " "):
+                    ready.append(name)
+            except (OSError, subprocess.SubprocessError):
+                pass
+        print(json.dumps({"paths": paths, "ready": ready,
+                          "missing": [name for name in sys.argv[1:] if name not in ready]}))
+      - tasks
+      - tasks-tui
+      - tasks-api
+  environment: &tasks_suite_environment
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['HOME'] }}/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: tasks_suite_initial
+  changed_when: false
+  check_mode: false
+
+- name: Probe Homebrew for a missing Tasks suite
+  when: (tasks_suite_initial.stdout | from_json).missing | length > 0
+  # A stub brew can exit zero without doing anything; require a real prefix.
+  ansible.builtin.command: brew --prefix
+  environment: *tasks_suite_environment
+  register: tasks_suite_brew
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Install the Tasks suite through Homebrew
+  when:
+    - not ansible_check_mode
+    - ansible_facts['os_family'] in ['Darwin', 'Debian', 'RedHat']
+    - (tasks_suite_initial.stdout | from_json).missing | length > 0
+    - tasks_suite_brew.stdout | default('') | trim | length > 0
+  environment: *tasks_suite_environment
+  block:
+    - name: Tap marcus/tap for Tasks
+      community.general.homebrew_tap:
+        name: marcus/tap
+        state: present
+
+    - name: Check trust state of the marcus tap for Tasks
+      ansible.builtin.command: brew tap-info marcus/tap
+      register: tasks_marcus_tap_info
+      changed_when: false
+      failed_when: false
+
+    - name: Trust the marcus tap for Tasks
+      when: "'Untrusted' in (tasks_marcus_tap_info.stdout | default(''))"
+      ansible.builtin.command: brew trust marcus/tap
+      changed_when: true
+
+    - name: Install Tasks and its companion commands
+      community.general.homebrew:
+        name: marcus/tap/tasks
+        state: present
+
+  rescue:
+    - name: Report the Tasks Homebrew failure
+      ansible.builtin.debug:
+        msg: >-
+          Tasks Homebrew installation failed. Linux will try verified release
+          binaries; macOS keeps the existing installation for manual repair.
+
+- name: Recheck the Tasks suite after Homebrew
+  ansible.builtin.command: *tasks_suite_probe
+  environment: *tasks_suite_environment
+  register: tasks_suite_after_brew
+  changed_when: false
+  check_mode: false
+
+- name: Select the Tasks release architecture
+  ansible.builtin.set_fact:
+    tasks_suite_arch: >-
+      {{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}
+         .get(target_architecture | default(ansible_facts['architecture']), 'unsupported') }}
+
+- name: Report unsupported Tasks release architecture
+  when:
+    - ansible_facts['os_family'] in ['Debian', 'RedHat']
+    - (tasks_suite_after_brew.stdout | from_json).missing | length > 0
+    - tasks_suite_arch == 'unsupported'
+  ansible.builtin.debug:
+    msg: "Tasks release installation skipped: unsupported architecture {{ target_architecture | default(ansible_facts['architecture']) }}."
+
+- name: Install missing Tasks commands from a verified Linux release
+  when:
+    - not ansible_check_mode
+    - ansible_facts['os_family'] in ['Debian', 'RedHat']
+    - (tasks_suite_after_brew.stdout | from_json).missing | length > 0
+    - tasks_suite_arch != 'unsupported'
+  block:
+    - name: Get the latest Tasks release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/marcus/tasks/releases/latest
+        return_content: true
+      register: tasks_suite_release
+
+    - name: Select the official Tasks release archive
+      ansible.builtin.set_fact:
+        tasks_suite_archive_root: "tasks_{{ tasks_suite_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ tasks_suite_arch }}"
+        tasks_suite_release_url: "https://github.com/marcus/tasks/releases/download/{{ tasks_suite_release.json.tag_name }}"
+
+    - name: Create a private Tasks download directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: tasks-install-
+      register: tasks_suite_stage
+
+    - name: Download and checksum-verify the Tasks release archive
+      ansible.builtin.get_url:
+        url: "{{ tasks_suite_release_url }}/{{ tasks_suite_archive_root }}.tar.gz"
+        dest: "{{ tasks_suite_stage.path }}/{{ tasks_suite_archive_root }}.tar.gz"
+        checksum: "sha256:{{ tasks_suite_release_url }}/checksums.txt"
+        mode: "0600"
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Extract the verified Tasks release
+      ansible.builtin.unarchive:
+        src: "{{ tasks_suite_stage.path }}/{{ tasks_suite_archive_root }}.tar.gz"
+        dest: "{{ tasks_suite_stage.path }}"
+        remote_src: true
+
+    # Validate every executable before replacing any destination. All three are
+    # shipped in the release's wrapped directory; do not pick arbitrary matches.
+    - name: Verify all Tasks release commands start
+      ansible.builtin.command:
+        argv:
+          - "{{ tasks_suite_stage.path }}/{{ tasks_suite_archive_root }}/{{ item }}"
+          - --version
+      loop: [tasks, tasks-tui, tasks-api]
+      register: tasks_suite_candidate
+      changed_when: false
+      failed_when: >-
+        tasks_suite_candidate.rc != 0 or
+        not tasks_suite_candidate.stdout.startswith(item + ' ')
+
+    - name: Ensure the user binary directory exists for Tasks
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: "0755"
+
+    - name: Install missing Tasks suite commands
+      ansible.builtin.copy:
+        src: "{{ tasks_suite_stage.path }}/{{ tasks_suite_archive_root }}/{{ item }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item }}"
+        mode: "0755"
+        remote_src: true
+        force: false
+      loop: [tasks, tasks-tui, tasks-api]
+      # Preserve existing commands and their package owner. A broken/shadowing
+      # binary is reported below, not silently overwritten or upgraded on apply.
+      when: (tasks_suite_after_brew.stdout | from_json).paths[item] == ''
+
+  rescue:
+    - name: Report a Tasks release installation failure
+      ansible.builtin.debug:
+        msg: "Tasks release installation failed; existing commands were preserved. Configuration bootstrap will require a working suite."
+
+  always:
+    - name: Remove the private Tasks download directory
+      when: tasks_suite_stage.path is defined
+      ansible.builtin.file:
+        path: "{{ tasks_suite_stage.path }}"
+        state: absent
+
+- name: Check the final Tasks suite
+  ansible.builtin.command: *tasks_suite_probe
+  environment: *tasks_suite_environment
+  register: tasks_suite_final
+  changed_when: false
+  check_mode: false
+
+- name: Publish Tasks suite availability and executable path
+  ansible.builtin.set_fact:
+    tasks_suite_available: "{{ (tasks_suite_final.stdout | from_json).missing | length == 0 }}"
+    tasks_cli_path: "{{ (tasks_suite_final.stdout | from_json).paths['tasks'] }}"
+
+- name: Report an incomplete Tasks suite
+  when: not tasks_suite_available
+  ansible.builtin.debug:
+    msg: >-
+      Tasks suite is unavailable or incomplete: {{ (tasks_suite_final.stdout | from_json).missing | join(', ') }}.
+      No existing command is auto-upgraded or overwritten. Repair its package owner
+      or PATH, then rerun --tags coding_agents_tasks. Configuration was not seeded.
+
+- name: Bootstrap Tasks configuration after the suite is available
+  ansible.builtin.import_tasks: tasks-config.yml
+  when: tasks_suite_available
