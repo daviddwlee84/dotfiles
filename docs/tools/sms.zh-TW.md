@@ -184,6 +184,9 @@ sms prune --keep 200 --include-unread --yes
   port-forward 隧道進去）。API 預設不會在 WAN 暴露。
 - **`sms watch` 執行中，網頁 UI 登入出現 108003** — watcher 只在收件匣變動時短暫登入，
   幾秒後重試即可；或在使用網頁 UI 時 `systemctl --user stop sms-watch`。
+- **`sms watch` 偶爾出現 `RemoteDisconnected`** — 路由器的 httpd 會提早關閉 keep-alive
+  連線。輪詢改用單一 GET 加 `Connection: close`，單次失敗會在 2 秒後靜默重試；
+  只有連續失敗才會記錄並退避。
 - **`sms watch` 沒有推播** — 查看 state 目錄中的 `notify.log`，並直接測試 URL：
   `apprise -b test '<url>'`。
 - **host 錯了** — 許多 HiLink 路由器預設是 `192.168.8.1`；這台用

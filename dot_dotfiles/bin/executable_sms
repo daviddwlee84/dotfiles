@@ -215,15 +215,28 @@ def fetch_inbox(cfg: dict[str, str], count: int = 50) -> list[dict[str, Any]]:
 
 def sms_count(cfg: dict[str, str]) -> dict[str, int]:
     """Inbox counters. Many firmwares (incl. B525s) serve this without login,
-    which lets `watch` poll without holding or churning an admin session."""
-    from huawei_lte_api.exceptions import ResponseErrorLoginRequiredException
+    which lets `watch` poll without holding or churning an admin session.
 
-    try:
-        with open_client(cfg, login=False) as client:
-            raw = client.sms.sms_count()
-    except ResponseErrorLoginRequiredException:
+    Polled with ONE plain GET + `Connection: close` rather than a library
+    Connection: that one first GETs `/` for CSRF tokens and then reuses the
+    keep-alive socket, which the router's httpd sometimes has already closed
+    → sporadic RemoteDisconnected (~1 in 60 polls on the B525s; raw: 0/60).
+    """
+    import xml.etree.ElementTree as ET
+
+    import requests
+
+    with requests.Session() as s:
+        s.trust_env = False  # LAN device — ignore ambient proxy env
+        r = s.get(f"http://{cfg['host']}/api/sms/sms-count",
+                  headers={"Connection": "close"}, timeout=10)
+        r.raise_for_status()
+    root = ET.fromstring(r.content)
+    if root.tag == "error":  # e.g. 100003 login required on stricter firmware
         with open_client(cfg) as client:
             raw = client.sms.sms_count()
+    else:
+        raw = {el.tag: (el.text or "").strip() for el in root}
     return {k: int(v) for k, v in (raw or {}).items() if str(v).lstrip("-").isdigit()}
 
 
@@ -618,7 +631,7 @@ class WatchCmd:
         last_sig: tuple[int, int] | None = None
         last_full = 0.0
         cap_alerted = False
-        backoff = interval
+        failures = 0
         while True:
             try:
                 c = sms_count(cfg)
@@ -639,11 +652,19 @@ class WatchCmd:
                 if sig != last_sig or now - last_full >= full_sync:
                     self._sync(cfg, urls, tag, mark_read)
                     last_sig, last_full = sig, now
-                backoff = interval
+                if failures > 1:
+                    log(f"router reachable again after {failures} failed attempt(s)")
+                failures = 0
             except Exception as e:
+                failures += 1
+                if failures == 1:
+                    # The router's tiny httpd drops a connection now and then;
+                    # one quick, silent retry absorbs it.
+                    time.sleep(2)
+                    continue
                 if self.once:
                     die(f"router error: {e}")
-                backoff = min(max(backoff, interval) * 2, MAX_BACKOFF)
+                backoff = min(interval * 2 ** (failures - 1), MAX_BACKOFF)
                 log(f"router error: {type(e).__name__}: {e} — retry in {backoff:g}s")
                 time.sleep(backoff)
                 continue

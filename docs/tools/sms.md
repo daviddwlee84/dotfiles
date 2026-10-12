@@ -198,6 +198,10 @@ the web UI). Use `sms refresh` or `sms --no-cache <cmd>` to bypass.
 - **Web UI login fails with 108003 while `sms watch` runs** — the watcher
   only logs in briefly when the inbox changes, so retry in a few seconds; or
   `systemctl --user stop sms-watch` while you use the web UI.
+- **Sporadic `RemoteDisconnected` in `sms watch`** — the router's httpd closes
+  keep-alive sockets early. Polling uses one plain GET with `Connection: close`
+  and a single failure is retried silently after 2 s; only consecutive failures
+  are logged and backed off.
 - **`sms watch` pushes nothing** — check `notify.log` in the state dir and
   test the URL directly: `apprise -b test '<url>'`.
 - **Wrong host** — many HiLink routers default to `192.168.8.1`; this one
