@@ -270,6 +270,7 @@ Rime 的手寫設定現在由 chezmoi 管理，而且與 Windows repo
 |---|---|
 | `default.custom.yaml` | `schema_list`（注音·臺灣正體、注音、朙月拼音、地球拼音、倉頡五代）與 `menu/page_size` |
 | `luna_pinyin.custom.yaml` | 朙月拼音固定輸出臺灣字形（`switches/@2/reset: 3`） |
+| `bopomofo.custom.yaml` | 注音選字鍵固定為 ⇧1…⇧0（`bopomofo_tw` 經 `__include` 一併繼承） |
 
 之所以能共用：Weasel 與 Squirrel 內建的方案集完全相同（都是 plum 的 `:preset`
 套件組 — `bopomofo`、`cangjie`、`luna-pinyin`、`terra-pinyin`、`stroke` 等），
@@ -316,6 +317,25 @@ Rime 的手寫設定現在由 chezmoi 管理，而且與 Windows repo
 
 Unix 這邊刻意維持手動：Squirrel 的 `--reload` 不夠可靠，而 `ibus restart` 會打斷
 當前輸入狀態，都不適合塞進 `chezmoi apply`。
+
+### 升級 Squirrel 與選字鍵差異
+
+Squirrel 是官方 `.pkg` 安裝（receipt `im.rime.inputmethod.Squirrel`，用
+`pkgutil --pkg-info im.rime.inputmethod.Squirrel` 查版本），之後靠內建的 Sparkle
+自我更新：輸入法選單 →「檢查更新」。Homebrew 的 `squirrel-app` cask 裝的是同一個
+pkg，但標了 `auto_updates`，`brew upgrade` / `just upgrade-*` 都會跳過它 —
+所以不需要改成 brew 管理，記得偶爾檢查更新即可。
+
+注音的選字鍵會隨 Squirrel 內建的 rime-bopomofo 版本改變：
+
+| Squirrel | rime-bopomofo | 選字 |
+|---|---|---|
+| 1.0.x | 2.4 | `menu/alternative_select_keys: ABCDEFGHIJ` → Shift+A…J |
+| 1.1.x | 3.0 | `key_binder` 把 `Shift+!@#…)` 送成 `KP_1…KP_0` → ⇧1…⇧0 |
+
+（數字鍵本身是大千式注音鍵，不能直接選字。）`bopomofo.custom.yaml` 把 3.0 的
+⇧數字綁定附加回去，讓行為不再跟著上游變；但 1.0.x 的 `alternative_select_keys`
+仍會優先，所以兩台機器顯示不同時，先把舊的那台升級。
 
 ### McBopomofo
 

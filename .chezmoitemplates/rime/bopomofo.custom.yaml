@@ -1,0 +1,28 @@
+# Rime — SHARED, PLATFORM-PORTABLE config (see default.custom.yaml header).
+#
+# Pin 注音's candidate-selection keys to Shift+digit (⇧1…⇧0).
+#
+# The bundled rime-bopomofo changed this between releases, so two machines on
+# different Squirrel/Weasel versions disagreed:
+#   rime-bopomofo 2.4 (Squirrel 1.0.x)  menu/alternative_select_keys: ABCDEFGHIJ
+#   rime-bopomofo 3.0 (Squirrel 1.1.x)  key_binder Shift+!@#…) → KP_1…KP_0
+# Digits themselves are bopomofo keys (大千式 1=ㄅ 2=ㄉ …), so a plain digit can
+# never select. This appends 3.0's own bindings (a harmless duplicate on 3.0)
+# so the behaviour survives a future upstream change. Upgrade a 1.0.x frontend
+# rather than patching 2.4: its alternative_select_keys still win there.
+#
+# bopomofo_tw does `__include: bopomofo.schema:/`, which pulls in this patch,
+# so 注音·臺灣正體 needs no file of its own.
+patch:
+  menu/alternative_select_labels: ['⇧1', '⇧2', '⇧3', '⇧4', '⇧5', '⇧6', '⇧7', '⇧8', '⇧9', '⇧0']
+  key_binder/bindings/+:
+    - { when: has_menu, accept: Shift+exclam, send: KP_1 }
+    - { when: has_menu, accept: Shift+at, send: KP_2 }
+    - { when: has_menu, accept: Shift+numbersign, send: KP_3 }
+    - { when: has_menu, accept: Shift+dollar, send: KP_4 }
+    - { when: has_menu, accept: Shift+percent, send: KP_5 }
+    - { when: has_menu, accept: Shift+asciicircum, send: KP_6 }
+    - { when: has_menu, accept: Shift+ampersand, send: KP_7 }
+    - { when: has_menu, accept: Shift+asterisk, send: KP_8 }
+    - { when: has_menu, accept: Shift+parenleft, send: KP_9 }
+    - { when: has_menu, accept: Shift+parenright, send: KP_0 }
