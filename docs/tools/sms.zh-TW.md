@@ -21,6 +21,7 @@ CLI 透過 [`huawei-lte-api`](https://github.com/Salamek/huawei-lte-api)
 
 - `~/.dotfiles/bin/sms` — CLI（uv-script；首次執行時會把依賴解到 uv 的 cache）
 - `~/.config/television/cable/sms.toml` — `tv sms` channel
+- `~/.config/television/cable/sms-archive.toml` — `tv sms-archive` channel
 - `~/.config/sms/config.toml.example` — 起始設定範本
 
 需要 `uv`（已透過 bootstrap script 安裝）。
@@ -64,6 +65,7 @@ sms watch [--interval 10] [--once] [--json] [--no-notify] [--mark-read]
 sms notify-test [--latest] [--dry-run]          # 透過與 watch 相同的目標送一則測試推播
 sms archive                                     # 把收件匣所有訊息複製到本機 SQLite 封存
 sms export [--format sbr|mbox|jsonl] [-o FILE] [--refresh]
+sms search [WORDS…] [--phone P] [--since 2026-10] [--codes] [--limit 20] [--json] [--key K]
 sms service install|uninstall|status            # `sms watch` 的 systemd --user unit（Linux）
 ```
 
@@ -81,6 +83,9 @@ tv sms
 - `Alt+D` — 刪除選中的訊息（會詢問確認）
 - `Ctrl+S` — 切換來源：全部 ↔ 僅未讀
 - 每 5 秒自動刷新 — 等驗證碼時開著就好。
+
+`tv sms-archive` 是同樣的選單，但查的是**本機封存**（完整歷史、可離線、不需登入路由器）：
+`Enter` / `Alt+C` 同上，`Alt+R` 先執行 `sms archive` 再重新載入，`Ctrl+S` 切換：全部 ↔ 僅驗證碼。
 
 ## 推播通知（`sms watch`）
 
@@ -195,6 +200,25 @@ sqlite3 ~/.local/share/sms/archive.sqlite 'select date, phone, content from sms 
 | `sbr` | Android app *SMS Backup & Restore*（SyncTech）——可還原到手機簡訊資料庫；也有網頁檢視器與許多轉換工具。事實上的簡訊封存格式。 |
 | `mbox` | 任何郵件程式（Apple Mail / Thunderbird 匯入）、`mutt -f`、`notmuch`。主旨 = 前 70 字；`Message-ID` 固定，重複匯入會去重。 |
 | `jsonl` | `jq`、腳本。 |
+
+### 檢視封存
+
+```bash
+sms search 驗證碼 --since 2026-10           # 多個關鍵字為 AND 子字串比對
+sms search --codes --limit 5                # 只看驗證碼簡訊
+sms search --phone 68005
+sms search --key 558e47                     # 完整內容（key 前綴取自表格）
+tv sms-archive                              # 模糊搜尋選單，複製內文 / 驗證碼
+```
+
+臨時探索可用機器上已有的工具：
+
+| 工具 | 指令 | 適合 |
+|------|------|------|
+| VisiData（`vd`） | `vd ~/.local/share/sms/archive.sqlite` | 瀏覽 / 排序 / 正規表示式篩選（`\|`）/ 次數統計（`Shift+F`） |
+| sqlit | `sqlit --db-type sqlite --file-path ~/.local/share/sms/archive.sqlite` | 在 TUI 中寫 SQL |
+| sqlite3 | `sqlite3 -box …/archive.sqlite "select phone, count(*) n from sms group by phone order by n desc limit 10"` | 一行查詢 |
+| datasette | `uvx datasette ~/.local/share/sms/archive.sqlite` | 瀏覽器介面——只開在 localhost（封存內含驗證碼） |
 
 封存檔位於 platformdirs 的 **data** 目錄（Linux 為 `~/.local/share/sms/archive.sqlite`，
 或 `XDG_DATA_HOME` 指向處），權限 600。每列的 key 與 `watch` 的 seen-state 相同

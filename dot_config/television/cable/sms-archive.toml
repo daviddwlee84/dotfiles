@@ -1,0 +1,63 @@
+# Archived SMS channel for television (tv)
+#
+# Fuzzy-search the LOCAL SQLite archive written by `sms archive` / `sms watch`
+# (archive = true) — full history, works offline, no router login. Sister of
+# `tv sms`, which shows the live router inbox; keys match that channel.
+#
+# Usage:
+#   tv sms-archive
+#
+# Source cycling (Ctrl+S):
+#   1. All archived messages (newest first)
+#   2. Verification codes only
+#
+# Keybindings (Alt+ namespace, per CLAUDE.md tmux/TV conflict rules):
+#   Enter      Copy message body to clipboard
+#   Alt+C      Extract and copy verification code (digits only)
+#   Alt+R      Pull new messages from the router into the archive + reload
+#   Ctrl+O     Toggle preview panel (TV built-in)
+#
+# Uses the `sms` CLI (deployed by chezmoi to ~/.dotfiles/bin/sms).
+
+[metadata]
+name = "sms-archive"
+description = "Archived SMS (local SQLite) — search full history, copy codes"
+requirements = ["sms", "jq"]
+
+[source]
+command = [
+  """sms search --json --limit 0 2>/dev/null | jq -r '[.key, (if .unread == 1 then "●" else " " end), .phone, .date, (.content | gsub("\\n"; " ") | .[0:120])] | @tsv'""",
+  """sms search --json --limit 0 --codes 2>/dev/null | jq -r '[.key, (if .unread == 1 then "●" else " " end), .phone, .date, (.content | gsub("\\n"; " ") | .[0:120])] | @tsv'""",
+]
+display = "{split:\\t:3}  {split:\\t:2}  {split:\\t:4}"
+output = "{split:\\t:0}"
+
+[preview]
+command = "sms search --key '{split:\\t:0}' 2>/dev/null"
+header = "{split:\\t:2} — {split:\\t:3}"
+
+[ui]
+input_header = "SMS Archive"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:copy_body"
+alt-c = "actions:copy_code"
+alt-r = ["actions:refresh", "reload_source"]
+
+[actions.copy_body]
+description = "Copy message body to clipboard"
+command = "sms search --key '{split:\\t:0}' --json 2>/dev/null | jq -r '.content' | x copy"
+mode = "fork"
+
+[actions.copy_code]
+description = "Extract and copy verification code"
+command = "body=$(sms search --key '{split:\\t:0}' --json 2>/dev/null | jq -r '.content'); code=$(printf '%s' \"$body\" | grep -oE '[0-9]{4,8}' | head -n1); printf '%s' \"$code\" | x copy"
+mode = "fork"
+
+[actions.refresh]
+description = "Pull new router messages into the archive"
+command = "sms archive >/dev/null 2>&1"
+mode = "fork"

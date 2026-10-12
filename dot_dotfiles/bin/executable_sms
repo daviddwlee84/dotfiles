@@ -332,13 +332,15 @@ def archive_upsert(db: sqlite3.Connection, msgs: list[dict[str, Any]], host: str
     return new
 
 
-def archive_rows() -> list[dict[str, Any]]:
+def archive_rows(where: str = "", params: tuple[Any, ...] = (), newest_first: bool = False) -> list[dict[str, Any]]:
     if not ARCHIVE_DB.exists():
         return []
     db = sqlite3.connect(ARCHIVE_DB)
     db.row_factory = sqlite3.Row
+    order = "DESC" if newest_first else "ASC"
     try:
-        return [dict(r) for r in db.execute("SELECT * FROM sms ORDER BY date, router_index")]
+        sql = f"SELECT * FROM sms {'WHERE ' + where if where else ''} ORDER BY date {order}, router_index {order}"
+        return [dict(r) for r in db.execute(sql, params)]
     finally:
         db.close()
 
@@ -1040,6 +1042,80 @@ def json_dump(obj: Any) -> None:
 
 # ---------- entrypoint ------------------------------------------------------
 
+@dataclass
+class SearchCmd:
+    """Search the local archive (newest first). Words are AND-ed substring matches."""
+    query: tyro.conf.Positional[list[str]]
+    phone: str = ""
+    """Only messages whose sender contains this."""
+    since: str = ""
+    """Only messages on/after this date prefix, e.g. 2026-10 or 2026-10-12."""
+    codes: bool = False
+    """Only messages that look like verification codes."""
+    limit: int = 20
+    """Max results (0 = all)."""
+    json: bool = False
+    """Output JSON lines (one archived row per line)."""
+    key: str = ""
+    """Show the message(s) whose archive key starts with this (full detail)."""
+
+    def run(self) -> int:
+        if not ARCHIVE_DB.exists():
+            die(f"archive is empty ({ARCHIVE_DB}); run `sms archive` first", 3)
+        clauses: list[str] = []
+        params: list[Any] = []
+        for word in self.query:
+            clauses.append("(content LIKE ? OR phone LIKE ?)")
+            params += [f"%{word}%", f"%{word}%"]
+        if self.phone:
+            clauses.append("phone LIKE ?")
+            params.append(f"%{self.phone}%")
+        if self.since:
+            clauses.append("date >= ?")
+            params.append(self.since)
+        if self.key:
+            clauses.append("key LIKE ?")
+            params.append(f"{self.key}%")
+        rows = archive_rows(" AND ".join(clauses), tuple(params), newest_first=True)
+        if self.codes:
+            rows = [r for r in rows if CODE_KEYWORDS.search(r["content"]) and extract_code(r["content"])]
+        if self.limit:
+            rows = rows[: self.limit]
+
+        if self.json:
+            for r in rows:
+                json_dump(r)
+            return 0
+        if not rows:
+            print("no matches", file=sys.stderr)
+            return 1
+        if self.key and len(rows) == 1:
+            r = rows[0]
+            code = extract_code(r["content"]) if CODE_KEYWORDS.search(r["content"]) else None
+            print(f"From:  {r['phone']}")
+            print(f"Date:  {r['date']}")
+            print(f"State: {'unread' if r['unread'] else 'read'} (on router when archived)")
+            if code:
+                print(f"Code:  {code}")
+            print(f"Key:   {r['key']}")
+            print()
+            print(r["content"])
+            return 0
+
+        from rich.console import Console
+        from rich.table import Table
+
+        table = Table(show_lines=False, expand=True)
+        table.add_column("Key", style="dim", no_wrap=True)
+        table.add_column("Date", no_wrap=True)
+        table.add_column("From", no_wrap=True)
+        table.add_column("Content", overflow="fold")
+        for r in rows:
+            table.add_row(r["key"][:8], r["date"], r["phone"], r["content"].replace("\n", " "))
+        Console().print(table)
+        return 0
+
+
 Command = Union[
     Annotated[ListCmd, tyro.conf.subcommand("list")],
     Annotated[LatestCmd, tyro.conf.subcommand("latest")],
@@ -1052,6 +1128,7 @@ Command = Union[
     Annotated[PruneCmd, tyro.conf.subcommand("prune")],
     Annotated[ArchiveCmd, tyro.conf.subcommand("archive")],
     Annotated[ExportCmd, tyro.conf.subcommand("export")],
+    Annotated[SearchCmd, tyro.conf.subcommand("search")],
     Annotated[WatchCmd, tyro.conf.subcommand("watch")],
     Annotated[NotifyTestCmd, tyro.conf.subcommand("notify-test")],
     Annotated[ServiceCmd, tyro.conf.subcommand("service")],

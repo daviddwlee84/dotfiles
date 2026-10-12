@@ -23,6 +23,7 @@ Deployed automatically by chezmoi:
 
 - `~/.dotfiles/bin/sms` — the CLI (uv-script; first run resolves deps into uv's cache)
 - `~/.config/television/cable/sms.toml` — the `tv sms` channel
+- `~/.config/television/cable/sms-archive.toml` — the `tv sms-archive` channel
 - `~/.config/sms/config.toml.example` — starter config
 
 `uv` must be installed (it is, via the bootstrap script).
@@ -66,6 +67,7 @@ sms watch [--interval 10] [--once] [--json] [--no-notify] [--mark-read]
 sms notify-test [--latest] [--dry-run]          # one test push via the same targets as watch
 sms archive                                     # copy every inbox message into the local SQLite archive
 sms export [--format sbr|mbox|jsonl] [-o FILE] [--refresh]
+sms search [WORDS…] [--phone P] [--since 2026-10] [--codes] [--limit 20] [--json] [--key K]
 sms service install|uninstall|status            # systemd --user unit for `sms watch` (Linux)
 ```
 
@@ -83,6 +85,10 @@ tv sms
 - `Alt+D` — delete selected message (with confirm)
 - `Ctrl+S` — cycle source: all ↔ unread only
 - Auto-refreshes every 5 s — leave it open while waiting for a code to arrive.
+
+`tv sms-archive` is the same picker over the **local archive** (full history,
+offline, no router login): `Enter` / `Alt+C` as above, `Alt+R` runs
+`sms archive` then reloads, `Ctrl+S` cycles all ↔ verification codes only.
 
 ## Push notifications (`sms watch`)
 
@@ -210,6 +216,25 @@ sqlite3 ~/.local/share/sms/archive.sqlite 'select date, phone, content from sms 
 | `sbr` | Android app *SMS Backup & Restore* (SyncTech) — restores into the phone's SMS store; its web viewer; many converters. The de-facto SMS archive format. |
 | `mbox` | Any mail client (Apple Mail / Thunderbird import), `mutt -f`, `notmuch`. Subject = first 70 chars; `Message-ID` is stable, so re-imports dedupe. |
 | `jsonl` | `jq`, scripts. |
+
+### Viewing the archive
+
+```bash
+sms search 驗證碼 --since 2026-10           # words are AND-ed substring matches
+sms search --codes --limit 5                # verification-code SMS only
+sms search --phone 68005
+sms search --key 558e47                     # full detail (key prefix from the table)
+tv sms-archive                              # fuzzy picker, copy body / code
+```
+
+For ad-hoc exploration, use the tools already on the box:
+
+| Tool | Command | Good for |
+|------|---------|----------|
+| VisiData (`vd`) | `vd ~/.local/share/sms/archive.sqlite` | Browse / sort / regex-filter (`\|`) / frequency (`Shift+F`) |
+| sqlit | `sqlit --db-type sqlite --file-path ~/.local/share/sms/archive.sqlite` | SQL in a TUI |
+| sqlite3 | `sqlite3 -box …/archive.sqlite "select phone, count(*) n from sms group by phone order by n desc limit 10"` | One-liners |
+| datasette | `uvx datasette ~/.local/share/sms/archive.sqlite` | Browser UI — keep it on localhost (the archive holds codes) |
 
 The archive lives in the platformdirs **data** dir (`~/.local/share/sms/archive.sqlite`
 on Linux, or wherever `XDG_DATA_HOME` points), chmod 600. Rows are keyed like
