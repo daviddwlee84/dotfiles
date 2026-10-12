@@ -10,30 +10,39 @@
 # ///
 """Read SMS from a Huawei HiLink router over its XML API.
 
-Deployed via chezmoi as ~/bin/sms. Uses huawei-lte-api (handles CSRF,
-SCRAM-SHA-256 login, session cookies) instead of scraping the JS SPA.
+Deployed via chezmoi as ~/.dotfiles/bin/sms. Uses huawei-lte-api (handles
+CSRF, SCRAM-SHA-256 login, session cookies) instead of scraping the JS SPA.
+`sms watch` polls the router and pushes each new SMS through apprise.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
 import tomllib
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any, Union
+from typing import Annotated, Any, Iterator, Literal, Union
 
 import tyro
-from platformdirs import user_cache_dir, user_config_dir
+from platformdirs import user_cache_dir, user_config_dir, user_state_dir
 
 APP = "sms"
 DEFAULT_HOST = "192.168.168.1"
 DEFAULT_USER = "admin"
 DEFAULT_TTL = 30
+DEFAULT_INTERVAL = 10.0
+DEFAULT_FULL_SYNC = 300.0
+DEFAULT_CAPACITY_WARN = 0.95
+MAX_BACKOFF = 300.0
+SEEN_CAP = 5000
 CODE_RE = re.compile(r"(?<!\d)(\d{4,8})(?!\d)")
 CODE_KEYWORDS = re.compile(
     r"verification|驗證|验证|\bcode\b|OTP|one[- ]?time|密碼|密码", re.I
@@ -43,6 +52,11 @@ CONFIG_DIR = Path(user_config_dir(APP))
 CACHE_DIR = Path(user_cache_dir(APP))
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 INBOX_CACHE = CACHE_DIR / "inbox.json"
+STATE_DIR = Path(user_state_dir(APP))
+SEEN_FILE = STATE_DIR / "seen.json"
+NOTIFY_LOG = STATE_DIR / "notify.log"
+UNIT_NAME = "sms-watch.service"
+UNIT_FILE = Path.home() / ".config" / "systemd" / "user" / UNIT_NAME
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -50,15 +64,24 @@ def die(msg: str, code: int = 1) -> None:
     sys.exit(code)
 
 
+def log(msg: str) -> None:
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
+
+
 # ---------- config / cache --------------------------------------------------
 
+def read_config_file() -> dict[str, Any]:
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return tomllib.loads(CONFIG_FILE.read_text())
+    except Exception as e:
+        die(f"bad config {CONFIG_FILE}: {e}")
+        return {}
+
+
 def load_config() -> dict[str, str]:
-    cfg: dict[str, str] = {}
-    if CONFIG_FILE.exists():
-        try:
-            cfg = tomllib.loads(CONFIG_FILE.read_text())
-        except Exception as e:
-            die(f"bad config {CONFIG_FILE}: {e}")
+    cfg = read_config_file()
     host = os.environ.get("SMS_ROUTER_HOST") or cfg.get("host") or DEFAULT_HOST
     user = os.environ.get("SMS_ROUTER_USER") or cfg.get("user") or DEFAULT_USER
     pw = os.environ.get("SMS_ROUTER_PASS") or cfg.get("password")
@@ -121,31 +144,36 @@ def clear_cache() -> None:
 
 # ---------- router API ------------------------------------------------------
 
-def _url(cfg: dict[str, str]) -> str:
+def _url(cfg: dict[str, str], login: bool = True) -> str:
     from urllib.parse import quote
+    if not login:
+        return f"http://{cfg['host']}/"
     user = quote(cfg["user"], safe="")
     pw = quote(cfg["password"], safe="")
     return f"http://{user}:{pw}@{cfg['host']}/"
 
 
-def fetch_inbox(cfg: dict[str, str], count: int = 50) -> list[dict[str, Any]]:
+@contextmanager
+def open_client(cfg: dict[str, str], login: bool = True, timeout: float = 10) -> Iterator[Any]:
+    """Yield a huawei-lte-api Client; logs out on exit when `login`.
+
+    The router is a LAN device, so ignore ambient HTTP(S)/SOCKS proxy env
+    (ALL_PROXY etc.) — same fix as mi-router/reyee (trust_env=False).
+    """
+    import requests
     from huawei_lte_api.Client import Client
     from huawei_lte_api.Connection import Connection
-    from huawei_lte_api.enums.sms import BoxTypeEnum, SortTypeEnum
 
+    session = requests.Session()
+    session.trust_env = False
     try:
-        with Connection(_url(cfg), timeout=10) as conn:
-            raw = Client(conn).sms.get_sms_list(
-                page=1,
-                box_type=BoxTypeEnum.LOCAL_INBOX,
-                read_count=count,
-                sort_type=SortTypeEnum.DATE,
-                ascending=False,
-                unread_preferred=False,
-            )
-    except Exception as e:
-        die(f"router error: {e}")
+        with Connection(_url(cfg, login), timeout=timeout, requests_session=session) as conn:
+            yield Client(conn)
+    finally:
+        session.close()
 
+
+def _normalize(raw: Any) -> list[dict[str, Any]]:
     msgs_node = (raw or {}).get("Messages") or {}
     items = msgs_node.get("Message") or []
     if isinstance(items, dict):
@@ -161,6 +189,42 @@ def fetch_inbox(cfg: dict[str, str], count: int = 50) -> list[dict[str, Any]]:
             "unread": str(m.get("Smstat", "")) == "0",
         })
     return norm
+
+
+def list_page(client: Any, page: int = 1, count: int = 50, ascending: bool = False) -> list[dict[str, Any]]:
+    from huawei_lte_api.enums.sms import BoxTypeEnum, SortTypeEnum
+
+    return _normalize(client.sms.get_sms_list(
+        page=page,
+        box_type=BoxTypeEnum.LOCAL_INBOX,
+        read_count=count,
+        sort_type=SortTypeEnum.DATE,
+        ascending=ascending,
+        unread_preferred=False,
+    ))
+
+
+def fetch_inbox(cfg: dict[str, str], count: int = 50) -> list[dict[str, Any]]:
+    try:
+        with open_client(cfg) as client:
+            return list_page(client, count=count)
+    except Exception as e:
+        die(f"router error: {e}")
+        return []
+
+
+def sms_count(cfg: dict[str, str]) -> dict[str, int]:
+    """Inbox counters. Many firmwares (incl. B525s) serve this without login,
+    which lets `watch` poll without holding or churning an admin session."""
+    from huawei_lte_api.exceptions import ResponseErrorLoginRequiredException
+
+    try:
+        with open_client(cfg, login=False) as client:
+            raw = client.sms.sms_count()
+    except ResponseErrorLoginRequiredException:
+        with open_client(cfg) as client:
+            raw = client.sms.sms_count()
+    return {k: int(v) for k, v in (raw or {}).items() if str(v).lstrip("-").isdigit()}
 
 
 def get_messages(cfg: dict[str, str], use_cache: bool = True, count: int = 50) -> list[dict[str, Any]]:
@@ -325,13 +389,10 @@ class DeleteCmd:
     index: tyro.conf.Positional[str]
 
     def run(self) -> int:
-        from huawei_lte_api.Client import Client
-        from huawei_lte_api.Connection import Connection
-
         cfg = load_config()
         try:
-            with Connection(_url(cfg), timeout=10) as conn:
-                Client(conn).sms.delete_sms(int(self.index))
+            with open_client(cfg) as client:
+                client.sms.delete_sms(int(self.index))
         except Exception as e:
             die(f"router error: {e}")
         clear_cache()
@@ -356,19 +417,333 @@ class LoginTestCmd:
     """Verify credentials by querying device info."""
 
     def run(self) -> int:
-        from huawei_lte_api.Client import Client
-        from huawei_lte_api.Connection import Connection
-
         cfg = load_config()
         try:
-            with Connection(_url(cfg), timeout=10) as conn:
-                info = Client(conn).device.information()
+            with open_client(cfg) as client:
+                info = client.device.information()
         except Exception as e:
             die(f"login failed: {e}")
         print(f"ok host={cfg['host']} user={cfg['user']}")
         for k in ("DeviceName", "HardwareVersion", "SoftwareVersion", "Imei", "Msisdn"):
             if info.get(k):
                 print(f"  {k}: {info[k]}")
+        return 0
+
+
+@dataclass
+class CountCmd:
+    """Show inbox counters (total / max / unread)."""
+    json: bool = False
+
+    def run(self) -> int:
+        cfg = load_config()
+        try:
+            c = sms_count(cfg)
+        except Exception as e:
+            die(f"router error: {e}")
+        if self.json:
+            json_dump(c)
+            return 0
+        inbox, cap = c.get("LocalInbox", 0), c.get("LocalMax", 0)
+        pct = f" ({inbox / cap:.0%})" if cap else ""
+        print(f"inbox  {inbox}/{cap}{pct}")
+        print(f"unread {c.get('LocalUnread', 0)}")
+        if c.get("SimInbox") or c.get("SimMax"):
+            print(f"sim    {c.get('SimInbox', 0)}/{c.get('SimMax', 0)}")
+        return 0
+
+
+@dataclass
+class PruneCmd:
+    """Delete the oldest messages, keeping the newest N."""
+    keep: int = 100
+    """Number of newest messages to keep."""
+    include_unread: bool = False
+    """Also delete unread messages (default: only read ones are eligible)."""
+    yes: bool = False
+    """Skip the confirmation prompt."""
+
+    def run(self) -> int:
+        cfg = load_config()
+        try:
+            total = sms_count(cfg).get("LocalInbox", 0)
+            excess = total - self.keep
+            if excess <= 0:
+                print(f"inbox has {total} ≤ {self.keep}; nothing to prune")
+                return 0
+            # Walk oldest-first and stop once `excess` messages have passed;
+            # the rest are the newest `keep`, which are never touched.
+            victims: list[dict[str, Any]] = []
+            seen = 0
+            with open_client(cfg) as client:
+                page = 1
+                while seen < excess:
+                    batch = list_page(client, page=page, ascending=True)
+                    if not batch:
+                        break
+                    for m in batch[: excess - seen]:
+                        if self.include_unread or not m["unread"]:
+                            victims.append(m)
+                    seen += min(len(batch), excess - seen)
+                    page += 1
+                if not victims:
+                    print(f"{excess} oldest messages are all unread; use --include-unread")
+                    return 0
+                print(f"will delete {len(victims)} message(s), "
+                      f"{victims[0]['date']} … {victims[-1]['date']}", file=sys.stderr)
+                if not self.yes:
+                    if not sys.stdin.isatty():
+                        die("refusing to prune without --yes on a non-TTY", 2)
+                    if input("Proceed? [y/N] ").strip().lower() not in ("y", "yes"):
+                        return 1
+                for m in victims:
+                    client.sms.delete_sms(int(m["index"]))
+        except Exception as e:
+            die(f"router error: {e}")
+        clear_cache()
+        print(f"deleted {len(victims)}")
+        return 0
+
+
+# ---------- watch: seen-state + apprise push ---------------------------------
+
+def msg_key(m: dict[str, Any]) -> str:
+    # Index alone is reused by the router after deletions.
+    return hashlib.sha1(f"{m['index']}|{m['phone']}|{m['date']}".encode()).hexdigest()[:16]
+
+
+def load_seen() -> dict[str, Any] | None:
+    if not SEEN_FILE.exists():
+        return None
+    try:
+        return json.loads(SEEN_FILE.read_text())
+    except Exception:
+        return None
+
+
+def save_seen(state: dict[str, Any]) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    state["keys"] = state["keys"][-SEEN_CAP:]
+    tmp = SEEN_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state))
+    tmp.replace(SEEN_FILE)
+
+
+def notify_targets(watch_cfg: dict[str, Any]) -> tuple[list[str], str | None]:
+    """(apprise URLs, apprise tag). URLs win over tag."""
+    env = os.environ.get("SMS_NOTIFY_URLS", "").split()
+    urls = env or [str(u) for u in watch_cfg.get("notify_urls") or []]
+    tag = None if urls else (watch_cfg.get("notify_tag") or None)
+    return urls, tag
+
+
+def notify(title: str, body: str, urls: list[str], tag: str | None) -> bool:
+    apprise = shutil.which("apprise") or str(Path.home() / ".local" / "bin" / "apprise")
+    ok = False
+    if Path(apprise).exists():
+        cmd = [apprise, "-t", title, "-b", body]
+        env = dict(os.environ)
+        if urls:
+            # Pass URLs via env, not argv, so tokens don't show up in `ps`.
+            env["APPRISE_URLS"] = " ".join(urls)
+        elif tag:
+            cmd += ["--tag", tag]
+        try:
+            r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=60)
+            ok = r.returncode == 0
+            if not ok:
+                log(f"apprise exit {r.returncode}: {(r.stderr or r.stdout).strip()[:300]}")
+        except Exception as e:
+            log(f"apprise failed: {e}")
+    else:
+        log("apprise not found on PATH")
+    if not ok:
+        # Never let a failed push vanish silently.
+        try:
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
+            with NOTIFY_LOG.open("a") as f:
+                flat = body.replace("\n", " ")
+                f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')}\t{title}\t{flat}\n")
+        except Exception:
+            pass
+    return ok
+
+
+def format_push(m: dict[str, Any]) -> tuple[str, str]:
+    code = extract_code(m["content"]) if CODE_KEYWORDS.search(m["content"]) else None
+    body = f"[code {code}] {m['content']}" if code else m["content"]
+    return f"SMS from {m['phone']}", f"{body}\n— {m['date']}"
+
+
+@dataclass
+class WatchCmd:
+    """Poll the router and push each new SMS via apprise (Ctrl+C to stop)."""
+    interval: float = 0
+    """Seconds between counter polls (0 = config `interval` or 10)."""
+    full_sync: float = 0
+    """Force an inbox diff at least this often, in seconds (0 = config or 300)."""
+    once: bool = False
+    """Run a single poll + diff and exit."""
+    json: bool = False
+    """Print new messages to stdout as JSON lines."""
+    no_notify: bool = False
+    """Don't push; only print new messages to stdout."""
+    mark_read: bool = False
+    """Mark pushed messages as read on the router (or config `mark_read`)."""
+    notify_existing_unread: bool = False
+    """On the first run (no state yet), push current unread messages instead of silently seeding."""
+
+    def run(self) -> int:
+        cfg = load_config()
+        wcfg = read_config_file().get("watch") or {}
+        interval = self.interval or float(wcfg.get("interval", DEFAULT_INTERVAL))
+        full_sync = self.full_sync or float(wcfg.get("full_sync", DEFAULT_FULL_SYNC))
+        cap_warn = float(wcfg.get("capacity_warn", DEFAULT_CAPACITY_WARN))
+        mark_read = self.mark_read or bool(wcfg.get("mark_read", False))
+        urls, tag = notify_targets(wcfg)
+        if not self.no_notify and not urls and not tag:
+            die("no notify target: set SMS_NOTIFY_URLS, or [watch] notify_urls / "
+                "notify_tag in ~/.config/sms/config.toml (or pass --no-notify)", 2)
+
+        def _term(*_: Any) -> None:
+            # SIGTERM can arrive twice (process-group kill + uv forwarding it,
+            # e.g. under systemd); ignore repeats so shutdown stays quiet.
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+            raise KeyboardInterrupt
+        signal.signal(signal.SIGTERM, _term)
+
+        target = "stdout only" if self.no_notify else (f"tag={tag}" if tag else f"{len(urls)} apprise URL(s)")
+        log(f"watching {cfg['host']} every {interval:g}s ({target})")
+
+        last_sig: tuple[int, int] | None = None
+        last_full = 0.0
+        cap_alerted = False
+        backoff = interval
+        while True:
+            try:
+                c = sms_count(cfg)
+                inbox, cap = c.get("LocalInbox", 0), c.get("LocalMax", 0)
+                if cap and inbox >= cap * cap_warn:
+                    if not cap_alerted:
+                        cap_alerted = True
+                        log(f"inbox nearly full: {inbox}/{cap}")
+                        if not self.no_notify:
+                            notify("SMS inbox nearly full",
+                                   f"{inbox}/{cap} on {cfg['host']} — new SMS will be dropped "
+                                   f"when full. Run `sms prune`.", urls, tag)
+                else:
+                    cap_alerted = False
+
+                sig = (inbox, c.get("LocalUnread", 0))
+                now = time.monotonic()
+                if sig != last_sig or now - last_full >= full_sync:
+                    self._sync(cfg, urls, tag, mark_read)
+                    last_sig, last_full = sig, now
+                backoff = interval
+            except Exception as e:
+                if self.once:
+                    die(f"router error: {e}")
+                backoff = min(max(backoff, interval) * 2, MAX_BACKOFF)
+                log(f"router error: {type(e).__name__}: {e} — retry in {backoff:g}s")
+                time.sleep(backoff)
+                continue
+            if self.once:
+                return 0
+            time.sleep(interval)
+
+    def _sync(self, cfg: dict[str, str], urls: list[str], tag: str | None, mark_read: bool) -> None:
+        with open_client(cfg) as client:
+            msgs = list_page(client)
+            state = load_seen()
+            first = state is None
+            if first:
+                # Watermark = newest date at seed time. A never-seen message
+                # older than this (e.g. an old one sliding back into the
+                # 50-message window after deletions) is not "new".
+                state = {"since": max((m["date"] for m in msgs), default=""), "keys": []}
+            seen = set(state["keys"])
+            fresh = [m for m in msgs if msg_key(m) not in seen]
+            if first:
+                new = [m for m in fresh if m["unread"]] if self.notify_existing_unread else []
+                log(f"seeded state with {len(fresh)} message(s)")
+            else:
+                new = [m for m in fresh if not m["date"] or m["date"] >= state["since"]]
+
+            for m in reversed(new):  # oldest first
+                if self.json:
+                    json_dump(m)
+                else:
+                    print(f"{m['date']}  {m['phone']}  {m['content']}".replace("\n", " "), flush=True)
+                if not self.no_notify:
+                    title, body = format_push(m)
+                    notify(title, body, urls, tag)
+                if mark_read and m["unread"]:
+                    client.sms.set_read(int(m["index"]))
+            sys.stdout.flush()
+
+            state["keys"].extend(msg_key(m) for m in fresh)
+            save_seen(state)
+        if new:
+            clear_cache()  # so `sms` / `tv sms` see it immediately
+
+
+# ---------- systemd user service (Linux) -------------------------------------
+
+UNIT_TEMPLATE = """\
+[Unit]
+Description=Push new Huawei router SMS via apprise (sms watch)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={exe} watch
+Restart=always
+RestartSec=30
+Environment=PATH={path}
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
+"""
+
+
+@dataclass
+class ServiceCmd:
+    """Manage the `sms watch` systemd --user service (Linux only)."""
+    action: tyro.conf.Positional[Literal["install", "uninstall", "status"]]
+
+    def run(self) -> int:
+        if not sys.platform.startswith("linux") or not shutil.which("systemctl"):
+            die("service management needs Linux + systemd; run `sms watch` "
+                "under tmux/pueue/launchd instead", 2)
+        sc = ["systemctl", "--user"]
+        if self.action == "status":
+            return subprocess.run([*sc, "status", UNIT_NAME, "--no-pager"]).returncode
+        if self.action == "uninstall":
+            subprocess.run([*sc, "disable", "--now", UNIT_NAME])
+            UNIT_FILE.unlink(missing_ok=True)
+            subprocess.run([*sc, "daemon-reload"], check=True)
+            print(f"removed {UNIT_FILE}")
+            return 0
+
+        # install: validate config up front so the unit doesn't crash-loop.
+        load_config()
+        urls, tag = notify_targets(read_config_file().get("watch") or {})
+        if not urls and not tag:
+            die("configure [watch] notify_urls or notify_tag in ~/.config/sms/config.toml first "
+                "(SMS_NOTIFY_URLS from your shell is not visible to systemd)", 2)
+        exe = Path(sys.argv[0]).resolve()
+        UNIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        UNIT_FILE.write_text(UNIT_TEMPLATE.format(exe=exe, path=os.environ.get("PATH", "")))
+        subprocess.run([*sc, "daemon-reload"], check=True)
+        subprocess.run([*sc, "enable", "--now", UNIT_NAME], check=True)
+        print(f"installed {UNIT_FILE}; logs: journalctl --user -u {UNIT_NAME} -f")
+        user = os.environ.get("USER", "")
+        r = subprocess.run(["loginctl", "show-user", user, "-p", "Linger", "--value"],
+                           capture_output=True, text=True)
+        if r.stdout.strip() != "yes":
+            print(f"note: lingering is off — the service stops when you log out. "
+                  f"Run: sudo loginctl enable-linger {user}", file=sys.stderr)
         return 0
 
 
@@ -387,6 +762,10 @@ Command = Union[
     Annotated[DeleteCmd, tyro.conf.subcommand("delete")],
     Annotated[RefreshCmd, tyro.conf.subcommand("refresh")],
     Annotated[LoginTestCmd, tyro.conf.subcommand("login-test")],
+    Annotated[CountCmd, tyro.conf.subcommand("count")],
+    Annotated[PruneCmd, tyro.conf.subcommand("prune")],
+    Annotated[WatchCmd, tyro.conf.subcommand("watch")],
+    Annotated[ServiceCmd, tyro.conf.subcommand("service")],
 ]
 
 

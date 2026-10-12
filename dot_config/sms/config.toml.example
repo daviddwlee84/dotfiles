@@ -9,3 +9,21 @@
 host = "192.168.168.1"
 user = "admin"
 password = ""
+
+# `sms watch` — push each new SMS through apprise.
+# Notification URLs carry tokens: they live ONLY in this per-host 0600 file
+# (chezmoi ships just the .example). Env SMS_NOTIFY_URLS (space-separated)
+# overrides notify_urls; notify_urls overrides notify_tag.
+#
+# [watch]
+# notify_urls = [
+#   "tgram://<bot_token>/<chat_id>",       # Telegram bot
+#   # "ntfy://<topic>",                    # ntfy.sh (or ntfys://host/topic)
+#   # "discord://<webhook_id>/<token>",
+# ]
+# # …or reuse a tag from ~/.config/apprise/apprise.yaml / custom.yaml:
+# # notify_tag = "sms"
+# interval = 10          # seconds between (login-free) counter polls
+# full_sync = 300        # force an inbox diff at least this often
+# capacity_warn = 0.95   # alert once when inbox/LocalMax crosses this
+# mark_read = false      # mark pushed messages read on the router
