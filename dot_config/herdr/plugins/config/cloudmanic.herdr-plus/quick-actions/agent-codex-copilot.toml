@@ -1,0 +1,46 @@
+# herdr-plus Quick Action — open codex-copilot next to the focused pane.
+# Managed by chezmoi. Level 1 is this entry in the Quick Actions list (type
+# "agent" to filter to all Agent: actions); level 2 is the select below, grouped
+# by recording mode via `heading` rows. ~/.config/herdr/agent-open.sh does the
+# split/tab and the shell rc fast path starts the agent before the heavy init.
+# See docs/tools/herdr.md § "Open a coding agent".
+name = "Agent: Codex (Copilot, once)"
+description = "codex-copilot-once beside this pane (SpecStory or direct)"
+type = "select"
+command = "~/.config/herdr/agent-open.sh {{.Value}}"
+
+[[options]]
+heading = "SpecStory (record)"
+
+[[options]]
+label = "→ Split right"
+value = "right codex-copilot run"
+description = "Side by side with the current pane"
+
+[[options]]
+label = "↓ Split down"
+value = "down codex-copilot run"
+description = "Stacked under the current pane"
+
+[[options]]
+label = "⊞ New tab"
+value = "tab codex-copilot run"
+description = "A new tab in this workspace, labelled with the agent"
+
+[[options]]
+heading = "Direct"
+
+[[options]]
+label = "→ Split right"
+value = "right codex-copilot off"
+description = "Side by side with the current pane"
+
+[[options]]
+label = "↓ Split down"
+value = "down codex-copilot off"
+description = "Stacked under the current pane"
+
+[[options]]
+label = "⊞ New tab"
+value = "tab codex-copilot off"
+description = "A new tab in this workspace, labelled with the agent"

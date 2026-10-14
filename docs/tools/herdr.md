@@ -175,6 +175,9 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` / `Alt + g` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
 | `prefix + S` | [Sidecar](td_sidecar.md) to the right of the focused pane, 50/50, in its current directory; focus moves to Sidecar | command pane |
+| `prefix + Alt + c` / `Alt + x` | claude / codex **+ SpecStory**, split right ([details](#open-agent)) | detached command |
+| `prefix + Alt + t` | claude **+ SpecStory** in a new tab | detached command |
+| `prefix + Alt + r` | repeat the last agent launch (from a hotkey or the *Agent:* Quick Actions) | detached command |
 | `prefix + Y` | [Yazi](yazi.md) file manager rooted at the focused pane cwd; `q` returns to the unchanged layout | 90% × 85% popup |
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
@@ -283,6 +286,17 @@ Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/clo
 **Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the six **copy** actions (see [Copy pane + space facts](#copy-to-clipboard)) plus the plugin's five **starter** examples (GitHub / Google / Search Google / Open Repo / Reveal Working Dir), adapted for Linux — macOS `open` → the repo's cross-platform [`x open`](../shells/aliases.md), and the repo-select points at `daviddwlee84/*`. The copy operations deliberately live here instead of consuming six direct prefix keys. Because this managed dir is non-empty, herdr-plus does **not** auto-seed those examples itself (it only seeds into an *empty* dir), which is why they're vendored here; delete any TOML you don't want. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
 
 > **Quick Actions are for one-off, non-interactive commands** (the shipped examples all `open <url>`). herdr-plus runs a chosen action via `sh -c` with no PTY and no interactive stdin, so an interactive TUI misbehaves — btop exits immediately, nvtop can't receive F10. For a TUI you want the dev/lazygit-style *floating command pane* (`[[keys.command]] type="pane"`) instead — that's why **dev** (`prefix+d`), **btop** (`prefix+M`), and **nvtop** (`prefix+N`) are keybinds, not Quick Actions.
+
+## Open a coding agent (`prefix + y` → *Agent: …*, `prefix + Alt + c/x/t/r`) {#open-agent}
+
+Open claude / codex / opencode / `claude-copilot-once` / `codex-copilot-once` beside the focused pane without typing into a fresh shell.
+
+- **Menu** — `prefix + y`, type `agent`: one *Agent: …* Quick Action per agent (level 1), then a select grouped by `heading` rows — **SpecStory (record)** / **Direct** × **→ Split right / ↓ Split down / ⊞ New tab** (level 2). herdr-plus has no deeper nesting (an `Option` is only `label/value/description/heading`), so the agent is the first level and recording × placement is the second. OpenCode shows only *Direct* (no SpecStory provider); the copilot variants map to `--specstory-mode run|off`.
+- **Hotkeys** — `prefix + Alt + c` claude+SpecStory → right, `Alt + x` codex+SpecStory → right, `Alt + t` claude+SpecStory → new tab, `Alt + r` repeat the last choice (`~/.cache/herdr/agent-open.last`).
+
+**Why it is faster than a manual split.** herdr can only spawn a pane with the default shell. `~/.config/herdr/agent-open.sh` creates the split/tab with `--env HERDR_AGENT_LAUNCH="<agent> <run|off>"`; a guard at the very top of `~/.zshrc` / `~/.bashrc` (before oh-my-zsh / ble.sh) runs `~/.config/herdr/agent-run.sh` as a child with a **lean env**, then lets the rc continue — so when the agent exits the pane becomes a normal, fully loaded shell. Measured: agent detected ~1s after the keypress.
+
+The lean env = `00_exports.sh` (PATH) + `09_editor.sh` + the cwd's `mise env` + `~/.shellrc.secrets` + `~/.config/bash/secrets.sh`, plus `43_copilot_proxy.sh` for the copilot variants. **Not** loaded: `~/.config/zsh/secrets.zsh` and every interactive module. If an agent needs the full interactive env, set `HERDR_AGENT_FULL_RC=1` for the launcher (plain split, then `herdr pane run` into the loaded shell — the slow path). Agents and modes are allowlisted in both scripts; nothing from the env var is `eval`'d. Tests: `tests/unit/herdr_agent_open.bats`.
 
 ## Television integration {#television-integration}
 

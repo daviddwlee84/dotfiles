@@ -66,6 +66,7 @@ Layer 4 omitted on purpose (per the design spec): listing every
 Multiplexer bindings live in their own namespaces: tmux opens the quota wakeup
 dashboard with `prefix + M-a`, while Herdr uses `prefix + Alt+A`. Both launch
 the same `tv agent-wakeup` channel; neither chord shadows an inner-shell key.
+Herdr also opens coding agents beside the focused pane with `prefix + Alt+c` / `Alt+x` / `Alt+t` / `Alt+r` (claude right, codex right, claude new tab, repeat last) — see [herdr.md § Open a coding agent](../tools/herdr.md#open-agent).
 
 The ZLE widget is rebound from `zvm_after_init` in
 [`dot_zshrc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_zshrc.tmpl)

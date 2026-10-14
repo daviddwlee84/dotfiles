@@ -348,6 +348,37 @@ width = "80%"
 height = "80%"
 description = "translate (interactive TUI, popup)"
 
+# --- Open a coding agent beside the focused pane (prefix+alt+c/x/t/r) ---
+# Hotkeys for the most common combos; the full matrix (5 agents × SpecStory/direct
+# × right/down/tab) is the "Agent: …" Quick Actions under prefix+y. type = "shell"
+# runs detached: agent-open.sh only creates the split/tab and exits, and the new
+# pane's rc fast path (HERDR_AGENT_LAUNCH) starts the agent before the heavy init.
+# prefix+alt+r repeats whatever was last picked, from either surface.
+# See docs/tools/herdr.md § "Open a coding agent".
+[[keys.command]]
+key = "prefix+alt+c"
+type = "shell"
+command = "~/.config/herdr/agent-open.sh right claude run"
+description = "claude + SpecStory (split right)"
+
+[[keys.command]]
+key = "prefix+alt+x"
+type = "shell"
+command = "~/.config/herdr/agent-open.sh right codex run"
+description = "codex + SpecStory (split right)"
+
+[[keys.command]]
+key = "prefix+alt+t"
+type = "shell"
+command = "~/.config/herdr/agent-open.sh tab claude run"
+description = "claude + SpecStory (new tab)"
+
+[[keys.command]]
+key = "prefix+alt+r"
+type = "shell"
+command = "~/.config/herdr/agent-open.sh last"
+description = "repeat the last agent launch"
+
 # --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
 # Requires: herdr plugin install cloudmanic/herdr-plus
 # Projects = declarative multi-pane workspace templates (see

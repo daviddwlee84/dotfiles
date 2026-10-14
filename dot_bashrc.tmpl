@@ -30,6 +30,19 @@ case $- in
       *) return ;;
 esac
 
+# herdr agent fast path: ~/.config/herdr/agent-open.sh spawns this shell with
+# HERDR_AGENT_LAUNCH="<agent> <run|off>". Run the agent BEFORE the heavy init
+# (as a child, with a lean env), then fall through so the pane becomes a normal
+# shell once the agent exits. Mirrored in dot_zshrc.tmpl + dot_bashrc.tmpl (only
+# the word-split spelling differs: zsh ${=v}, bash $v) — docs/tools/herdr.md § "Open a coding agent".
+if [ -n "${HERDR_AGENT_LAUNCH:-}" ]; then
+    _herdr_agent_launch=$HERDR_AGENT_LAUNCH
+    unset HERDR_AGENT_LAUNCH
+    [ -x "$HOME/.config/herdr/agent-run.sh" ] &&
+        "$HOME/.config/herdr/agent-run.sh" $_herdr_agent_launch
+    unset _herdr_agent_launch
+fi
+
 # 2. ============================================================
 # /etc/bashrc on RHEL families carries the protective `rm -i`
 # aliases, the Modules system init, and umask defaults. Source it
