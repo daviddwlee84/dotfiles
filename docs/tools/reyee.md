@@ -112,12 +112,21 @@ When the web UI's `子路由管理 → 子路由列表` greys out a sub-router (
 run `reyee mesh`. It cross-checks four router tables (`ap_list`, `topology`,
 `user_list`, and `dhcp_lease`) to separate two distinct failure modes:
 
-1. **L2 associated, L3 / control plane wedged (zombie state)** — the sub-router
-   MAC is actively associated on the hidden `@Ruijie-Repeater` 5 GHz backhaul
-   interface (`rax5`) with a live RSSI/rate and DHCP lease, yet `ap_list`
-   reports `OFF` and `remoteIp` RPCs fail with `get sid fail`. Fix: physically
-   power-cycle the sub-router for 10 seconds so its `br-lan` bridge and
-   `rlink`/`uhttpd` daemons re-initialize.
+1. **Listed on the backhaul, but L3 status decides the verdict** — the
+   sub-router MAC shows up on the hidden `@Ruijie-Repeater` 5 GHz backhaul
+   interface (`rax5`) in `user_list`, yet `ap_list` reports `OFF` and
+   `remoteIp` RPCs fail with `get sid fail`. `reyee mesh` then pings the
+   sub-router **from the local host** and checks ARP:
+   - **ping OK** → only the mesh control plane is down. Reboot it from its own
+     web UI; if it stays `OFF`, delete it under `子路由管理` and re-pair
+     (management password / `networkId` out of sync).
+   - **no ping, ARP unresolved** → the sub-router's OS is down. The `user_list`
+     entry is **not** proof of life: it lingers (frozen `onlinetime` /
+     `activeTime`, counters not reset) after the node drops. Power-cycle once
+     (unplug 30 s). If it does not return, its LED cycles red → off (boot
+     loop), the UI flips green → red, or it buzzes / whines, the built-in power
+     supply has failed — unplug it and RMA; a factory reset will not help.
+     (Real case, 2026-10: H30S with exactly this signature.)
 2. **L2 backhaul not associated** — the sub-router is absent from `user_list`.
    Check power/LEDs, distance, or whether its 5 GHz channel was pinned to a
    different channel than the main router.
