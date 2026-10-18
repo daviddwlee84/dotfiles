@@ -74,7 +74,13 @@ K_PASSPHRASE = "eweb"
 # by `set-channel` because they are a poor choice for latency-sensitive use.
 DFS_5G = set(range(52, 65)) | set(range(100, 145))
 
-CONFIG_DIR = Path(user_config_dir(APP))
+_XDG_CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / APP
+_PLATFORM_CONFIG_DIR = Path(user_config_dir(APP))
+CONFIG_DIR = (
+    _PLATFORM_CONFIG_DIR
+    if (_PLATFORM_CONFIG_DIR / "config.toml").exists() and not (_XDG_CONFIG_DIR / "config.toml").exists()
+    else _XDG_CONFIG_DIR
+)
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 
 console = Console()
@@ -238,6 +244,15 @@ class Reyee:
     def clients(self) -> list[dict]:
         return (self.get("dev_sta", "user_list") or {}).get("list", [])
 
+    def ap_list(self) -> list[dict]:
+        return (self.get("dev_sta", "ap_list") or {}).get("list", [])
+
+    def topology(self) -> list[dict]:
+        return (self.get("dev_sta", "topology") or {}).get("topology", [])
+
+    def dhcp_leases(self) -> list[dict]:
+        return (self.get("dev_sta", "dhcp_lease") or {}).get("List", [])
+
 
 def _band_of_radio_index(idx: str) -> str:
     return {"1": "2.4G", "2": "5G"}.get(str(idx), str(idx))
@@ -267,6 +282,11 @@ class Radios:
 @dataclass
 class Clients:
     """List connected client devices (band, channel, RSSI, rate)."""
+
+
+@dataclass
+class Mesh:
+    """Show mesh / sub-router status and cross-check backhaul health."""
 
 
 @dataclass
@@ -314,7 +334,7 @@ class LoginTest:
     """Verify credentials and connectivity (no other output)."""
 
 
-Cmd = Union[Info, Wifi, Radios, Clients, SetChannel, Raw, LoginTest]
+Cmd = Union[Info, Wifi, Radios, Clients, Mesh, SetChannel, Raw, LoginTest]
 
 
 # ------------------------------------------------------------------ renderers
@@ -324,6 +344,7 @@ def show_info(r: Reyee) -> None:
     radios = r.radios()
     wl = r.wireless()
     clients = r.clients()
+    aps = r.ap_list()
     t = Table(title="Router", show_header=False, box=None, pad_edge=False)
     t.add_column(style="bold cyan")
     t.add_column()
@@ -336,6 +357,10 @@ def show_info(r: Reyee) -> None:
         )
     t.add_row("SSIDs", str(len(wl.get("ssidList", []))))
     t.add_row("Clients", str(len(clients)))
+    if len(aps) > 1:
+        online = sum(1 for a in aps if a.get("status") == "ON")
+        style = "green" if online == len(aps) else "yellow"
+        t.add_row("Mesh APs", f"[{style}]{online}/{len(aps)} online[/{style}] (run `reyee mesh` for details)")
     console.print(t)
 
 
@@ -395,6 +420,109 @@ def show_clients(r: Reyee) -> None:
     console.print(t)
 
 
+def _flatten_topo(nodes: list[dict], out: dict[str, dict]) -> None:
+    for n in nodes:
+        sn = n.get("sn")
+        if sn:
+            out[sn] = n
+        _flatten_topo(n.get("child") or [], out)
+
+
+def show_mesh(r: Reyee) -> None:
+    aps = r.ap_list()
+    topo_by_sn: dict[str, dict] = {}
+    _flatten_topo(r.topology(), topo_by_sn)
+    clients_by_mac = {(c.get("mac") or "").lower(): c for c in r.clients() if c.get("mac")}
+    leases_by_mac = {(l.get("mac") or "").lower(): l for l in r.dhcp_leases() if l.get("mac")}
+
+    t = Table(title="Mesh APs")
+    for col in ("model", "role", "ip", "status", "channel", "uplink", "sta"):
+        t.add_column(col, no_wrap=True)
+
+    offline_aps: list[tuple[dict, dict, dict | None, dict | None]] = []
+    for ap in aps:
+        sn = ap.get("serialNumber", "?")
+        mac = ap.get("mac", "?")
+        mac_l = mac.lower()
+        topo = topo_by_sn.get(sn, {})
+        bh_client = clients_by_mac.get(mac_l)
+        lease = leases_by_mac.get(mac_l)
+
+        ap_status = ap.get("status", "?")
+        topo_status = topo.get("status")
+        is_online = ap_status == "ON" and topo_status != "0"
+        status_cell = "[green]ON[/green]" if is_online else f"[red]{ap_status}[/red]"
+
+        uplink_parts: list[str] = []
+        band = topo.get("band") or (bh_client or {}).get("band")
+        ch = topo.get("channel") or (bh_client or {}).get("channel")
+        if band and ch:
+            uplink_parts.append(f"{band}/{ch}")
+        elif band:
+            uplink_parts.append(str(band))
+        rssi = topo.get("rssi") or (bh_client or {}).get("rssi")
+        if rssi:
+            uplink_parts.append(f"{rssi}dBm")
+        rate = (bh_client or {}).get("rxrate") or topo.get("rxrate")
+        if rate:
+            uplink_parts.append(str(rate))
+        uplink_str = " ".join(uplink_parts) if uplink_parts else "-"
+
+        t.add_row(
+            ap.get("devModel") or ap.get("deviceType") or "?",
+            ap.get("forwardMode", "?"),
+            ap.get("ip", "?"),
+            status_cell,
+            ap.get("channel", "?"),
+            uplink_str,
+            str(ap.get("staNum", "?")),
+        )
+        if not is_online and sn != r.sn:
+            offline_aps.append((ap, topo, bh_client, lease))
+
+    console.print(t)
+
+    for ap, topo, bh_client, lease in offline_aps:
+        model = ap.get("devModel") or ap.get("deviceType") or "sub-AP"
+        sn = ap.get("serialNumber", "?")
+        ip = ap.get("ip", "?")
+        mac = ap.get("mac", "?")
+        console.print()
+        console.print(f"[bold yellow]Diagnostic for offline sub-router {model} (sn={sn}, ip={ip}, mac={mac}):[/bold yellow]")
+        if bh_client:
+            console.print(
+                f"  • [green]L2 wireless backhaul is ASSOCIATED[/green] on SSID [bold]{bh_client.get('ssid', '?')}[/bold] "
+                f"(ifname={bh_client.get('ifname', '?')}, {bh_client.get('band', '?')} ch {bh_client.get('channel', '?')}, "
+                f"RSSI {bh_client.get('rssi', '?')} dBm, rxrate {bh_client.get('rxrate', '?')}, "
+                f"online since {bh_client.get('onlinetime', '?')}, active {bh_client.get('activeTime', '?')}s, "
+                f"up={bh_client.get('up', '0')}B down={bh_client.get('down', '0')}B)"
+            )
+            if lease:
+                console.print(
+                    f"  • [green]DHCP lease active[/green]: {lease.get('ip', '?')} "
+                    f"(hostname={lease.get('hostname', '?')}, {lease.get('leasetime', '?')}m remaining)"
+                )
+            console.print(
+                "  • [red]Control plane / L3 is WEDGED (zombie state)[/red]: `ap_list` reports OFF and `topology` "
+                f"reports status={topo.get('status', '?')} despite active L2 association on `@Ruijie-Repeater`."
+            )
+            console.print(
+                "  • [bold]Fix[/bold]: physically power-cycle the sub-router (unplug power for 10s, then plug back in) "
+                "so its bridge (`br-lan`) and `rlink`/`uhttpd` daemons re-initialize."
+            )
+        else:
+            console.print("  • [red]L2 backhaul NOT associated[/red] (not present in `user_list` on `@Ruijie-Repeater`).")
+            if lease:
+                console.print(
+                    f"  • [yellow]Stale DHCP lease[/yellow]: {lease.get('ip', '?')} "
+                    f"({lease.get('leasetime', '?')}m remaining)"
+                )
+            console.print(
+                "  • [bold]Fix[/bold]: check that the sub-router is powered on and within 5G range; if its 5G channel "
+                "was manually locked to a different channel than the main router, restore it to `auto`."
+            )
+
+
 def _norm_band(band: str) -> str:
     b = band.lower().replace("ghz", "").replace("g", "")
     if b in ("2", "2.4"):
@@ -407,13 +535,6 @@ def _norm_band(band: str) -> str:
 def show_set_channel(r: Reyee, band: str, channel: str, ap: str | None, yes: bool) -> None:
     target_type = _norm_band(band)
     where = f"AP {ap}" if ap else "this AP"
-    radios = r.radios(remote_ip=ap)
-    if not radios:
-        die(f"could not read radio config for {where}")
-
-    target = next((x for x in radios if x.get("type") == target_type), None)
-    if target is None:
-        die(f"{where} has no {target_type} radio")
 
     ch = channel.strip().lower()
     if ch != "auto":
@@ -424,6 +545,21 @@ def show_set_channel(r: Reyee, band: str, channel: str, ap: str | None, yes: boo
                 f"[yellow]warning:[/yellow] channel {ch} is a DFS channel "
                 "(radar detection) — not ideal for latency-sensitive use."
             )
+        if ap and target_type == "5G":
+            sub_ap = next((a for a in r.ap_list() if a.get("ip") == ap), None)
+            if sub_ap and sub_ap.get("relayMode") == "wirelessBridge":
+                err.print(
+                    f"[yellow]warning:[/yellow] {where} uses 5G wirelessBridge backhaul; locking its 5G radio "
+                    "to a channel that differs from the main router can break its mesh uplink (prefer 'auto')."
+                )
+
+    radios = r.radios(remote_ip=ap)
+    if not radios:
+        die(f"could not read radio config for {where}")
+
+    target = next((x for x in radios if x.get("type") == target_type), None)
+    if target is None:
+        die(f"{where} has no {target_type} radio")
 
     cur = target.get("channel", "?")
     if str(cur) == ch:
@@ -495,6 +631,8 @@ def main() -> None:
         show_radios(r)
     elif isinstance(cmd, Clients):
         show_clients(r)
+    elif isinstance(cmd, Mesh):
+        show_mesh(r)
     elif isinstance(cmd, SetChannel):
         show_set_channel(r, cmd.band, cmd.channel, cmd.ap, cmd.yes)
     elif isinstance(cmd, Raw):

@@ -61,11 +61,12 @@ Default: `host = 192.168.110.1`. The router is password-only (no username).
 ## Commands
 
 ```text
-reyee info                                  # identity + per-radio summary
+reyee info                                  # identity + per-radio + mesh summary
 reyee radios                                # per-radio channel / TX power
 reyee wifi                                   # configured SSIDs
 reyee wifi --show-passwords                  #   …with cleartext PSKs
 reyee clients                                # connected clients (band/ch/RSSI)
+reyee mesh                                   # mesh APs + sub-router backhaul diagnostics
 reyee login-test                             # verify creds, no other output
 reyee raw devConfig.get --params '{"module":"radio"}'   # any JSON-RPC method
 reyee raw devSta.get --params '{"module":"topology"}'   # mesh topology
@@ -73,7 +74,7 @@ reyee raw devSta.get --params '{"module":"topology"}'   # mesh topology
 # Guarded writer — dry-runs unless --yes:
 reyee set-channel --band 5g --channel 36                 # dry-run
 reyee set-channel --band 5g --channel 36 --yes           # apply
-reyee set-channel --band 5g --channel 149 --ap 192.168.110.91 --yes  # sub-AP
+reyee set-channel --band 5g --channel auto --ap 192.168.110.91 --yes  # sub-AP
 reyee set-channel --band 5g --channel auto --yes         # restore auto
 ```
 
@@ -96,9 +97,30 @@ client on that radio**. So it:
   and are poor for latency-sensitive use; the tool flags them.
 - **targets sub-APs** — `--ap <ip>` routes the change to a mesh node via the
   eWeb `remoteIp` mechanism (each AP holds its own channel; "以下配置只对当前设备生效").
+  Note: dual-band sub-routers using 5 GHz wireless backhaul (`wirelessBridge`)
+  share their single 5 GHz radio between the mesh uplink (`@Ruijie-Repeater`)
+  and local AP service — keep a wireless sub-router's 5 GHz channel on `auto`
+  (or the exact same channel as the main router), and warns if you try to pin a
+  fixed 5 GHz channel on a `wirelessBridge` sub-AP.
 
 Other writes (SSID, password, reboot, reset, band steering, …) are
 intentionally **not** wired up — do those in the web UI.
+
+## Diagnosing offline sub-routers (`reyee mesh`)
+
+When the web UI's `子路由管理 → 子路由列表` greys out a sub-router (`status: OFF`),
+run `reyee mesh`. It cross-checks four router tables (`ap_list`, `topology`,
+`user_list`, and `dhcp_lease`) to separate two distinct failure modes:
+
+1. **L2 associated, L3 / control plane wedged (zombie state)** — the sub-router
+   MAC is actively associated on the hidden `@Ruijie-Repeater` 5 GHz backhaul
+   interface (`rax5`) with a live RSSI/rate and DHCP lease, yet `ap_list`
+   reports `OFF` and `remoteIp` RPCs fail with `get sid fail`. Fix: physically
+   power-cycle the sub-router for 10 seconds so its `br-lan` bridge and
+   `rlink`/`uhttpd` daemons re-initialize.
+2. **L2 backhaul not associated** — the sub-router is absent from `user_list`.
+   Check power/LEDs, distance, or whether its 5 GHz channel was pinned to a
+   different channel than the main router.
 
 ## Useful raw modules
 
@@ -109,8 +131,11 @@ Read with `reyee raw devConfig.get --params '{"module":"<m>"}'` (or
 |---|---|---|
 | `devConfig` | `radio` | per-radio channel / txpower / hwmode (the RF view) |
 | `acConfig` | `wireless` | SSID list (⚠ includes cleartext PSK) |
-| `devSta` | `user_list` | connected clients: band, channel, RSSI, rate |
-| `devSta` | `topology` | mesh topology (which clients on which AP) |
+| `devSta` | `user_list` | connected clients: band, channel, RSSI, rate (includes `@Ruijie-Repeater` backhaul) |
+| `devSta` | `ap_list` | all mesh APs: SN, model, IP, MAC, `status` (`ON`/`OFF`), `relayMode`, channel |
+| `devSta` | `topology` | mesh topology tree (which clients/sub-APs hang off which AP) |
+| `devSta` | `dhcp_lease` | active DHCP leases (`List` of MAC, IP, hostname, remaining minutes) |
+| `devSta` | `dev_diag` | router self-diagnostic checklist (ports, WAN, DHCP, loop, DNS, cloud) |
 | `devSta` | `neighbor` | neighbor APs the router has scanned |
 | `acConfig` | `roam` | 802.11k/v roaming / band-steering policy |
 
