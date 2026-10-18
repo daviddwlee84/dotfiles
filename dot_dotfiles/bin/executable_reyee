@@ -48,6 +48,7 @@ import getpass
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import tomllib
@@ -420,6 +421,30 @@ def show_clients(r: Reyee) -> None:
     console.print(t)
 
 
+def _probe_l3(ip: str) -> tuple[bool, bool | None]:
+    """Ping `ip` from THIS host; on failure, check whether ARP resolved.
+
+    Returns (ping_ok, arp_ok); arp_ok is None when it cannot be determined.
+    A sub-router whose OS is down / boot-looping still lingers in the main
+    router's `user_list`, but it never answers ARP — that is the tell.
+    """
+    try:
+        ok = subprocess.run(
+            ["ping", "-c", "3", ip], capture_output=True, timeout=8
+        ).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        ok = False
+    if ok:
+        return True, True
+    try:
+        arp = subprocess.run(["arp", "-n", ip], capture_output=True, text=True, timeout=3).stdout.lower()
+    except (OSError, subprocess.TimeoutExpired):
+        return False, None
+    if "incomplete" in arp or "no entry" in arp or not arp.strip():
+        return False, False
+    return False, True
+
+
 def _flatten_topo(nodes: list[dict], out: dict[str, dict]) -> None:
     for n in nodes:
         sn = n.get("sn")
@@ -502,14 +527,29 @@ def show_mesh(r: Reyee) -> None:
                     f"  • [green]DHCP lease active[/green]: {lease.get('ip', '?')} "
                     f"(hostname={lease.get('hostname', '?')}, {lease.get('leasetime', '?')}m remaining)"
                 )
-            console.print(
-                "  • [red]Control plane / L3 is WEDGED (zombie state)[/red]: `ap_list` reports OFF and `topology` "
-                f"reports status={topo.get('status', '?')} despite active L2 association on `@Ruijie-Repeater`."
-            )
-            console.print(
-                "  • [bold]Fix[/bold]: physically power-cycle the sub-router (unplug power for 10s, then plug back in) "
-                "so its bridge (`br-lan`) and `rlink`/`uhttpd` daemons re-initialize."
-            )
+            ping_ok, arp_ok = _probe_l3(ip) if ip != "?" else (False, None)
+            if ping_ok:
+                console.print(
+                    f"  • [green]L3 reachable[/green]: {ip} answers ping from this host, but `ap_list` reports OFF "
+                    f"and `topology` status={topo.get('status', '?')} — only the mesh control plane is down "
+                    "(`remoteIp` RPCs typically fail with `get sid fail`)."
+                )
+                console.print(
+                    f"  • [bold]Fix[/bold]: reboot it from its own web UI (http://{ip}/); if it stays OFF, the "
+                    "management password / networkId is out of sync — delete it under 子路由管理 and re-pair."
+                )
+            else:
+                arp_note = {False: "ARP does NOT resolve", True: "ARP resolves", None: "ARP state unknown"}[arp_ok]
+                console.print(
+                    f"  • [red]Host is down at L3[/red]: no ping reply from {ip} ({arp_note}). The `user_list` "
+                    "entry above can be stale — it lingers after the sub-router drops, so it does not prove the "
+                    "radio is still up."
+                )
+                console.print(
+                    "  • [bold]Fix[/bold]: power-cycle it once (unplug 30s). If it does not come back, or its LED "
+                    "cycles red → off → red (boot loop), or the UI flips green → red, or it buzzes / whines: that is "
+                    "a hardware / power-supply failure — unplug it and RMA. Factory reset will not help."
+                )
         else:
             console.print("  • [red]L2 backhaul NOT associated[/red] (not present in `user_list` on `@Ruijie-Repeater`).")
             if lease:
