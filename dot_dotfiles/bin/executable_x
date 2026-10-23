@@ -236,24 +236,23 @@ copy_backend() {
         if wl-copy; then
             return 0
         fi
-        err "copy backend failed: wl-copy"
-        exit 1
+        # Compositor unreachable (stale WAYLAND_DISPLAY inherited from
+        # tmux/herdr server start, or session ended). Fall through — display
+        # connection failures happen before stdin is consumed.
     fi
 
     if [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
         if xclip -selection clipboard; then
             return 0
         fi
-        err "copy backend failed: xclip"
-        exit 1
+        # X server unreachable (stale DISPLAY, SSH without forwarding, etc.).
     fi
 
     if [[ -n "${DISPLAY:-}" ]] && command -v xsel >/dev/null 2>&1; then
         if xsel --clipboard --input; then
             return 0
         fi
-        err "copy backend failed: xsel"
-        exit 1
+        # Same as xclip above.
     fi
 
     # Final fallback: OSC 52 (no display server, or a local terminal that
@@ -384,24 +383,21 @@ paste_backend() {
         if wl-paste --no-newline; then
             return 0
         fi
-        err "paste backend failed: wl-paste"
-        exit 1
+        # Compositor unreachable — fall through.
     fi
 
-    if command -v xclip >/dev/null 2>&1; then
+    if [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
         if xclip -selection clipboard -o; then
             return 0
         fi
-        err "paste backend failed: xclip"
-        exit 1
+        # X server unreachable — fall through.
     fi
 
-    if command -v xsel >/dev/null 2>&1; then
+    if [[ -n "${DISPLAY:-}" ]] && command -v xsel >/dev/null 2>&1; then
         if xsel --clipboard --output; then
             return 0
         fi
-        err "paste backend failed: xsel"
-        exit 1
+        # X server unreachable — fall through.
     fi
 
     clipboard_backend_help
