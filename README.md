@@ -153,7 +153,7 @@ Full diagnosis: [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](pitfalls/bo
 - On sudo-enabled machines, the ansible role for your `primaryShell` choice switches your login shell automatically (`zsh` role for `primaryShell=zsh`, `bash` role for `primaryShell=bash`). Log out / back in to pick it up, or run `exec zsh` / `exec bash` now.
 - `primaryShell=bash` on macOS additionally installs Homebrew bash 5.x and adds it to `/etc/shells` (system bash 3.2 is too old for oh-my-bash plugins + ble.sh). zsh-primary mac users see no extra brew install.
 - On `noRoot=true` installs, login shell isn't changed — run `exec zsh` / `exec bash` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER` (or `bash`).
-- Open a new shell after install so PATH changes take effect. Both `~/.bashrc` and `~/.zshrc` are deployed regardless of `primaryShell` choice, so the other shell still works ad-hoc.
+- Open a new shell after install so PATH changes take effect. Pi/OMP PATH setup keeps managed CLIs in `~/.dotfiles/bin` ahead of legacy copies in `~/.local/bin` (including `x`). Both `~/.bashrc` and `~/.zshrc` are deployed regardless of `primaryShell` choice, so the other shell still works ad-hoc.
 
 ### Optional Components
 

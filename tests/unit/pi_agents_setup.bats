@@ -136,7 +136,7 @@ EOF
   run chezmoi execute-template --source "$REPO_ROOT" \
     --override-data '{"installCodingAgents":true}' <"$PATH_FRAGMENT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'export PATH="$HOME/.local/bin:$PATH"'* ]]
+  [[ "$output" == *'export PATH="$HOME/.dotfiles/bin:$HOME/.local/bin:$PATH"'* ]]
   [[ "$output" == *'_pia_root="$HOME/.local/share/pi-agents"'* ]]
   [[ "$output" == *'export PATH="$_pia_root/bin:$PATH"'* ]]
 
@@ -153,12 +153,13 @@ EOF
   local rendered="$BATS_TEST_TMPDIR/08_pi_agents.sh"
   local mise_bin="$BATS_TEST_TMPDIR/mise-node/bin"
   local bun_bin="$test_home/.bun/bin"
-  mkdir -p "$test_home/.local/bin" "$test_home/.local/share/pi-agents/bin" \
+  mkdir -p "$test_home/.local/bin" "$test_home/.dotfiles/bin" "$test_home/.local/share/pi-agents/bin" \
     "$mise_bin" "$bun_bin"
 
   for path in "$test_home/.local/bin/pi" "$test_home/.local/bin/omp" \
     "$test_home/.local/share/pi-agents/bin/pia" "$mise_bin/pi" \
-    "$bun_bin/omp" "$BATS_STUB_DIR/pia"; do
+    "$bun_bin/omp" "$BATS_STUB_DIR/pia" \
+    "$test_home/.dotfiles/bin/x" "$test_home/.local/bin/x"; do
     printf '%s\n' '#!/bin/sh' 'exit 0' >"$path"
     chmod +x "$path"
   done
@@ -168,11 +169,43 @@ EOF
 
   for shell in /bin/bash /bin/zsh; do
     run env HOME="$test_home" PATH="$mise_bin:$bun_bin:$BATS_STUB_DIR:/usr/bin:/bin" \
-      "$shell" -c '. "$1"; command -v pi; command -v omp; command -v pia' _ "$rendered"
+      "$shell" -c '. "$1"; command -v pi; command -v omp; command -v pia; command -v x' _ "$rendered"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "$test_home/.local/bin/pi" ]
     [ "${lines[1]}" = "$test_home/.local/bin/omp" ]
     [ "${lines[2]}" = "$test_home/.local/share/pi-agents/bin/pia" ]
+    [ "${lines[3]}" = "$test_home/.dotfiles/bin/x" ]
+  done
+}
+
+@test "Pi PATH fragment preserves baseline when disabled or agents are absent" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+
+  local test_home="$BATS_TEST_TMPDIR/optional-home"
+  local rendered="$BATS_TEST_TMPDIR/optional.sh"
+  local baseline="$test_home/.dotfiles/bin:$test_home/.local/bin:/usr/bin:/bin"
+  mkdir -p "$test_home/.dotfiles/bin" "$test_home/.local/bin"
+  for path in "$test_home/.dotfiles/bin/x" "$test_home/.local/bin/x"; do
+    printf '%s\n' '#!/bin/sh' 'exit 0' >"$path"
+    chmod +x "$path"
+  done
+
+  for enabled in true false; do
+    # Enabled without installed agents; disabled even with agents installed.
+    if [ "$enabled" = false ]; then
+      cp "$test_home/.local/bin/x" "$test_home/.local/bin/pi"
+      mkdir -p "$test_home/.local/share/pi-agents/bin"
+      cp "$test_home/.local/bin/x" "$test_home/.local/share/pi-agents/bin/pia"
+    fi
+    chezmoi execute-template --source "$REPO_ROOT" \
+      --override-data "{\"installCodingAgents\":$enabled}" <"$PATH_FRAGMENT" >"$rendered"
+    for shell in /bin/bash /bin/zsh; do
+      run env HOME="$test_home" PATH="$baseline" "$shell" -c \
+        '. "$1"; command -v x; printf "%s\n" "$PATH"' _ "$rendered"
+      [ "$status" -eq 0 ]
+      [ "${lines[0]}" = "$test_home/.dotfiles/bin/x" ]
+      [ "${lines[1]}" = "$baseline" ]
+    done
   done
 }
 

@@ -67,7 +67,8 @@ in a normal development clone, commit and push them, then run
 directory is required for `pia`.
 
 The shared `08_pi_agents.sh` fragment loads after mise and Bun setup. It
-re-prepends `~/.local/bin` when managed Pi/OMP binaries exist, then prepends the
+re-prepends `~/.dotfiles/bin:~/.local/bin` when managed Pi/OMP binaries exist,
+so managed CLIs such as `x` still beat legacy copies in `~/.local/bin`. It then prepends the
 external `pia` bin directory. Upgrade commands also invoke the exact canonical
 paths rather than whichever same-named command happens to appear first on PATH.
 

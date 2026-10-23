@@ -143,6 +143,12 @@ Its copy backend tries, in order: `clip.exe` (WSL) → `pbcopy` (macOS) → `wl-
 
 **Under SSH, herdr, or zellij** — `prefer_osc52()`: `SSH_CONNECTION`/`SSH_TTY`/`SSH_CLIENT`, `HERDR_ENV`, or `ZELLIJ` — that order flips: OSC 52 is tried *first*, because a local `wl-copy` / `xclip` there targets the **wrong machine** (SSH) or a **frozen display** (a herdr/zellij pane inherits the env from when its server started, not the client attached now; the pane TTY, though, always proxies to the real client). If `/dev/tty` can't be opened (`ssh` with no PTY), `x` falls back through the display-server tools for the `ssh -X` case. `x copy-file` refuses here — OSC 52 is text-only and a file object can't cross. Same predicate as Neovim's `options.lua`.
 
+**Check the executable first:** `command -v x` should resolve to `~/.dotfiles/bin/x`.
+A legacy `~/.local/bin/x` can report `copy backend failed: xclip` even after
+`cas` updates the managed copy. The shared Pi/OMP PATH setup preserves
+`~/.dotfiles/bin` ahead of `~/.local/bin`; reload your shell after applying it.
+Use `type -a x` to find other copies or overrides.
+
 **`X_CLIPBOARD`** overrides autodetect entirely: `osc52 | wl-copy | xclip | xsel | pbcopy | clip.exe`. Put `export X_CLIPBOARD=osc52` in `~/.shellrc.adhoc` on a box you always reach through something that hides `SSH_*` and isn't herdr/zellij (bare `mosh`, some Remote-SSH setups).
 
 `x copy-file PATH...` is intentionally separate from `x copy PATH`: it places file objects on the desktop clipboard so a file manager can paste/copy the selected files, instead of pasting the files' text contents. It uses macOS `osascript` on Finder-compatible desktops and Linux `x-special/gnome-copied-files` MIME data via `wl-copy` / `xclip` for common GTK file managers. This is local-desktop only; OSC 52 cannot carry file objects over SSH. For remote hosts, copy contents with `x copy FILE` or copy a path with `realpath FILE | x copy`.

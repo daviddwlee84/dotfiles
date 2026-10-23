@@ -2,11 +2,12 @@
 #
 # 05_mise.sh can prepend a Node-version bin directory and legacy Bun setup can
 # prepend ~/.bun/bin. Reassert only the managed agent locations afterwards so
-# stale package-manager copies cannot shadow the canonical installs.
+# stale package-manager copies cannot shadow the canonical installs. Keep
+# chezmoi-managed CLIs ahead of legacy copies in ~/.local/bin (notably x).
 
 {{ if .installCodingAgents -}}
 if [ -x "$HOME/.local/bin/pi" ] || [ -x "$HOME/.local/bin/omp" ]; then
-    export PATH="$HOME/.local/bin:$PATH"
+    export PATH="$HOME/.dotfiles/bin:$HOME/.local/bin:$PATH"
 fi
 
 _pia_root="$HOME/.local/share/pi-agents"
