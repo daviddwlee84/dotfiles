@@ -1,4 +1,11 @@
 # https://docs.astral.sh/uv/concepts/configuration-files/
+{{- with .uvCacheDir }}
+
+# Per-machine cache location (chezmoi data `uvCacheDir`, set in ~/.config/chezmoi/chezmoi.toml).
+# Keep it on the same filesystem as the projects so uv hardlinks from the cache instead of
+# copying every package into every venv. Top-level key: must come before any [table].
+cache-dir = {{ . | quote }}
+{{ end }}
 
 {{- if .useChineseMirror }}
 # Chinese PyPI mirrors for faster downloads behind GFW
