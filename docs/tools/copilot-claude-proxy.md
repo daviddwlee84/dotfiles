@@ -449,6 +449,15 @@ launchers. They start the gateway/shim when necessary and pass a custom
 `~/.codex/config.toml` or `.codex/config.toml`, so plain `codex` remains on its
 normal provider.
 
+On Codex 0.162.1, these command-line configuration overrides require an embedded
+app server. Startup reports: `Running without the shared background server:
+command-line configuration overrides (-c, --enable, --disable, or --search)
+requires embedded mode.` The launcher's `/daemon` menu therefore reports that
+it is not connected to the shared background server. The shared Command Center
+(`codex agents` / `/agents`) and the current session's `/subagents` picker are
+different surfaces; enabling multi-agent does not make the launcher join the
+shared daemon. This was verified with a no-prompt startup check.
+
 For GUI or plain-CLI resumes, chezmoi seeds a missing
 `[model_providers.copilot_api]` table in the user config. A saved thread retains
 the provider ID, but not the launcher's temporary provider definition. The

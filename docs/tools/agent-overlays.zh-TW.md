@@ -114,8 +114,10 @@ multi_agent = true
 status_line = [
   "model-with-reasoning",
   "fast-mode",
+  "run-state",
   "git-branch",
   "context-remaining",
+  "used-tokens",
   "task-progress",
   "current-dir",
 ]
@@ -136,7 +138,7 @@ enabled = true
 - 頂層的 personality 與 reasoning 偏好；`model` 刻意不釘選，保留 live user choice。
 - `[features]` — 啟用此使用者一律想開啟的實驗性 flag。
 - `[tui].status_line` — 使用 Codex 原生 footer 顯示 model/reasoning、fast mode、
-  branch、剩餘 context、task progress 與目錄。Copilot launcher 是 per-process
+  執行狀態、branch、剩餘 context、已用 tokens、task progress 與目錄。Copilot launcher 是 per-process
   換 provider，所以刻意不顯示可能仍屬於 ChatGPT account 的 quota 欄位。詳見
   [Codex status line](codex-status-line.zh-TW.md)。
 - `[tui.keymap.editor]` — 保留 TUI 多行輸入的 `Ctrl+J`、`Shift+Enter`、`Alt+Enter`。

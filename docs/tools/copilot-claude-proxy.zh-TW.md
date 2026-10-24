@@ -343,6 +343,14 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 `copilot_api` Responses provider 傳給 Codex；不會編輯 `~/.codex/config.toml`
 或 `.codex/config.toml`，所以 plain `codex` 仍走原本 provider。
 
+Codex 0.162.1 的這些 command-line configuration overrides 需要 embedded
+app server。啟動時會顯示：`Running without the shared background server:
+command-line configuration overrides (-c, --enable, --disable, or --search)
+requires embedded mode.` 因此 launcher 的 `/daemon` 會顯示沒有連上 shared
+background server。跨 session 的 Command Center（`codex agents` / `/agents`）
+與目前 session 的 `/subagents` picker 是不同介面；開啟 multi-agent 不會讓
+launcher 自動加入 shared daemon。已用不送 prompt 的啟動檢查確認。
+
 為支援 GUI 或 plain CLI 恢復舊 thread，chezmoi 會在 user config 缺少時補上
 `[model_providers.copilot_api]`。Thread 會保存 provider ID，但不會保留 launcher
 臨時傳入的完整定義。預設指向 `http://localhost:4142`，並使用本機 gateway 接受的

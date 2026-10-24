@@ -9,12 +9,21 @@ preserving project trust, providers, plugins, and other live settings:
 status_line = [
   "model-with-reasoning",
   "fast-mode",
+  "run-state",
   "git-branch",
   "context-remaining",
+  "used-tokens",
   "task-progress",
   "current-dir",
 ]
 ```
+
+`run-state` shows whether the thread is ready or working. `used-tokens` shows
+token usage when Codex has usage data; it can be absent before the first turn.
+In Codex 0.162.1's fullscreen TUI, the footer stays on one line and truncates
+the right-hand end with `…` when the terminal is too narrow. It does not wrap;
+earlier items remain visible first, and widening the terminal restores the rest.
+This was checked at 40, 60, 80, 100, 120, and 160 columns without sending a prompt.
 
 Run `/status` when you need authoritative routing details. In a
 `codex-copilot` session it should show the localhost model provider even if the

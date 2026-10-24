@@ -109,8 +109,10 @@ multi_agent = true
 status_line = [
   "model-with-reasoning",
   "fast-mode",
+  "run-state",
   "git-branch",
   "context-remaining",
+  "used-tokens",
   "task-progress",
   "current-dir",
 ]
@@ -131,7 +133,7 @@ enabled = true
 - Top-level personality + reasoning preferences. `model` is deliberately not pinned: Codex can follow the account/CLI default unless a live user config already contains a model choice. The modify script only prunes exact stale model values this repo previously wrote, such as `gpt-5.4`.
 - `[features]` — opt into the experimental flags this user always wants on.
 - `[tui].status_line` — use Codex's native footer for model/reasoning, fast
-  mode, branch, remaining context, task progress, and directory. The Copilot
+  mode, run state, branch, remaining context, used tokens, task progress, and directory. The Copilot
   launcher is provider-switched per process, so ChatGPT-account quota fields
   are deliberately omitted. See [Codex status line](codex-status-line.md).
 - `[tui.keymap.editor]` — keep multi-line entry reachable in the TUI (`Ctrl+J`, `Shift+Enter`, `Alt+Enter`). tmux still needs `extended-keys on` plus `xterm*:extkeys` for modified Enter keys to reach inner apps.

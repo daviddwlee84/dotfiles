@@ -178,7 +178,7 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   echo "$output" | yq -p toml -e '.model_reasoning_effort == "xhigh"' >/dev/null
   echo "$output" | yq -p toml -e '.features.hooks == true' >/dev/null
   echo "$output" | yq -p toml -e '.features.unified_exec == true' >/dev/null
-  echo "$output" | yq -p toml -e '.tui.status_line | join("|") == "model-with-reasoning|fast-mode|git-branch|context-remaining|task-progress|current-dir"' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.status_line | join("|") == "model-with-reasoning|fast-mode|run-state|git-branch|context-remaining|used-tokens|task-progress|current-dir"' >/dev/null
   echo "$output" | yq -p toml -e '.tui.status_line | contains(["five-hour-limit"]) | not' >/dev/null
   echo "$output" | yq -p toml -e '.tui.status_line | contains(["weekly-limit"]) | not' >/dev/null
   echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[0] == "ctrl-j"' >/dev/null

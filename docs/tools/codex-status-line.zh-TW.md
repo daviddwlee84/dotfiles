@@ -9,12 +9,20 @@ plugin 與 live settings 都保留：
 status_line = [
   "model-with-reasoning",
   "fast-mode",
+  "run-state",
   "git-branch",
   "context-remaining",
+  "used-tokens",
   "task-progress",
   "current-dir",
 ]
 ```
+
+`run-state` 顯示 thread 是待命還是工作中；`used-tokens` 在 Codex 有 usage data
+時顯示已用 tokens，第一個 turn 前可能不出現。Codex 0.162.1 的全螢幕 footer
+保持單行，視窗太窄時在右端以 `…` 截斷，不會換行。清單前面的欄位較容易保留，
+拉寬後其餘資訊會恢復。已在不送 prompt 的情況下實測 40、60、80、100、120、
+160 欄寬度。
 
 需要確認實際路由時請看 `/status`。在 `codex-copilot` session 中，Model provider
 應顯示 localhost；Account 仍顯示已登入 ChatGPT 帳號並不代表 inference 繞過 proxy，

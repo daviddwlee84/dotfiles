@@ -15,8 +15,10 @@ multi_agent = true
 status_line = [
   "model-with-reasoning",
   "fast-mode",
+  "run-state",
   "git-branch",
   "context-remaining",
+  "used-tokens",
   "task-progress",
   "current-dir",
 ]
