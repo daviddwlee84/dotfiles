@@ -88,7 +88,9 @@ Results cache at `$XDG_CACHE_HOME/pqsum/<host>-<prompt_hash>.json` (default
 `agent-wakeup` uses pueue as a small persistent scheduler for quota/rate-limit
 resets in live coding-agent panes. It creates group `agent-wakeup`, sets group
 parallelism to 1, and labels tmux tasks as `agent-wakeup:%pane_id` and Herdr
-tasks as `agent-wakeup:herdr:<session>:<agent-session-id>`.
+tasks as `agent-wakeup:herdr:<session>:<agent-session-id>` when a stable ID is
+available, otherwise `agent-wakeup:herdr:<session>:pane:<pane-id>`. The existing
+shell interface is unchanged.
 
 ```bash
 agent-wakeup status
@@ -101,12 +103,31 @@ agent-wakeup cancel --pane %12
 ```
 
 The scheduled command calls back into
-`~/.config/television/agent-wakeup.py send-now`. When the task runs, it
-captures the target tmux or Herdr pane again. Herdr tasks re-resolve the stable
-agent session ID first, so a moved agent follows its new pane. If the original quota marker has
-disappeared, the task exits without sending text unless `--force` was used.
-That guard is intentional: scheduled `continue` should not type into a pane
-that may already have resumed or changed context.
+`~/.config/television/agent-wakeup.py send-now` and re-captures the target pane.
+Herdr prefers the stable agent session ID and re-resolves it to follow moves.
+Without one, scheduling snapshots a SHA256 of the terminal ID, agent name, and
+matching foreground agent PID/start time/argv (start time from local `ps`),
+refusing if unavailable. Execution rejects changed or unverifiable processes.
+This fallback is **process identity, not conversation identity**: it cannot
+detect conversation switches within the same live process or follow pane moves.
+
+Scheduled Herdr sends require `idle`/`done`, except for a recognized `blocked`
+quota menu needing Enter. The quota guard is enabled only if quota is detected
+at scheduling, unless `--no-expect-quota` is used. For text sends it checks the
+active tail; Enter menus retain the full capture, but a blocked send also requires
+the Stop-and-wait option in the active tail. A missing marker aborts. `--force` bypasses
+only the quota guard, never identity or readiness checks.
+
+Each task is one-shot, not a retry loop. The host must be awake with pueued,
+Herdr and the target agent running; wakeups do not reopen them or guarantee
+exact execution timing.
+
+Herdr text submission uses `agent prompt --wait --until working --until blocked
+--timeout 15000` to verify agent activity rather than just successful key writes.
+It does not wait for the whole turn. Failure/stall/timeout is recorded without
+retrying; inspect the pane before resubmitting, since delivery may have occurred.
+Menu Enter remains `agent send-keys`. Ordinary shells use `herdr pane run`, not
+this agent scheduler.
 
 Use `--auto` when you do not know whether the pane needs `continue` or only
 `Enter`: Claude's `/rate-limit-options` screen is treated as `Enter` because

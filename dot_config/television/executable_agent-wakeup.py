@@ -14,6 +14,7 @@ when the pane contains explicit limit/reset wording; normal idle panes stay idle
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -268,6 +269,30 @@ def _find_herdr_agent(session: str, agent_session_id: str, pane: str = "") -> Pa
     return next((row for row in rows if row.pane_id == pane), None)
 
 
+def _herdr_process_identity(rec: PaneRec) -> str:
+    """Pin ID-less agents to a local terminal and agent process incarnation."""
+    pane = _json_result(_herdr(rec.backend_session, "pane", "get", rec.pane_id)).get("pane", {})
+    info = _json_result(_herdr(
+        rec.backend_session, "pane", "process-info", "--pane", rec.pane_id,
+    )).get("process_info", {})
+    processes = []
+    for process in info.get("foreground_processes", []):
+        argv = process.get("argv") or []
+        if process.get("name") != rec.agent and (not argv or Path(argv[0]).name != rec.agent):
+            continue
+        pid = process.get("pid")
+        if not isinstance(pid, int) or pid <= 0:
+            continue
+        cp = run(["ps", "-p", str(pid), "-o", "lstart="])
+        if cp.returncode != 0 or not cp.stdout.strip():
+            return ""
+        processes.append((pid, cp.stdout.strip(), argv))
+    if not pane.get("terminal_id") or not processes:
+        return ""
+    identity = [pane["terminal_id"], rec.agent, sorted(processes)]
+    return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+
+
 _ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 # Word-boundary anchored so we don't fire on "quotation"/"quotas"/incidental
 # substrings; "hit your <plan> limit" stays flexible but bounded.
@@ -448,6 +473,9 @@ def _pueue_tasks() -> list[WakeTask]:
             if len(parts) == 3:
                 backend, backend_session, agent_session_id = parts
                 pane_id = agent_session_id
+                if agent_session_id.startswith("pane:"):
+                    pane_id = agent_session_id[len("pane:"):]
+                    agent_session_id = ""
         tasks.append(
             WakeTask(
                 task_id=str(task.get("id", tid)),
@@ -465,14 +493,22 @@ def _pueue_tasks() -> list[WakeTask]:
 
 def _identity(rec: PaneRec) -> str:
     if rec.backend == "herdr":
-        return f"herdr:{rec.backend_session}:{rec.agent_session_id}"
+        return f"herdr:{rec.backend_session}:{rec.agent_session_id or 'pane:' + rec.pane_id}"
     return rec.pane_id
 
 
 def _task_identity(task: WakeTask) -> str:
     if task.backend == "herdr":
-        return f"herdr:{task.backend_session}:{task.agent_session_id}"
+        return f"herdr:{task.backend_session}:{task.agent_session_id or 'pane:' + task.pane_id}"
     return task.pane_id
+
+
+def _task_matches(task: WakeTask, rec: PaneRec) -> bool:
+    return _task_identity(task) == _identity(rec) or (
+        task.backend == rec.backend == "herdr"
+        and task.backend_session == rec.backend_session
+        and not task.agent_session_id and task.pane_id == rec.pane_id
+    )
 
 
 def _rows(backend: str = "auto", herdr_session: str | None = None) -> tuple[list[PaneRec], list[WakeTask], list[str]]:
@@ -496,10 +532,6 @@ def _rows(backend: str = "auto", herdr_session: str | None = None) -> tuple[list
             except (OSError, RuntimeError) as exc:
                 errors.append(f"herdr:{session}: {exc}")
     tasks = _pueue_tasks()
-    tasks_by_pane: dict[str, list[WakeTask]] = {}
-    for task in tasks:
-        tasks_by_pane.setdefault(_task_identity(task), []).append(task)
-
     now = datetime.now().astimezone()
     for pane in panes:
         text = capture_target(
@@ -516,7 +548,7 @@ def _rows(backend: str = "auto", herdr_session: str | None = None) -> tuple[list
         pane.quota_message = msg
         pane.reset_epoch = reset_epoch
         pane.reset_display = reset_display
-        pane_tasks = tasks_by_pane.get(_identity(pane), [])
+        pane_tasks = [task for task in tasks if _task_matches(task, pane)]
         if pane_tasks:
             pane.state = "SCHEDULED"
             pane.scheduled_display = ", ".join(t.when_display or t.status for t in pane_tasks)
@@ -536,9 +568,9 @@ def _rows(backend: str = "auto", herdr_session: str | None = None) -> tuple[list
         else:
             pane.state = "UNKNOWN"
 
-    live_ids = {_identity(p) for p in panes if p.pane_id}
+    live_panes = list(panes)
     for task in tasks:
-        if _task_identity(task) in live_ids:
+        if any(_task_matches(task, pane) for pane in live_panes if pane.pane_id):
             continue
         panes.append(
             PaneRec(
@@ -687,7 +719,8 @@ def cmd_schedule(args: argparse.Namespace) -> int:
         action = recommended_action(capture_target(pane, backend=rec.backend, session=rec.backend_session))
     expect_quota = False
     if not args.no_expect_quota:
-        msg, _, _ = detect_quota(capture_target(pane, backend=rec.backend, session=rec.backend_session))
+        capture = capture_target(pane, backend=rec.backend, session=rec.backend_session)
+        msg, _, _ = detect_quota(active_quota_text(capture, action))
         expect_quota = bool(msg)
 
     cmd = [
@@ -702,6 +735,13 @@ def cmd_schedule(args: argparse.Namespace) -> int:
         cmd.extend(["--herdr-session", shlex.quote(rec.backend_session)])
     if rec.agent_session_id:
         cmd.extend(["--agent-session-id", shlex.quote(rec.agent_session_id)])
+    if rec.backend == "herdr":
+        cmd.append("--scheduled")
+        if not rec.agent_session_id:
+            identity = _herdr_process_identity(rec)
+            if not identity:
+                raise SystemExit("agent-wakeup: cannot verify ID-less Herdr agent process; refusing to schedule")
+            cmd.extend(["--expected-process", identity])
     if action == ACTION_ENTER:
         cmd.append("--enter-only")
     else:
@@ -759,40 +799,61 @@ def cmd_schedule(args: argparse.Namespace) -> int:
 def cmd_send_now(args: argparse.Namespace) -> int:
     rec = _select_target(args)
     pane = rec.pane_id
-    capture = capture_target(pane, backend=rec.backend, session=rec.backend_session)
-    action = ACTION_ENTER if args.enter_only else ACTION_CONTINUE
-    if args.auto:
-        action = recommended_action(capture)
-    if args.expect_quota and not args.force:
-        msg, _, _ = detect_quota(capture)
-        if not msg:
-            print(f"agent-wakeup: quota marker gone for {pane}; aborting", file=sys.stderr)
-            return 3
     if rec.backend == "herdr":
         current = _find_herdr_agent(rec.backend_session, rec.agent_session_id, pane)
         if not current:
             print(f"agent-wakeup: Herdr agent identity no longer exists: {rec.agent_session_id or pane}", file=sys.stderr)
             return 2
-        pane = current.pane_id
+        rec = current
+        pane = rec.pane_id
+        expected = getattr(args, "expected_process", None)
+        if expected and _herdr_process_identity(rec) != expected:
+            print(f"agent-wakeup: Herdr agent process changed or unverifiable: {pane}; aborting", file=sys.stderr)
+            return 3
+        if getattr(args, "scheduled", False) and not rec.agent_session_id and not expected:
+            print("agent-wakeup: scheduled Herdr input requires a session ID or process guard", file=sys.stderr)
+            return 3
+    capture = capture_target(pane, backend=rec.backend, session=rec.backend_session)
+    action = ACTION_ENTER if args.enter_only else ACTION_CONTINUE
+    if args.auto:
+        action = recommended_action(capture)
+    if args.expect_quota and not args.force:
+        msg, _, _ = detect_quota(active_quota_text(capture, action))
+        if not msg:
+            print(f"agent-wakeup: quota marker gone for {pane}; aborting", file=sys.stderr)
+            return 3
+    if rec.backend == "herdr":
+        if getattr(args, "scheduled", False) and rec.native_status not in {"idle", "done"}:
+            quota_menu = (
+                rec.native_status == "blocked" and action == ACTION_ENTER
+                and "stop and wait for limit to reset" in "\n".join(
+                    capture.lower().splitlines()[-ACTIVE_TAIL_LINES:]
+                ) and detect_quota(capture)[0]
+            )
+            if not quota_menu:
+                print(f"agent-wakeup: Herdr agent is {rec.native_status or 'unknown'}: {pane}; aborting", file=sys.stderr)
+                return 3
         if action == ACTION_ENTER:
             commands = [["agent", "send-keys", pane, "enter"]]
             sent = "Enter"
         else:
             text = args.text or DEFAULT_TEXT
-            commands = [
-                ["pane", "send-keys", pane, "ctrl+u"],
-                ["pane", "send-text", pane, text],
-                ["agent", "send-keys", pane, "enter"],
-            ]
-            sent = repr(text)
+            # Verify turn startup, not completion of potentially long-running work.
+            commands = [[
+                "agent", "prompt", pane, text, "--wait",
+                "--until", "working", "--until", "blocked", "--timeout", "15000",
+            ]]
+            sent = f"{text!r} (agent activity observed)"
         if args.dry_run:
             for command in commands:
-                print(" ".join(shlex.quote(part) for part in ["herdr", *command]))
+                print(" ".join(shlex.quote(part) for part in ["herdr", "--session", rec.backend_session, *command]))
             return 0
         for command in commands:
             cp = _herdr(rec.backend_session, *command)
             if cp.returncode != 0:
                 print(cp.stderr or cp.stdout, file=sys.stderr, end="")
+                if action != ACTION_ENTER:
+                    print("agent-wakeup: prompt failed or activity unconfirmed; inspect the agent before retrying", file=sys.stderr)
                 return cp.returncode
     else:
         if not resolve_pane_id(pane):
@@ -819,7 +880,7 @@ def cmd_send_now(args: argparse.Namespace) -> int:
 def cmd_cancel(args: argparse.Namespace) -> int:
     rec = _select_target(args)
     identity = _identity(rec)
-    tasks = [t for t in _pueue_tasks() if _task_identity(t) == identity]
+    tasks = [t for t in _pueue_tasks() if _task_matches(t, rec)]
     if not tasks:
         print(f"no queued wakeup tasks for {identity}")
         return 0
@@ -918,6 +979,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_schedule)
 
     s = sub.add_parser("send-now", help="Send continue to a pane now")
+    s.add_argument("--scheduled", action="store_true", help=argparse.SUPPRESS)
+    s.add_argument("--expected-process", help=argparse.SUPPRESS)
     s.add_argument("--pane", help="tmux pane target or pane id")
     s.add_argument("--current", action="store_true", help="Use $HERDR_PANE_ID or $TMUX_PANE")
     s.add_argument("--backend", choices=("auto", "tmux", "herdr"), default="auto")

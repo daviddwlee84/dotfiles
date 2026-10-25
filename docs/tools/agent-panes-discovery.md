@@ -95,7 +95,7 @@ recommended action is `enter`, not `continue`.
 | `Alt+X` | Cancel queued wakeup tasks for that pane |
 | `Ctrl+F` | Cycle preview; live `tmux capture-pane` or `herdr agent read --source visible` output |
 
-The shell equivalent is:
+The shell interface is unchanged:
 
 ```bash
 agent-wakeup status
@@ -111,16 +111,36 @@ agent-wakeup cancel --pane %12
 
 Scheduled wakeups are pueue tasks in group `agent-wakeup`. Tmux labels remain
 `agent-wakeup:%pane_id`; Herdr labels are
-`agent-wakeup:herdr:<session>:<agent-session-id>`. A Herdr task re-resolves the
-stable agent session ID when it fires, so pane moves are followed. It fails
-closed if the identity disappeared or the quota marker is gone. Sending uses
-literal `pane send-text` plus explicit keys rather than `agent prompt`, because
-Herdr intentionally rejects prompts while an agent is already `blocked`.
-The scheduled task re-captures the pane right before
-sending. If the quota marker has disappeared, it aborts instead of blindly
-typing into a session that may already be doing unrelated work. With `--auto`,
-the send step re-captures the pane and chooses `Enter` for a rate-limit menu
-or `continue` for a normal prompt.
+`agent-wakeup:herdr:<session>:<agent-session-id>` when a stable ID is available.
+That ID is preferred and re-resolved at execution to follow pane moves; a
+missing identity aborts the send. Without an ID, the label is
+`agent-wakeup:herdr:<session>:pane:<pane-id>`. Scheduling snapshots a SHA256 of
+the terminal ID, agent name, and matching foreground agent PID/start time/argv
+(start time from local `ps`), refusing if unavailable. Execution rejects changed
+or unverifiable processes. This is **process identity, not conversation
+identity**: switching conversations within the same live process is undetectable,
+and pane moves are not followed without a stable ID.
+
+Scheduled Herdr sends require `idle`/`done`, except for a recognized `blocked`
+quota Enter menu. The quota guard is enabled only when detected at scheduling,
+unless `--no-expect-quota` is used; text sends recheck the active tail, while
+Enter menus retain the full capture. Blocked sends additionally require the
+Stop-and-wait option in the active tail. A missing marker aborts. `--force` bypasses only quota,
+not identity or readiness. With `--auto`, a fresh capture selects Enter for a
+rate-limit menu or `continue` for a normal prompt. Text uses `agent prompt --wait
+--until working --until blocked --timeout 15000`: Herdr submits text and Enter
+together and verifies startup, without waiting for the whole turn to finish.
+Only menu Enter uses `agent send-keys`. A stalled/timeout result is not retried:
+inspect the agent first because the prompt may already have been delivered.
+
+For ordinary shell panes use `herdr pane run <pane-id> "ls"`, not `agent prompt`.
+That submits a shell command plus Enter; inspect output with `pane read` or
+`pane wait-output` to verify execution. These are Herdr terminal-control APIs,
+not direct calls to the agent provider.
+
+Wakeups are one-shot: the host must be awake with pueued, Herdr and the target
+agent running. They do not reopen closed sessions or agents, and exact execution
+timing is not guaranteed.
 
 The fully automatic "detect quota, schedule, continue, repeat until non-quota
 exit" supervisor is deliberately deferred; see
