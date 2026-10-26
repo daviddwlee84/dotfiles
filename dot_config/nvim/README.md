@@ -3,6 +3,18 @@
 A starter template for [LazyVim](https://github.com/LazyVim/LazyVim).
 Refer to the [documentation](https://lazyvim.github.io/installation) to get started.
 
+## Yank history
+
+`lazyvim.json` enables `lazyvim.plugins.extras.coding.yanky`. After chezmoi
+applies this configuration, lazy.nvim installs the plugin if missing when Neovim
+starts; no manual `:LazyExtras` selection is needed on a new machine.
+
+Use `Space p` to search and paste a previous yank. After pasting with `p` / `P`,
+use `[y` / `]y` to cycle through history. Yanky defaults to 100 entries stored
+through ShaDa, normally at `~/.local/state/nvim/shada/main.shada` on macOS/Linux
+(without XDG overrides), so history can survive a normal restart. History is
+local to the machine running Neovim; it is not synced by chezmoi.
+
 ## Prettier installation and selection
 
 `lua/plugins/mason.lua` adds Prettier to LazyVim's Mason `ensure_installed` list.
