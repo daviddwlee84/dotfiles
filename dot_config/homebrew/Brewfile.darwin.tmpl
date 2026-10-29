@@ -10,6 +10,14 @@
 # =============================================================================
 cask "alacritty"
 cask "ghostty"
+{{ if eq .chezmoi.os "darwin" -}}
+{{ if semverCompare ">=14.2" (output "sw_vers" "-productVersion" | trim) -}}
+tap "penso/tap"
+cask "herdr-gpui"
+{{ else -}}
+# Herdr UI skipped: requires macOS 14.2 or newer.
+{{ end -}}
+{{ end -}}
 # cask "iterm2"
 # cask "warp"   # exploration converged on Alacritty + herdr; keep off by default
 # cask "cmux"   # exploration converged on Alacritty + herdr; keep off by default

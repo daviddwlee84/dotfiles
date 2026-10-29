@@ -202,3 +202,5 @@ flowchart LR
 - [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) — 在 macOS cask 安裝程式重複使用的 sudo-session 輔助函式。
 - [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl) — `upgrade-externals` 強制刷新的 `refreshPeriod` 條目。
 - 用於枚舉的 ansible role 預設值：[`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml)、[`python_uv_tools`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml)、[`llm_tools`](../../dot_ansible/roles/llm_tools/defaults/main.yml)、[`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml)。
+
+Herdr UI 依套件來源更新：macOS 使用 Homebrew；Linux 使用 App Updates（PolicyKit）或官方安裝器。apply 僅補裝，`just upgrade-herdr` 仍只更新 daemon。詳見 [Herdr UI](../tools/herdr.zh-TW.md)。

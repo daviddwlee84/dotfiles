@@ -1121,6 +1121,22 @@ linux = "GitHub release single binary → `~/.local/bin/herdr`"
 role_md = "devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**)"
 
 [[tool]]
+id = "herdr-gpui"
+bins = ["herdr-gpui"]
+category = "Terminals & Editors"
+desc = "Native GUI client for the existing Herdr daemon"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+gate = "installBrewApps"
+gate_linux = "installBrewApps"
+app = "Herdr"
+docs = "docs/tools/herdr.md"
+upgrade = "Homebrew (macOS) / App Updates (Linux)"
+mac = "penso/tap/herdr-gpui cask; macOS 14.2+"
+linux = "SHA-256 verified stable .deb; glibc 2.39+, x64/arm64, sudo"
+role_md = "GUI bundle; apply installs missing copies only"
+
+[[tool]]
 id = "herdr-plus"
 label = "**herdr-plus** (herdr plugin)"
 bins = []

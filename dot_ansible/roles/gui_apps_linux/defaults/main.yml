@@ -11,3 +11,6 @@ gui_apps_linux_no_root: false
 # Desktop gaming bundle. Currently installs Steam only. Plumbed from the
 # `installGamingApps` chezmoi prompt on ubuntu_desktop.
 gui_apps_linux_install_gaming_apps: false
+
+# Herdr UI follows installBrewApps, independently of other GUI role tasks.
+gui_apps_linux_install_herdr_gui: false

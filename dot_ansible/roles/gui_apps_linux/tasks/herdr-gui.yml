@@ -1,0 +1,91 @@
+---
+# Install-only: the app's App Updates panel owns subsequent package updates.
+- name: Check for an existing Herdr UI
+  ansible.builtin.shell: command -v herdr-gpui
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: herdr_gui_available
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Check host glibc version for Herdr UI
+  ansible.builtin.command: getconf GNU_LIBC_VERSION
+  register: herdr_gui_libc
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine Herdr UI package compatibility
+  ansible.builtin.set_fact:
+    herdr_gui_supported: >-
+      {{ ansible_facts['os_family'] == 'Debian'
+         and target_architecture in ['x86_64', 'aarch64', 'arm64']
+         and not (gui_apps_linux_no_root | bool)
+         and herdr_gui_libc.rc == 0
+         and (herdr_gui_libc.stdout | regex_replace('^glibc ', '') is version('2.39', '>=')) }}
+
+- name: Explain unsupported Herdr UI hosts
+  when: not (herdr_gui_supported | bool)
+  ansible.builtin.debug:
+    msg: "Herdr UI skipped: automatic install requires Debian/Ubuntu, glibc 2.39+, x64/arm64 and sudo. Use a supported desktop client over SSH."
+
+- name: Install missing Herdr UI from a verified stable Debian package
+  when:
+    - herdr_gui_supported | bool
+    - herdr_gui_available.rc != 0
+    - not ansible_check_mode
+  tags: [sudo]
+  block:
+    - name: Get latest stable Herdr UI release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/penso/herdr-gpui/releases/latest
+        return_content: true
+      register: herdr_gui_release
+
+    - name: Select Herdr UI Debian asset
+      ansible.builtin.set_fact:
+        herdr_gui_assets: >-
+          {{ herdr_gui_release.json.assets
+             | selectattr('name', 'match', '^Herdr-.*-' ~
+               ('x86_64' if target_architecture == 'x86_64' else 'aarch64') ~
+               '-unknown-linux-gnu\.deb$') | list }}
+
+    - name: Require exactly one matching Herdr UI package
+      ansible.builtin.assert:
+        that: herdr_gui_assets | length == 1
+        fail_msg: "Latest Herdr UI release has no unique matching Debian asset"
+
+    - name: Create private Herdr UI download directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: herdr-ui-
+      register: herdr_gui_tmp
+
+    - name: Download Herdr UI with upstream SHA-256 verification
+      ansible.builtin.get_url:
+        url: "{{ herdr_gui_assets[0].browser_download_url }}"
+        dest: "{{ herdr_gui_tmp.path }}/herdr-ui.deb"
+        checksum: "sha256:{{ herdr_gui_assets[0].browser_download_url }}.sha256"
+        mode: '0644'
+
+    - name: Allow apt sandbox to read the verified package
+      ansible.builtin.file:
+        path: "{{ herdr_gui_tmp.path }}"
+        mode: '0755'
+
+    - name: Install verified Herdr UI Debian package and runtime dependencies
+      become: true
+      ansible.builtin.apt:
+        deb: "{{ herdr_gui_tmp.path }}/herdr-ui.deb"
+        state: present
+  rescue:
+    - name: Report Herdr UI installation failure
+      ansible.builtin.debug:
+        msg: "Herdr UI installation failed: {{ ansible_failed_result.msg | default('see task output') }}. Skipping; retry on a later apply."
+  always:
+    - name: Remove Herdr UI temporary downloads
+      when: herdr_gui_tmp.path is defined
+      ansible.builtin.file:
+        path: "{{ herdr_gui_tmp.path }}"
+        state: absent

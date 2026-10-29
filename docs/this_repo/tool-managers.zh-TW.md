@@ -1091,6 +1091,7 @@ agent-specific 升級路徑。
 | **grc** | brew | apt | devtools |
 | **gum** | brew | GitHub release | devtools |
 | **herdr** | GitHub release single binary → `~/.local/bin/herdr` (**not brew** — see note) | GitHub release single binary → `~/.local/bin/herdr` | devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**) |
+| **herdr-gpui** | penso/tap/herdr-gpui cask; macOS 14.2+ | SHA-256 verified stable .deb; glibc 2.39+, x64/arm64, sudo | GUI bundle; apply installs missing copies only |
 | **herdr-plus** (herdr plugin) | `herdr plugin install cloudmanic/herdr-plus` (prebuilt binary when no Go; idempotent ansible task) | same | devtools |
 | **Homebrew** | curl installer | same (Linux, gated) | bootstrap |
 | **htop** | brew | apt | devtools |

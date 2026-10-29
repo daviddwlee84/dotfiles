@@ -53,6 +53,7 @@ Ubuntu 對桌面應用 (desktop apps) 有**五種**打包機制 (packaging mecha
 | **Steam** | Valve apt repo（`steam-launcher`），由 `installGamingApps=true` 與 x86_64 控制 | ✅ launcher/runtime 套件透過 apt；Steam client 啟動時自我更新 | 同 role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
 | **Zen Browser** | AppImage 固定放在 `~/.local/opt/zen/zen.AppImage`（不在 AppImageLauncher 監看目錄）；launcher 用 `APPIMAGELAUNCHER_DISABLE=1` 避免執行時再次整合 | ❌ —— 覆寫固定 AppImage 後重跑 role | 同 role | `~/.local/opt/zen/zen.AppImage`；舊的 `~/Applications/zen*.AppImage` 會遷移一次。profile 在 `~/.zen/` |
 | **Alacritty** | `cargo install alacritty`；desktop entry 的 `TryExec`/`Exec` 使用絕對路徑，避免 GNOME 登入環境沒有 cargo PATH 時隱藏它 | ❌ —— `just upgrade-cargo` | [`gui_apps_linux` role](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) | `~/.cargo/bin/alacritty` |
+| **Herdr UI** | 上游 stable `.deb`，核對 SHA-256；`installBrewApps` | App Updates（PolicyKit）或官方安裝器 | `gui_apps_linux/tasks/herdr-gui.yml` | x64/ARM64、glibc 2.39+、sudo；[Herdr UI](../tools/herdr.zh-TW.md) |
 | **AppImageLauncher** | `.deb`（22.04 用 PPA、24.04 用 GitHub release） | ✅ 透過 apt | 同 role | system + `appimagelauncherd.service`（user） |
 | **Bitwarden CLI** (`bw`) | 透過 mise 用 npm 安裝（由 `installBitwarden=true` 控制） | ❌ —— `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
 | **Bitwarden Desktop** | Snap (`bitwarden`) → 若 `snap` 不可用則退回 `.deb`；由 `installBitwarden=true` AND `profile=ubuntu_desktop` 控制 | ✅ 透過 `snapd` 背景重整（後備 `.deb` 則 `apt upgrade`） | 同 role | `/snap/bitwarden/current/` |

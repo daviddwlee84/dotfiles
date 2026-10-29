@@ -640,3 +640,31 @@ command is unavailable (including older dev versions).
 The shared SSH setup helper follows nested Includes and adds an exact Include for
 a newly selected file, so wiring one file does not activate dormant neighbors.
 Legacy directory-level helper subcommands remain available for existing callers.
+
+
+## Herdr UI (native GUI client)
+
+[Herdr UI](https://github.com/penso/herdr-gpui) is a separate client for the
+existing Herdr daemon. TUI and GUI can share sessions; closing the GUI leaves
+terminal sessions running. The UI installer never installs or upgrades the
+Herdr daemon. GUI preferences remain app-owned; apply does not launch the app
+or enable launch at login.
+
+- macOS: follows `installBrewApps`; Homebrew cask `penso/tap/herdr-gpui`,
+  Apple Silicon / Intel, macOS 14.2+. Older macOS skips this cask. Open with
+  `open -a Herdr`, or use the `herdr-gpui` CLI.
+- Ubuntu/Debian desktop: `profile=ubuntu_desktop` and `installBrewApps=true`.
+  Requires glibc 2.39+ (Ubuntu 24.04 / Debian 13 or newer), x86_64 or ARM64,
+  and sudo. Ansible downloads the latest stable `.deb`, verifies its upstream
+  SHA-256 and installs via apt with runtime dependencies. noRoot, older libc
+  and unsupported architectures skip with a message. Vulkan drivers must be
+  available for the GPU. Launch `herdr-gpui` or the application-menu entry.
+- Apply installs missing copies only; existing PATH installations are preserved.
+  macOS upgrades through Homebrew (`brew upgrade --cask penso/tap/herdr-gpui`);
+  Linux uses the app's App Updates panel (PolicyKit authentication agent and
+  `pkexec` required). Manual Linux updates can use the
+  [official installer](https://herdrui.dev/install.sh).
+- Fedora/Arch/Nix installations are manual: see the
+  [official installation guide](https://github.com/penso/herdr-gpui#install).
+  Headless hosts keep running the daemon; use a GUI client on a desktop over SSH.
+- `just upgrade-herdr` remains the daemon upgrade command; it does not upgrade UI.

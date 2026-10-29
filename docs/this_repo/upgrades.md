@@ -241,3 +241,5 @@ Keep the return-value contract: `0` = success, `77` = skipped (prerequisite miss
 - [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) — the sudo-session helper reused for macOS cask installers.
 - [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl) — the `refreshPeriod` entries that `upgrade-externals` force-refreshes.
 - Ansible role defaults consumed for enumeration: [`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml), [`go_tools`](../../dot_ansible/roles/go_tools/defaults/main.yml), [`python_uv_tools`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml), [`llm_tools`](../../dot_ansible/roles/llm_tools/defaults/main.yml), [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml).
+
+Herdr UI follows its own package owner: macOS Homebrew; Linux App Updates (PolicyKit) or the official installer. Apply only installs missing copies. `just upgrade-herdr` remains daemon-only. See [Herdr UI](../tools/herdr.md#herdr-ui-native-gui-client).

@@ -604,3 +604,26 @@ Television SSH channel 優先使用 `dev ssh list --format tsv` 的 active alias
 dev 不可用或版本尚無 machine-management command 時，退回 flat／群組檔案的顯示型掃描。共用 SSH setup helper 追蹤
 巢狀 Include，為新選定檔案加入精確 Include，不會順便啟用相鄰的休眠檔案。
 原有以目錄為單位的 helper 子命令仍保留供既有呼叫者使用。
+
+
+## Herdr UI（原生 GUI client）
+
+[Herdr UI](https://github.com/penso/herdr-gpui) 是既有 Herdr daemon 的獨立圖形介面。
+TUI 與 GUI 可共用 session，關閉 GUI 不會結束終端 session。GUI 安裝器不會安裝或
+升級 Herdr daemon。GUI 偏好設定由應用程式管理；apply 不啟動應用程式，也不開啟登入自啟。
+
+- macOS：隨 `installBrewApps` 安裝 Homebrew cask `penso/tap/herdr-gpui`；
+  支援 Apple Silicon／Intel，需要 macOS 14.2+，舊版直接跳過。以 `open -a Herdr`
+  或 `herdr-gpui` 啟動。
+- Ubuntu/Debian 桌面：需要 `profile=ubuntu_desktop` 與 `installBrewApps=true`、
+  glibc 2.39+（Ubuntu 24.04／Debian 13 起）、x86_64／ARM64 及 sudo。
+  Ansible 下載最新 stable `.deb`，核對上游 SHA-256 後交給 apt 安裝相依套件。
+  noRoot、舊 libc、不支援架構會說明並跳過。GPU 需有 Vulkan driver；從應用程式選單
+  或 `herdr-gpui` 啟動。
+- apply 僅補裝，保留 PATH 上既有安裝。macOS 透過 Homebrew 更新
+  （`brew upgrade --cask penso/tap/herdr-gpui`）；Linux 使用 App Updates
+  （需要 `pkexec` 與桌面 PolicyKit 認證代理），也可手動執行
+  [官方安裝器](https://herdrui.dev/install.sh) 更新。
+- Fedora／Arch／Nix 請依[官方安裝指南](https://github.com/penso/herdr-gpui#install)
+  手動安裝；無桌面主機保留 daemon，由桌面 GUI 透過 SSH 連線。
+- `just upgrade-herdr` 仍只負責 daemon 升級。
