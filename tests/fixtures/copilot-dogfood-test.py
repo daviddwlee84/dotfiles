@@ -72,7 +72,8 @@ class DogfoodTest(unittest.TestCase):
 
         def capture(*args, **kwargs):
             process = original(*args, **kwargs)
-            owned.append(process)
+            if kwargs.get("start_new_session"):
+                owned.append(process)
             return process
 
         try:
@@ -86,6 +87,20 @@ class DogfoodTest(unittest.TestCase):
             self.assertIsNone(sibling.poll())
         finally:
             dogfood.terminate(sibling)
+
+    def test_darwin_eperm_requires_independent_empty_group_evidence(self):
+        process = unittest.mock.Mock(pid=12345)
+        for listing, empty in [(" 12345\n 77\n", False), (" 77\n", True)]:
+            with patch.object(dogfood.sys, "platform", "darwin"), \
+                 patch.object(dogfood.os, "killpg", side_effect=[None, PermissionError(), PermissionError()]), \
+                 patch.object(dogfood.time, "monotonic", side_effect=[0, 0, 99]), \
+                 patch.object(dogfood.time, "sleep"), \
+                 patch.object(dogfood.subprocess, "run", return_value=unittest.mock.Mock(stdout=listing)):
+                if empty:
+                    dogfood.terminate(process)
+                else:
+                    with self.assertRaises(PermissionError):
+                        dogfood.terminate(process)
 
     def test_exited_leader_does_not_leave_its_descendant_running(self):
         script = ("import subprocess,sys; p=subprocess.Popen([sys.executable,'-c',"

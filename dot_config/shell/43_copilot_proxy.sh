@@ -951,6 +951,62 @@ _copilot_alive() {
 
 # --- doctor helpers -------------------------------------------------------------
 
+# Offline check: the fork routes Claude Code's pure WebSearch requests through
+# its own model, independently of the launcher's main/role model settings.
+# Return only selected diagnostic fields, never the config's auth/providers.
+_copilot_web_search_check() {
+  local config="${COPILOT_API_HOME:-$HOME/.local/share/copilot-api}/config.json"
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' '{"state":"unknown","message":"unverified (jq is unavailable)"}'
+    return
+  fi
+  if [ "$(_copilot_pkg_flavor)" = original ]; then
+    printf '%s\n' '{"state":"skip","message":"unsupported by the original copilot-api package"}'
+    return
+  fi
+  if [ ! -r "$config" ]; then
+    printf '%s\n' '{"state":"unknown","message":"unverified (backend config is absent or unreadable)"}'
+    return
+  fi
+  command jq -n --slurpfile configs "$config" --arg catalog "${1:-}" '
+    def result($state; $message): {state: $state, message: $message};
+    if ($configs | length) != 1 or ($configs[0] | type) != "object" then
+      result("unknown"; "unverified (backend config must be one JSON object)")
+    else $configs[0] as $c |
+      if ($c | has("messageApiWebSearchModel") | not) then
+        result("unknown"; "unverified (search model omitted; backend default is version-dependent)")
+      elif ($c.messageApiWebSearchModel | type) != "string" then
+        result("unknown"; "unverified (search model is not a string)")
+      elif ($c.messageApiWebSearchModel | test("^\\s*$")) then
+        result("skip"; "disabled (empty messageApiWebSearchModel)")
+      elif ($c.messageApiWebSearchModel | contains("/")) then
+        result("unknown"; "provider search model configured; native provider search capability is unverified")
+      elif $c.useResponsesApiWebSearch == false then
+        result("skip"; "disabled (useResponsesApiWebSearch=false)")
+      elif ($c | has("useResponsesApiWebSearch")) and
+           $c.useResponsesApiWebSearch != null and
+           ($c.useResponsesApiWebSearch | type) != "boolean" then
+        result("unknown"; "unverified (useResponsesApiWebSearch is not a boolean)")
+      else $c.messageApiWebSearchModel as $model |
+        (try ($catalog | fromjson) catch null) as $models |
+        if ($models.data | type) != "array" then
+          result("unknown"; "unverified (model catalog unavailable)")
+        else [$models.data[] | select(.id == $model)] as $matches |
+          if ($matches | length) == 0 then
+            result("bad"; $model + " is not served; WebSearch can fail with model_not_available_for_integrator")
+          elif ($matches[0].supported_endpoints | type) != "array" then
+            result("unknown"; $model + " is listed; Responses capability is unverified")
+          elif ($matches[0].supported_endpoints | any(. == "/responses" or . == "ws:/responses")) then
+            result("ok"; $model + " is listed with Responses support (search execution not probed)")
+          else
+            result("bad"; $model + " does not advertise Responses support for WebSearch")
+          end
+        end
+      end
+    end' 2>/dev/null ||
+    printf '%s\n' '{"state":"unknown","message":"unverified (backend config or catalog could not be parsed)"}'
+}
+
 # Every model id the proxy will accept: the raw `.id` PLUS the `.claude_model_id`
 # alias (which is the one carrying the "[1m]" suffix Claude Code sends). Checking
 # only `.id` — as _copilot_model_list does — would reject a valid "...[1m]" pin.
@@ -1703,6 +1759,23 @@ EOF
           fi
         fi
       fi
+
+      printf '\n%s\n' "WebSearch"
+      local _search_check _search_state _search_detail _search_config
+      _search_check="$(_copilot_web_search_check "$(_copilot_model_catalog 2>/dev/null || true)")"
+      _search_state="$(printf '%s' "$_search_check" | jq -r '.state' 2>/dev/null)"
+      _search_detail="$(printf '%s' "$_search_check" | jq -r '.message' 2>/dev/null)"
+      _search_config="${COPILOT_API_HOME:-$HOME/.local/share/copilot-api}/config.json"
+      case "$_search_state" in
+        ok) _ok "search model" "$_search_detail" ;;
+        bad)
+          _bad "search model" "$_search_detail"
+          _hint "edit messageApiWebSearchModel in $_search_config to a served Responses model; then copilot-proxy restart"
+          ;;
+        skip) _skip "search model" "$_search_detail" ;;
+        *) _note "search model" "${_search_detail:-unverified (jq is unavailable)}" ;;
+      esac
+      _skip "config" "$_search_config (read-only check; independent of copilot-model)"
 
       printf '\n%s\n' "Upstream (GitHub Copilot API)"
       local _sysproxy _r _code _t

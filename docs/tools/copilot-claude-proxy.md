@@ -321,6 +321,14 @@ client policies are functional validation, not a controlled performance comparis
 Trial directories contain private credential/config copies and must not be shared
 or committed wholesale. See the [implementation and measured Ubuntu results](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/copilot-proxy-backend-2-5-2-stability.md).
 
+The 2026-10 Mac follow-up also compared repaired 2.5.2 with verified 2.8.2:
+Messages, tool continuation, Responses streaming, both WebSearch modes and
+Sol Fast passed; native Claude was unavailable in that account. The production
+pin remains 2.5.2. That report also records 2.8.2 startup config migrations.
+Dogfood cleanup handles Darwin's intermittent process-group probe `EPERM`
+only after independently checking group membership; permission errors alone
+never prove that a process has stopped.
+
 ### `copilot-proxy doctor [--live]` (alias: `test`)
 
 Diagnoses the whole path and exits non-zero on any failure. Read-only by default;
@@ -334,7 +342,7 @@ expired IDE token calls for a restart and retry, and rejected stored credentials
 call for `copilot-proxy auth` followed by a restart. It never prints the token.
 
 Sections, in order: prerequisites (`bun`/`curl`/`jq`) → **package** → token file →
-proxy and throttle-shim liveness → stale installer → **models** → upstream
+proxy and throttle-shim liveness → stale installer → **models** → **WebSearch** → upstream
 reachability → local proxy/VPN → **Codex Apps** → live inference probe.
 
 The **package** check reports whether the pinned spec is installed in the prefix
@@ -361,6 +369,40 @@ It validates the main model **and** the Fable/Opus/Sonnet/Haiku aliases against
 the served list, including `[1m]` aliases. A stale background-role id can make
 workflows fail with 400 even while ordinary chat succeeds. No Claude entitlement
 is a warning rather than a failure when the computed OpenAI profile is usable.
+
+The **WebSearch** check reads `messageApiWebSearchModel` from
+`${COPILOT_API_HOME:-$HOME/.local/share/copilot-api}/config.json`. The fork
+uses this independent model for pure Claude Code WebSearch requests, regardless
+of the main model or role aliases selected with `copilot-model`. A configured
+Copilot model absent from the served catalog, or explicitly lacking Responses
+support, is a failure. Empty search-model settings and disabled Responses search
+are shown as disabled; missing/invalid config, provider aliases, unavailable
+catalogs and missing endpoint metadata are shown as unverified. A catalog pass
+does not prove that a real search succeeds. The check never writes config or
+sends inference, including under `--live` (which still adds only the existing
+ordinary chat probe).
+
+### WebSearch returns `model_not_available_for_integrator`
+
+On older fork installations, `messageApiWebSearchModel` can still be
+`gpt-5-mini` after that model disappears from the Copilot catalog. Search then
+returns HTTP 400 mentioning integrator `vscode-chat` even though the header is
+being sent correctly. Run `copilot-proxy doctor`, privately back up the backend
+config, and set **only** `messageApiWebSearchModel` to a served Responses model
+(currently `gpt-6-luna` on the tested account). Wait for active/queued work to
+finish, run `copilot-proxy restart`, then retry WebSearch. `copilot-model` alone
+does not change this backend setting.
+
+The pinned 2.5.2 already supports this repair. Upstream
+[2.6.7](https://github.com/caozhiyuan/copilot-api/releases/tag/v2.6.7) changed
+the default, and
+[2.7.36](https://github.com/caozhiyuan/copilot-api/commit/269421ca75c8fa127ed84c2de337e256d755bd3f)
+added startup migration of exact `gpt-5-mini` values in `alphaSearchModel`,
+`messageApiWebSearchModel` and `claudeAutoModel`; custom/provider IDs and empty
+strings are preserved. Details and measured JSON/streaming reproduction:
+[pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-websearch-model-not-available-for-integrator.md).
+
+### Upstream reachability
 
 Upstream reachability probes both `api.enterprise.githubcopilot.com` and
 `api.githubcopilot.com`, directly *and* through the macOS system proxy when one is

@@ -6,6 +6,63 @@
 **Decision date**: 2026-09-08
 **Related**: `TODO.md`; `dot_config/shell/43_copilot_proxy.sh`; `dot_config/shell/copilot-throttle-shim.js`; user-supplied compact incident notes identified below
 
+## WebSearch repair and 2.8.2 trial — 2026-10-30
+
+The Mac production service remains **2.5.2**. Its stored
+`messageApiWebSearchModel=gpt-5-mini` reproduced HTTP 400
+`model_not_available_for_integrator` for `vscode-chat`. A private 0600 backup
+was retained at
+`~/.local/state/copilot-proxy/backups/config-websearch-20261029T175708Z.json`;
+only that setting was changed to `gpt-6-luna`. After admission showed zero
+active/queued/draining/unknown requests, the deployed wrapper and paired
+backend/shim were restarted. Both original search queries then returned sources
+through the production `:4142` gateway, including a normal streaming
+`message_stop`. `doctor` now checks this independent model without inference or
+config writes. See the [symptom-first pitfall](../pitfalls/copilot-websearch-model-not-available-for-integrator.md).
+
+The separate Mac trial compared repaired 2.5.2 against **2.8.2**, using Node
+26.9.0, Bun 1.3.13 and the same shim
+`1e88b80fec22a815703b0a1a430fea7757955ce61831d561dc8df7fe66a1476b` (SHA-256).
+The candidate was downloaded from canonical npm at exact version 2.8.2,
+SHA-512 verified, installed from that archive, help-smoked, and all 41 packaged
+files compared byte-for-byte with the installed runtime. Candidate SRI:
+`sha512-YRVOVD98Tbfru8osmbPnl25HKFNi2B0BEH/KC41BoW+zyXK3wu973dL5Cl8vtAhtry53EwEG8CnW8yz6DVY6DA==`.
+
+Each version used independent loopback ports, private config/credential copies,
+SQLite and metrics files. Retries were disabled. Fourteen logical requests
+produced fourteen physical dispatches: seven for each version.
+
+| Scenario | 2.5.2 | 2.8.2 |
+|---|---|---|
+| Messages JSON, synthetic expected text | pass | pass |
+| Messages tool call and tool-result continuation (two requests) | pass | pass |
+| Responses stream, expected text and `response.completed` | pass | pass |
+| WebSearch JSON, OpenAI query with actual source | pass | pass |
+| WebSearch stream, Anthropic query with source and `message_stop` | pass | pass |
+| Responses Fast, `gpt-5.6-sol` → `gpt-5.6-sol-fast`, completed stream | pass | pass |
+| Native Claude | unavailable in account catalog | unavailable in account catalog |
+
+Starting 2.8.2 from the old search setting automatically migrated it to
+`gpt-6-luna`; auth and provider settings were preserved. Its startup also changed
+`alphaSearchModel`, `modelMappings` and `opencodeModelContextWindow`, so this is
+not a search-only package change. The first cleanup attempt exposed Darwin's
+intermittent `killpg(..., 0)` EPERM during group shutdown; the verified remaining
+trial backend was stopped, and cleanup now independently checks the process-group
+inventory instead of interpreting EPERM alone as shutdown. The resumed trial
+confirmed all children exited and removed private temporary directories.
+
+**Recommendation:** 2.8.2 passed this bounded gateway compatibility trial and is
+a viable candidate for a separate controlled upgrade. The production pin is
+unchanged. This trial did not launch real Claude Code/Codex UI sessions, exercise
+native Claude, long-context compaction, sustained concurrent load, or Windows.
+Latency numbers from these small requests are not a performance comparison.
+The sanitized local report is `/tmp/copilot-websearch-upgrade-report-20261030.json`;
+credentials and private backend configs are not included in this repository.
+
+Validation: 157/157 Copilot Bats cases (including the expanded eight-test dogfood
+fixture), Bash/Zsh syntax, `git diff --check`, `just docs-build`, deployed
+`copilot-proxy doctor`, and two successful production WebSearch requests.
+
 ## Implementation results — 2026-09-08
 
 Implemented the exact 2.5.2 pin, verified-artifact staging, transport-field/package

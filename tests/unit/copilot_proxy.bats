@@ -51,6 +51,75 @@ teardown() {
   return 0
 }
 
+# Exercise the shared check in both actual shells. curl must never be called;
+# catalog discovery belongs to doctor, and this helper only inspects its input.
+web_search_check() {
+  local config="$1" catalog="$2" expected="$3" shell
+  mkdir -p "$TMP/backend" "$TMP/bin"
+  printf '%s' "$config" >"$TMP/backend/config.json"
+  cp "$TMP/backend/config.json" "$TMP/before.json"
+  printf '%s\n' '#!/bin/sh' 'touch "$PROBE_CALLED"; exit 99' >"$TMP/bin/curl"
+  chmod +x "$TMP/bin/curl"
+  for shell in bash zsh; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    run env COPILOT_API_HOME="$TMP/backend" COPILOT_API_PKG='@jeffreycao/copilot-api@2.5.2' \
+      PROBE_CALLED="$TMP/probe-called" PATH="$TMP/bin:$PATH" "$shell" -c '
+        source "$1"
+        _copilot_web_search_check "$2"
+      ' check "$SHELL_LIB" "$catalog"
+    [ "$status" -eq 0 ]
+    printf '%s' "$output" | jq -e --arg expected "$expected" '.state == $expected'
+    [[ "$output" != *"private-fixture-value"* ]]
+    cmp "$TMP/before.json" "$TMP/backend/config.json"
+    [ ! -e "$TMP/probe-called" ]
+  done
+}
+
+@test "WebSearch validates its own model and Responses capability in both shells" {
+  web_search_check '{"messageApiWebSearchModel":"gpt-6-luna","auth":{"adminApiKey":"private-fixture-value"}}' \
+    '{"data":[{"id":"gpt-6-luna","supported_endpoints":["/responses"]}]}' ok
+  web_search_check '{"messageApiWebSearchModel":"gpt-6-luna"}' \
+    '{"data":[{"id":"gpt-6-luna","supported_endpoints":["ws:/responses"]}]}' ok
+  web_search_check '{"messageApiWebSearchModel":"gpt-5-mini"}' \
+    '{"data":[{"id":"gpt-6-luna","supported_endpoints":["/responses"]}]}' bad
+  [[ "$output" == *"model_not_available_for_integrator"* ]]
+  web_search_check '{"messageApiWebSearchModel":"claude-fixture"}' \
+    '{"data":[{"id":"claude-fixture","supported_endpoints":["/v1/messages"]}]}' bad
+}
+
+@test "WebSearch preserves deliberate disable settings and does not require a catalog" {
+  web_search_check '{"messageApiWebSearchModel":""}' '' skip
+  web_search_check '{"messageApiWebSearchModel":"  "}' '' skip
+  web_search_check '{"messageApiWebSearchModel":"gpt-5-mini","useResponsesApiWebSearch":false}' '' skip
+}
+
+@test "WebSearch reports unknown config, provider routes and missing capabilities honestly" {
+  web_search_check '{}' '{"data":[]}' unknown
+  web_search_check '{"messageApiWebSearchModel":null}' '' unknown
+  web_search_check '{"messageApiWebSearchModel":42}' '' unknown
+  web_search_check '{"messageApiWebSearchModel":"gpt-6-luna","useResponsesApiWebSearch":"false"}' '' unknown
+  web_search_check '{"messageApiWebSearchModel":"custom/gpt-5-mini","providers":{"custom":{"apiKey":"private-fixture-value"}}}' '{"data":[]}' unknown
+  web_search_check '{"messageApiWebSearchModel":"gpt-6-luna"}' '{"data":[{"id":"gpt-6-luna"}]}' unknown
+  web_search_check '{"messageApiWebSearchModel":"gpt-6-luna"}' 'unavailable' unknown
+  web_search_check '{broken' '{"data":[]}' unknown
+  web_search_check '[]' '{"data":[]}' unknown
+  web_search_check '{} {}' '{"data":[]}' unknown
+}
+
+@test "WebSearch uses the alternate backend home and skips the original package" {
+  mkdir -p "$TMP/backend" "$HOME/.local/share/copilot-api"
+  printf '%s' '{"messageApiWebSearchModel":"gpt-5-mini"}' >"$HOME/.local/share/copilot-api/config.json"
+  web_search_check '{"messageApiWebSearchModel":"gpt-6-luna"}' \
+    '{"data":[{"id":"gpt-6-luna","supported_endpoints":["/responses"]}]}' ok
+  run env COPILOT_API_HOME="$TMP/absent" bash -c 'source "$1"; _copilot_web_search_check' check "$SHELL_LIB"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '.state == "unknown"'
+  run env COPILOT_API_HOME="$TMP/backend" COPILOT_API_PKG=copilot-api@0.7.0 \
+    bash -c 'source "$1"; _copilot_web_search_check' check "$SHELL_LIB"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e '.state == "skip"'
+}
+
 write_fake_codex() {
   mkdir -p "$TMP/bin" "$TMP/proj"
   printf '%s\n' \

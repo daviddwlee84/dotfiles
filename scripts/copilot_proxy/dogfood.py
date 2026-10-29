@@ -89,6 +89,18 @@ def terminate(process: subprocess.Popen, grace: float = 8) -> None:
             os.killpg(process.pid, 0)
         except ProcessLookupError:
             return
+        except PermissionError:
+            # Darwin can report EPERM for an empty, recently exited group.
+            # Permission failure alone is not evidence of shutdown: confirm
+            # with an independent process inventory, and fail if it is live.
+            if sys.platform != "darwin":
+                raise
+            listing = subprocess.run(["ps", "-axo", "pgid="], check=True,
+                                     capture_output=True, text=True)
+            if not any(row.strip() == str(process.pid) for row in listing.stdout.splitlines()):
+                return
+            # The signalled group can still be disappearing. Keep waiting;
+            # any genuine permission failure on the final SIGKILL propagates.
         time.sleep(0.05)
     try:
         os.killpg(process.pid, signal.SIGKILL)
