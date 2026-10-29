@@ -58,8 +58,9 @@ unverified; disabled search is not a failure.
 Upstream 2.6.7 changed the default to `gpt-6-luna`. Version 2.7.36 additionally
 migrates exact `gpt-5-mini` values in `alphaSearchModel`,
 `messageApiWebSearchModel` and `claudeAutoModel` at startup, preserving custom
-models and empty strings. This local repair retains the 2.5.2 production pin;
-upgrade compatibility is evaluated separately.
+models and empty strings. The initial local repair retained 2.5.2; after the
+separate compatibility trial, the Mac and built-in pin were explicitly upgraded
+to 2.8.2 with the old generation retained for rollback.
 
 ## Related
 

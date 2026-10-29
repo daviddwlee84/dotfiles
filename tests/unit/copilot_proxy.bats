@@ -345,10 +345,10 @@ JSON
   mkdir -p "$TMP/state/copilot-proxy"
   run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
   [ "$status" -eq 0 ]
-  [ "$output" = "@jeffreycao/copilot-api@2.5.2" ]
+  [ "$output" = "@jeffreycao/copilot-api@2.8.2" ]
   run bash -c "source '$SHELL_LIB'; _copilot_builtin_integrity"
   [ "$status" -eq 0 ]
-  [ "$output" = "sha512-bMVpuniekbKKq0LMtmZZJKjDVpaOODAHs19akwkP/hyGfgcx+YK0X22jfB46lQb0p9EoywDrJMyTcAfLr18jEQ==" ]
+  [ "$output" = "sha512-YRVOVD98Tbfru8osmbPnl25HKFNi2B0BEH/KC41BoW+zyXK3wu973dL5Cl8vtAhtry53EwEG8CnW8yz6DVY6DA==" ]
   printf '%s\n' '{"spec":"@jeffreycao/copilot-api@2.2.0","integrity":"sha512-test"}' > "$TMP/state/copilot-proxy/package.json"
   run bash -c "export XDG_STATE_HOME='$TMP/state'; unset COPILOT_API_PKG; source '$SHELL_LIB'; _copilot_pkg"
   [ "$status" -eq 0 ]
@@ -677,7 +677,7 @@ SH
 
 @test "trusted installation uses the verified archive and ignores a stale manager lock" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  write_update_fakes 2.5.2
+  write_update_fakes 2.8.2
   local digest
   digest="$(openssl dgst -sha512 -binary "$TMP/package.tgz" | openssl base64 -A)"
   mkdir -p "$TMP/data/copilot-api/pkg"
@@ -688,14 +688,14 @@ SH
     _copilot_registry_metadata() { printf '{\"dist\":{\"integrity\":\"%s\",\"tarball\":\"https://fake/package.tgz\"}}' \"\$META_INTEGRITY\"; }
     _copilot_ensure_pkg >/dev/null"
   [ "$status" -eq 0 ]
-  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.5.2" ]
+  [ "$(cat "$TMP/data/copilot-api/pkg/.installed-spec")" = "@jeffreycao/copilot-api@2.8.2" ]
   [[ "$(cat "$TMP/data/copilot-api/pkg/installed-from")" == *'/verified-package.tgz' ]]
   cmp "$TMP/package.tgz" "$TMP/data/copilot-api/pkg/verified-package.tgz"
 }
 
 @test "trusted installation refuses registry metadata that disagrees with the built-in pin" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  write_update_fakes 2.5.2
+  write_update_fakes 2.8.2
   run bash -c "export PATH='$TMP/bin':\"\$PATH\" XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state'
     source '$SHELL_LIB'
     _copilot_registry_metadata() { printf '%s' '{\"dist\":{\"integrity\":\"sha512-tampered\",\"tarball\":\"https://fake/package.tgz\"}}'; }

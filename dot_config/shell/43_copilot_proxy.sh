@@ -72,7 +72,7 @@
 #   COPILOT_API_PKG      default: unset       - temporary highest-priority
 #                                               package override. Otherwise use
 #                                               persisted selection, then built-in
-#                                               @jeffreycao/copilot-api@2.5.2.
+#                                               @jeffreycao/copilot-api@2.8.2.
 #   COPILOT_ASTRA_COMPACT_RATIO default: 0.70 - fraction of live Astra prompt
 #                                               capacity for new client sessions
 #   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
@@ -88,8 +88,8 @@
 # --- shared constants / helpers -------------------------------------------------
 
 _copilot_port() { printf '%s' "${COPILOT_PROXY_PORT:-4141}"; }
-_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.5.2'; }
-_copilot_builtin_integrity() { printf '%s' 'sha512-bMVpuniekbKKq0LMtmZZJKjDVpaOODAHs19akwkP/hyGfgcx+YK0X22jfB46lQb0p9EoywDrJMyTcAfLr18jEQ=='; }
+_copilot_builtin_pkg() { printf '%s' '@jeffreycao/copilot-api@2.8.2'; }
+_copilot_builtin_integrity() { printf '%s' 'sha512-YRVOVD98Tbfru8osmbPnl25HKFNi2B0BEH/KC41BoW+zyXK3wu973dL5Cl8vtAhtry53EwEG8CnW8yz6DVY6DA=='; }
 _copilot_pkg_selection_state() { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/package.json"; }
 _copilot_pkg() {
   if [ -n "${COPILOT_API_PKG:-}" ]; then printf '%s' "$COPILOT_API_PKG"; return; fi
@@ -545,7 +545,7 @@ _copilot_update_exact() {
     return 1
   fi
   printf '%s' "$version" | command grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || {
-    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.5.2)." >&2; return 1; }
+    printf '%s\n' "copilot-proxy: update requires an exact version (for example 2.8.2)." >&2; return 1; }
   spec="@jeffreycao/copilot-api@$version"; prefix="$(_copilot_pkg_prefix)"
   [ "$spec" != "$(_copilot_builtin_pkg)" ] || trusted="$(_copilot_builtin_integrity)"
   command mkdir -p "$(command dirname "$prefix")" || return 1
@@ -592,9 +592,10 @@ _copilot_update_exact() {
 }
 
 # --- throttle + metrics shim (default, in front of the fork) --------------------
-# A tiny Bun reverse proxy that caps concurrent in-flight upstream requests,
-# transparently retries 403/429/500/502/503/504 BEFORE any upstream model body
-# streams — so downstream agents never see transient gateway/throttle failures — and keeps
+# The local Bun gateway caps concurrent in-flight upstream requests,
+# permits one bounded replay of completed 500/502/503 (or classified body-read
+# 408) failures before model output, passes throttles through while adapting,
+# quarantines ambiguous execution instead of replaying it, and keeps
 # a streamed response alive with SSE comment frames while an OpenAI reasoning
 # model thinks (copilot-api withholds headers until the first token and sends no
 # `ping`, so the socket is otherwise silent for minutes and gets reaped; see

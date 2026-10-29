@@ -1,14 +1,88 @@
-# copilot-proxy 2.5.2 upgrade and request stability
+# copilot-proxy upgrade stability and gateway audit
 
-**Status**: shipped — implementation and bounded Ubuntu trial complete; production cutover, natural-usage observation and native Windows validation remain
+**Status**: 2.8.2 pinned and running on the Mac; bounded compatibility and gateway audit passed; long natural sessions and native Windows validation remain
 **Effort**: L
 **Owner**: Unix implementation; Windows mirrors the shared behavior with native package/process handling
 **Decision date**: 2026-09-08
 **Related**: `TODO.md`; `dot_config/shell/43_copilot_proxy.sh`; `dot_config/shell/copilot-throttle-shim.js`; user-supplied compact incident notes identified below
 
+## Production 2.8.2 and gateway review — 2026-10-30
+
+The user explicitly requested committing the repair, then upgrading to latest
+and evaluating whether the outer shim is still needed. The repair and a stable,
+scanned transcript snapshot were committed as `f2e6c876`. Canonical npm and
+GitHub releases both reported **2.8.2**. The exact verified updater staged the
+archive while traffic finished, waited for zero active/queued/draining/unknown
+work, then cut over both backend and gateway. The repo's built-in pin and SRI
+now match the installed 2.8.2 selection.
+
+The previous 2.5.2 generation, consistent database evidence, config and deployed
+wrapper/shim are retained at
+`~/.local/share/copilot-api/pkg.rollback.ZGhEbE`; `copilot-proxy rollback`
+restores that selection offline. Production startup migrated `alphaSearchModel`,
+`modelMappings` and `opencodeModelContextWindow`. The already-repaired
+`messageApiWebSearchModel` stayed `gpt-6-luna`, and the host's explicit
+`useResponsesApiWebSocket=false` was preserved. Both original WebSearch queries
+returned sources after cutover; JSON, streaming `message_stop`, and Sol Fast
+`response.completed` all passed. No native Claude models were available to test.
+
+### Is the shim still justified?
+
+**Keep the behavior boundary for now, reduce the accumulated implementation.**
+The file has grown to about 1,940 lines and mixes three responsibilities:
+admission/recovery policy, Responses compatibility, and telemetry. Native 2.8.2
+now implements zstd decompression, empty namespace descriptions and request
+timing/events, so those are real overlaps. It still does not replace the whole
+gateway's semantics. The [current capability table](../docs/tools/copilot-claude-proxy.md#why-the-gateway-still-exists-with-282)
+records ownership and removal criteria.
+
+To make the distinction reproducible, run:
+
+```sh
+bun tests/fixtures/copilot-native-2-8-2-audit.mjs
+```
+
+This imports the actual installed 2.8.2 handler with synthetic in-memory tokens,
+an isolated config/SQLite directory, and a loopback-only fake upstream. It makes
+**zero external inference requests**. Results on Bun 1.3.13:
+
+| Native-handler scenario | Observed behavior |
+|---|---|
+| zstd Responses request | decoded successfully |
+| Empty `namespace.description` | replaced by namespace name |
+| Empty `mcp_list_tools` description | forwarded unchanged; known Copilot strict-schema gap remains |
+| `service_tier=fast` | stripped; requested model unchanged |
+| Fake upstream waits 200 ms before headers | client headers awaited that upstream delay (208 ms observed) |
+| HTTP 200 carrying terminal `response.failed` | native `request.end.outcome` was `completed` |
+| Three concurrent delayed calls | all three reached the fake upstream concurrently |
+
+These are mechanism/parity checks, not measurements of live GitHub performance
+or throttle behavior. The native plugin API offers asynchronous observation
+events and bounded delivery queues; it has no blocking admission or payload
+filter hook. Native timing is a useful future source, but it cannot replace the
+gateway's terminal-outcome and physical-attempt evidence unchanged.
+
+Recommended next work is recorded in TODO: separate admission, compatibility and
+telemetry; remove a workaround only when the pinned native version passes its
+parity case; prefer upstream support over adding another repair here. Do not
+disable the gateway merely because ordinary requests succeed directly. This
+upgrade leaves the shared shim bytes and its Unix/Windows parity untouched.
+
+Upstream evidence (pinned tag):
+[Responses handler](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/routes/responses/handler.ts),
+[zstd middleware](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/lib/zstd-request.ts),
+[Copilot transport](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/services/copilot/create-responses.ts),
+[request outcomes](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/lib/request-events.ts),
+[plugin API](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/lib/types/gateway-plugins.ts).
+
+Validation: 157/157 Copilot Bats cases for the new pin, native audit fixture,
+Bash/Zsh syntax, ShellCheck, deployed doctor, documentation build, and the three
+post-upgrade production requests above. No full client UI, long-context or
+Windows stability claim is made from this smoke test.
+
 ## WebSearch repair and 2.8.2 trial — 2026-10-30
 
-The Mac production service remains **2.5.2**. Its stored
+The initial repair kept the Mac production service on **2.5.2**. Its stored
 `messageApiWebSearchModel=gpt-5-mini` reproduced HTTP 400
 `model_not_available_for_integrator` for `vscode-chat`. A private 0600 backup
 was retained at

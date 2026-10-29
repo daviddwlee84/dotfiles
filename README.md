@@ -221,7 +221,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 
 ### Config Files
 
-- Copilot agent launchers — `claude-copilot-once` / `codex-copilot-once` inject one-session settings; `--specstory-mode exit` exports history after exit. Persistent Claude routing is an explicit `copilot-here on` operation. `copilot-proxy doctor` also checks the independent WebSearch model against the served Responses catalog ([guide](docs/tools/copilot-claude-proxy.md)).
+- Copilot agent launchers — the verified backend pin is `@jeffreycao/copilot-api@2.8.2`; `claude-copilot-once` / `codex-copilot-once` inject one-session settings, and `--specstory-mode exit` exports history after exit. Persistent Claude routing is an explicit `copilot-here on` operation. `copilot-proxy doctor` also checks the independent WebSearch model against the served Responses catalog ([guide](docs/tools/copilot-claude-proxy.md)).
 
 - `~/.ssh/config` and `~/.ssh/config.d/{git,common}/` — create-only grouped seeds on new machines, with explicit Include order and four-space indentation. Existing layouts are preserved; optional `dev ssh format` / `organize` provide reviewed cleanup ([guide](docs/tutorials/setup_ssh_key_on_remote.md#grouped-ssh-configuration-and-dev-integration)).
 

@@ -160,7 +160,7 @@ remains available, but inherited temporary-proxy metadata requires a compatible 
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
 | `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` uses a detected proxy, or direct only when none is configured; `always` requires a proxy; `never` clears inherited proxy variables for direct access; or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
-| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.5.2` pin. While set, update/rollback refuse to change persisted state. |
+| `COPILOT_API_PKG` | unset | Highest-priority temporary package override. Otherwise the persisted exact selection is used, then the built-in `@jeffreycao/copilot-api@2.8.2` pin. While set, update/rollback refuse to change persisted state. |
 | `COPILOT_ASTRA_COMPACT_RATIO` | `0.70` | New Astra sessions/pins compact against this fraction of the live prompt ceiling; numeric `0 < ratio <= 1`. Explicit client compact settings take precedence. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_SHIM_MIN` | `4` | adaptive concurrency floor and startup limit |
@@ -277,9 +277,9 @@ verifies the downloaded SHA-512 archive, installs **that same local archive**,
 checks the installed version and runs a help smoke test before touching the live
 prefix. Trusted first installs use the same artifact path; stale manager locks
 cannot vouch for different runtime bytes. The built-in target is
-[`@jeffreycao/copilot-api@2.5.2`](https://github.com/caozhiyuan/copilot-api/releases/tag/v2.5.2),
-SRI `sha512-bMVpuniekbKKq0LMtmZZJKjDVpaOODAHs19akwkP/hyGfgcx+YK0X22jfB46lQb0p9EoywDrJMyTcAfLr18jEQ==`.
-An existing selection remains authoritative until `copilot-proxy update 2.5.2`.
+[`@jeffreycao/copilot-api@2.8.2`](https://github.com/caozhiyuan/copilot-api/releases/tag/v2.8.2),
+SRI `sha512-YRVOVD98Tbfru8osmbPnl25HKFNi2B0BEH/KC41BoW+zyXK3wu973dL5Cl8vtAhtry53EwEG8CnW8yz6DVY6DA==`.
+An existing selection remains authoritative until `copilot-proxy update 2.8.2`.
 
 Update retains a private `pkg.rollback.*` generation containing the previous
 package/selection, backend config, consistent backend/metrics SQLite images,
@@ -321,13 +321,53 @@ client policies are functional validation, not a controlled performance comparis
 Trial directories contain private credential/config copies and must not be shared
 or committed wholesale. See the [implementation and measured Ubuntu results](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/copilot-proxy-backend-2-5-2-stability.md).
 
-The 2026-10 Mac follow-up also compared repaired 2.5.2 with verified 2.8.2:
+The 2026-10 Mac follow-up compared repaired 2.5.2 with verified 2.8.2:
 Messages, tool continuation, Responses streaming, both WebSearch modes and
-Sol Fast passed; native Claude was unavailable in that account. The production
-pin remains 2.5.2. That report also records 2.8.2 startup config migrations.
+Sol Fast passed; native Claude was unavailable in that account. The Mac was
+then explicitly upgraded to 2.8.2 with a retained 2.5.2 rollback generation;
+production JSON/streaming WebSearch and Responses Fast passed after cutover.
+That report also records 2.8.2 startup config migrations.
 Dogfood cleanup handles Darwin's intermittent process-group probe `EPERM`
 only after independently checking group membership; permission errors alone
 never prove that a process has stopped.
+
+### Why the gateway still exists with 2.8.2
+
+The historical "shim" is now a gateway with admission, compatibility and
+observation responsibilities, about 1,940 lines. It has accumulated overlapping
+work, but removing the whole layer currently changes working behavior:
+
+| Responsibility | Native 2.8.2 coverage | Decision |
+|---|---|---|
+| Decode Codex zstd | Implemented on Responses routes | Upstream owns decompression; the gateway still decodes when it must inspect/rewrite a body |
+| Repair blank tool descriptions | Repairs empty `namespace` descriptions only | Keep the general MCP/function repair until upstream handles missing/blank descriptions too |
+| Codex Fast tier → fast sibling | Copilot path deletes `service_tier` without changing the model | Keep the live-catalog mapping |
+| Concurrent request admission and uncertain-work tracking | Quota headers are logged; no equivalent configurable admission gate | Keep bounded admission, draining and quarantine policy |
+| SSE heartbeat while waiting for HTTP upstream headers | HTTP Responses flow awaits upstream headers before returning SSE | Keep the early heartbeat; this host retains HTTP transport |
+| Request timing and usage | Native first-token/duration/outcome metrics and event plugins exist | Prefer native timing as the future source; avoid maintaining two equivalent telemetry systems |
+| Semantic failure and retry evidence | Native request-end outcome uses HTTP status/body completion | Keep terminal-event classification and physical-attempt evidence until equivalent upstream coverage exists |
+
+This was checked against the installed package with
+`bun tests/fixtures/copilot-native-2-8-2-audit.mjs`. It runs the actual Hono
+handler against a loopback fake with synthetic credentials, independent config
+and SQLite, and zero external inference. It confirms native zstd/namespace
+handling, unchanged blank MCP descriptions, stripped Fast tier, and an HTTP-200
+`response.failed` stream reported as `completed` by the native request-end event.
+A deliberately delayed fake also confirms that HTTP response headers are awaited;
+its timing is not a production latency measurement.
+
+The next refactor should separate admission, Responses compatibility and
+telemetry, then remove each workaround when a pinned upstream version passes its
+parity case. Do not add another protocol repair to the same file without that
+ownership/removal check. Native plugins currently expose asynchronous observation
+events, not blocking request filters, so moving the whole gateway into a plugin
+is not a supported replacement. No gateway behavior was removed during this
+upgrade.
+
+Upstream references: [Responses handler](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/routes/responses/handler.ts),
+[Copilot transport](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/services/copilot/create-responses.ts),
+[request outcomes](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/lib/request-events.ts),
+[plugin API](https://github.com/caozhiyuan/copilot-api/blob/v2.8.2/src/lib/types/gateway-plugins.ts).
 
 ### `copilot-proxy doctor [--live]` (alias: `test`)
 
@@ -393,7 +433,7 @@ config, and set **only** `messageApiWebSearchModel` to a served Responses model
 finish, run `copilot-proxy restart`, then retry WebSearch. `copilot-model` alone
 does not change this backend setting.
 
-The pinned 2.5.2 already supports this repair. Upstream
+The former 2.5.2 pin already supported this repair. Upstream
 [2.6.7](https://github.com/caozhiyuan/copilot-api/releases/tag/v2.6.7) changed
 the default, and
 [2.7.36](https://github.com/caozhiyuan/copilot-api/commit/269421ca75c8fa127ed84c2de337e256d755bd3f)
