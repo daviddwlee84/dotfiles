@@ -1,5 +1,5 @@
 # https://docs.astral.sh/uv/concepts/configuration-files/
-{{- with .uvCacheDir }}
+{{- with (dig "uvCacheDir" "" .) }}
 
 # Per-machine cache location (chezmoi data `uvCacheDir`, set in ~/.config/chezmoi/chezmoi.toml).
 # Keep it on the same filesystem as the projects so uv hardlinks from the cache instead of
