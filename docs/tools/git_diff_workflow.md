@@ -71,6 +71,7 @@ bat never reads `.tmTheme` at runtime — only the bincode cache under `~/.cache
 
 ## References
 
+- [gh-dash cheat-sheet](gh-dash.md) — views, search, keys, Herdr hotkeys
 - [diffnav](https://github.com/dlvhdr/diffnav)
 - [gh-dash docs](https://www.gh-dash.dev/getting-started/)
 - [LazyGit custom diff renderers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_DiffRenderers.md)

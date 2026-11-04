@@ -75,6 +75,7 @@ bat 執行期並不讀取 `.tmTheme`，只讀 `~/.cache/bat` 底下由 `bat cach
 
 ## 參考資料
 
+- [gh-dash 速查](gh-dash.md) — view、搜尋、快捷鍵、Herdr 熱鍵
 - [diffnav](https://github.com/dlvhdr/diffnav)
 - [gh-dash docs](https://www.gh-dash.dev/getting-started/)
 - [LazyGit custom diff renderers](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_DiffRenderers.md)

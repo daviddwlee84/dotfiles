@@ -343,6 +343,7 @@ nav:
           - git diff workflow: tools/git_diff_workflow.md
           - lazygit (branch insights + history surgery): tools/lazygit.md
           - GitHub CLI (gh) auth: tools/gh-cli.md
+          - gh-dash (PR / issue / notification TUI): tools/gh-dash.md
           - pre-commit: tools/pre-commit.md
           - actionlint (GitHub Actions linter): tools/actionlint.md
           - Infrastructure-as-Code: tools/infrastructure-as-code.md

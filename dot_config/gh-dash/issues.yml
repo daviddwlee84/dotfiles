@@ -1,0 +1,8 @@
+# ~/.config/gh-dash/issues.yml — open gh-dash on the issues view (managed by chezmoi).
+# Launch: gh dash --config ~/.config/gh-dash/issues.yml   (Herdr: see docs/tools/gh-dash.md)
+# Everything else comes from config.yml; this file wins only for keys it sets.
+# Note: --config bypasses a repo-local .gh-dash.yml.
+include:
+  - ./config.yml
+defaults:
+  view: issues

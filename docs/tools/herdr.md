@@ -174,6 +174,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` / `Alt + g` | lazygit temporary pane (a near-full popup was rejected because it blocks tab/workspace switching until closed) | command pane |
+| `prefix + Alt + p` / `Alt + i` / `Alt + n` | [gh-dash](gh-dash.md) temporary pane on the **PRs** / **issues** / **notifications** view, scoped to the focused pane's repo (`t` toggles) | command pane |
 | `prefix + S` | [Sidecar](td_sidecar.md) to the right of the focused pane, 50/50, in its current directory; focus moves to Sidecar | command pane |
 | `prefix + Alt + c` / `Alt + x` | claude / codex **+ SpecStory**, split right ([details](#open-agent)) | detached command |
 | `prefix + Alt + t` | claude **+ SpecStory** in a new tab | detached command |

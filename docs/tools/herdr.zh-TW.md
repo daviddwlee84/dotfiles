@@ -170,6 +170,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + shift + b` | 新 git worktree（從 `prefix + shift + g` 移過來） | rebound |
 | `prefix + d` | [`dev`](https://github.com/daviddwlee84/dev-cli) repository/task/worktree dashboard | command pane |
 | `prefix + G` / `Alt + g` | lazygit 暫時 pane（近全螢幕 popup 會阻止切 tab/workspace，因此試用後移除） | command pane |
+| `prefix + Alt + p` / `Alt + i` / `Alt + n` | [gh-dash](gh-dash.md) 暫時 pane，分別開在 **PR** / **Issue** / **通知** view，預設只看當前 pane 的 repo（`t` 切換） | command pane |
 | `prefix + Y` | 在聚焦 pane cwd 開啟 [Yazi](yazi.md) 檔案管理員；按 `q` 回到不變的 layout | 90% × 85% popup |
 | `prefix + M` | btop 系統監控器 | command pane |
 | `prefix + N` | nvtop GPU 監控器 | command pane |

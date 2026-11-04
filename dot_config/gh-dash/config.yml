@@ -1,2 +1,8 @@
+# ~/.config/gh-dash/config.yml — global gh-dash config (managed by chezmoi).
+# Source: dot_config/gh-dash/config.yml
+#
+# This is the SSOT. issues.yml / notifications.yml `include` it and only
+# change `defaults.view` (gh-dash has no CLI flag for the start view). Herdr
+# binds prefix+Alt+p/i/n to the three entry points. Doc: docs/tools/gh-dash.md
 pager:
   diff: "diffnav"

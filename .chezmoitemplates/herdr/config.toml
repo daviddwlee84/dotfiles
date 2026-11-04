@@ -153,6 +153,31 @@ type = "pane"
 command = "lazygit"
 description = "lazygit (temporary pane)"
 
+# gh-dash (GitHub PR / issue / notification dashboard) — same temporary-pane form
+# as lazygit, for the same reason (a popup is session-modal). It runs in the
+# focused pane's cwd, so gh-dash's smart filtering scopes it to that repo (`t`
+# toggles). gh-dash has no start-view flag, so issues/notifications use thin
+# configs that `include` config.yml. prefix+P is built-in rename_pane, and bare
+# Alt+P/I belong to shell tv channels, hence the prefix+alt family.
+# See docs/tools/gh-dash.md.
+[[keys.command]]
+key = "prefix+alt+p"
+type = "pane"
+command = "gh dash"
+description = "gh-dash: pull requests (temporary pane)"
+
+[[keys.command]]
+key = "prefix+alt+i"
+type = "pane"
+command = "gh dash --config ~/.config/gh-dash/issues.yml"
+description = "gh-dash: issues (temporary pane)"
+
+[[keys.command]]
+key = "prefix+alt+n"
+type = "pane"
+command = "gh dash --config ~/.config/gh-dash/notifications.yml"
+description = "gh-dash: notifications (temporary pane)"
+
 # Yazi is intentionally a popup: this is a quick, modal filesystem operation
 # from an agent pane. It starts in the focused pane's cwd; quitting returns to
 # the unchanged layout and does not attempt to change the source shell's cwd.

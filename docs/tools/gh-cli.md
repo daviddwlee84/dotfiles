@@ -142,4 +142,5 @@ Set `GHREPO_ROOT` / `GLREPO_ROOT` to clone into a fixed repo root instead of the
 
 - [chezmoi prefixes](chezmoi-prefixes.md) — `modify_` / `create_` / `_remove` semantics in this repo
 - [Agent overlays](agent-overlays.md) — the same modify_ pattern applied to Claude / OpenCode / Codex / Cursor configs
+- [gh-dash](gh-dash.md) — PR / issue / notification dashboard (`gh dash`), keys and Herdr hotkeys
 - [git diff workflow](git_diff_workflow.md) — how this repo uses `gh pr diff`, delta, `gh-dash`, etc.

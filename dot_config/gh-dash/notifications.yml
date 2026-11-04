@@ -1,0 +1,8 @@
+# ~/.config/gh-dash/notifications.yml — open gh-dash on the notifications view (managed by chezmoi).
+# Launch: gh dash --config ~/.config/gh-dash/notifications.yml   (Herdr: see docs/tools/gh-dash.md)
+# Everything else comes from config.yml; this file wins only for keys it sets.
+# Note: --config bypasses a repo-local .gh-dash.yml.
+include:
+  - ./config.yml
+defaults:
+  view: notifications

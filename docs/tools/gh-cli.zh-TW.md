@@ -142,4 +142,5 @@ repo 清單會**快取**在 `~/.cache/tv/`（stale-while-revalidate；`GHREPO_CA
 
 - [chezmoi prefixes](chezmoi-prefixes.md) — 本 repo 裡 `modify_` / `create_` / `_remove` 的語意
 - [Agent overlays](agent-overlays.md) — 同一個 modify_ 模式套在 Claude / OpenCode / Codex / Cursor configs
+- [gh-dash](gh-dash.md) — PR / Issue / 通知儀表板（`gh dash`）、快捷鍵與 Herdr 熱鍵
 - [git diff workflow](git_diff_workflow.md) — 本 repo 怎麼用 `gh pr diff`、delta、`gh-dash` 等
