@@ -53,12 +53,31 @@ from the environment inherited by system binaries**, so the usual
 `export DYLD_LIBRARY_PATH` in a shell profile does not survive either. Linux
 avoids this entirely because apt installs libcairo into `/usr/lib/...`.
 
+**3. (Recurrence, 2026-11, uv 0.12.18) `uv run` itself drops `DYLD_*`.**
+`just docs-build` regressed to the same `no library called "cairo-2" was found`
+crash even with the variable set on the `uv run` line. uv's binary removes
+`DYLD_*` from the environment it hands to Python, most likely the macOS
+hardened-runtime purge of `DYLD_*` for signed, notarized binaries:
+
+```sh
+DYLD_FALLBACK_LIBRARY_PATH=/x uv run --no-sync python -c 'import os;print(os.environ.get("DYLD_FALLBACK_LIBRARY_PATH"))'
+# None
+DYLD_FALLBACK_LIBRARY_PATH=/x .venv/bin/python -c 'import os;print(os.environ.get("DYLD_FALLBACK_LIBRARY_PATH"))'
+# /x
+```
+
+So the variable must be set on a command that execs the venv's interpreter
+**directly**, with no uv in between.
+
 ## Workaround
 
 ```sh
 uv sync --extra docs
-DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib" uv run mkdocs build --strict
+DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib" .venv/bin/mkdocs build --strict
 ```
+
+Do **not** write `DYLD_FALLBACK_LIBRARY_PATH=… uv run mkdocs …`. uv swallows the
+variable (gap 3 above).
 
 Prerequisite native libs (macOS): `brew install cairo pango`. Linux: the apt
 list in `.github/workflows/docs.yml` (`libcairo2-dev libpango1.0-dev
@@ -79,7 +98,7 @@ libraries that happen to share a name.
 Both steps are baked into the justfile so nobody has to remember them:
 
 ```
-just docs-build     # uv sync --extra docs + DYLD_FALLBACK_LIBRARY_PATH + --strict
+just docs-build     # uv sync --extra docs + DYLD_FALLBACK_LIBRARY_PATH + .venv/bin/mkdocs (not uv run) + --strict
 just docs-serve     # same env, live preview
 ```
 

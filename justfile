@@ -700,15 +700,18 @@ az-dev-vm-ssh *ARGS:
 #      found` even with the Python package installed. DYLD_FALLBACK_LIBRARY_PATH
 #      is set below; needs `brew install cairo pango` (Linux: the apt list in
 #      .github/workflows/docs.yml).
+#   3. The venv's mkdocs is exec'd DIRECTLY, never via `uv run`: uv >= 0.12's
+#      binary drops DYLD_* before spawning Python (hardened-runtime purge), so
+#      `DYLD_FALLBACK_LIBRARY_PATH=… uv run mkdocs` silently loses the variable.
 # See pitfalls/mkdocs-social-plugin-cairosvg-not-found-macos.md
 docs-build:
     uv sync --extra docs
-    DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix 2>/dev/null)/lib" uv run mkdocs build --strict
+    DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix 2>/dev/null)/lib" "${UV_PROJECT_ENVIRONMENT:-.venv}/bin/mkdocs" build --strict
 
 # Live-reloading preview on http://127.0.0.1:8000 (same env as docs-build).
 docs-serve:
     uv sync --extra docs
-    DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix 2>/dev/null)/lib" uv run mkdocs serve
+    DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix 2>/dev/null)/lib" "${UV_PROJECT_ENVIRONMENT:-.venv}/bin/mkdocs" serve
 
 # ============================================================================
 # Ad-hoc Scripts
