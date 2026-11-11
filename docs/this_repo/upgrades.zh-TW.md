@@ -203,4 +203,4 @@ flowchart LR
 - [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl) — `upgrade-externals` 強制刷新的 `refreshPeriod` 條目。
 - 用於枚舉的 ansible role 預設值：[`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml)、[`python_uv_tools`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml)、[`llm_tools`](../../dot_ansible/roles/llm_tools/defaults/main.yml)、[`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml)。
 
-Herdr UI 依套件來源更新：macOS 使用 Homebrew；Linux 使用 App Updates（PolicyKit）或官方安裝器。apply 僅補裝，`just upgrade-herdr` 仍只更新 daemon。詳見 [Herdr UI](../tools/herdr.zh-TW.md)。
+Sheprd（原 Herdr UI）依套件來源更新：macOS 使用 Homebrew（由 App 內更新器觸發）；Linux 使用 App Updates（PolicyKit）或官方安裝器。官方 Herdr App 自行更新。herdr-core 有獨立分類：`just upgrade-herdr-core` 對安裝器管理的 `~/.local/bin/herdr-core` 執行 `hc update`，其他來源跳過。apply 僅補裝，`just upgrade-herdr` 仍只更新 Herdr 1 daemon。詳見 [GUI 客戶端與 Herdr 2](../tools/herdr.zh-TW.md)。

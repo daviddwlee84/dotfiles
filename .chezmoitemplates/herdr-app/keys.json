@@ -1,0 +1,5 @@
+{
+  "global": { "ctrl-b": "mod.open:tmux-prefix" },
+  "terminal": { "ctrl-b": "mod.open:tmux-prefix" },
+  "mod:tmux-prefix": { "ctrl-b": "tmux-prefix.send-prefix" }
+}

@@ -56,7 +56,8 @@
 # dotnet_tools tasks: {{ include "dot_ansible/roles/dotnet_tools/tasks/main.yml" | sha256sum }}
 # dotnet_tools defaults: {{ include "dot_ansible/roles/dotnet_tools/defaults/main.yml" | sha256sum }}
 # gui_apps_linux tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/main.yml" | sha256sum }}
-# Herdr UI GUI tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/herdr-gui.yml" | sha256sum }}
+# Sheprd GUI tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/sheprd.yml" | sha256sum }}
+# Herdr App GUI tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/herdr-app.yml" | sha256sum }}
 # Ghostty GUI tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/ghostty.yml" | sha256sum }}
 # gui_apps_linux defaults: {{ include "dot_ansible/roles/gui_apps_linux/defaults/main.yml" | sha256sum }}
 # homelab_tools tasks: {{ include "dot_ansible/roles/homelab_tools/tasks/main.yml" | sha256sum }}
@@ -378,7 +379,7 @@ else
 fi
 {{ end -}}
 {{ if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
-EXTRA_VARS="$EXTRA_VARS gui_apps_linux_install_herdr_gui={{ .installBrewApps }}"
+EXTRA_VARS="$EXTRA_VARS gui_apps_linux_install_sheprd={{ .installBrewApps }} gui_apps_linux_install_herdr_app={{ .installBrewApps }}"
 
 # Discord channel (gui_apps_linux): flatpak | deb | none. Default flatpak.
 {{ $discordChannel := "flatpak" }}{{ if hasKey . "discordChannel" }}{{ $discordChannel = .discordChannel }}{{ end -}}

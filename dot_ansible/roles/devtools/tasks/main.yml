@@ -4810,6 +4810,68 @@
       ansible.builtin.debug:
         msg: "herdr installation failed (likely network timeout) - skipping"
 
+# --- herdr-core (`hc`: Herdr 2 terminal runtime for agents) ---
+# Separate from the herdr TUI above: different binary, different server, no
+# shared sessions. The official Herdr App and Sheprd both use it; on its own it
+# is a headless CLI (persistent terminals, agent delegation, SSH machines), so
+# it installs everywhere herdr does, including servers. Upstream ships no
+# GitHub releases, only an installer on releases.herdr.dev. We pin that
+# installer by commit + SHA-256; it then verifies the build against the release
+# manifest's SHA-256 (and, on macOS, the Developer ID signature). It installs
+# ~/.local/bin/herdr-core and an `hc` link only when no other `hc` exists.
+# Install-only: `just upgrade-herdr-core` runs `hc update` (terminals survive).
+- name: Check if herdr-core is installed
+  when: ansible_facts["os_family"] in ["Debian", "Darwin"]
+  ansible.builtin.shell: >-
+    command -v herdr-core || test -e "$HOME/.local/bin/herdr-core"
+  register: herdr_core_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install herdr-core with the pinned upstream installer (user-level)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "Darwin"]
+    - herdr_core_check.rc | default(1) != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - not ansible_check_mode
+  vars:
+    herdr_core_installer_url: https://raw.githubusercontent.com/herdrdev/herdr-core/bb08e28befc52d41ce920771d00fb9c2ba6815f2/distribution/install.sh
+    herdr_core_installer_sha256: ac94d641e3ddb7cd1e8ec9b61babafe77a0a8f741a4eafea0844a00d0e14dd59
+  block:
+    - name: Create private herdr-core download directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: herdr-core-
+      register: herdr_core_tmp
+
+    - name: Download the pinned herdr-core installer
+      ansible.builtin.get_url:
+        url: "{{ herdr_core_installer_url }}"
+        dest: "{{ herdr_core_tmp.path }}/install.sh"
+        checksum: "sha256:{{ herdr_core_installer_sha256 }}"
+        mode: '0700'
+        timeout: 60
+
+    - name: Run the herdr-core installer into ~/.local/bin
+      ansible.builtin.command: sh "{{ herdr_core_tmp.path }}/install.sh"
+      environment:
+        HC_INSTALL_DIR: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+      changed_when: true
+  rescue:
+    - name: Warn herdr-core installation failed
+      ansible.builtin.debug:
+        msg: "herdr-core installation failed: {{ ansible_failed_result.msg | default('see task output') }} - skipping; retry on a later apply"
+  always:
+    - name: Remove herdr-core temporary downloads
+      when: herdr_core_tmp.path is defined
+      ansible.builtin.file:
+        path: "{{ herdr_core_tmp.path }}"
+        state: absent
+
 # --- herdr-plus plugin (Projects + Quick Actions; sesh/tmuxp/menu analog) ---
 # Installed via `herdr plugin install`, which downloads a prebuilt release binary
 # when no Go toolchain is found, so it works with or without Go. When a Go build

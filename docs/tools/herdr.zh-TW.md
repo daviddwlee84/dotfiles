@@ -607,24 +607,81 @@ dev 不可用或版本尚無 machine-management command 時，退回 flat／群�
 原有以目錄為單位的 helper 子命令仍保留供既有呼叫者使用。
 
 
-## Herdr UI（原生 GUI client）
+## GUI 客戶端與 Herdr 2（Sheprd、Herdr App、herdr-core）
 
-[Herdr UI](https://github.com/penso/herdr-gpui) 是既有 Herdr daemon 的獨立圖形介面。
-TUI 與 GUI 可共用 session，關閉 GUI 不會結束終端 session。GUI 安裝器不會安裝或
-升級 Herdr daemon。GUI 偏好設定由應用程式管理；apply 不啟動應用程式，也不開啟登入自啟。
+Herdr 目前有**兩套互不共用 session 的 runtime**：
 
-- macOS：隨 `installBrewApps` 安裝 Homebrew cask `penso/tap/herdr-gpui`；
-  支援 Apple Silicon／Intel，需要 macOS 14.2+，舊版直接跳過。以 `open -a Herdr`
-  或 `herdr-gpui` 啟動。
-- Ubuntu/Debian 桌面：需要 `profile=ubuntu_desktop` 與 `installBrewApps=true`、
-  glibc 2.39+（Ubuntu 24.04／Debian 13 起）、x86_64／ARM64 及 sudo。
-  Ansible 下載最新 stable `.deb`，核對上游 SHA-256 後交給 apt 安裝相依套件。
-  noRoot、舊 libc、不支援架構會說明並跳過。GPU 需有 Vulkan driver；從應用程式選單
-  或 `herdr-gpui` 啟動。
-- apply 僅補裝，保留 PATH 上既有安裝。macOS 透過 Homebrew 更新
-  （`brew upgrade --cask penso/tap/herdr-gpui`）；Linux 使用 App Updates
-  （需要 `pkexec` 與桌面 PolicyKit 認證代理），也可手動執行
-  [官方安裝器](https://herdrui.dev/install.sh) 更新。
-- Fedora／Arch／Nix 請依[官方安裝指南](https://github.com/penso/herdr-gpui#install)
-  手動安裝；無桌面主機保留 daemon，由桌面 GUI 透過 SSH 連線。
-- `just upgrade-herdr` 仍只負責 daemon 升級。
+| | Herdr 1（本頁） | Herdr 2 |
+|---|---|---|
+| Runtime | `herdr` TUI 與其 server | `herdr-core`（`hc`） |
+| 桌面 GUI | [Sheprd](https://sheprd.org/)（第三方，原 Herdr UI） | 官方 [Herdr App](https://herdr.dev/) |
+| 行動裝置 | [HerdrChat](https://github.com/cobanov/herdrchat)（iOS、SSH）、Sheprd iOS beta（[TestFlight](https://sheprd.org/testflight/)） | – |
+| 擴充 | `herdr plugin install`（herdr-plus…） | App [mods](https://herdr.dev/mods/)／[layouts](https://herdr.dev/layouts/) |
+
+TUI 照常使用，Herdr 2 並行安裝。以下皆為**僅補裝**：apply 只安裝缺少的副本，
+不升級、不啟動應用程式，也不開啟登入自啟。
+
+### Sheprd（原 Herdr UI）
+
+[Sheprd](https://github.com/sheprd-labs/sheprd) 是 Herdr 1 daemon 的原生客戶端
+（沒有 Herdr 1 時也會用內建、版本固定的 herdr-core 開本機 shell）。TUI 與 Sheprd
+共用 session，關閉 GUI 不會結束 session。改名保留 bundle ID `so.pen.herdr-gpui`，
+設定、登入、keyring 與已配對機器都會沿用。
+
+- macOS：隨 `installBrewApps` 安裝 cask `sheprd-labs/tap/sheprd` → `/Applications/Sheprd.app`，
+  支援 Apple Silicon／Intel，需要 macOS 14.2+；App 內更新器會呼叫 `brew upgrade`。
+- Ubuntu/Debian 桌面：`profile=ubuntu_desktop` + `installBrewApps`，需要 glibc 2.39+
+  （Ubuntu 24.04／Debian 13 起）、x86_64／ARM64 與 sudo。Ansible 下載最新 stable
+  `Sheprd-*.deb`，核對上游 SHA-256 後以 apt 安裝。套件同時提供 `sheprd` 與相容的
+  `herdr-gpui`，PATH 上有任一個即視為已安裝；之後由 App Updates（PolicyKit）更新。
+  需要 Vulkan driver。Linux app ID 改為 `org.sheprd.Sheprd`，指名 `so.pen.herdr-gpui`
+  的視窗規則需重設。
+- Fedora／Arch／Nix：手動安裝，見[安裝說明](https://sheprd.org/#install)。
+
+#### 在 macOS 從 Herdr UI 遷移
+
+舊的 `penso/tap/herdr-gpui` cask 安裝到 `/Applications/Herdr.app`，與官方 Herdr App
+同路徑。只要偵測到舊 cask，Brewfile 就不會加裝 Sheprd（避免同 bundle ID 兩份），
+而是輸出指向本節的註解。若你曾手動把舊 App 改名（如 `HerdrUI.app`）騰出位置，
+**不要 `brew uninstall` 它**：brew 會刪掉目前位於 `/Applications/Herdr.app` 的官方 App。
+見[這個 pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/brew-uninstall-herdr-gpui-deletes-official-herdr-app.md)。
+
+1. 結束舊 App，只移除 brew 的過期紀錄：`rm -rf "$(brew --caskroom)/herdr-gpui"`
+   （只是 metadata，不含 App），再 `brew untap penso/tap`。
+2. `brew install sheprd-labs/tap/sheprd`，啟動並確認機器與設定都在。
+3. 把改過名的舊 bundle 移到垃圾桶。不要用 `--zap`，也不要動 `~/Library/...`、
+   `~/.config/herdr/`、`~/.herdr`，保留的狀態都在那裡。
+
+### 官方 Herdr App 與 herdr-core（`hc`）
+
+- **herdr-core**（`hc`）：無介面的 runtime，提供持久終端、agent 委派（`hc run`、
+  `hc send`、`hc wait --children all`）與 SSH 機器。devtools role 會在所有安裝 herdr 的主機
+  （macOS／Linux、x86_64／aarch64，含 server）以 commit 與 SHA-256 固定的上游安裝器安裝，
+  位置為 `~/.local/bin/herdr-core`，並建立 `hc` 連結。以 `just upgrade-herdr-core`（`hc update`）
+  升級，執行中的終端不受影響，在 `hc` 終端內執行也安全。可提供 `hc --skill` 給 agent。
+- **Herdr App**：隨 `installBrewApps`。macOS 使用 `herdr-app` cask，**僅支援 Apple Silicon**
+  （Intel 跳過）；Ubuntu 桌面以固定版本的上游安裝器安裝到 `~/.local/share/herdr-app`
+  與 `~/.local/bin/herdr-app`（使用者層級，需要 Vulkan）。App 會自行更新。若
+  `/Applications/Herdr.app` 已存在且非 Homebrew 安裝，Brewfile 不會動它，並提示
+  `brew install --cask --adopt herdr-app`。使用遙測預設開啟，可在 Settings → Privacy 關閉。
+  Mods 是受信任的程式碼，沒有 sandbox。
+
+### Herdr App 設定（`~/.config/herdr-app`）
+
+只管理使用者擁有的檔案，且只在會安裝 App 的主機上：
+
+| 檔案 | 管理方式 |
+|---|---|
+| `keys.json` | `modify_` overlay：合併 [tmux-prefix](https://herdr.dev/mods/herdrdev/tmux-prefix/) 按鍵，其餘按鍵保留 |
+| `settings.json` | `modify_` overlay：`appearance`、`minimum_contrast`，其餘由 App 管理 |
+| `mods/tmux-prefix/` | 原樣 vendor 自 `herdrdev/herdr-layout-examples`（固定 commit） |
+| 內建 mods／layouts、`frame/`、`data/`、`view.json`、`shared.json`… | 不管理（Herdr 會重寫） |
+
+`keys.json`／`settings.json` 為空或不存在時，交給 Herdr 首次啟動寫入預設值，下次
+apply 再合併。想保留個人 mod 或 layout：在 App 內複製後，把資料夾加到
+`dot_config/herdr-app/mods/`（或 `layouts/`），並同步到 Windows repo（需逐位元相同）。
+以 `herdr-app check ~/.config/herdr-app/mods/<name>` 驗證 mod。
+
+**tmux-prefix 與 Ctrl+B：** 在 App 終端中，Ctrl+B 會開啟 prefix 提示（`c`、`%`、`"`、
+`x`、`n/p`、數字、`hjkl`、`J/K`、`z`、`d`、`?`）。herdr TUI 與 tmux 也使用 Ctrl+B；
+在 App 終端裡按 **Ctrl+B Ctrl+B** 即可把字面上的 prefix 送給它們。

@@ -1,0 +1,74 @@
+---
+# Official Herdr App (herdrdev/herdr-app): desktop client for herdr-core.
+# Install-only, user-level (no sudo): the upstream installer puts the app in
+# ~/.local/share/herdr-app, `herdr-app` in ~/.local/bin and a launcher entry,
+# and installs herdr-core only when none exists. The app updates itself
+# afterwards (Settings → Updates), so apply never reinstalls or upgrades it.
+#
+# The installer is pinned by commit and SHA-256 here; it then verifies the
+# release tarball against the release manifest's SHA-256 on its own.
+- name: Check for an existing Herdr App
+  ansible.builtin.shell: >-
+    command -v herdr-app ||
+    test -e "${XDG_DATA_HOME:-$HOME/.local/share}/herdr-app"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: herdr_app_available
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine Herdr App compatibility
+  ansible.builtin.set_fact:
+    herdr_app_supported: >-
+      {{ ansible_facts['os_family'] == 'Debian'
+         and target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64'] }}
+
+- name: Explain unsupported Herdr App hosts
+  when: not (herdr_app_supported | bool)
+  ansible.builtin.debug:
+    msg: "Herdr App skipped: automatic install covers Debian/Ubuntu desktops on x64/arm64."
+
+- name: Install missing Herdr App with the pinned upstream installer
+  when:
+    - herdr_app_supported | bool
+    - herdr_app_available.rc != 0
+    - not ansible_check_mode
+  vars:
+    herdr_app_installer_url: https://raw.githubusercontent.com/herdrdev/herdr-app/4cff5791364ab77532c0a6965019fe7bc3df1ce4/distribution/install.sh
+    herdr_app_installer_sha256: b636d66cf54eb42e16e47fb2be419a9ff2ded0dc1ecc3db46fb2cc193dda92c2
+  block:
+    - name: Create private Herdr App download directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: herdr-app-
+      register: herdr_app_tmp
+
+    - name: Download the pinned Herdr App installer
+      ansible.builtin.get_url:
+        url: "{{ herdr_app_installer_url }}"
+        dest: "{{ herdr_app_tmp.path }}/install.sh"
+        checksum: "sha256:{{ herdr_app_installer_sha256 }}"
+        mode: '0700'
+        timeout: 60
+
+    - name: Run the Herdr App installer (user-level)
+      ansible.builtin.command: sh "{{ herdr_app_tmp.path }}/install.sh"
+      environment:
+        PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+      register: herdr_app_install
+      changed_when: true
+
+    - name: Note Herdr App runtime requirement
+      ansible.builtin.debug:
+        msg: "Herdr App installed. It needs a desktop session and a working Vulkan driver; it updates itself from Settings → Updates."
+  rescue:
+    - name: Report Herdr App installation failure
+      ansible.builtin.debug:
+        msg: "Herdr App installation failed: {{ ansible_failed_result.msg | default('see task output') }}. Skipping; retry on a later apply."
+  always:
+    - name: Remove Herdr App temporary downloads
+      when: herdr_app_tmp.path is defined
+      ansible.builtin.file:
+        path: "{{ herdr_app_tmp.path }}"
+        state: absent

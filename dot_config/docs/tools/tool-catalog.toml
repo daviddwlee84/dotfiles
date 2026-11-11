@@ -1121,19 +1121,49 @@ linux = "GitHub release single binary → `~/.local/bin/herdr`"
 role_md = "devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**)"
 
 [[tool]]
-id = "herdr-gpui"
-bins = ["herdr-gpui"]
+id = "herdr-app"
 category = "Terminals & Editors"
-desc = "Native GUI client for the existing Herdr daemon"
+desc = "Official Herdr desktop app (Herdr 2) on herdr-core"
 role = "Brewfile.darwin"
 role_linux = "gui_apps_linux"
+tag = "herdr_app"
 gate = "installBrewApps"
 gate_linux = "installBrewApps"
 app = "Herdr"
 docs = "docs/tools/herdr.md"
-upgrade = "Homebrew (macOS) / App Updates (Linux)"
-mac = "penso/tap/herdr-gpui cask; macOS 14.2+"
-linux = "SHA-256 verified stable .deb; glibc 2.39+, x64/arm64, sudo"
+upgrade = "self-update (Settings → Updates)"
+mac = "`herdr-app` cask; Apple Silicon only"
+linux = "pinned upstream installer (user-level, Vulkan); x64/arm64"
+role_md = "GUI bundle; apply installs missing copies only"
+
+[[tool]]
+id = "herdr-core"
+bins = ["herdr-core", "hc"]
+category = "Sessions & Multiplexing"
+desc = "Herdr 2 terminal runtime for agents (`hc`)"
+role = "devtools"
+docs = "docs/tools/herdr.md"
+upgrade = "just upgrade-herdr-core"
+mac = "pinned upstream installer → `~/.local/bin/herdr-core` (+ `hc`)"
+linux = "pinned upstream installer → `~/.local/bin/herdr-core` (+ `hc`)"
+role_md = "devtools · upgrade: `just upgrade-herdr-core` (`hc update`; terminals keep running)"
+
+[[tool]]
+id = "sheprd"
+bins = ["sheprd", "herdr-gpui"]
+pkgs = ["sheprd-labs/tap/sheprd"]
+category = "Terminals & Editors"
+desc = "Sheprd (formerly Herdr UI): native GUI client for Herdr 1 sessions"
+role = "Brewfile.darwin"
+role_linux = "gui_apps_linux"
+tag = "sheprd"
+gate = "installBrewApps"
+gate_linux = "installBrewApps"
+app = "Sheprd"
+docs = "docs/tools/herdr.md"
+upgrade = "in-app updater (Homebrew-aware on macOS) / App Updates (Linux)"
+mac = "`sheprd-labs/tap/sheprd` cask; macOS 14.2+"
+linux = "SHA-256 verified stable `Sheprd-*.deb`; glibc 2.39+, x64/arm64, sudo"
 role_md = "GUI bundle; apply installs missing copies only"
 
 [[tool]]

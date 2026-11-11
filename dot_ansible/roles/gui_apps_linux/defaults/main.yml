@@ -12,5 +12,7 @@ gui_apps_linux_no_root: false
 # `installGamingApps` chezmoi prompt on ubuntu_desktop.
 gui_apps_linux_install_gaming_apps: false
 
-# Herdr UI follows installBrewApps, independently of other GUI role tasks.
-gui_apps_linux_install_herdr_gui: false
+# Sheprd (formerly Herdr UI) and the official Herdr App follow installBrewApps,
+# independently of other GUI role tasks.
+gui_apps_linux_install_sheprd: false
+gui_apps_linux_install_herdr_app: false

@@ -54,10 +54,15 @@
 # Ghostty (graphics-capable terminal for terminal-browser / Herdr)
 # =============================================================================
 
-- name: Install Herdr UI on selected GUI hosts
-  ansible.builtin.import_tasks: herdr-gui.yml
-  when: gui_apps_linux_install_herdr_gui | bool
-  tags: [herdr_gui]
+- name: Install Sheprd (Herdr 1 GUI client) on selected GUI hosts
+  ansible.builtin.import_tasks: sheprd.yml
+  when: gui_apps_linux_install_sheprd | bool
+  tags: [sheprd]
+
+- name: Install the official Herdr App on selected GUI hosts
+  ansible.builtin.import_tasks: herdr-app.yml
+  when: gui_apps_linux_install_herdr_app | bool
+  tags: [herdr_app]
 
 - name: Install Ghostty on GUI hosts
   ansible.builtin.import_tasks: ghostty.yml

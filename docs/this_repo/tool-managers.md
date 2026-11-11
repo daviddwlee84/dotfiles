@@ -1179,7 +1179,8 @@ list.
 | **grc** | brew | apt | devtools |
 | **gum** | brew | GitHub release | devtools |
 | **herdr** | GitHub release single binary → `~/.local/bin/herdr` (**not brew** — see note) | GitHub release single binary → `~/.local/bin/herdr` | devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**) |
-| **herdr-gpui** | penso/tap/herdr-gpui cask; macOS 14.2+ | SHA-256 verified stable .deb; glibc 2.39+, x64/arm64, sudo | GUI bundle; apply installs missing copies only |
+| **herdr-app** | `herdr-app` cask; Apple Silicon only | pinned upstream installer (user-level, Vulkan); x64/arm64 | GUI bundle; apply installs missing copies only |
+| **herdr-core** | pinned upstream installer → `~/.local/bin/herdr-core` (+ `hc`) | pinned upstream installer → `~/.local/bin/herdr-core` (+ `hc`) | devtools · upgrade: `just upgrade-herdr-core` (`hc update`; terminals keep running) |
 | **herdr-plus** (herdr plugin) | `herdr plugin install cloudmanic/herdr-plus` (prebuilt binary when no Go; idempotent ansible task) | same | devtools |
 | **Homebrew** | curl installer | same (Linux, gated) | bootstrap |
 | **htop** | brew | apt | devtools |
@@ -1264,6 +1265,7 @@ list.
 | **sesh** | brew | GitHub release | devtools |
 | **sevenzip** (7-Zip; `7zz` / `7z`) | brew (`sevenzip`) | apt (`p7zip-full`) | devtools — yazi archive + dmg listing. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **shellcheck / shfmt** | brew | apt or release | devtools |
+| **sheprd** | `sheprd-labs/tap/sheprd` cask; macOS 14.2+ | SHA-256 verified stable `Sheprd-*.deb`; glibc 2.39+, x64/arm64, sudo | GUI bundle; apply installs missing copies only |
 | **sidecar** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
 | **skopeo** | brew | apt (`universe`) | devtools — client-side registry copy; rung 3 of `docker-net pull`. See [docker-net.md](../tools/docker-net.md) |
 | **smartmontools** (`smartctl`) | n/a | apt/yum | homelab_tools |

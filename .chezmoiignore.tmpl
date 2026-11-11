@@ -177,6 +177,17 @@ pyrightconfig.json
 .config/aerospace/**
 {{- end }}
 
+# Official Herdr App config — only where the app itself is selected: macOS
+# Apple Silicon (upstream ships no Intel build) or ubuntu_desktop, both behind
+# installBrewApps like the Brewfile cask / gui_apps_linux task that install it.
+# Only user-owned files are managed (keys/settings overlays, personal mods);
+# shipped mods, layouts and the app's own state are never in the source.
+{{- $herdrAppHost := or (and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64")) (and (eq .chezmoi.os "linux") (eq (get . "profile") "ubuntu_desktop")) }}
+{{- if not (and $installBrewApps $herdrAppHost) }}
+.config/herdr-app
+.config/herdr-app/**
+{{- end }}
+
 # summarize config + prompt presets — only manage when installSummarize=true.
 # ~/.summarize/config.json is NOT XDG on purpose: summarize hardcodes that path
 # (no XDG lookup, no SUMMARIZE_CONFIG override). The prompt presets summarize

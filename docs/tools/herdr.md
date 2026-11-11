@@ -643,29 +643,94 @@ a newly selected file, so wiring one file does not activate dormant neighbors.
 Legacy directory-level helper subcommands remain available for existing callers.
 
 
-## Herdr UI (native GUI client)
+## GUI clients and Herdr 2 (Sheprd, Herdr App, herdr-core)
 
-[Herdr UI](https://github.com/penso/herdr-gpui) is a separate client for the
-existing Herdr daemon. TUI and GUI can share sessions; closing the GUI leaves
-terminal sessions running. The UI installer never installs or upgrades the
-Herdr daemon. GUI preferences remain app-owned; apply does not launch the app
-or enable launch at login.
+Herdr now has **two runtimes that do not share sessions**:
 
-- macOS: follows `installBrewApps`; Homebrew cask `penso/tap/herdr-gpui`,
-  Apple Silicon / Intel, macOS 14.2+. Older macOS skips this cask. Open with
-  `open -a Herdr`, or use the `herdr-gpui` CLI.
-- Ubuntu/Debian desktop: `profile=ubuntu_desktop` and `installBrewApps=true`.
-  Requires glibc 2.39+ (Ubuntu 24.04 / Debian 13 or newer), x86_64 or ARM64,
-  and sudo. Ansible downloads the latest stable `.deb`, verifies its upstream
-  SHA-256 and installs via apt with runtime dependencies. noRoot, older libc
-  and unsupported architectures skip with a message. Vulkan drivers must be
-  available for the GPU. Launch `herdr-gpui` or the application-menu entry.
-- Apply installs missing copies only; existing PATH installations are preserved.
-  macOS upgrades through Homebrew (`brew upgrade --cask penso/tap/herdr-gpui`);
-  Linux uses the app's App Updates panel (PolicyKit authentication agent and
-  `pkexec` required). Manual Linux updates can use the
-  [official installer](https://herdrui.dev/install.sh).
-- Fedora/Arch/Nix installations are manual: see the
-  [official installation guide](https://github.com/penso/herdr-gpui#install).
-  Headless hosts keep running the daemon; use a GUI client on a desktop over SSH.
-- `just upgrade-herdr` remains the daemon upgrade command; it does not upgrade UI.
+| | Herdr 1 (this page) | Herdr 2 |
+|---|---|---|
+| Runtime | `herdr` TUI + its server | `herdr-core` (`hc`) |
+| Desktop GUI | [Sheprd](https://sheprd.org/) (third party, formerly Herdr UI) | official [Herdr App](https://herdr.dev/) |
+| Mobile | [HerdrChat](https://github.com/cobanov/herdrchat) (iOS, SSH), Sheprd iOS beta on [TestFlight](https://sheprd.org/testflight/) | – |
+| Extensions | `herdr plugin install` (herdr-plus, ...) | App [mods](https://herdr.dev/mods/) / [layouts](https://herdr.dev/layouts/) |
+
+Keep using the TUI; Herdr 2 installs alongside it. Every install below is
+**install-only**: apply adds missing copies and never upgrades, launches the
+app, or enables launch at login.
+
+### Sheprd (formerly Herdr UI)
+
+[Sheprd](https://github.com/sheprd-labs/sheprd) is a native client for the Herdr
+1 daemon (it also bundles a pinned herdr-core for local shells when no Herdr 1
+exists). TUI and Sheprd share sessions; closing the GUI leaves them running.
+The rename kept the bundle ID `so.pen.herdr-gpui`, so settings, sign-ins,
+keyring entries and paired machines carry over.
+
+- macOS: `installBrewApps`; cask `sheprd-labs/tap/sheprd` → `/Applications/Sheprd.app`,
+  Apple Silicon / Intel, macOS 14.2+. The in-app updater drives `brew upgrade`.
+- Ubuntu/Debian desktop: `profile=ubuntu_desktop` + `installBrewApps`. Requires
+  glibc 2.39+ (Ubuntu 24.04 / Debian 13+), x86_64/ARM64 and sudo. Ansible
+  downloads the latest stable `Sheprd-*.deb`, verifies its upstream SHA-256 and
+  installs via apt. Packages provide `sheprd` plus a legacy `herdr-gpui`, and
+  either one on PATH counts as installed. Linux updates go through App Updates (PolicyKit).
+  Vulkan drivers are required. Window rules naming `so.pen.herdr-gpui` must be
+  redone: the Linux app ID is now `org.sheprd.Sheprd`.
+- Fedora/Arch/Nix: manual, see the [install guide](https://sheprd.org/#install).
+
+#### Migrating from Herdr UI on macOS
+
+The old `penso/tap/herdr-gpui` cask installs to `/Applications/Herdr.app`, which
+is also where the official Herdr App lives. While that legacy cask is
+installed, the Brewfile emits neither Sheprd nor a second copy. Instead it
+prints a comment pointing here. If you renamed the old app by hand (e.g.
+`HerdrUI.app`) to make room, **do not `brew uninstall` it**: brew would delete
+whatever is at `/Applications/Herdr.app` now, the official app. See
+[the pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/brew-uninstall-herdr-gpui-deletes-official-herdr-app.md).
+
+1. Quit the old app, then remove brew's stale record only:
+   `rm -rf "$(brew --caskroom)/herdr-gpui"` (metadata, not the app), then
+   `brew untap penso/tap`.
+2. `brew install sheprd-labs/tap/sheprd`, launch it, and confirm your machines/settings.
+3. Move the old renamed bundle to the Trash. Never use `--zap`, and leave
+   `~/Library/...`, `~/.config/herdr/` and `~/.herdr` alone. They hold the
+   retained state.
+
+### Official Herdr App and herdr-core (`hc`)
+
+- **herdr-core** (`hc`): a headless runtime with persistent terminals, agent
+  delegation (`hc run`, `hc send`, `hc wait --children all`) and SSH machines.
+  The devtools role installs it everywhere herdr is (macOS/Linux, x86_64/aarch64, servers
+  included) with the upstream installer, pinned by commit and SHA-256 and
+  writing to `~/.local/bin/herdr-core` plus an `hc` link. Upgrade with `just upgrade-herdr-core`
+  (`hc update`), which keeps running terminals and is safe inside an `hc` terminal.
+  Give agents `hc --skill`.
+- **Herdr App**: `installBrewApps`. macOS uses the `herdr-app` cask on **Apple
+  Silicon only** (Intel skips). On Ubuntu desktop the pinned upstream installer
+  writes `~/.local/share/herdr-app` and `~/.local/bin/herdr-app`
+  (user-level, needs Vulkan). The app updates itself. If `/Applications/Herdr.app`
+  already exists outside Homebrew, the Brewfile leaves it alone and suggests
+  `brew install --cask --adopt herdr-app`. Usage telemetry is on by default. Turn it off in
+  Settings → Privacy. Mods are trusted code, not sandboxed.
+
+### Herdr App config (`~/.config/herdr-app`)
+
+Only user-owned files are managed, and only on hosts that get the app:
+
+| File | Managed as |
+|---|---|
+| `keys.json` | `modify_` overlay: the [tmux-prefix](https://herdr.dev/mods/herdrdev/tmux-prefix/) keys are merged in; all other keys are preserved |
+| `settings.json` | `modify_` overlay: `appearance`, `minimum_contrast`; everything else stays app-owned |
+| `mods/tmux-prefix/` | vendored unchanged from `herdrdev/herdr-layout-examples` (pinned) |
+| shipped mods/layouts, `frame/`, `data/`, `view.json`, `shared.json`, ... | never (Herdr rewrites them) |
+
+An empty or missing `keys.json`/`settings.json` is left for Herdr to create
+with its defaults on first start; the next apply merges. To keep a personal
+mod or layout, duplicate it in the app and add its folder under
+`dot_config/herdr-app/mods/` (or `layouts/`). Then mirror it to the Windows
+repo (byte-identical). Run `herdr-app check ~/.config/herdr-app/mods/<name>`
+to validate a mod.
+
+**tmux-prefix and Ctrl+B:** in app terminals, Ctrl+B opens the prefix hint
+(`c`, `%`, `"`, `x`, `n/p`, digits, `hjkl`, `J/K`, `z`, `d`, `?`). The herdr
+TUI and tmux also use Ctrl+B. Inside an app terminal, press **Ctrl+B Ctrl+B**
+to send a literal prefix to them.

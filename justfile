@@ -496,6 +496,11 @@ upgrade-atuin:
 upgrade-herdr:
     ./scripts/upgrade_tools.sh herdr
 
+# `hc update` for the installer-managed herdr-core (Herdr 2 runtime). Safe from
+# inside an hc terminal; running terminals keep running. See docs/tools/herdr.md.
+upgrade-herdr-core:
+    ./scripts/upgrade_tools.sh herdr-core
+
 # Linux terminal-browser release + packaged skills; skips live browsers.
 # macOS uses upgrade-brew. Playwright CLI/Chromium use upgrade-npm.
 upgrade-terminal-browser:

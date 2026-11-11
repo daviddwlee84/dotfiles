@@ -11,11 +11,31 @@
 cask "alacritty"
 cask "ghostty"
 {{ if eq .chezmoi.os "darwin" -}}
+{{- $caskroom := "/usr/local/Caskroom" }}{{ if eq .chezmoi.arch "arm64" }}{{ $caskroom = "/opt/homebrew/Caskroom" }}{{ end -}}
 {{ if semverCompare ">=14.2" (output "sw_vers" "-productVersion" | trim) -}}
-tap "penso/tap"
-cask "herdr-gpui"
+{{ if stat (joinPath $caskroom "herdr-gpui") -}}
+# Sheprd: a legacy penso/tap `herdr-gpui` cask (target /Applications/Herdr.app)
+# is installed; it keeps upgrading in place but collides with the official
+# Herdr App. Migrate per docs/tools/herdr.md § Migrating from Herdr UI
+# (never `brew uninstall`/`--zap` it after a manual rename).
 {{ else -}}
-# Herdr UI skipped: requires macOS 14.2 or newer.
+# Sheprd (formerly Herdr UI): Herdr 1 GUI client → /Applications/Sheprd.app
+tap "sheprd-labs/tap"
+cask "sheprd-labs/tap/sheprd"
+{{ end -}}
+{{ else -}}
+# Sheprd skipped: requires macOS 14.2 or newer.
+{{ end -}}
+{{ if eq .chezmoi.arch "arm64" -}}
+{{ if or (not (stat "/Applications/Herdr.app")) (stat (joinPath $caskroom "herdr-app")) -}}
+# Official Herdr App (Herdr 2 desktop; installs herdr-core on first run if missing)
+cask "herdr-app"
+{{ else -}}
+# Herdr App: /Applications/Herdr.app exists outside Homebrew; adopt it with
+#   brew install --cask --adopt herdr-app
+{{ end -}}
+{{ else -}}
+# Herdr App skipped: upstream ships Apple Silicon builds only.
 {{ end -}}
 {{ end -}}
 # cask "iterm2"

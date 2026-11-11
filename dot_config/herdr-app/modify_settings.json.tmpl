@@ -1,0 +1,30 @@
+#!/bin/sh
+# chezmoi modify_ overlay for ~/.config/herdr-app/settings.json (official Herdr App).
+# Herdr writes this file itself (defaults on first start, Settings / command
+# palette edits), so it is an overlay, not a managed file. The managed fragment
+# .chezmoitemplates/herdr-app/settings.json is deep-merged in: its keys win, and
+# every other key is preserved. See .chezmoitemplates/herdr-app/README.md.
+set -eu
+
+input=$(cat)
+
+# Missing or empty file: leave it to Herdr, which writes its full defaults on
+# first start. A settings.json holding only our fragment would replace them.
+if [ -z "$(printf '%s' "$input" | tr -d ' \t\r\n')" ]; then
+  exit 0
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "$input"
+  exit 0
+fi
+
+managed=$(cat <<'HERDR_APP_FRAGMENT'
+{{ includeTemplate "herdr-app/settings.json" . | trim }}
+HERDR_APP_FRAGMENT
+)
+
+# Invalid live JSON (e.g. a half-written edit): pass it through untouched;
+# Herdr itself keeps the last good version and reports the error.
+printf '%s' "$input" | jq --argjson managed "$managed" '. * $managed' 2>/dev/null \
+  || printf '%s\n' "$input"

@@ -91,7 +91,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo go personal dotnet gem flatpak warp atuin herdr micro terminal-browser agents plugins yazi-plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go personal dotnet gem flatpak warp atuin herdr herdr-core micro terminal-browser agents plugins yazi-plugins)
 
 usage() {
   cat <<EOF
@@ -1202,6 +1202,35 @@ cat_plugins() {
 }
 
 # ============================================================================
+# Category: herdr-core — `hc update` for the self-managed Herdr 2 runtime
+# ============================================================================
+# Unlike the herdr TUI, `hc update` swaps the core without ending running
+# terminals and works from inside one of them, so there is no pane guard. It
+# only applies to the installer-managed copy in ~/.local/bin (the devtools
+# role and the Herdr App installer both put it there); any other copy belongs
+# to its package manager or to an app bundle (Sheprd ships its own).
+cat_herdr_core() {
+  local p
+  p="$(command -v herdr-core 2>/dev/null || true)"
+  if [[ -z "$p" && -e "$HOME/.local/bin/herdr-core" ]]; then
+    p="$HOME/.local/bin/herdr-core"
+  fi
+  if [[ -z "$p" ]]; then
+    warn "herdr-core not installed — skipping"
+    return $SKIP_RC
+  fi
+  if [[ "$p" != "$HOME/.local/bin/herdr-core" ]]; then
+    warn "herdr-core at $p is not the installer-managed copy — upgrade it with its owner"
+    return $SKIP_RC
+  fi
+  info "Upgrading herdr-core (hc update; running terminals keep running)"
+  _run "$p" update || {
+    error "hc update failed"
+    return 1
+  }
+}
+
+# ============================================================================
 # Micro's verified user-level release only. Package-manager installs are upgraded
 # through brew / apt / Scoop; never overwrite them with a downloaded binary.
 # ============================================================================
@@ -1252,6 +1281,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         warp) run_category warp cat_warp ;;
         atuin) run_category atuin cat_atuin ;;
         herdr) run_category herdr cat_herdr ;;
+        herdr-core) run_category herdr-core cat_herdr_core ;;
         micro) run_category micro cat_micro ;;
         terminal-browser) run_category terminal-browser cat_terminal_browser ;;
         agents) run_category agents cat_agents ;;

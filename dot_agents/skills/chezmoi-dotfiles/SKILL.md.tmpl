@@ -290,4 +290,7 @@ SSH/fleet/Herdr registrations; dotfiles apply never registers machines. The SSH
 Television channel prefers dev's static active-alias listing and has a grouped-file
 fallback. See `docs/tutorials/setup_ssh_key_on_remote.md` in the source repository.
 
-Herdr UI (`herdr-gpui`) follows `installBrewApps`: macOS cask (14.2+), Ubuntu/Debian desktop verified .deb (glibc 2.39+, x64/ARM64, sudo). Apply installs missing copies only; UI settings stay app-owned. Upgrade via Homebrew / App Updates, separately from `just upgrade-herdr`. See `docs/tools/herdr.md`.
+Herdr GUI/Herdr 2 (all install-only; see `docs/tools/herdr.md` § GUI clients and Herdr 2):
+- Sheprd (formerly Herdr UI, `sheprd`/`herdr-gpui`; Herdr 1 sessions) follows `installBrewApps`: cask `sheprd-labs/tap/sheprd` (macOS 14.2+) or verified `Sheprd-*.deb` on Ubuntu desktop. The legacy `penso/tap/herdr-gpui` cask targets `/Applications/Herdr.app`; never `brew uninstall` it after a manual rename.
+- The official Herdr App (`herdr-app`; Herdr 2) follows `installBrewApps`: cask on Apple Silicon only, or the pinned installer on Ubuntu desktop. `~/.config/herdr-app/{keys,settings}.json` are `modify_` overlays; `mods/tmux-prefix` is vendored (Ctrl+B prefix; Ctrl+B Ctrl+B passes through).
+- herdr-core (`hc`, `~/.local/bin/herdr-core`) installs with the herdr TUI on every macOS/Linux host; upgrade with `just upgrade-herdr-core`. Herdr 1 and Herdr 2 do not share sessions.

@@ -1,0 +1,95 @@
+---
+# Sheprd (formerly Herdr UI / penso/herdr-gpui): native GUI client for Herdr.
+# Install-only: the app's App Updates panel owns subsequent package updates.
+# Packages keep the internal name herdr-gpui and ship both `sheprd` and a
+# legacy `/usr/bin/herdr-gpui`, so either command means "already installed".
+- name: Check for an existing Sheprd (or legacy Herdr UI)
+  ansible.builtin.shell: command -v sheprd || command -v herdr-gpui
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: sheprd_available
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Check host glibc version for Sheprd
+  ansible.builtin.command: getconf GNU_LIBC_VERSION
+  register: sheprd_libc
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Determine Sheprd package compatibility
+  ansible.builtin.set_fact:
+    sheprd_supported: >-
+      {{ ansible_facts['os_family'] == 'Debian'
+         and target_architecture in ['x86_64', 'aarch64', 'arm64']
+         and not (gui_apps_linux_no_root | bool)
+         and sheprd_libc.rc == 0
+         and (sheprd_libc.stdout | regex_replace('^glibc ', '') is version('2.39', '>=')) }}
+
+- name: Explain unsupported Sheprd hosts
+  when: not (sheprd_supported | bool)
+  ansible.builtin.debug:
+    msg: "Sheprd skipped: automatic install requires Debian/Ubuntu, glibc 2.39+, x64/arm64 and sudo. Use a supported desktop client over SSH."
+
+- name: Install missing Sheprd from a verified stable Debian package
+  when:
+    - sheprd_supported | bool
+    - sheprd_available.rc != 0
+    - not ansible_check_mode
+  tags: [sudo]
+  block:
+    - name: Get latest stable Sheprd release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/sheprd-labs/sheprd/releases/latest
+        return_content: true
+      register: sheprd_release
+
+    - name: Select Sheprd Debian asset
+      # Only the Sheprd-* packages publish a .sha256; the legacy Herdr-* copies do not.
+      ansible.builtin.set_fact:
+        sheprd_assets: >-
+          {{ sheprd_release.json.assets
+             | selectattr('name', 'match', '^Sheprd-.*-' ~
+               ('x86_64' if target_architecture == 'x86_64' else 'aarch64') ~
+               '-unknown-linux-gnu\.deb$') | list }}
+
+    - name: Require exactly one matching Sheprd package
+      ansible.builtin.assert:
+        that: sheprd_assets | length == 1
+        fail_msg: "Latest Sheprd release has no unique matching Debian asset"
+
+    - name: Create private Sheprd download directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: sheprd-
+      register: sheprd_tmp
+
+    - name: Download Sheprd with upstream SHA-256 verification
+      ansible.builtin.get_url:
+        url: "{{ sheprd_assets[0].browser_download_url }}"
+        dest: "{{ sheprd_tmp.path }}/sheprd.deb"
+        checksum: "sha256:{{ sheprd_assets[0].browser_download_url }}.sha256"
+        mode: '0644'
+
+    - name: Allow apt sandbox to read the verified package
+      ansible.builtin.file:
+        path: "{{ sheprd_tmp.path }}"
+        mode: '0755'
+
+    - name: Install verified Sheprd Debian package and runtime dependencies
+      become: true
+      ansible.builtin.apt:
+        deb: "{{ sheprd_tmp.path }}/sheprd.deb"
+        state: present
+  rescue:
+    - name: Report Sheprd installation failure
+      ansible.builtin.debug:
+        msg: "Sheprd installation failed: {{ ansible_failed_result.msg | default('see task output') }}. Skipping; retry on a later apply."
+  always:
+    - name: Remove Sheprd temporary downloads
+      when: sheprd_tmp.path is defined
+      ansible.builtin.file:
+        path: "{{ sheprd_tmp.path }}"
+        state: absent

@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 REPO = Path(__file__).resolve().parents[2]
-TASKS = REPO / 'dot_ansible/roles/gui_apps_linux/tasks/herdr-gui.yml'
+TASKS = REPO / 'dot_ansible/roles/gui_apps_linux/tasks/sheprd.yml'
 ANSIBLE = shutil.which('ansible-playbook')
 # Prefer Ansible's own interpreter (e.g. uv tools) over an unrelated host Python.
 PYTHON = sys.executable
@@ -23,16 +23,17 @@ if ANSIBLE:
 
 
 @unittest.skipUnless(shutil.which('ansible-playbook'), 'ansible-playbook required')
-class HerdrGuiCompatibilityTest(unittest.TestCase):
+class SheprdCompatibilityTest(unittest.TestCase):
     def run_case(self, *, libc='2.39', arch='x86_64', no_root=False,
-                 family='Debian', existing=False, supported=True):
-        with tempfile.TemporaryDirectory(prefix='herdr-gui-test-') as tmp:
+                 family='Debian', existing=False, supported=True,
+                 existing_name='sheprd'):
+        with tempfile.TemporaryDirectory(prefix='sheprd-test-') as tmp:
             root = Path(tmp)
             stub = root / 'getconf'
             stub.write_text('#!/bin/sh\nprintf "glibc ' + libc + '\\n"\n')
             stub.chmod(0o755)
             if existing:
-                stub = root / 'herdr-gpui'
+                stub = root / existing_name
                 stub.write_text('#!/bin/sh\nexit 0\n')
                 stub.chmod(0o755)
             path = str(root) + os.pathsep + os.environ['PATH']
@@ -47,9 +48,9 @@ class HerdrGuiCompatibilityTest(unittest.TestCase):
                 'tasks': [
                     {'ansible.builtin.import_tasks': str(TASKS)},
                     {'ansible.builtin.assert': {'that': [
-                        'herdr_gui_libc.rc == 0',
-                        'herdr_gui_supported | bool == ' + str(supported).lower(),
-                        'herdr_gui_available.rc == ' + ('0' if existing else '1'),
+                        'sheprd_libc.rc == 0',
+                        'sheprd_supported | bool == ' + str(supported).lower(),
+                        'sheprd_available.rc == ' + ('0' if existing else '1'),
                     ]}},
                 ],
             }]
@@ -70,6 +71,9 @@ class HerdrGuiCompatibilityTest(unittest.TestCase):
     def test_existing_arm64_install_is_preserved(self):
         self.run_case(arch='aarch64', existing=True)
 
+    def test_legacy_herdr_gpui_command_counts_as_installed(self):
+        self.run_case(existing=True, existing_name='herdr-gpui')
+
     def test_old_glibc_skips(self):
         self.run_case(libc='2.35', supported=False)
 
@@ -85,9 +89,9 @@ class HerdrGuiCompatibilityTest(unittest.TestCase):
     def run_failure_case(self, failure):
         # Run the actual download/rescue/cleanup tasks against local HTTP
         # fixtures. Replace only apt itself so this cannot install software.
-        with tempfile.TemporaryDirectory(prefix='herdr-gui-download-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='sheprd-download-') as tmp:
             package = b'fixture package'
-            asset = 'Herdr-20261029.1-x86_64-unknown-linux-gnu.deb'
+            asset = 'Sheprd-20261109.1-x86_64-unknown-linux-gnu.deb'
             checksum = hashlib.sha256(package).hexdigest()
             if failure == 'checksum':
                 checksum = '0' * 64
@@ -138,7 +142,7 @@ class HerdrGuiCompatibilityTest(unittest.TestCase):
                     'vars': {'ansible_python_interpreter': PYTHON,
                              'target_architecture': 'x86_64'},
                     'tasks': [install, {
-                        'ansible.builtin.stat': {'path': '{{ herdr_gui_tmp.path }}'},
+                        'ansible.builtin.stat': {'path': '{{ sheprd_tmp.path }}'},
                         'register': 'download_dir',
                     }, {'ansible.builtin.assert': {'that': ['not download_dir.stat.exists']}}],
                 }]
@@ -148,7 +152,7 @@ class HerdrGuiCompatibilityTest(unittest.TestCase):
                                         text=True, capture_output=True)
                 output = result.stdout + result.stderr
                 self.assertEqual(result.returncode, 0, output)
-                self.assertIn('Herdr UI installation failed:', output)
+                self.assertIn('Sheprd installation failed:', output)
                 if failure == 'checksum':
                     self.assertIn('checksum', output.lower())
                 if failure == 'download':
