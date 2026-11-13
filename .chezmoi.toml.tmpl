@@ -51,6 +51,14 @@ agentSounds = {{ promptChoiceOnce . "agentSounds" "Agent completion feedback (no
 {{ else -}}
 agentSounds = "none"
 {{ end -}}
+# Coding agent 的輸出語言規則（只在 installCodingAgents = true 時生效）。
+# none  = 不部署任何語言規則
+# zh-TW = 部署 ~/.claude/rules/language-policy.md（Claude Code user-level rule）：
+#         對話 + plan 檔用繁體中文，專有名詞/identifier 保留英文；
+#         README/docs/commit message 照 repo 慣例，沒有慣例就用英文；thinking 不限制。
+# 不碰你手寫的 ~/.claude/CLAUDE.md；改回 none 時 apply 會移除該 rule 檔。
+# 見 docs/tools/agent-language-policy.md
+agentLanguagePolicy = {{ promptChoiceOnce . "agentLanguagePolicy" "Agent language policy (none|zh-TW)" (list "none" "zh-TW") "none" | quote }}
 # 是否安裝十三件個人 CLI；macOS 走 Homebrew，Linux 走驗證 checksum 的 release（不需 Go SDK）。
 # 只裝 CLI，不啟動後端、不建立 credentials，也不在首次呼叫時下載。
 installPersonalTools = {{ promptBoolOnce . "installPersonalTools" "Install personal CLI suite (dev, translate, exp and lazy tools)" true }}

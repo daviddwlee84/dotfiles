@@ -1,0 +1,12 @@
+{{- /*
+  ~/.claude/rules/language-policy.md — user-level Claude Code rule, loaded in
+  every project alongside (never instead of) a hand-written ~/.claude/CLAUDE.md.
+  Gate: installCodingAgents && agentLanguagePolicy == "zh-TW". Any other value
+  renders empty, and chezmoi removes an empty (non-empty_) target, so turning
+  the prompt off also cleans the file up. The body lives in
+  .chezmoitemplates/agent-language-policy.md and is byte-identical across the
+  Unix and Windows repos. Decision record: dotfiles-all docs/agent-language-policy.md
+*/ -}}
+{{- if and (dig "installCodingAgents" false .) (eq (dig "agentLanguagePolicy" "none" .) "zh-TW") -}}
+{{ template "agent-language-policy.md" . }}
+{{- end -}}

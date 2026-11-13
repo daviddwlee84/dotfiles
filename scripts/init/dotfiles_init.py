@@ -248,6 +248,22 @@ PROMPTS: tuple[Prompt, ...] = (
                     "headless（server）一律 none：沒有音效裝置也沒有通知 daemon。\n"
                     "peon 的音量/音效包/通知樣式由 `peon` CLI 自己管，chezmoi 不碰，\n"
                     "所以隨便調都不會產生 chezmoi diff。見 docs/tools/agent-sounds.md")),
+    Prompt("agentLanguagePolicy", "choice", "Coding agents & AI",
+           "Agent language policy",
+           "none = no managed rule; zh-TW = deploy ~/.claude/rules/language-policy.md: "
+           "繁體中文 for chat + plan files, English technical terms/identifiers, "
+           "long-lived docs/commits follow the repo (default English). "
+           "Only takes effect with installCodingAgents.",
+           default="none",
+           prompt_text="Agent language policy (none|zh-TW)",
+           choices=("none", "zh-TW"),
+           comment=("Coding agent 的輸出語言規則（只在 installCodingAgents = true 時生效）。\n"
+                    "none  = 不部署任何語言規則\n"
+                    "zh-TW = 部署 ~/.claude/rules/language-policy.md（Claude Code user-level rule）：\n"
+                    "        對話 + plan 檔用繁體中文，專有名詞/identifier 保留英文；\n"
+                    "        README/docs/commit message 照 repo 慣例，沒有慣例就用英文；thinking 不限制。\n"
+                    "不碰你手寫的 ~/.claude/CLAUDE.md；改回 none 時 apply 會移除該 rule 檔。\n"
+                    "見 docs/tools/agent-language-policy.md")),
 
     # --- Personal tools --------------------------------------------------
     Prompt("installPersonalTools", "bool", "Personal tools",
@@ -586,6 +602,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installBrewApps": True,
         "installNetworkingTools": True,
         "installMediaTools": True,
+        "agentLanguagePolicy": "zh-TW",
         "backupMode": "smart",
     },
     "work-mac": {
@@ -598,6 +615,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installExtraRuntimes": True,
         "installBrewApps": True,
         "installGamingApps": False,
+        "agentLanguagePolicy": "zh-TW",
         "backupMode": "smart",
         # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden, installGamingApps
     },
@@ -678,6 +696,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         # No audio device and no notification daemon in CI / Docker, and the
         # peon-ping hook would fire on every turn for nothing.
         "agentSounds": "none",
+        "agentLanguagePolicy": "none",
         # Vim mode off: CI / Docker shells don't benefit from modal editing,
         # and emacs keymap matches what most non-interactive automation
         # expects (Ctrl+L = clear, Ctrl+H = backspace, no mode flicker).

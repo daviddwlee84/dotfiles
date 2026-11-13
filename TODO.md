@@ -78,6 +78,7 @@ with a one-line summary of what shipped.
 
 ## P3 — Someday / nice to have
 
+- [ ] **[S] Extend `agentLanguagePolicy` to Codex** — Claude Code gets `~/.claude/rules/language-policy.md`; Codex has no rules dir and `~/.codex/AGENTS.md` is user-owned, so it would need a `modify_` managed block (same body from `.chezmoitemplates/agent-language-policy.md`). Windows repo has the matching TODO line. → [docs](docs/tools/agent-language-policy.md)
 - [ ] **[M] Fold `cli-tools.md` into the tool catalog** — `tv tools` / Alt+T still parse the hand-written `dot_config/docs/tools/cli-tools.md` (55 rows), which now duplicates `category` + `desc` from `dot_config/docs/tools/tool-catalog.toml` (the `tv inventory` SSOT). Add `launcher = "rg "` (invocation, trailing space = needs args) + `notes` fields to catalog entries and generate cli-tools.md from them, or point both pickers at `tool-catalog.py`. Touches the fzf ZLE widget `11_tools_picker.zsh` + tmux `prefix+U` — keep their wire format.
 - [ ] **[S] Tool catalog: probe plugins/extensions** — `tv inventory` shows `·` (nothing to probe) for yazi plugins (`ya pkg list`), gh extensions (`gh extension list`), herdr plugins, fonts (`fc-list`), keg-only `ffmpeg-full` (`brew --prefix ffmpeg-full`). A per-tool `probe = "<shell cmd>"` field would turn those into real ●/× statuses.
 

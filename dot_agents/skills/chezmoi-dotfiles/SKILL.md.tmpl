@@ -121,6 +121,9 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 {{- if dig "agentSounds" false . }}
 - **Agent sounds** — audio notifications on agent Stop/Notification hooks. See `docs/tools/agent-sounds.md`.
 {{- end }}
+{{- if eq (dig "agentLanguagePolicy" "none" .) "zh-TW" }}
+- **Agent language policy** — `~/.claude/rules/language-policy.md` (zh-TW chat/plans, English terms + long-lived docs). Edit `.chezmoitemplates/agent-language-policy.md`, never the deployed file. See `docs/tools/agent-language-policy.md`.
+{{- end }}
 {{- if dig "enableVimMode" true . }}
 - **Vim mode** — shell modal editing + tmux vim nav (NOT Neovim/editors — those are always vim).
 {{- end }}
