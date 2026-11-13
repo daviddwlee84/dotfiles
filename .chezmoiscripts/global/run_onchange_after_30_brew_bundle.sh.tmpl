@@ -134,13 +134,14 @@ export HOMEBREW_NO_INSTALL_UPGRADE=1
 #
 # Why opt-in (CHEZMOI_BREW_ADOPT_PREFLIGHT=1 to enable):
 #
-#   1. **Version-strict**: `--adopt` compares SHA256 of /Applications/Foo.app
-#      against the SHA256 brew's formula expects. If your manually-installed
-#      version differs by even a single byte (different download date, vendor
-#      auto-update, etc.) brew raises "no installed App to adopt" and falls
-#      back to a full download. In a typical real-world `Brewfile.darwin`
-#      with 20+ casks, the hit rate observed was ~40% — the rest re-download
-#      anyway, defeating the point.
+#   1. **Version-strict** (except `auto_updates` casks): `--adopt` compares
+#      the downloaded app's Info.plist CFBundleShortVersionString and
+#      CFBundleVersion with /Applications/Foo.app's (`diff -r` when there is
+#      no Info.plist). Any mismatch raises "It seems the existing App is
+#      different from the one being installed." Casks marked `auto_updates`
+#      skip the comparison and adopt whatever version is present. In a typical
+#      real-world `Brewfile.darwin` with 20+ casks, the hit rate observed was
+#      ~40% — the rest re-download anyway, defeating the point.
 #
 #   2. **Password storm**: each `brew install --cask --adopt` invocation
 #      internally calls `sudo /usr/sbin/installer` / `sudo xattr` / similar.
@@ -159,6 +160,13 @@ export HOMEBREW_NO_INSTALL_UPGRADE=1
 #      the App Store, the brew cask version's pkg installer pops up an
 #      interactive "already installed via Mac App Store" dialog mid-apply.
 #      We detect this via `mas list` when opt-in is enabled.
+#
+#   5. **App Management permission**: after adopting, brew runs
+#      `sudo chmod -R a+rX,go-w` on the app. macOS refuses that, even as
+#      root, for another developer's signed app unless the terminal running
+#      brew has System Settings → Privacy & Security → App Management. The
+#      adopt then fails with "Operation not permitted" (the app is untouched).
+#      See pitfalls/brew-adopt-chmod-operation-not-permitted-app-management.md.
 #
 # When useful:
 #   - You're setting up a NEW mac, have just manually dragged some `.app`s
