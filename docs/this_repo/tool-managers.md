@@ -441,7 +441,7 @@ dependencies should pin their own version for CI consistency.
 | `gui_apps_linux` (Linux Debian + `ubuntu_desktop` profile) | Alacritty, libfuse2, AppImageLauncher, VSCode, Cursor, Google Chrome, Discord, Zen Browser, CopyQ, playerctl/wmctrl/xdotool, wl-clipboard/xclip/xsel | Alacritty: cargo build (apt deps `cmake`, `pkg-config`, font/X libs) · AppImageLauncher: PPA → GitHub `.deb` → Lite AppImage to `~/Applications/` · VSCode: Microsoft apt repo · Cursor: `.deb` from `cursor.com/api/download` · Google Chrome: `.deb` from `dl.google.com` (x86_64 only) · Discord: flatpak (Flathub user-scope, default) or `.deb` via `discordChannel` chooser · Zen Browser: AppImage to `~/Applications/zen.AppImage` |
 | `auditd` (Linux, gated `installAuditd`) | `auditd` + `audispd-plugins` (Debian) / `audit` (RedHat); rule files `00-baseline.rules`, `05-privileged.rules`, optional `10-execve.rules`, `99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`, `gitleaks` | macOS: brew (`gitleaks`) + uv (`pre-commit`) · Linux: gitleaks from GitHub release (system → `/usr/local/bin`; user fallback → `~/.local/bin`) + uv pre-commit. **Go is no longer here** — it moved to mise (`go = "latest"`, gated `installExtraRuntimes`). |
-| `bitwarden` (gated `installBitwarden`) | `@bitwarden/cli` + Bitwarden Desktop (when `bitwarden_install_desktop=true`) | CLI: `mise exec -- npm install -g @bitwarden/cli` (preferred) / system npm fallback · Desktop: macOS brew cask · Linux: snap → `.deb` fallback |
+| `bitwarden` (gated `installBitwarden`) | `@bitwarden/cli` + Bitwarden Desktop (when `bitwarden_install_desktop=true`) | CLI: `mise exec -- npm install -g @bitwarden/cli` (preferred) / system npm fallback · Desktop: macOS Mac App Store via `mas` (bundles the Safari extension), brew cask fallback · Linux: snap → `.deb` fallback |
 | `input_method` (gated `installInputMethod`) | `mcbopomofo`, `squirrel` (macOS) · `ibus-rime` (Debian) | macOS: brew cask · Linux: apt. Rime's `*.custom.yaml` is chezmoi-managed and shared with the Windows repo — see [input_methods](../input_methods/README.md). |
 | `atuin` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
 | `homebrew` | (see [§ 2 Homebrew](#2-homebrew-formulae--casks)) | — |
@@ -1103,7 +1103,7 @@ list.
 | **bat** | brew | apt + `/usr/bin/bat` symlink → GitHub musl | base/devtools |
 | **bats-core** | brew | apt → GitHub `install.sh` | devtools |
 | **Bitwarden CLI** (`bw`) | `mise exec -- npm install -g @bitwarden/cli` | same | bitwarden |
-| **Bitwarden Desktop** | brew cask | snap → `.deb` | bitwarden |
+| **Bitwarden Desktop** | Mac App Store (`mas`) → brew cask fallback | snap → `.deb` | bitwarden |
 | **btop** | brew | apt → GitHub release | devtools |
 | **build-essential** | n/a | apt | bootstrap (Linux) |
 | **bun** | mise | mise | mise |

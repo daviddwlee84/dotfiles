@@ -417,7 +417,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 | `gui_apps_linux`(Linux Debian + `ubuntu_desktop` profile) | Alacritty、libfuse2、AppImageLauncher、VSCode、Cursor、Google Chrome、Discord、Zen Browser、CopyQ、playerctl/wmctrl/xdotool、wl-clipboard/xclip/xsel | Alacritty:cargo 編譯(apt 依賴 `cmake`、`pkg-config`、字型/X 函式庫) · AppImageLauncher:PPA → GitHub `.deb` → Lite AppImage 到 `~/Applications/` · VSCode:Microsoft apt repo · Cursor:`.deb` 來自 `cursor.com/api/download` · Google Chrome:`.deb` 來自 `dl.google.com`(僅 x86_64) · Discord:flatpak(Flathub user-scope,預設)或 `.deb`,由 `discordChannel` 選擇 · Zen Browser:AppImage 到 `~/Applications/zen.AppImage` |
 | `auditd`(Linux,`installAuditd` 控管) | `auditd` + `audispd-plugins`(Debian)/ `audit`(RedHat);rule 檔 `00-baseline.rules`、`05-privileged.rules`、選用 `10-execve.rules`、`99-finalize.rules` | apt / yum |
 | `security_tools` | `pre-commit`、`gitleaks` | macOS:brew(`gitleaks`)+ uv(`pre-commit`) · Linux:gitleaks 來自 GitHub release(系統 → `/usr/local/bin`;使用者 fallback → `~/.local/bin`)+ uv pre-commit。**Go 已不在此** — 移到 mise(`go = "latest"`,gate 於 `installExtraRuntimes`)。 |
-| `bitwarden`(`installBitwarden` 控管) | `@bitwarden/cli` + Bitwarden Desktop(`bitwarden_install_desktop=true` 時) | CLI:`mise exec -- npm install -g @bitwarden/cli`(優先)/ 系統 npm fallback · Desktop:macOS brew cask · Linux:snap → `.deb` fallback |
+| `bitwarden`(`installBitwarden` 控管) | `@bitwarden/cli` + Bitwarden Desktop(`bitwarden_install_desktop=true` 時) | CLI:`mise exec -- npm install -g @bitwarden/cli`(優先)/ 系統 npm fallback · Desktop:macOS 以 `mas` 從 Mac App Store 安裝(內含 Safari 延伸功能),失敗時改用 brew cask · Linux:snap → `.deb` fallback |
 | `input_method`(`installInputMethod` 控管) | `mcbopomofo`、`squirrel`(macOS)· `ibus-rime`(Debian) | macOS:brew cask · Linux:apt。Rime 的 `*.custom.yaml` 由 chezmoi 納管並與 Windows repo 共用 — 見 [input_methods](../input_methods/README.zh-TW.md)。 |
 | `atuin` | (見 [§ 3.1 基礎/共用](#31-基礎--共用-cli)) | — |
 | `homebrew` | (見 [§ 2 Homebrew](#2-homebrew-formulae--casks)) | — |
@@ -1015,7 +1015,7 @@ agent-specific 升級路徑。
 | **bat** | brew | apt + `/usr/bin/bat` symlink → GitHub musl | base/devtools |
 | **bats-core** | brew | apt → GitHub `install.sh` | devtools |
 | **Bitwarden CLI** (`bw`) | `mise exec -- npm install -g @bitwarden/cli` | same | bitwarden |
-| **Bitwarden Desktop** | brew cask | snap → `.deb` | bitwarden |
+| **Bitwarden Desktop** | Mac App Store (`mas`) → brew cask fallback | snap → `.deb` | bitwarden |
 | **btop** | brew | apt → GitHub release | devtools |
 | **build-essential** | n/a | apt | bootstrap (Linux) |
 | **bun** | mise | mise | mise |

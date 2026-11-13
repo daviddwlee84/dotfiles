@@ -343,7 +343,7 @@ category = "Security & Secrets"
 desc = "Bitwarden desktop app"
 role = "bitwarden"
 app = "Bitwarden"
-mac = "brew cask"
+mac = "Mac App Store (`mas`) → brew cask fallback"
 linux = "snap → `.deb`"
 
 [[tool]]

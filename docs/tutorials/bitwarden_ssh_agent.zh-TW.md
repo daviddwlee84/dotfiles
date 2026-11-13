@@ -18,7 +18,7 @@
 
 - **CLI** (`bw`)：所有 profile 皆透過 npm 安裝
 - **Desktop app**：僅在 desktop profile 安裝（`ubuntu_desktop`、`macos`）
-    - **macOS**：透過 Homebrew Cask（`brew install --cask bitwarden`）
+    - **macOS**：透過 `mas` 從 Mac App Store 安裝（App Store 版內含 Safari 延伸功能）；沒有登入 App Store 時改用 Homebrew Cask（`brew install --cask bitwarden`）。已經存在的 `Bitwarden.app` 不會被更動
     - **Ubuntu**：優先使用 Snap，`.deb` 下載作為備援
 
 ```bash
@@ -33,7 +33,7 @@ cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags bitwarden --extra-v
 
 如果你偏好手動安裝，或正在使用 `ubuntu_server`：
 
-- **macOS**：`brew install --cask bitwarden`
+- **macOS**：`sudo mas get 1352778147`（App Store 版，含 Safari 延伸功能）或 `brew install --cask bitwarden`
 - **Ubuntu (snap)**：`sudo snap install bitwarden`
 - **Ubuntu (.deb)**：從 [vault.bitwarden.com](https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=deb) 下載
 - **Flatpak**：`flatpak install flathub com.bitwarden.desktop`

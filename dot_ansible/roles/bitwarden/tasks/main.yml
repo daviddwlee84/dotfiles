@@ -109,7 +109,12 @@
 # Only runs when bitwarden_install_desktop=true (set via --extra-vars)
 # =============================================================================
 
-# --- macOS: Homebrew Cask ---
+# --- macOS: Mac App Store (preferred), Homebrew Cask fallback ---
+# The App Store build bundles the Safari extension; the cask/DMG build does
+# not. Both run the SSH agent (different socket paths; 94_ssh_agent.sh and the
+# ~/.ssh defaults probe both). Any existing Bitwarden.app is left alone.
+# mas 5+ needs root for `get`/`install` and an App Store sign-in; without
+# either (not signed in, or sudo skipped) the cask fallback below installs it.
 
 - name: Check if Bitwarden Desktop is installed (macOS)
   when:
@@ -119,11 +124,48 @@
     path: /Applications/Bitwarden.app
   register: bitwarden_desktop_macos
 
-- name: Install Bitwarden Desktop via Homebrew Cask (macOS)
+- name: Install Bitwarden Desktop from the Mac App Store (macOS)
   when:
     - bitwarden_install_desktop | bool
     - ansible_facts["os_family"] == "Darwin"
     - not (bitwarden_desktop_macos.stat.exists | default(false))
+    - not ansible_check_mode
+  tags: [sudo]
+  block:
+    - name: Ensure mas (Mac App Store CLI) is installed
+      community.general.homebrew:
+        name: mas
+        state: present
+
+    - name: Get Bitwarden Desktop with mas
+      become: true
+      ansible.builtin.command: "mas get {{ bitwarden_desktop_mas_id }}"
+      register: bitwarden_mas_get
+      changed_when: true
+  rescue:
+    - name: Report Mac App Store install failure (Bitwarden Desktop)
+      ansible.builtin.debug:
+        msg: >-
+          Bitwarden Desktop: Mac App Store install failed
+          ({{ ansible_failed_result.stderr | default(ansible_failed_result.msg) | default('see task output') }}).
+          Sign in to the App Store app to get the App Store build next time;
+          falling back to the Homebrew cask now.
+
+- name: Recheck Bitwarden Desktop after the Mac App Store attempt (macOS)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Darwin"
+    - not (bitwarden_desktop_macos.stat.exists | default(false))
+  ansible.builtin.stat:
+    path: /Applications/Bitwarden.app
+  register: bitwarden_desktop_macos_after_mas
+
+- name: Install Bitwarden Desktop via Homebrew Cask (macOS fallback)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Darwin"
+    - not (bitwarden_desktop_macos.stat.exists | default(false))
+    - not (bitwarden_desktop_macos_after_mas.stat.exists | default(false))
   community.general.homebrew_cask:
     name: bitwarden
     state: present

@@ -6,3 +6,7 @@ bitwarden_cli_npm_package: "@bitwarden/cli"
 # Override via --extra-vars "bitwarden_install_desktop=true"
 # Only meaningful on ubuntu_desktop (snap/deb) and macOS (homebrew cask)
 bitwarden_install_desktop: false
+
+# Mac App Store ID of Bitwarden Desktop (preferred on macOS: it bundles the
+# Safari extension). The role falls back to the Homebrew cask when mas fails.
+bitwarden_desktop_mas_id: 1352778147
