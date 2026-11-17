@@ -21,25 +21,37 @@ SpecStory reads configuration in this order:
 
 Later sources override earlier ones. That means the dotfile provides global defaults, while a repo-specific `.specstory/cli/config.toml` can override them when a project needs different behavior.
 
-!!! note "Seeded once, not continuously managed"
-    The user-level config is a chezmoi `create_` file (`private_dot_specstory/private_cli/create_config.toml`): chezmoi writes it on first `apply` and then **never touches it again**. This is deliberate — the SpecStory CLI writes runtime UI state back into the file (e.g. a `[resume]` block with `view_mode` / `last_agent` after `specstory resume`), which would otherwise show up as permanent chezmoi drift. To change the shipped defaults, edit the source and re-seed: `cp ~/.specstory/cli/config.toml "$(chezmoi source-path ~/.specstory/cli/config.toml)"`.
+!!! note "Overlay-managed (`modify_`), not plain-managed"
+    The user-level config is rendered by a chezmoi `modify_` script (`private_dot_specstory/private_cli/modify_private_config.toml.tmpl`) from the template `.chezmoitemplates/specstory/config.toml`. SpecStory is a foreign writer: `specstory resume` writes a `[resume]` table (`view_mode` / `last_agent`) back into the file, so a plain managed file would drift forever. On every `chezmoi apply`, each **active** key in the template wins; every other live key is kept: unknown tables such as `[resume]` wholesale, plus extra keys inside managed tables, for example a host-local `local_time_zone = true` under `[local_sync]`. Deleting a key from the template does **not** remove it from hosts, so set it to the value you want instead. Invalid TOML in the live file fails the apply loudly rather than being overwritten. Edit the template, never `chezmoi add` the target (that would overwrite the script). The file used to be `create_` (seed-once), which meant template updates never reached existing hosts. The `private_` attribute matches the 0600 mode SpecStory itself uses when it rewrites the file; without it, every `resume` would cause a mode drift.
 
 ## Managed Defaults
 
-The managed config keeps the upstream sample sections as commented documentation, but only enables `[providers]` defaults.
+The managed config keeps the upstream sample sections as commented documentation, and enables only `[providers]` and `[redaction]` defaults.
 
-Configured providers:
+Configured providers (every `*_cmd` key SpecStory 2.17 accepts for a local CLI):
 
-- `antigravity_cmd = "agy --dangerously-skip-permissions"`
-- `claude_cmd = "claude --dangerously-skip-permissions"`
-- `codex_cmd = 'codex --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'`
-- `cursor_cmd = "cursor-agent --force"`
-- `droid_cmd = "droid --yolo"`
-- `gemini_cmd = "gemini --sandbox=none"`
+| Key | Command | Bypass mechanism |
+|---|---|---|
+| `antigravity_cmd` | `agy --dangerously-skip-permissions` | auto-approve all tool requests |
+| `claude_cmd` | `claude --dangerously-skip-permissions` | bypassPermissions (`--permission-mode auto` is the classifier-gated alternative) |
+| `codex_cmd` | `codex --dangerously-bypass-approvals-and-sandbox -c model_reasoning_summary="detailed"` | = `-a never -s danger-full-access` |
+| `copilot_cmd` | `copilot --yolo` | = `--allow-all` (tools, paths, URLs) |
+| `cursor_cmd` | `cursor-agent --force` | run everything unless denied |
+| `droid_cmd` | `droid --yolo` | — |
+| `gemini_cmd` | `gemini --yolo` | auto-approve all tools |
+| `opencode_cmd` | `opencode --auto` | auto-approve anything not explicitly denied |
+| `pi_cmd` | `pi` | Pi has no permission prompts |
+| `qwen_cmd` | `qwen --yolo` | auto-approve all tools |
+
+`deepseek_cmd` / `grok_cmd` / `muse_cmd` ship commented out — their bypass flags were not verified. The IDE/cloud providers (`copilotide`, `cursoride`, `cursorcloud`) don't launch a local CLI through `run` and have no entry.
+
+Other non-provider defaults: `[redaction] enabled = true` (pinned explicitly so an upstream default change can't silently disable secret redaction). Analytics and cloud sync are left at their upstream defaults (cloud sync, is on only when logged in to SpecStory Cloud).
 
 These are the commands `specstory run claude`, `specstory run codex`, and similar provider shortcuts will execute by default unless overridden per project or on the command line.
 
-Codex 0.156.0 rejects the old `model_supports_reasoning_summaries` override and reports it as an ignored `session-flags` setting at startup. Keep `model_reasoning_summary="detailed"` to request detailed summaries. On existing hosts, remove only `-c model_supports_reasoning_summaries=true` from `codex_cmd` in `~/.specstory/cli/config.toml` (and any project override); `chezmoi apply` does not update this seed-only file. Restart the Codex session to use the corrected command.
+Codex model and reasoning effort are deliberately **not** pinned here — they come from `~/.codex/config.toml`. Only `model_reasoning_summary="detailed"` stays, so the saved markdown keeps reasoning text. (The original seed pinned `model_reasoning_effort="high"` and the obsolete `model_supports_reasoning_summaries=true`; Codex 0.156+ reports the latter as an ignored `session-flags` setting.) Gemini used to ship `--sandbox=none`, which only controls sandboxing and never skipped approvals; `--yolo` is the actual bypass.
+
+Existing hosts pick up template changes on the next `chezmoi apply` (or `fleet-apply`), with no manual re-seed.
 
 ### Always name the provider — the no-arg default is not stable
 
@@ -63,10 +75,10 @@ commit the export automatically.
 
 The configured provider commands intentionally favor low-friction agent execution:
 
-- Claude uses `--dangerously-skip-permissions`
-- Codex uses `--ask-for-approval never` and `--sandbox danger-full-access`
-- Antigravity uses `--dangerously-skip-permissions`; Cursor uses `--force` and Droid `--yolo`
-- Gemini uses `--sandbox=none`
+- Claude and Antigravity use `--dangerously-skip-permissions`
+- Codex uses `--dangerously-bypass-approvals-and-sandbox` (no approvals, no sandbox)
+- Copilot, Droid, Gemini and Qwen use `--yolo`; Cursor uses `--force`; OpenCode uses `--auto`
+- Pi has no permission layer at all
 
 This removes most interactive permission prompts, which is useful for fast local workflows, but it also gives the wrapped agents broader filesystem or command access. Keep these defaults only if you trust the environment and want convenience over stricter guardrails. If not, override the relevant provider command in the global file, a project-local config, or the `specstory run -c ...` flag.
 

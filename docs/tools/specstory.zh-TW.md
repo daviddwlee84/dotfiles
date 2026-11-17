@@ -26,25 +26,37 @@
 
 後者覆蓋前者。也就是說 dotfile 提供全域預設值，而 repo 專屬的 `.specstory/cli/config.toml` 可在專案需要不同行為時覆寫之。
 
-!!! note "只種一次 (seed once)，不持續管理"
-    使用者層級設定是 chezmoi 的 `create_` 檔（`private_dot_specstory/private_cli/create_config.toml`）：chezmoi 只在第一次 `apply` 時寫入，之後**不再更動它**。這是刻意設計的 —— SpecStory CLI 會把執行期的 UI 狀態寫回這個檔（例如 `specstory resume` 之後產生的 `[resume]` 區塊，含 `view_mode` / `last_agent`），若持續管理就會變成永久的 chezmoi drift。要修改內建預設值，請改 source 檔再重新種一次：`cp ~/.specstory/cli/config.toml "$(chezmoi source-path ~/.specstory/cli/config.toml)"`。
+!!! note "以 overlay（`modify_`）管理，而非一般受管理檔案"
+    使用者層級設定由 chezmoi `modify_` 腳本（`private_dot_specstory/private_cli/modify_private_config.toml.tmpl`）依 template `.chezmoitemplates/specstory/config.toml` 產生。SpecStory 是外部寫入者：`specstory resume` 會把 `[resume]` 區塊（`view_mode` / `last_agent`）寫回這個檔，所以一般受管理檔案會永遠 drift。每次 `chezmoi apply` 時，template 中每個**啟用中**的 key 都會以 template 為準；其他 live key 一律保留：`[resume]` 這類未知區塊整塊保留，受管理區塊裡多出的 key 也會保留，例如 `[local_sync]` 底下主機本機的 `local_time_zone = true`。從 template 刪掉某個 key **不會**從主機上移除它，請改成設定想要的值。live 檔若不是合法 TOML，apply 會直接報錯，而不是覆蓋掉。請修改 template，不要對 target 做 `chezmoi add`（會把腳本蓋掉）。這個檔以前是 `create_`（只種一次），因此 template 更新永遠到不了既有主機。`private_` 屬性是為了配合 SpecStory 自己改寫這個檔時用的 0600 權限；少了它，每次 `resume` 都會造成 mode drift。
 
 ## 受管理的預設值
 
-受管理的設定保留上游範例區塊作為註解文件，但只啟用 `[providers]` 預設值。
+受管理的設定保留上游範例區塊作為註解文件，只啟用 `[providers]` 與 `[redaction]` 預設值。
 
-已設定的 provider：
+已設定的 provider（SpecStory 2.17 對本機 CLI 接受的所有 `*_cmd` key）：
 
-- `antigravity_cmd = "agy --dangerously-skip-permissions"`
-- `claude_cmd = "claude --dangerously-skip-permissions"`
-- `codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'`
-- `cursor_cmd = "cursor-agent --force"`
-- `droid_cmd = "droid --yolo"`
-- `gemini_cmd = "gemini --sandbox=none"`
+| Key | 命令 | Bypass 機制 |
+|---|---|---|
+| `antigravity_cmd` | `agy --dangerously-skip-permissions` | 自動核准所有 tool 請求 |
+| `claude_cmd` | `claude --dangerously-skip-permissions` | bypassPermissions（`--permission-mode auto` 是由 classifier 把關的替代方案） |
+| `codex_cmd` | `codex --dangerously-bypass-approvals-and-sandbox -c model_reasoning_summary="detailed"` | = `-a never -s danger-full-access` |
+| `copilot_cmd` | `copilot --yolo` | = `--allow-all`（tools、paths、URLs） |
+| `cursor_cmd` | `cursor-agent --force` | 除非明確拒絕，否則全部執行 |
+| `droid_cmd` | `droid --yolo` | — |
+| `gemini_cmd` | `gemini --yolo` | 自動核准所有 tools |
+| `opencode_cmd` | `opencode --auto` | 自動核准所有未明確拒絕的請求 |
+| `pi_cmd` | `pi` | Pi 沒有權限提示 |
+| `qwen_cmd` | `qwen --yolo` | 自動核准所有 tools |
+
+`deepseek_cmd` / `grok_cmd` / `muse_cmd` 以註解形式提供 —— 它們的 bypass flag 尚未驗證。IDE/cloud provider（`copilotide`、`cursoride`、`cursorcloud`）不會透過 `run` 啟動本機 CLI，因此沒有對應項目。
+
+其他非 provider 的預設值：`[redaction] enabled = true`（明確固定，避免上游預設改變時悄悄關掉 secret redaction）。Analytics 與 cloud sync 維持上游預設（cloud sync 只有登入 SpecStory Cloud 時才會開啟）。
 
 這些是 `specstory run claude`、`specstory run codex` 與類似 provider 捷徑預設會執行的命令，除非在專案內或命令列上另行覆寫。
 
-Codex 0.156.0 不接受舊的 `model_supports_reasoning_summaries` 覆寫值，啟動時會將它列為被忽略的 `session-flags` 設定。保留 `model_reasoning_summary="detailed"` 即可要求詳細摘要。既有主機需從 `~/.specstory/cli/config.toml` 的 `codex_cmd`（及任何專案覆寫）中移除 `-c model_supports_reasoning_summaries=true`；`chezmoi apply` 不會更新這個只種一次的檔案。重新啟動 Codex 工作階段後才會使用修正後的命令。
+Codex 的 model 與 reasoning effort 刻意**不**在此固定 —— 它們來自 `~/.codex/config.toml`。只保留 `model_reasoning_summary="detailed"`，讓存下的 markdown 保有 reasoning 文字。（最初的 seed 固定了 `model_reasoning_effort="high"` 與已過時的 `model_supports_reasoning_summaries=true`；Codex 0.156+ 會把後者列為被忽略的 `session-flags` 設定。）Gemini 過去使用 `--sandbox=none`，它只控制 sandbox，從未跳過核准；真正的 bypass 是 `--yolo`。
+
+既有主機在下一次 `chezmoi apply`（或 `fleet-apply`）時就會套用 template 變更，不需要手動重新種。
 
 ### 一律明寫 provider —— 無參數的預設值並不穩定
 
@@ -55,10 +67,10 @@ Codex 0.156.0 不接受舊的 `model_supports_reasoning_summaries` 覆寫值，�
 
 設定的 provider 命令刻意傾向低摩擦的代理執行：
 
-- Claude 使用 `--dangerously-skip-permissions`
-- Codex 使用 `--ask-for-approval never` 與 `--sandbox danger-full-access`
-- Antigravity 使用 `--dangerously-skip-permissions`；Cursor 使用 `--force`、Droid 使用 `--yolo`
-- Gemini 使用 `--sandbox=none`
+- Claude 與 Antigravity 使用 `--dangerously-skip-permissions`
+- Codex 使用 `--dangerously-bypass-approvals-and-sandbox`（無核准、無 sandbox）
+- Copilot、Droid、Gemini 與 Qwen 使用 `--yolo`；Cursor 使用 `--force`；OpenCode 使用 `--auto`
+- Pi 完全沒有權限層
 
 這移除了大部分互動式權限提示，對快速本機工作流程很有用，但同時也讓被包裝的代理擁有更廣的檔案系統或命令存取權。只有在您信任該環境並重視便利勝於更嚴格的護欄時，才保留這些預設值。若否，請在全域檔、專案本機設定或 `specstory run -c ...` flag 中覆寫相關的 provider 命令。
 

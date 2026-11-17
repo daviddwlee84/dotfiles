@@ -109,9 +109,10 @@ grep -rn 'specstory run\( \|$\)' --include='*.sh' --include='*.tmpl' \
 ```
 
 To add flags for a newly-registered provider, use its `<id>_cmd` key in
-`private_dot_specstory/private_cli/create_config.toml` (and hand-copy into the
-live `~/.specstory/cli/config.toml` — it's a `create_` file, so chezmoi seeds
-it once and never touches it again):
+`.chezmoitemplates/specstory/config.toml`; the `modify_` overlay
+(`private_dot_specstory/private_cli/modify_private_config.toml.tmpl`) re-asserts it on
+the next `chezmoi apply`. It was a seed-once `create_` file when this pitfall
+was written:
 
 ```toml
 # Antigravity CLI command (binary is `agy`; add `--effort high` if wanted)

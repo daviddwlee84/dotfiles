@@ -1,5 +1,11 @@
 # SpecStory CLI Configuration
 #
+# MANAGED BY CHEZMOI via modify_ overlay
+# (source: .chezmoitemplates/specstory/config.toml). Every *active* key below
+# is re-asserted on `chezmoi apply`; other keys and tables (e.g. SpecStory's own
+# [resume] state, or a key you uncomment here) are preserved. Per-project
+# overrides belong in ./.specstory/cli/config.toml.
+#
 # This is the user-level config file for SpecStory CLI.
 # Settings here act as global defaults for all projects when you run `specstory`.
 #
@@ -59,7 +65,8 @@
 # Override the default service name (default: "specstory-cli")
 # service_name = "my-service-name"
 
-# Include user prompt text in telemetry spans (default: true)
+# Include user prompt text in telemetry spans (default: true). Only matters
+# once an endpoint is set; set `prompts = false` then if prompts are sensitive.
 # prompts = false
 
 [redaction]
@@ -67,7 +74,8 @@
 # session data. (default: true)
 # Detection uses the betterleaks ruleset, covering API keys, tokens, private
 # keys, and other credentials for many providers.
-# enabled = false # equivalent to --no-redact-secrets
+# Pinned on explicitly so an upstream default change can't silently disable it.
+enabled = true # `false` is equivalent to --no-redact-secrets
 
 [providers]
 # Agent execution commands by provider (used by `specstory run`)
@@ -80,20 +88,44 @@
 # no config key to override that. Always name the provider explicitly:
 # `specstory run claude`. See pitfalls/specstory-run-default-agent-drift.md.
 
-# Antigravity CLI command (binary is `agy`; add `--effort high` if wanted)
+# Defaults favour zero-prompt runs (bypass / YOLO). Flags verified against
+# each CLI's `--help`; see docs/tools/specstory.md § Safety Tradeoff.
+# IDE/cloud providers (copilotide, cursoride, cursorcloud) don't launch a
+# local CLI via `run`, so they have no entry here.
+
+# Antigravity CLI (binary is `agy`; add `--effort high` if wanted)
 antigravity_cmd = "agy --dangerously-skip-permissions"
 
-# Claude Code command
+# Claude Code (`--permission-mode auto` is the classifier-gated alternative)
 claude_cmd = "claude --dangerously-skip-permissions"
 
-# Codex CLI command
-codex_cmd = 'codex --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed"'
+# Codex CLI: one flag = `-a never -s danger-full-access`. The summary override
+# keeps reasoning text in the saved markdown; model / effort stay in
+# ~/.codex/config.toml.
+codex_cmd = 'codex --dangerously-bypass-approvals-and-sandbox -c model_reasoning_summary="detailed"'
 
-# Cursor CLI command
+# GitHub Copilot CLI (`--yolo` = `--allow-all`: tools, paths, URLs)
+copilot_cmd = "copilot --yolo"
+
+# Cursor CLI (`--yolo` is an alias)
 cursor_cmd = "cursor-agent --force"
 
-# Droid CLI command
+# Factory Droid CLI
 droid_cmd = "droid --yolo"
 
-# Gemini CLI command
-gemini_cmd = "gemini --sandbox=none"
+# Gemini CLI (`--yolo` auto-approves tools; `--sandbox` is a separate axis)
+gemini_cmd = "gemini --yolo"
+
+# OpenCode (auto-approve everything not explicitly denied)
+opencode_cmd = "opencode --auto"
+
+# Pi has no permission prompts; listed for completeness
+pi_cmd = "pi"
+
+# Qwen Code (Gemini CLI fork; `--approval-mode auto` is the classifier option)
+qwen_cmd = "qwen --yolo"
+
+# Unverified bypass flags: uncomment and add one once installed.
+# deepseek_cmd = "deepseek"   # DeepSeek TUI
+# grok_cmd = "grok"           # Grok Build
+# muse_cmd = "muse"           # Muse Code

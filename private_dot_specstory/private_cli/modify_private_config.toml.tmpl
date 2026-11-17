@@ -1,0 +1,80 @@
+#!/bin/sh
+# chezmoi modify_ script: overlay managed SpecStory defaults onto
+# ~/.specstory/cli/config.toml.
+#
+# Why: SpecStory is a foreign writer for this file — `specstory resume` persists
+# a [resume] table (view_mode / last_agent). It was previously `create_`
+# (seed-once), which avoided drift but meant template edits (new providers,
+# privacy defaults) never reached an already-seeded host.
+#
+# Merge model — template-as-base, per-key pull-through:
+#   - Base = .chezmoitemplates/specstory/config.toml (keeps upstream comments).
+#   - Every ACTIVE key in the template wins (e.g. providers.*_cmd,
+#     analytics.enabled, redaction.enabled).
+#   - Live keys the template doesn't set are copied in: unknown tables like
+#     [resume] wholesale, and extra keys inside managed tables (e.g. a host-local
+#     `local_sync.local_time_zone = true`).
+#   - Consequence: deleting a key from the template does NOT remove it from
+#     hosts; set it to the desired value instead.
+#
+# Python runtime: prefer uv (guarantees tomllib + tomlkit), then python3; with
+# neither, or without tomlkit, print the template (a fresh host still gets a
+# full config; only [resume] UI state is lost for that run).
+set -eu
+
+tmpl_file=$(mktemp "${TMPDIR:-/tmp}/specstory-config.XXXXXX")
+trap 'rm -f "$tmpl_file"' EXIT INT TERM
+
+cat <<'TOML' > "$tmpl_file"
+{{ template "specstory/config.toml" . }}
+TOML
+
+live=$(cat)
+
+if command -v uv >/dev/null 2>&1; then
+  set -- uv run --no-project --quiet --with tomlkit --python '>=3.11' python -
+elif command -v python3 >/dev/null 2>&1; then
+  set -- python3 -
+else
+  echo "modify_config.toml (specstory): neither uv nor python3 found; emitting managed template" >&2
+  cat "$tmpl_file"
+  exit 0
+fi
+
+SPECSTORY_TEMPLATE_FILE="$tmpl_file" SPECSTORY_LIVE="$live" "$@" <<'PYEOF'
+import os
+import sys
+
+with open(os.environ["SPECSTORY_TEMPLATE_FILE"]) as fh:
+    template_text = fh.read()
+
+try:
+    import tomllib
+    import tomlkit
+except ModuleNotFoundError:
+    print("modify_config.toml (specstory): tomllib/tomlkit unavailable; "
+          "emitting managed template", file=sys.stderr)
+    sys.stdout.write(template_text)
+    sys.exit(0)
+
+live_text = os.environ.get("SPECSTORY_LIVE", "")
+try:
+    live = tomllib.loads(live_text) if live_text.strip() else {}
+except tomllib.TOMLDecodeError as exc:
+    # Don't silently discard a hand-broken file's intent; fail the apply loudly.
+    print(f"modify_config.toml (specstory): live config is not valid TOML: {exc}",
+          file=sys.stderr)
+    sys.exit(1)
+
+doc = tomlkit.parse(template_text)
+for key, value in live.items():
+    if key not in doc:
+        doc[key] = value
+    elif isinstance(value, dict) and isinstance(doc[key], dict):
+        for sub, sub_value in value.items():
+            if sub not in doc[key]:
+                doc[key][sub] = sub_value
+
+out = tomlkit.dumps(doc)
+sys.stdout.write(out if out.endswith("\n") else out + "\n")
+PYEOF
