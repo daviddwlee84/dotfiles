@@ -47,7 +47,7 @@ LSP infra plugins from [`create_lazy-lock.json`](../../dot_config/nvim/create_la
 }
 ```
 
-- **`pyright-lsp@claude-plugins-official`** — Python LSP for Claude Code, sourced from the official marketplace.
+- **`pyright-lsp@claude-plugins-official`** — Python LSP for Claude Code, sourced from the official marketplace. It launches the separately installed `pyright-langserver` binary from `PATH`.
 - **`gopls-lsp@claude-plugins-official`** — Go LSP adapter for Claude Code. It launches the separately installed `gopls` binary from `PATH`.
 - **`claude-hud@claude-hud`** — the statusline plugin, deliberately `false`. Disabling it drops its two install/config-time commands (`claude-hud:setup` / `claude-hud:configure`) out of every session's skill listing, which is the only context they were costing. The HUD itself is unaffected: `statusLine.command` globs `~/.claude/plugins/cache/claude-hud/*/` and execs `dist/index.js` directly, never resolving through the plugin loader. Updates are likewise unaffected — they run through [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) (`just upgrade-plugins`), which only touches `installed_plugins.json` and the versioned cache dir. See [upgrades.md](../this_repo/upgrades.md).
 
@@ -59,6 +59,7 @@ The overlay deep-merges via a hook-aware `jq` script ([details](agent-overlays.m
 
 - **`taplo`** — installed by [`dot_ansible/roles/devtools/tasks/main.yml`](../../dot_ansible/roles/devtools/tasks/main.yml) (system-wide CLI: `taplo fmt`, `taplo lint`). Note: also auto-installed by `lazyvim.plugins.extras.lang.toml` into Mason. Two binaries, both fine.
 - **`gopls`** — macOS via Homebrew; Linux via [`go_tools`](../../dot_ansible/roles/go_tools/defaults/main.yml). Claude Code's `gopls-lsp` plugin requires this PATH-visible binary.
+- **`pyright`** — `uv tool install 'pyright[nodejs]'` in [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml) (gated by `installCodingAgents`, same as Claude Code). Provides the `pyright-langserver` that Claude Code's `pyright-lsp` plugin requires; the `[nodejs]` extra bundles Node so it doesn't depend on mise shims being on Claude's PATH. Independent of nvim's Mason-managed `basedpyright`.
 
 Runtime prerequisites (not LSPs themselves, but most LSPs need them):
 

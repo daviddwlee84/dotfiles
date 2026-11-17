@@ -1250,6 +1250,7 @@ list.
 | **prettier** | Mason (Neovim-local) | Mason (Neovim-local) | LazyVim `ensure_installed`; Conform prefers project-local `node_modules/.bin/prettier` |
 | **procps** | (system) | apt | bootstrap (Linux) |
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
+| **pyright** | `uv tool install 'pyright[nodejs]'` | same | Python language server for Claude Code's official `pyright-lsp` plugin |
 | **raycast** | brew cask | n/a | Brewfile.darwin |
 | **rclone** | brew | official installer or GitHub | devtools — macOS `rclone mount` also needs **macFUSE** (5.x on macOS 26+), manual & **not** repo-managed (reboot + GUI approval); brew rclone ≥1.73 already ships `mount` so the binary isn't the blocker ([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md)) |
 | **readability-cli** (`readable`) | npm global | `mise exec -- npm install -g` | js_cli_tools |

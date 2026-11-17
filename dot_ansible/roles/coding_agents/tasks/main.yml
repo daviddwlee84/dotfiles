@@ -70,6 +70,42 @@
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.claude/local/bin/claude"
 
+# === Pyright (backs Claude Code's pyright-lsp plugin) ===
+# dot_claude/modify_settings.json.tmpl force-enables
+# `pyright-lsp@claude-plugins-official`, which only launches a PATH-visible
+# `pyright-langserver` — without it every session warns "couldn't start".
+# `[nodejs]` bundles a Node runtime (nodejs-wheel) so the server does not
+# depend on mise's node shims being on the PATH Claude spawns it with.
+# The PyPI wrapper fetches the real npm package on first run; the warm-up
+# below pays that cost here instead of inside the LSP startup timeout.
+
+- name: Check if uv is available (pyright)
+  ansible.builtin.command: which uv
+  register: uv_pyright_check
+  changed_when: false
+  failed_when: false
+
+- name: Install pyright via uv
+  when: uv_pyright_check.rc == 0
+  ansible.builtin.command: uv tool install 'pyright[nodejs]'
+  register: pyright_install
+  until: pyright_install is succeeded
+  retries: 3
+  delay: 5
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/pyright-langserver"
+
+- name: Warm up pyright (download the bundled npm package)
+  when: pyright_install is changed
+  ansible.builtin.command: "{{ ansible_facts['env']['HOME'] }}/.local/bin/pyright --version"
+  changed_when: false
+  failed_when: false
+
+- name: Warn when uv is missing and pyright is not installed
+  when: uv_pyright_check.rc != 0
+  ansible.builtin.debug:
+    msg: "uv not found; skipping pyright. Claude Code's pyright-lsp plugin will warn until `uv tool install 'pyright[nodejs]'` is run."
+
 # === OpenCode ===
 # Cross-platform: use the official installer everywhere. We dropped the macOS
 # Homebrew path (anomalyco/tap formula) because:

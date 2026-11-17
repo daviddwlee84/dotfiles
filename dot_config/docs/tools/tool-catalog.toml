@@ -1719,6 +1719,16 @@ linux = "apt (`poppler-utils`)"
 role_md = "devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md)"
 
 [[tool]]
+id = "pyright"
+bins = ["pyright", "pyright-langserver"]
+category = "Dev Tools"
+desc = "Python type checker / language server (Claude Code pyright-lsp plugin)"
+role = "coding_agents"
+mac = "`uv tool install 'pyright[nodejs]'`"
+linux = "same"
+role_md = "Python language server for Claude Code's official `pyright-lsp` plugin"
+
+[[tool]]
 id = "pre-commit"
 category = "Dev Tools"
 desc = "Git hook framework"
