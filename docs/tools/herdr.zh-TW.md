@@ -187,6 +187,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `` prefix + ` `` | scratch shell | command popup |
 | `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
 | `prefix + O` | herdr-plus **Projects**（layout launcher） | plugin action |
+| `prefix + Q` | 為聚焦中的 agent **排入 prompt**，等它的 turn 結束才送出（[agent-queue](#agent-queue)） | plugin popup |
 | `` prefix + t `` | **互動式翻譯器** ——在 `translate` TUI 輸入或貼上文字（[詳細](#translate-pane)） | 80% × 80% popup |
 | `prefix + Alt + c` / `Alt + x` | claude / codex **+ SpecStory**，往右分割（[細節](#open-agent)） | detached command |
 | `prefix + Alt + t` | claude **+ SpecStory** 開在新 tab | detached command |
@@ -263,6 +264,20 @@ Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic
 **Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨六個 **copy** action（見 [複製 pane 與 space 的資訊](#copy-to-clipboard)）,外加 plugin 的五個**起手式**範例（GitHub / Google / Search Google / Open Repo / Reveal Working Dir）,已為 Linux 調整——macOS `open` → 本 repo 的跨平台 [`x open`](../shells/aliases.md),repo 選單指向 `daviddwlee84/*`。這些 copy 操作刻意集中在此處,不再占用六個 prefix 直達鍵。因為這個受管目錄非空,herdr-plus **不會** 自己 seed 那些範例（它只在*空*目錄時 seed）,所以在此 vendored;不要的 TOML 刪掉即可。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
 
 > **Quick Actions 是給一次性、非互動式指令用的**（內建範例全是 `open <url>`）。herdr-plus 用 `sh -c` 跑選中的 action,沒有 PTY、沒有互動 stdin,所以互動式 TUI 會出問題——btop 立刻退出、nvtop 收不到 F10。要跑 TUI 就用 dev/lazygit 那種*浮動 command pane*（`[[keys.command]] type="pane"`）——這就是為何 **dev**（`prefix+d`）、**btop**（`prefix+M`）與 **nvtop**（`prefix+N`）是快捷鍵而非 Quick Action。
+
+## agent-queue plugin（Codex 式 prompt queue） {#agent-queue}
+
+[herdr-agent-queue](https://github.com/connerohnesorge/herdr-agent-queue) 讓你在 agent 還在工作時先排好後續 prompt，就像 Codex 原生的行為。在 agent pane 按 `prefix + Q` 會開一個 popup，列出該 pane 的 queue 並讀一行輸入：Enter 排入、Tab 補全 Claude 的 `/skills`、空行取消、`:clear` 清空 queue。側邊欄會在該 pane 顯示 `N queued`。
+
+**安裝已自動化**，由 `devtools` role（`# --- herdr-agent-queue plugin ---` 區塊，與 herdr-plus 相同的 check/install/rescue 結構）處理。手動 fallback：`herdr plugin install connerohnesorge/herdr-agent-queue`。它只是一個 Python script，需要 `python3`，沒有建置步驟。用 `herdr plugin update` 更新。
+
+**何時送出。** 每次收到狀態為 `done` 或 `idle` 的 `pane.agent_status_changed` event，它會取得 lock、重新讀取即時狀態，再用 `herdr agent prompt … --wait --until working` 送出 queue 的第一則。lock 加上 wait 可防止 `done` → `idle` 連續兩個 event 在同一個 turn 送出兩則。**沒有 debounce**，所以 queue 完全信任 herdr 的狀態偵測：
+
+- **Claude 的狀態是 heuristic。** 已安裝的 Claude integration hook 只回報 session（`pane.report_agent_session`）。working、done、idle 仍來自 screen heuristics，所以 turn 中途短暫誤判成 `idle` 就可能提前送出。對 Claude Code 來說這通常只會變成一則 mid-turn 訊息，因為 Claude 工作中也能收輸入。
+- **按 Esc 中斷會觸發 queue。** 中斷 agent 會讓狀態變成 `idle`，下一則排好的 prompt 會立刻送出。想糾正 agent 時，先開 popup 執行 `:clear`。
+- `blocked`（權限確認或提問）會暫停 queue。
+
+限制：每則 prompt 只能一行；已關閉 pane 的 queue 檔不會自動清掉。除錯用 `herdr plugin log list --plugin conner.agent-queue`（送出時會記錄 `submitted to <pane>: …`）；原始 queue 在 `~/.local/state/herdr/plugins/conner.agent-queue/<terminal-id>.json`。
 
 ## 開啟 coding agent（`prefix + y` → *Agent: …*、`prefix + Alt + c/x/t/r`） {#open-agent}
 

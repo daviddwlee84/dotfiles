@@ -1167,6 +1167,17 @@ linux = "SHA-256 verified stable `Sheprd-*.deb`; glibc 2.39+, x64/arm64, sudo"
 role_md = "GUI bundle; apply installs missing copies only"
 
 [[tool]]
+id = "herdr-agent-queue"
+label = "**herdr-agent-queue** (herdr plugin)"
+bins = []
+category = "Sessions & Multiplexing"
+desc = "herdr plugin that queues prompts until the agent's turn ends"
+role = "devtools"
+upgrade = "`herdr plugin update`"
+mac = "`herdr plugin install connerohnesorge/herdr-agent-queue` (single Python script; idempotent ansible task)"
+linux = "same"
+
+[[tool]]
 id = "herdr-plus"
 label = "**herdr-plus** (herdr plugin)"
 bins = []

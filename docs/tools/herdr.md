@@ -195,6 +195,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `` prefix + ` `` | scratch shell | command popup |
 | `prefix + E` | **run any command** in the pane's cwd — fzf-pick from history or type it; the popup closes itself when the command exits ([details](#run-any-command)) | command **popup** |
 | `prefix + O` | herdr-plus **Projects** (layout launcher) | plugin action |
+| `prefix + Q` | **queue a prompt** for the focused agent, submitted when its turn ends ([agent-queue](#agent-queue)) | plugin popup |
 | `` prefix + t `` | **interactive translator** — enter or paste text into the `translate` TUI ([details](#translate-pane)) | 80% × 80% popup |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
@@ -287,6 +288,20 @@ Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/clo
 **Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the six **copy** actions (see [Copy pane + space facts](#copy-to-clipboard)) plus the plugin's five **starter** examples (GitHub / Google / Search Google / Open Repo / Reveal Working Dir), adapted for Linux — macOS `open` → the repo's cross-platform [`x open`](../shells/aliases.md), and the repo-select points at `daviddwlee84/*`. The copy operations deliberately live here instead of consuming six direct prefix keys. Because this managed dir is non-empty, herdr-plus does **not** auto-seed those examples itself (it only seeds into an *empty* dir), which is why they're vendored here; delete any TOML you don't want. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
 
 > **Quick Actions are for one-off, non-interactive commands** (the shipped examples all `open <url>`). herdr-plus runs a chosen action via `sh -c` with no PTY and no interactive stdin, so an interactive TUI misbehaves — btop exits immediately, nvtop can't receive F10. For a TUI you want the dev/lazygit-style *floating command pane* (`[[keys.command]] type="pane"`) instead — that's why **dev** (`prefix+d`), **btop** (`prefix+M`), and **nvtop** (`prefix+N`) are keybinds, not Quick Actions.
+
+## agent-queue plugin (Codex-style prompt queue) {#agent-queue}
+
+[herdr-agent-queue](https://github.com/connerohnesorge/herdr-agent-queue) lets you queue follow-up prompts for an agent while it is still working, the way Codex does natively. `prefix + Q` on an agent pane opens a popup that lists the pane's queue and reads one line: Enter queues it, Tab completes Claude `/skills`, an empty line cancels, and `:clear` empties the queue. The sidebar shows `N queued` on that pane.
+
+**Install is automated** by the `devtools` role (the `# --- herdr-agent-queue plugin ---` block, same check/install/rescue shape as herdr-plus). Manual fallback: `herdr plugin install connerohnesorge/herdr-agent-queue`. It is a single Python script, so it needs `python3` and has no build step. Update with `herdr plugin update`.
+
+**When it submits.** On every `pane.agent_status_changed` event whose status is `done` or `idle`, it takes a lock, re-reads the live status, and sends the head of the queue with `herdr agent prompt … --wait --until working`. The lock plus the wait stop a `done` → `idle` pair from sending two prompts into one turn. **There is no debounce**, so the queue trusts herdr's status detection completely:
+
+- **Claude state is heuristic.** The installed Claude integration hook only reports the session (`pane.report_agent_session`). Working, done, and idle still come from screen heuristics, so a brief false `idle` mid-turn can send a prompt early. For Claude Code this usually just becomes a mid-turn message, because Claude accepts input while it works.
+- **Esc-interrupt fires the queue.** Interrupting an agent makes it `idle`, and the next queued prompt goes out at once. To correct an agent, open the popup and `:clear` first.
+- `blocked` (a permission prompt or question) holds the queue.
+
+Limitations: one line per prompt; queue files for closed panes are not cleaned up. Debug with `herdr plugin log list --plugin conner.agent-queue` (a delivery logs `submitted to <pane>: …`); raw queues live in `~/.local/state/herdr/plugins/conner.agent-queue/<terminal-id>.json`.
 
 ## Open a coding agent (`prefix + y` → *Agent: …*, `prefix + Alt + c/x/t/r`) {#open-agent}
 

@@ -1179,6 +1179,7 @@ list.
 | **grc** | brew | apt | devtools |
 | **gum** | brew | GitHub release | devtools |
 | **herdr** | GitHub release single binary → `~/.local/bin/herdr` (**not brew** — see note) | GitHub release single binary → `~/.local/bin/herdr` | devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, **must run outside herdr**) |
+| **herdr-agent-queue** (herdr plugin) | `herdr plugin install connerohnesorge/herdr-agent-queue` (single Python script; idempotent ansible task) | same | devtools |
 | **herdr-app** | `herdr-app` cask; Apple Silicon only | pinned upstream installer (user-level, Vulkan); x64/arm64 | GUI bundle; apply installs missing copies only |
 | **herdr-core** | pinned upstream installer → `~/.local/bin/herdr-core` (+ `hc`) | pinned upstream installer → `~/.local/bin/herdr-core` (+ `hc`) | devtools · upgrade: `just upgrade-herdr-core` (`hc update`; terminals keep running) |
 | **herdr-plus** (herdr plugin) | `herdr plugin install cloudmanic/herdr-plus` (prebuilt binary when no Go; idempotent ansible task) | same | devtools |

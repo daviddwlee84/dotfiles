@@ -4927,3 +4927,38 @@
     - name: Warn herdr-plus install failed (non-fatal)
       ansible.builtin.debug:
         msg: "herdr-plus plugin install failed (network/build) — skipping. Run manually: herdr plugin install cloudmanic/herdr-plus"
+
+# --- herdr-agent-queue plugin (Codex-style prompt queue, prefix+Q) ---
+# A single Python script (needs python3, no build step) that holds prompts until
+# herdr reports the agent's turn over. Same idempotent check/install/rescue shape
+# as herdr-plus above; non-fatal. See docs/tools/herdr.md § agent-queue.
+- name: Check herdr-agent-queue plugin status
+  ansible.builtin.shell: |
+    set -o pipefail
+    command -v herdr >/dev/null 2>&1 || { echo "no-herdr"; exit 0; }
+    if herdr plugin list --json 2>/dev/null | grep -q 'conner.agent-queue'; then
+      echo "present"
+    else
+      echo "absent"
+    fi
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: herdr_agent_queue_check
+  changed_when: false
+  failed_when: false
+
+- name: Install herdr-agent-queue plugin (herdr present, plugin absent)
+  when: herdr_agent_queue_check.stdout | default('') | trim == "absent"
+  block:
+    - name: herdr plugin install connerohnesorge/herdr-agent-queue
+      ansible.builtin.command: herdr plugin install connerohnesorge/herdr-agent-queue --yes
+      environment:
+        PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+      register: herdr_agent_queue_install
+      changed_when: "'Installed' in (herdr_agent_queue_install.stdout | default(''))"
+  rescue:
+    - name: Warn herdr-agent-queue install failed (non-fatal)
+      ansible.builtin.debug:
+        msg: "herdr-agent-queue plugin install failed — skipping. Run manually: herdr plugin install connerohnesorge/herdr-agent-queue"

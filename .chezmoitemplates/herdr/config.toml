@@ -422,3 +422,15 @@ key = "prefix+y"
 type = "plugin_action"
 command = "cloudmanic.herdr-plus.quick-actions"
 description = "herdr-plus: Quick Actions"
+
+# --- agent-queue plugin (Codex-style prompt queue) ---
+# Requires: herdr plugin install connerohnesorge/herdr-agent-queue (devtools role).
+# Queues a one-line prompt for the focused agent and submits it when herdr reports
+# the turn over (done/idle). No debounce: an Esc-interrupt (-> idle) fires the next
+# queued prompt immediately — type `:clear` in the popup first. No-op if absent.
+
+[[keys.command]]
+key = "prefix+shift+q"
+type = "plugin_action"
+command = "conner.agent-queue.open"
+description = "agent-queue: queue a prompt for the focused agent until its turn ends"
