@@ -91,7 +91,33 @@ if [ -z "$pane" ]; then
 fi
 [ -n "$pane" ] || { echo "pane-copy: could not determine a pane id" >&2; exit 1; }
 
-copy() { printf '%s' "$1" | "$X_BIN" copy; }
+# OSC 52 routing. A Quick Action runs inside a herdr-plus *overlay* pane that herdr
+# tears down the moment the command exits, so an OSC 52 written to that pane's own
+# /dev/tty never reaches the outer terminal (`x copy` "succeeds", clipboard stays
+# unchanged). Route the sequence through the target pane's long-lived pty instead:
+# writing to a pane's pty slave is exactly what a program running in it does, so
+# herdr parses and forwards it like a normal in-pane `x copy`. Only done when
+# invoked from a Quick Action ($HERDR_PLUS_PANE_ID) and the pty is ours/writable;
+# otherwise `x` keeps its own /dev/tty default.
+osc52_tty=""
+if [ -n "${HERDR_PLUS_PANE_ID:-}" ]; then
+    shell_pid=$(herdr pane process-info --pane "$pane" 2>/dev/null \
+        | jq -r '.result.process_info.shell_pid // empty' 2>/dev/null || true)
+    if [ -n "$shell_pid" ]; then
+        t=$(readlink "/proc/$shell_pid/fd/0" 2>/dev/null || true)
+        case "$t" in
+            /dev/pts/*) [ -c "$t" ] && [ -w "$t" ] && osc52_tty="$t" ;;
+        esac
+    fi
+fi
+
+copy() {
+    if [ -n "$osc52_tty" ]; then
+        printf '%s' "$1" | X_OSC52_TTY="$osc52_tty" "$X_BIN" copy
+    else
+        printf '%s' "$1" | "$X_BIN" copy
+    fi
+}
 
 case "$action" in
     process)

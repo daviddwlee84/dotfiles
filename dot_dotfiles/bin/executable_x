@@ -101,12 +101,16 @@ file_clipboard_backend_help() {
 # OSC 52 clipboard copy: ships stdin bytes through a terminal escape sequence.
 # Works over SSH with no X/Wayland as long as the terminal (or tmux with
 # set-clipboard on) forwards OSC 52. Writes to /dev/tty so it is not captured
-# by an outer pipeline.
+# by an outer pipeline. X_OSC52_TTY overrides the target terminal device — for
+# callers whose own TTY is short-lived or never forwarded (e.g. a herdr-plus
+# Quick Action overlay pane, which herdr tears down right after the command
+# exits), so they can emit the sequence through a long-lived pane's pty instead.
 osc52_copy() {
-    # Actually open /dev/tty, not just `[[ -w ]]` — a detached/container
+    local tty="${X_OSC52_TTY:-/dev/tty}"
+    # Actually open the tty, not just `[[ -w ]]` — a detached/container
     # context can have a /dev/tty node whose open(2) returns ENXIO. Bail here,
     # before `base64` consumes stdin, so a caller's fallback still has input.
-    { : >/dev/tty; } 2>/dev/null || return 1
+    { : >"$tty"; } 2>/dev/null || return 1
     command -v base64 >/dev/null 2>&1 || return 1
 
     local data
@@ -122,10 +126,10 @@ osc52_copy() {
 
     if [[ -n "${TMUX:-}" ]]; then
         # shellcheck disable=SC1003 # printf consumes the backslash escapes.
-        printf '\033Ptmux;\033\033]52;c;%s\033\033\\\033\\' "$data" > /dev/tty
+        printf '\033Ptmux;\033\033]52;c;%s\033\033\\\033\\' "$data" > "$tty"
     else
         # shellcheck disable=SC1003 # printf consumes the backslash escapes.
-        printf '\033]52;c;%s\033\\' "$data" > /dev/tty
+        printf '\033]52;c;%s\033\\' "$data" > "$tty"
     fi
 }
 

@@ -502,6 +502,8 @@ Six low-frequency "grab this onto the clipboard" operations live in the `prefix+
 
 The **coordinate** answers "which `session > space > tab > pane` is this?" in a form you can feed back to the CLI. herdr has **no `--session` flag** on the `pane`/`tab`/`workspace` subcommands — a session is targeted only via `HERDR_SOCKET_PATH` — so the block includes the `socket=` line as the session selector (the session *name* is resolved by matching that socket against `herdr session list --json`).
 
+> **OSC 52 from a Quick Action goes through the target pane's pty.** A Quick Action runs inside a herdr-plus *overlay* pane that herdr tears down as soon as the command exits, so an OSC 52 written to that overlay's own `/dev/tty` never reaches the outer terminal — `x copy` exits 0 and the clipboard is unchanged (most visible when attached over SSH, where OSC 52 is the only route). When `$HERDR_PLUS_PANE_ID` is set, `pane-copy.sh` resolves the target pane's shell pty (`herdr pane process-info` → `/proc/<shell_pid>/fd/0`) and hands it to `x` as `X_OSC52_TTY`, so herdr parses the sequence exactly as if the pane had printed it. Off-Linux (no `/proc`) or when the pty isn't writable it falls back to `x`'s default `/dev/tty`.
+
 The `copy-*.toml` Quick Actions all share the same helper and are fuzzy-launched via `prefix+y`. Their former direct bindings (`prefix+P/D/V/S/d/ctrl+d`) were removed to keep the prefix namespace focused on interactive tools; `prefix+d` now launches the dev dashboard. The interactive file-path picker remains on `prefix+p` because fzf requires a PTY/stdin and cannot run inside a Quick Action.
 
 ### `dir` vs `cwd`, and why the right-click menu can't do this {#space-dir}

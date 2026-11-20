@@ -175,3 +175,19 @@ EOF
   [ "$status" -eq 2 ]
   [[ "$output" == *"copy-file: expected at least one PATH"* ]]
 }
+
+@test "X_OSC52_TTY redirects the OSC 52 sequence to another terminal device" {
+  # A plain file stands in for the pane pty pane-copy.sh passes from a herdr-plus
+  # Quick Action (its own overlay /dev/tty is torn down before herdr forwards).
+  : > "$X_TMP/fake-tty"
+  run env X_CLIPBOARD=osc52 X_OSC52_TTY="$X_TMP/fake-tty" \
+    bash -c 'printf hello | "$1" copy' _ "$X_BIN"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$X_TMP/fake-tty")" = "$(printf '\033]52;c;aGVsbG8=\033\\')" ]
+}
+
+@test "X_OSC52_TTY pointing at an unwritable path fails instead of claiming success" {
+  run env X_CLIPBOARD=osc52 X_OSC52_TTY="$X_TMP/missing-dir/tty" \
+    bash -c 'printf hello | "$1" copy' _ "$X_BIN"
+  [ "$status" -ne 0 ]
+}
