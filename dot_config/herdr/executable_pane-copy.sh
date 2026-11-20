@@ -50,14 +50,22 @@ usage() {
     exit 64
 }
 
+# herdr-plus Quick Actions inherit the herdr server's bare PATH (no ~/.local/bin),
+# so `herdr` itself is not found there. herdr exports its own binary path to plugin
+# processes as $HERDR_BIN_PATH; put that dir (and ~/.local/bin) first.
+[ -n "${HERDR_BIN_PATH:-}" ] && PATH="${HERDR_BIN_PATH%/*}:$PATH"
+PATH="$PATH:$HOME/.local/bin"
 command -v herdr >/dev/null 2>&1 || { echo "pane-copy: herdr not found" >&2; exit 1; }
 command -v jq    >/dev/null 2>&1 || { echo "pane-copy: jq is required" >&2; exit 1; }
 
 # Resolve the clipboard CLI (`x copy`) even without the interactive PATH.
-if command -v x >/dev/null 2>&1; then
-    X_BIN=x
-elif [ -x "$HOME/.dotfiles/bin/x" ]; then
+# The managed copy wins over PATH: a stale pre-move `x` can linger in ~/.local/bin
+# (bins moved to ~/.dotfiles/bin), and in a Quick Action's bare PATH it would be
+# found first and lacks the OSC 52 preference / X_OSC52_TTY support.
+if [ -x "$HOME/.dotfiles/bin/x" ]; then
     X_BIN="$HOME/.dotfiles/bin/x"
+elif command -v x >/dev/null 2>&1; then
+    X_BIN=x
 else
     echo "pane-copy: clipboard tool 'x' not found" >&2
     exit 1

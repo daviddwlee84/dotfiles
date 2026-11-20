@@ -340,6 +340,11 @@ fi
 # ---------------------------------------------------------------------------
 # Capture side.
 # ---------------------------------------------------------------------------
+# herdr-plus Quick Actions inherit the herdr server's bare PATH (no ~/.local/bin),
+# so `herdr` itself is not found there. herdr exports its own binary path to plugin
+# processes as $HERDR_BIN_PATH; put that dir (and ~/.local/bin) first.
+[ -n "${HERDR_BIN_PATH:-}" ] && PATH="${HERDR_BIN_PATH%/*}:$PATH"
+PATH="$PATH:$HOME/.local/bin"
 command -v herdr >/dev/null 2>&1 || { echo "pane-translate: herdr not found" >&2; exit 1; }
 command -v jq    >/dev/null 2>&1 || { echo "pane-translate: jq is required" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "pane-translate: python3 is required" >&2; exit 1; }
@@ -427,8 +432,14 @@ case "$act" in
         rm -f "$capture"
         ;;
     copy)
-        X_BIN=$(resolve_bin x "$HOME/.dotfiles/bin/x") \
-            || { rm -f "$capture"; echo "pane-translate: clipboard tool 'x' not found" >&2; exit 1; }
+        # Managed copy first: a stale pre-move `x` may linger in ~/.local/bin,
+        # which is now on PATH (see the HERDR_BIN_PATH prelude) — same as pane-copy.sh.
+        if [ -x "$HOME/.dotfiles/bin/x" ]; then
+            X_BIN="$HOME/.dotfiles/bin/x"
+        else
+            X_BIN=$(resolve_bin x) \
+                || { rm -f "$capture"; echo "pane-translate: clipboard tool 'x' not found" >&2; exit 1; }
+        fi
         [ -n "$to" ] || to="${HERDR_TRANSLATE_TO:-}"
         # Do not leave the capture behind when translate fails under `set -e`.
         trap 'rm -f "$capture"' EXIT INT TERM

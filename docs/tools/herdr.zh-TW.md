@@ -473,6 +473,8 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 **座標**回答「這是哪個 `session > space > tab > pane`?」,並以可餵回 CLI 的形式呈現。herdr 在 `pane`/`tab`/`workspace` 子命令上**沒有 `--session` 旗標**——session 只能經由 `HERDR_SOCKET_PATH` 指定——所以區塊裡納入 `socket=` 那行作為 session 選擇器（session *名稱* 則是把該 socket 對 `herdr session list --json` 比對而得）。
 
+> **Quick Action 的環境：PATH 很陽春。** herdr-plus 用 herdr server 的 PATH 執行 action（只有系統目錄，沒有 `~/.local/bin`、`~/.dotfiles/bin`），連 `herdr` 都找不到，helper 以前會在複製前就以 `pane-copy: herdr not found` 結束。因此 `pane-copy.sh`、`space-root.sh`、`pane-translate.sh` 會把 `dirname $HERDR_BIN_PATH`（herdr 會把自身路徑匯出給 plugin process）放到 PATH 最前面，並在後面補 `~/.local/bin`。`x` 也改成**優先**用 `~/.dotfiles/bin/x`：`~/.local/bin` 可能殘留搬家前的舊版，它沒有 OSC 52 優先邏輯，會掉到 `xclip`（`Error: Can't open display: (null)`）。
+>
 > **Quick Action 的 OSC 52 改走目標 pane 的 pty。** Quick Action 跑在 herdr-plus 的 *overlay* pane 裡，指令一結束 herdr 就把它拆掉，所以寫進 overlay 自己 `/dev/tty` 的 OSC 52 到不了外層終端——`x copy` 回傳 0，剪貼簿卻沒變（SSH attach 時最明顯，因為 OSC 52 是唯一管道）。當 `$HERDR_PLUS_PANE_ID` 有值時，`pane-copy.sh` 會解析目標 pane 的 shell pty（`herdr pane process-info` → `/proc/<shell_pid>/fd/0`），以 `X_OSC52_TTY` 交給 `x`，herdr 就會像該 pane 自己印出序列一樣解析並轉送。非 Linux（沒有 `/proc`）或 pty 不可寫時，退回 `x` 預設的 `/dev/tty`。
 
 所有 `copy-*.toml` Quick Actions 都共用這支 helper,並由 `prefix+y` 模糊啟動。原本的直達鍵（`prefix+P/D/V/S/d/ctrl+d`）已移除,讓 prefix namespace 優先留給互動式工具；`prefix+d` 現在啟動 dev dashboard。互動式檔案路徑 picker 仍保留在 `prefix+p`,因為 fzf 需要 PTY/stdin,無法在 Quick Action 裡執行。

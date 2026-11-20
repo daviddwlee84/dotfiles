@@ -38,6 +38,11 @@
 #   space-root.sh                        # defaults to the current pane's space
 set -eu
 
+# herdr-plus Quick Actions inherit the herdr server's bare PATH (no ~/.local/bin),
+# so `herdr` itself is not found there. herdr exports its own binary path to plugin
+# processes as $HERDR_BIN_PATH; put that dir (and ~/.local/bin) first.
+[ -n "${HERDR_BIN_PATH:-}" ] && PATH="${HERDR_BIN_PATH%/*}:$PATH"
+PATH="$PATH:$HOME/.local/bin"
 command -v herdr >/dev/null 2>&1 || { echo "space-root: herdr not found" >&2; exit 1; }
 command -v jq    >/dev/null 2>&1 || { echo "space-root: jq is required" >&2; exit 1; }
 
