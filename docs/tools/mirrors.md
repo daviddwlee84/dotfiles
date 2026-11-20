@@ -28,7 +28,7 @@ chezmoi apply
 
 | Ecosystem | Managed by | Mirror | TUNA doc |
 |---|---|---|---|
-| **PyPI** (`uv` / `pip`) | `~/.config/uv/uv.toml` | Aliyun → TUNA → USTC (multi-index fallback) | [pypi](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/) |
+| **PyPI** (`uv` / `pip`) | `~/.config/uv/uv.toml` | Aliyun → TUNA → Huawei (multi-index fallback; USTC dropped 2026-11, its redirect needs IPv6 — `pitfalls/uv-sync-network-unreachable-os-error-101-ustc-pypi-mirror.md`) | [pypi](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/) |
 | **npm** | `~/.npmrc` | `registry.npmmirror.com` | — |
 | **Bun** | `~/.config/.bunfig.toml` | `registry.npmmirror.com` | — |
 | **crates.io** (Cargo) | `~/.cargo/config.toml` | TUNA sparse index | [crates.io-index](https://mirrors.tuna.tsinghua.edu.cn/help/crates.io-index/) |

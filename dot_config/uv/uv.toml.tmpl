@@ -14,9 +14,16 @@ cache-dir = {{ . | quote }}
 # Available mirrors (ordered by typical speed):
 #   - Aliyun: https://mirrors.aliyun.com/pypi/simple/
 #   - Tuna: https://pypi.tuna.tsinghua.edu.cn/simple/
-#   - USTC: https://pypi.mirrors.ustc.edu.cn/simple/
-#   - Huawei: https://repo.huaweicloud.com/repository/pypi/simple/
+#   - Huawei: https://repo.huaweicloud.com/repository/pypi/simple/  (no AAAA record)
+#   - USTC: https://pypi.mirrors.ustc.edu.cn/simple/  -- NOT USED, see below
 #   - Tencent: https://mirrors.cloud.tencent.com/pypi/simple/
+#
+# USTC was the third index until 2026-11. pypi.mirrors.ustc.edu.cn now 301-redirects
+# to mirrors.ustc.edu.cn, which has an AAAA record; uv connects there over IPv6 and,
+# on a host without an IPv6 route (ts_nas), fails the WHOLE resolution with
+# "Network is unreachable (os error 101)" -- one broken index anywhere in the list is
+# enough, even when an earlier index has the package. Huawei (IPv4-only DNS) replaces
+# it. See pitfalls/uv-sync-network-unreachable-os-error-101-ustc-pypi-mirror.md.
 
 # Enable fallback to next mirror if primary fails.
 # "unsafe-first-match" = take the first index that has ANY matching version,
@@ -40,13 +47,13 @@ url = "https://mirrors.aliyun.com/pypi/simple/"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 
 [[index]]
-url = "https://pypi.mirrors.ustc.edu.cn/simple/"
+url = "https://repo.huaweicloud.com/repository/pypi/simple/"
 
 # Legacy pip-compatible syntax for uv pip commands
 [pip]
 index-url = "https://mirrors.aliyun.com/pypi/simple/"
 extra-index-url = [
     "https://pypi.tuna.tsinghua.edu.cn/simple/",
-    "https://pypi.mirrors.ustc.edu.cn/simple/"
+    "https://repo.huaweicloud.com/repository/pypi/simple/"
 ]
 {{- end }}
