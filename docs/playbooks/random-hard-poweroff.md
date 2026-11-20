@@ -45,6 +45,12 @@ journalctl -b -1 -n 25 -o short-precise
 - Ends **mid-log-line**, with an unrelated daemon chattering → **hard cut.**
   Continue down the ladder.
 
+> **Clean shutdown, but the machine never came back?** Then the outage is the
+> *next* boot, not the power-off. A kernel left half-installed by a failed
+> unattended upgrade boots to `Kernel panic … unknown-block(0,0)` and sits there
+> silently — see
+> [`pitfalls/kernel-panic-unknown-block-0-0-after-unattended-kernel-update.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/kernel-panic-unknown-block-0-0-after-unattended-kernel-update.md).
+
 This rung matters more than it looks: a run of "crashes" routinely contains one or
 two ordinary reboots, and including them wrecks any pattern you try to infer.
 
