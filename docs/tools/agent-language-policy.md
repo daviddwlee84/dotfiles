@@ -51,6 +51,31 @@ chezmoi apply
 Verify in a new Claude Code session with `/memory`. The user rule should be
 listed there.
 
+## Where it takes effect
+
+The rule loads at the start of **every** Claude Code session, in every project,
+and survives context compaction like CLAUDE.md does. Two conditions keep it
+unconditional:
+
+- The deployed file has **no `paths:` frontmatter**. A rules file with `paths:`
+  only loads when Claude touches a matching file. Don't add one to the template.
+- Loading is not enforcement. It is an instruction, not a hard constraint, and a
+  project CLAUDE.md or an explicit request in the conversation outranks it.
+
+| Surface | Reads `~/.claude/rules/`? |
+|---|---|
+| Claude Code CLI | ✅ |
+| Claude Code IDE extensions (VS Code / JetBrains) | ✅ same engine, same `~/.claude` |
+| Claude Desktop app, **Code** tab (local sessions) | ✅ |
+| Claude Desktop app / claude.ai **Chat** | ❌ uses claude.ai profile preferences and Project instructions |
+| Claude Code on the web / cloud sessions | ❌ runs on a cloud VM without your local `~/.claude` |
+| Agent SDK / embedded `claude -p` | ⚠️ only when `settingSources` includes `user` |
+
+Other ways to miss it: `CLAUDE_CONFIG_DIR` points Claude Code at a different
+directory, and a remote host (fleet / SSH) only has the rule after its own
+`chezmoi apply`. For Traditional Chinese in claude.ai Chat, set it in claude.ai's
+profile preferences; chezmoi cannot reach that.
+
 ## Design choices
 
 - **Why not `settings.json` `language`?** Claude Code passes that value

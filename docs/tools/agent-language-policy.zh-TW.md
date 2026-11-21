@@ -32,6 +32,24 @@ chezmoi apply
 
 驗證方式：開一個新的 Claude Code session，執行 `/memory`，應該會看到這條 user rule。
 
+## 在哪裡生效
+
+每個 Claude Code session 啟動時都會載入這條規則，不分 project，context compaction 之後也還在（跟 CLAUDE.md 一樣）。它能無條件載入，有兩個前提：
+
+- 部署出去的檔案**沒有 `paths:` frontmatter**。有 `paths:` 的 rules 檔只有在 Claude 碰到符合的檔案時才會載入，所以不要在 template 裡加。
+- 載入不等於強制。它是 instruction，不是硬性限制；project 的 CLAUDE.md 和對話中的明確要求優先序比它高。
+
+| 介面 | 讀不讀 `~/.claude/rules/` |
+|---|---|
+| Claude Code CLI | ✅ |
+| Claude Code IDE extension（VS Code / JetBrains） | ✅ 同一個引擎、同一個 `~/.claude` |
+| Claude Desktop app 的 **Code** 分頁（本機 session） | ✅ |
+| Claude Desktop app / claude.ai 的一般 **Chat** | ❌ 用的是 claude.ai 的 profile preferences 和 Project instructions |
+| Claude Code on the web / cloud session | ❌ 在雲端 VM 上跑，看不到你本機的 `~/.claude` |
+| Agent SDK / 嵌入式 `claude -p` | ⚠️ 要 `settingSources` 包含 `user` 才會載入 |
+
+其他會漏掉的情況：設了 `CLAUDE_CONFIG_DIR` 時，Claude Code 會改讀那個目錄；遠端主機（fleet / SSH）要自己跑過 `chezmoi apply` 才會有這個檔案。想讓 claude.ai Chat 也用繁中，要到 claude.ai 的 profile preferences 設定，chezmoi 管不到那裡。
+
 ## 設計取捨
 
 - **為什麼不用 `settings.json` 的 `language`？** Claude Code 會把這個值原樣變成「always respond in X」，commit message 和 docs 也會被拉成中文，還會一起改 voice dictation 和 session title 的語言。要依場合區分語言，只能寫成規則。
